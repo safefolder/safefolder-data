@@ -1,0 +1,21 @@
+---
+  uri: Command
+  schema:
+    Language:
+      type: object
+      required: false
+      items:
+        anyOf:
+          - Codes:
+              type: array
+          - Codes:
+              type: array
+            Default:
+              type: string
+    Fields:
+      type: object
+      required: true
+      items:
+        anyOf:
+          - 
+
