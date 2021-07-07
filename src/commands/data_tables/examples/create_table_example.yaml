@@ -3,10 +3,3 @@ Command: CREATE TABLE "My Table"
 Language:
   Codes: ["english", "spanish"]
   Default: "english"
-Fields:
-  - Name: "My Field"
-    Type: "Small Text"
-    Required: true
-  - Name: "My Other Field"
-    Type: "Small Text"
-    Required: false

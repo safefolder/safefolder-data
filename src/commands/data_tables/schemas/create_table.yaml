@@ -1,0 +1,14 @@
+---
+  uri: create_table
+  schema:
+    type: object
+    items:
+      Command:
+        type: string
+      Language:
+        type: object
+        items:
+            Codes:
+              type: array
+            Default:
+              type: string

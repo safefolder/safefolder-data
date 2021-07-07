@@ -5,6 +5,8 @@ pub mod commands;
 use argparse::{ArgumentParser, StoreTrue, Store};
 use std::fs;
 
+use crate::commands::data_tables::schema::Command;
+
 fn main() {
 
     // achiever run command ...
@@ -12,12 +14,12 @@ fn main() {
     // achiever run journey ...
 
     let mut verbose = false;
-    let mut account_id = "".to_string();
-    let mut space_id = "".to_string();
-    let mut path_yaml = "".to_string();
-    let mut command = "".to_string();
-    let mut op = "run".to_string();
-    let mut scope = "".to_string();
+    let mut account_id = String::from("");
+    let mut space_id= String::from("");
+    let mut path_yaml = String::from("");
+    let mut command = String::from("");
+    let mut op = String::from("run");
+    let mut scope = String::from("");
 
     { // this block limits scope of borrows by ap.refer() method
         let mut ap = ArgumentParser::new();
@@ -55,8 +57,19 @@ fn run_command(command: &str, account_id: &str, space_id: &str, path_yaml: &str)
         // so commands con grow. Commands would be registered into the registry. I need to do after the permission
         // and security system implemented, since needs to be signed. So far we just map the commands.
         // Also, think about a folder where to grab commands, actions and journeys, so full path is not neccesary
+        // "CREATE TABLE" => commands::data_tables::schema::create_table(&account_id, &space_id, &yaml_config),
         match command {
-            "CREATE TABLE" => commands::data_tables::schema::create_table(&account_id, &space_id, &yaml_config),
+            "CREATE TABLE" => {
+                let schema_name = "CREATE TABLE".to_lowercase().replace(" ", "_");
+                let create_table = commands::data_tables::schema::CreateTable{
+                    schema_name: &schema_name,
+                    account_id: &account_id,
+                    space_id: &space_id,
+                    yaml_config: &yaml_config,
+                };
+                create_table.validate(&yaml_config, &schema_name);
+                create_table.run();
+            },
             _ => println!("default")
         }
         Ok("Command executed".to_string())
