@@ -1,11 +1,12 @@
 extern crate argparse;
 
 pub mod commands;
+pub mod storage;
 
 use argparse::{ArgumentParser, StoreTrue, Store};
 use std::fs;
 
-use crate::commands::data_tables::schema::Command;
+use crate::commands::table::schema::Command;
 
 fn main() {
 
@@ -61,7 +62,7 @@ fn run_command(command: &str, account_id: &str, space_id: &str, path_yaml: &str)
         match command {
             "CREATE TABLE" => {
                 let schema_name = "CREATE TABLE".to_lowercase().replace(" ", "_");
-                let create_table = commands::data_tables::schema::CreateTable{
+                let create_table = commands::table::schema::CreateTable{
                     schema_name: &schema_name,
                     account_id: &account_id,
                     space_id: &space_id,

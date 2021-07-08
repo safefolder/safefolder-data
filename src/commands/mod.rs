@@ -1,1 +1,1 @@
-pub mod data_tables;
+pub mod table;

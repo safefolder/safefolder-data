@@ -17,9 +17,10 @@ rust-stemmers = {version="1.2.0"}
 dirs = {version="3.0.2"}
 uuid = {version="0.8.2"}
 argparse = {version="0.2.2"}
-validator = { version = "0.12", features = ["derive"] }
+validator = { version = "0.14", features=["derive", "phone", "unic", "card"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = {version="0.8"}
 i18n-embed = {version="0.10"}
 xtr = {version="0.1.6"}
 tr = {version="0.1.6"}
+xid = {version="1.0.0"}
