@@ -28,3 +28,6 @@ Cargo.lock
 
 /target
 #**/*.rs.bk
+
+/i18n/pot
+/i18n/mo

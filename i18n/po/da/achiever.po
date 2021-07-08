@@ -1,0 +1,22 @@
+# Danish translations for achiever package.
+# Copyright (C) 2021 THE achiever'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the achiever package.
+# Jorge Alegre <me@jorgealegre.com>, 2021.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: achiever 0.1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-07-08 08:24+0000\n"
+"PO-Revision-Date: 2021-07-08 10:24+0200\n"
+"Last-Translator: Jorge Alegre <me@jorgealegre.com>\n"
+"Language-Team: Danish <dansk@dansk-gruppen.dk>\n"
+"Language: da\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: src/commands/data_tables/schema.rs:20
+msgid "Could not open file"
+msgstr ""

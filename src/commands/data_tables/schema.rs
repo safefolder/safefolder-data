@@ -1,9 +1,12 @@
+extern crate tr;
+
 use yaml_validator::{
     yaml_rust::YamlLoader,
     Context, Validate,
 };
 use std::convert::TryFrom;
 use std::{fs, env};
+use tr::tr;
 
 struct CommandValidator {
     schema_path: String,
@@ -15,7 +18,7 @@ impl CommandValidator {
     fn validate(&self, yaml_config: &str) {
         let path_dir = env::current_dir().unwrap();
         let path_schema = format!("{}/src/{}", path_dir.display(), &self.schema_path);
-        let schema_config = fs::read_to_string(&path_schema).expect("Could not open file");
+        let schema_config = fs::read_to_string(&path_schema).expect(&tr!("Could not open file"));
         let schemas = vec![
             YamlLoader::load_from_str(&*schema_config).unwrap().remove(0)
         ];

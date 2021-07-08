@@ -8,7 +8,7 @@
       Language:
         type: object
         items:
-            Codes:
-              type: array
-            Default:
-              type: string
+          Codes:
+            type: array
+          Default:
+            type: string

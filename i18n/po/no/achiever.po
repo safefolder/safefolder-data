@@ -1,0 +1,3 @@
+#: src/commands/data_tables/schema.rs:20
+msgid "Could not open file"
+msgstr ""
