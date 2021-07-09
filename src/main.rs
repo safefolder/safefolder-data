@@ -1,4 +1,6 @@
 extern crate argparse;
+extern crate xid;
+extern crate serde_yaml;
 
 pub mod commands;
 pub mod storage;
@@ -6,7 +8,7 @@ pub mod storage;
 use argparse::{ArgumentParser, StoreTrue, Store};
 use std::fs;
 
-use crate::commands::table::schema::Command;
+use crate::commands::table::Command;
 
 fn main() {
 
@@ -48,7 +50,35 @@ fn main() {
         run_command(&command, &account_id, &space_id, &path_yaml).unwrap();
     }
 
+    // This is a test of only field config, having validations
+    // let field_config = FieldConfig{
+    //     id: "xxxxxxxxxxxxxxxxxxx",
+    //     name: Some("Company Name"),
+    //     field_type: Some("SmallText"),
+    //     ..FieldConfig::defaults()
+    // };
+    // match field_config.is_valid() {
+    //     Ok(_) => println!("Went fine"),
+    //     Err(e) => println!("Had an error {}", e)
+    // }
+
+    // I take YAML file and convert into a CreateTableConfig
+    // if Some(&path_yaml).is_some() {
+    //     let yaml_config = fs::read_to_string(&path_yaml)
+    //     .expect("Something went wrong reading the YAML file");
+    //     println!("YAML config: {}", yaml_config);
+    //     // Create struct from YAML file
+    //     // let deserialized_map: BTreeMap<String, f64> = serde_yaml::from_str(&s)?;
+    //     let create_table: CreateTableConfig = serde_yaml::from_str(&yaml_config).unwrap();
+    //     println!("{:?}", create_table);
+    //     match create_table.is_valid() {
+    //         Ok(_) => println!("Went fine"),
+    //         Err(e) => println!("Had an error {}", e)
+    //     }
+    // }
 }
+
+
 
 fn run_command(command: &str, account_id: &str, space_id: &str, path_yaml: &str) -> Result<String, String> {
     if Some(&path_yaml).is_some() {
@@ -61,14 +91,12 @@ fn run_command(command: &str, account_id: &str, space_id: &str, path_yaml: &str)
         // "CREATE TABLE" => commands::data_tables::schema::create_table(&account_id, &space_id, &yaml_config),
         match command {
             "CREATE TABLE" => {
-                let schema_name = "CREATE TABLE".to_lowercase().replace(" ", "_");
                 let create_table = commands::table::schema::CreateTable{
-                    schema_name: &schema_name,
+                    config: serde_yaml::from_str(&yaml_config).unwrap(),
                     account_id: &account_id,
                     space_id: &space_id,
-                    yaml_config: &yaml_config,
                 };
-                create_table.validate(&yaml_config, &schema_name);
+                create_table.validate().unwrap();
                 create_table.run();
             },
             _ => println!("default")

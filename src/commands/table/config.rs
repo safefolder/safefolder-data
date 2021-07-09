@@ -1,15 +1,26 @@
 
 use serde::{Deserialize, Serialize};
-use validator::{Validate};
+use validator::{Validate, ValidationErrors};
 
 use crate::storage::config::{LanguageConfig, FieldConfig};
 
-#[derive(Debug, Deserialize, Serialize, Validate)]
-pub struct CreateTableConfig<'a> {
+#[derive(Debug, Serialize, Deserialize, Validate, Clone)]
+pub struct CreateTableConfig {
     #[validate(required)]
-    command: Option<&'a str>,
-    #[validate(required)]
-    pub language: Option<LanguageConfig<'a>>,
-    #[validate(required)]
-    pub fields: Option<Vec<FieldConfig<'a>>>,
+    pub command: Option<String>,
+    #[validate]
+    pub language: Option<LanguageConfig>,
+    #[validate]
+    pub fields: Option<Vec<FieldConfig>>,
+}
+
+impl CreateTableConfig {
+    pub fn is_valid(&self) -> Result<(), ValidationErrors> {
+        match self.validate() {
+            Ok(_) => return Ok(()),
+            Err(errors) => {
+                return Err(errors);
+            },
+          };
+    }
 }

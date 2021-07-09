@@ -1,5 +1,13 @@
 ---
-Command: CREATE TABLE "My Table"
-Language:
-  Codes: ["english", "spanish"]
-  Default: "english"
+command: CREATE TABLE "My Table"
+language:
+  codes: ["english", "spanish"]
+  default: "english"
+fields:
+  - name: "My Field"
+    field_type: "Small Text"
+    required: true
+  - name: "Description"
+    field_type: "Long Text"
+  - name: "Is Published"
+    field_type: "Checkbox"
