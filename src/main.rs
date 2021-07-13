@@ -9,6 +9,7 @@ pub mod planet;
 
 use colored::*;
 use crate::commands::table::config::CreateTableConfig;
+use crate::commands::CommandRunner;
 use argparse::{ArgumentParser, StoreTrue, Store};
 use std::fs;
 use tr::tr;
@@ -16,7 +17,7 @@ use std::collections::HashMap;
 use std::env;
 
 use crate::commands::table::Command;
-use crate::planet::{PlanetContext, validation::PlanetValidationError};
+use crate::planet::{PlanetContext, Context, validation::PlanetValidationError};
 
 fn main() {
 
@@ -54,60 +55,51 @@ fn main() {
         ap.parse_args_or_exit();
     }
 
-    // Get planet context
-    // let planet_context: PlanetContext = serde_yaml::from_str(&yaml_config).unwrap();
-    // let planet_context: PlanetContext = PlanetContext::import_context().unwrap();
+    // Get planet context. I embed planet context into components
+    let planet_context: PlanetContext = PlanetContext::import_context().unwrap();
+
+    // Context: This is TEMP, simply context struct, but in future will come from shell, or we create a new one
+    let context: Context = Context{
+        id: None,
+        data: HashMap::new(),
+    };
 
     if op.to_lowercase() == "run" && &scope.to_lowercase() == "command" {
-        run_command(&command, &account_id, &space_id, &path_yaml).unwrap();
+        let command_runner: CommandRunner = CommandRunner{
+            planet_context: &planet_context,
+            context: &context,
+            command: &command,
+            space_id: Some(&space_id),
+            account_id: Some(&account_id),
+            path_yaml: Some(&path_yaml)
+        };
+        run_command(&command_runner).unwrap();
     }
-
-    // This is a test of only field config, having validations
-    // let field_config = FieldConfig{
-    //     id: "xxxxxxxxxxxxxxxxxxx",
-    //     name: Some("Company Name"),
-    //     field_type: Some("SmallText"),
-    //     ..FieldConfig::defaults()
-    // };
-    // match field_config.is_valid() {
-    //     Ok(_) => println!("Went fine"),
-    //     Err(e) => println!("Had an error {}", e)
-    // }
-
-    // I take YAML file and convert into a CreateTableConfig
-    // if Some(&path_yaml).is_some() {
-    //     let yaml_config = fs::read_to_string(&path_yaml)
-    //     .expect("Something went wrong reading the YAML file");
-    //     println!("YAML config: {}", yaml_config);
-    //     // Create struct from YAML file
-    //     // let deserialized_map: BTreeMap<String, f64> = serde_yaml::from_str(&s)?;
-    //     let create_table: CreateTableConfig = serde_yaml::from_str(&yaml_config).unwrap();
-    //     println!("{:?}", create_table);
-    //     match create_table.is_valid() {
-    //         Ok(_) => println!("Went fine"),
-    //         Err(e) => println!("Had an error {}", e)
-    //     }
-    // }
-
-    let mut error_message_map: HashMap<&str, &str> = HashMap::new();
-    error_message_map.insert("code_01", &*tr!("This is something new"));
-
-    println!("runtime_dir: {:?}", env::current_exe());
 }
 
-
-fn run_command(command: &str, account_id: &str, space_id: &str, path_yaml: &str) -> Result<String, String> {
-    if Some(&path_yaml).is_some() {
-        let path_yaml = String::from(path_yaml);
-        match command {
+fn run_command(runner: &CommandRunner) -> Result<String, String> {
+    // CommandRunner: command, account_id, space_id, path_yaml, possible command_file (when get from dir), planet context
+    // I also need to create a context if not informed.
+    if Some(&runner.path_yaml).is_some() {
+        let mut path_yaml: String = String::from("");
+        if runner.path_yaml.is_none() {
+            // In future case that we don't send path through shell
+            path_yaml = String::from("");
+        } else {
+            path_yaml = runner.path_yaml.unwrap().to_string();
+        }
+        match runner.command {
             "CREATE TABLE" => {
-                let config: Result<CreateTableConfig, Vec<PlanetValidationError>> = CreateTableConfig::import(&path_yaml);
+                let config: Result<CreateTableConfig, Vec<PlanetValidationError>> = 
+                    CreateTableConfig::import(&path_yaml);
                 match config {
                     Ok(_) => {
                         let create_table = commands::table::schema::CreateTable{
+                            planet_context: runner.planet_context,
+                            context: runner.context,
                             config: config.unwrap(),
-                            account_id: &account_id,
-                            space_id: &space_id,
+                            account_id: runner.account_id,
+                            space_id: runner.space_id,
                         };
                         // println!("{:?}", create_table_config);
                         // create_table.validate().unwrap();

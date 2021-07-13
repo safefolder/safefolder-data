@@ -11,8 +11,6 @@ use super::fetch_yaml_config;
 pub struct CreateTableConfig {
     #[validate(required)]
     pub command: Option<String>,
-    pub number: u64,
-    pub my_number: u64,
     #[validate]
     pub language: Option<LanguageConfig>,
     #[validate]

@@ -20,11 +20,17 @@ pub struct PlanetContext {
 
 impl PlanetContext {
     pub fn import_context() -> Result<PlanetContext, io::Error> {
-        let path_planet_context = env::current_exe();
-        if path_planet_context.is_ok() {
-            let planet_context = fs::read_to_string(&path_planet_context.unwrap())
+        let home_path = env::current_dir();
+        if home_path.is_err() {
+            return Err(home_path.unwrap_err())
+        }
+        let home_path_str = home_path.unwrap();
+        let home_path_str = home_path_str.to_str().unwrap();
+        let path_planet_context: &str = &*format!("{}/planet_context.yaml", home_path_str);
+        if Some(path_planet_context).is_some() {
+            let planet_context_str = fs::read_to_string(&path_planet_context)
             .expect("Something went wrong reading the YAML file");
-            let mut planet_context: PlanetContext = serde_yaml::from_str(&planet_context).unwrap();
+            let mut planet_context: PlanetContext = serde_yaml::from_str(&planet_context_str).unwrap();
             
             // Planet validation errors with i18m support
             let mut validation_errors: HashMap<String, String> = HashMap::new();
@@ -38,4 +44,9 @@ impl PlanetContext {
         }
     }
 
+}
+
+pub struct Context {
+    pub id: Option<String>,
+    pub data: HashMap<String, String>,
 }

@@ -4,11 +4,14 @@ use validator::{ValidationErrors};
 
 use crate::commands::table::config::CreateTableConfig;
 use crate::commands::table::{Command, CommandConfig};
+use crate::planet::{PlanetContext, Context};
 
 pub struct CreateTable<'a> {
+    pub planet_context: &'a PlanetContext,
+    pub context: &'a Context,
     pub config: CreateTableConfig,
-    pub account_id: &'a str,
-    pub space_id: &'a str,
+    pub account_id: Option<&'a str>,
+    pub space_id: Option<&'a str>,
 }
 
 impl<'a> Command for CreateTable<'a> {
