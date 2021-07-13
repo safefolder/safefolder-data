@@ -24,3 +24,5 @@ i18n-embed = {version="0.10"}
 xtr = {version="0.1.6"}
 tr = {version="0.1.6"}
 xid = {version="1.0.0"}
+regex = {version="1"}
+colored = {version="2.0.0"}

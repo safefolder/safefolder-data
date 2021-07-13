@@ -3,7 +3,7 @@ extern crate tr;
 use validator::{ValidationErrors};
 
 use crate::commands::table::config::CreateTableConfig;
-use crate::commands::table::Command;
+use crate::commands::table::{Command, CommandConfig};
 
 pub struct CreateTable<'a> {
     pub config: CreateTableConfig,
@@ -17,6 +17,8 @@ impl<'a> Command for CreateTable<'a> {
         match self.config.is_valid() {
             Ok(_) => Ok(()),
             Err(e) => {
+                println!("Hola...");
+                println!("{}", e);
                 return Err(e);
             }
         }

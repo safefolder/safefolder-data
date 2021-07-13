@@ -1,5 +1,7 @@
 ---
 command: CREATE TABLE "My Table"
+number: pepito34
+my_number: pepito
 language:
   codes: ["english", "spanish"]
   default: "english"

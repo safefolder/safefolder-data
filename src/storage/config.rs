@@ -16,7 +16,7 @@ pub struct LanguageConfig {
 
 #[derive(Debug, Deserialize, Serialize, Validate, Clone)]
 pub struct FieldConfig {
-    #[validate(length(equal=20, code="length_equal"))]
+    #[validate(length(equal=20))]
     #[serde(default="generate_id")]
     pub id: Option<String>,
     #[validate(required)]

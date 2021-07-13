@@ -1,3 +1,43 @@
-#: src/commands/data_tables/schema.rs:20
-msgid "Could not open file"
+#: src/planet/validation.rs:42
+msgid "{command}: Invalid type for field \"{field}\" with value: {value}"
+msgstr ""
+
+#: src/planet/validation.rs:52
+msgid "{command}: Invalid value for field \"{field}\""
+msgstr ""
+
+#: src/planet/validation.rs:61
+msgid "{command}: Invalid length for field \"{field}\""
+msgstr ""
+
+#: src/planet/validation.rs:70
+msgid "{command}: Unknown variant for field \"{field}\""
+msgstr ""
+
+#: src/planet/validation.rs:80
+msgid "{command}: Unknown field for \"{field}\""
+msgstr ""
+
+#: src/planet/validation.rs:89
+msgid "{command}: Missing field"
+msgstr ""
+
+#: src/planet/validation.rs:97
+msgid "{command}: Duplicate field"
+msgstr ""
+
+#: src/planet/mod.rs:31
+msgid "This is a message"
+msgstr ""
+
+#: src/planet/mod.rs:37
+msgid "Could not import planet context"
+msgstr ""
+
+#: src/commands/table/mod.rs:21
+msgid "Something went wrong reading the YAML file"
+msgstr ""
+
+#: src/main.rs:91
+msgid "This is something new"
 msgstr ""
