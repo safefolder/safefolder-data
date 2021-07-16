@@ -7,15 +7,12 @@ pub mod commands;
 pub mod storage;
 pub mod planet;
 
-use colored::*;
-use crate::commands::table::config::CreateTableConfig;
 use crate::commands::CommandRunner;
 use argparse::{ArgumentParser, StoreTrue, Store};
-use tr::tr;
 use std::collections::HashMap;
 
 use crate::commands::table::Command;
-use crate::planet::{PlanetContext, Context, validation::PlanetValidationError};
+use crate::planet::{PlanetContext, Context};
 
 fn main() {
 
@@ -87,41 +84,7 @@ fn run_command(runner: &CommandRunner) -> Result<String, String> {
             path_yaml = runner.path_yaml.unwrap().to_string();
         }
         match runner.command {
-            "CREATE TABLE" => {
-                let config: Result<CreateTableConfig, Vec<PlanetValidationError>> = 
-                    CreateTableConfig::import(&runner.planet_context, &path_yaml);
-                // println!("main :: config: {:#?}", config);
-                match config {
-                    Ok(_) => {
-                        let create_table = commands::table::schema::CreateTable{
-                            planet_context: runner.planet_context,
-                            context: runner.context,
-                            config: config.unwrap(),
-                            account_id: runner.account_id,
-                            space_id: runner.space_id,
-                        };
-                        // println!("{:?}", create_table_config);
-                        // create_table.validate().unwrap();
-                        create_table.run();
-                    },
-                    Err(errors) => {
-                        println!();
-                        println!("{}", tr!("I found these errors").red().bold());
-                        println!("{}", "--------------------".red());
-                        println!();
-                        let mut count = 1;
-                        for error in errors {
-                            println!(
-                                "{}{} {}", 
-                                count.to_string().blue(), 
-                                String::from('.').blue(), 
-                                error.message
-                            );
-                            count += 1;
-                        }
-                    }
-                }
-            },
+            "CREATE TABLE" => commands::table::schema::CreateTable::runner(&runner, &path_yaml),
             _ => println!("default")
         }
         Ok("Command executed".to_string())

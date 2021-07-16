@@ -20,16 +20,6 @@ pub struct CreateTableConfig {
 
 impl CreateTableConfig {
 
-    pub fn is_valid(&self) -> Result<(), ValidationErrors> {
-        // This is deprecated, since we do validation logic into the import operation
-        match self.validate() {
-            Ok(_) => return Ok(()),
-            Err(errors) => {
-                return Err(errors);
-            },
-        };
-    }
-
     pub fn import(planet_context: &PlanetContext, yaml_path: &String) -> Result<CreateTableConfig, Vec<PlanetValidationError>> {
         // Fetch yaml config
         let yaml_str: String = fetch_yaml_config(&yaml_path);

@@ -5,9 +5,26 @@ use validator::{ValidationErrors};
 use tr::tr;
 use std::fs;
 
+use crate::planet::PlanetContext;
+use crate::commands::CommandRunner;
+
+
+pub trait ImportConfig {
+    fn import_new(planet_context: &PlanetContext, yaml_path: &String);
+}
+
+// pub trait CommandConfig {
+
+//     fn defaults() {
+//         println!("Hello");
+//     };
+
+// }
+
 pub trait Command {
-    fn validate(&self) -> Result<(), ValidationErrors>;
+    // fn validate(&self) -> Result<(), ValidationErrors>;
     fn run(&self);
+    fn runner(runner: &CommandRunner, path_yaml: &String) -> ();
 }
 
 
