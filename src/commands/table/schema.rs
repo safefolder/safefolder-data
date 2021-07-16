@@ -3,7 +3,7 @@ extern crate tr;
 use validator::{ValidationErrors};
 
 use crate::commands::table::config::CreateTableConfig;
-use crate::commands::table::{Command, CommandConfig};
+use crate::commands::table::{Command};
 use crate::planet::{PlanetContext, Context};
 
 pub struct CreateTable<'a> {

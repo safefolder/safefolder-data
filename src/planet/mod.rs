@@ -2,6 +2,7 @@ pub mod validation;
 pub mod constants;
 
 extern crate serde_yaml;
+extern crate colored;
 
 use serde::{Deserialize, Serialize};
 use validator::{Validate};
@@ -11,6 +12,7 @@ use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::io;
+// use colored::*;
 
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
 pub struct PlanetContext {
@@ -34,7 +36,24 @@ impl PlanetContext {
             
             // Planet validation errors with i18m support
             let mut validation_errors: HashMap<String, String> = HashMap::new();
-            validation_errors.insert(String::from("length_min"), tr!("This is a message"));
+            validation_errors.insert(String::from("length_min"), 
+                tr!("{command}: Length for field \"{field}\" is higher than {value}."));
+            validation_errors.insert(String::from("length_max"), 
+                tr!("{command}: Length for field \"{field}\" is lower than {value}."));
+            validation_errors.insert(String::from("length_equal"), 
+                tr!("{command}: Length for field \"{field}\" is not equal to {value}."));
+            validation_errors.insert(String::from("range_min"), 
+                tr!("{command}: Range for field \"{field}\" does not meet. {} is lower than allowed range."));
+            validation_errors.insert(String::from("range_max"), 
+                tr!("{command}: Range for field \"{field}\" does not meet. {} is higher than allowed range"));
+            validation_errors.insert(String::from("must_match"), 
+                tr!("{command}: Value from field \"{field_origin}\" does not match with field \"{field_matched}\""));
+            validation_errors.insert(String::from("contains"), 
+                tr!("{command}: Field \"{field}\" does not contain \"{value}\""));
+            validation_errors.insert(String::from("regex"), 
+                tr!("{command}: String expression formula does not match (Regex) for field \"{field}\""));
+                validation_errors.insert(String::from("required"), 
+                tr!("{command}: Field \"{field}\" is required"));
             
             planet_context.validation_errors = Some(validation_errors);
             return Ok(planet_context);

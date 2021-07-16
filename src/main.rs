@@ -11,10 +11,8 @@ use colored::*;
 use crate::commands::table::config::CreateTableConfig;
 use crate::commands::CommandRunner;
 use argparse::{ArgumentParser, StoreTrue, Store};
-use std::fs;
 use tr::tr;
 use std::collections::HashMap;
-use std::env;
 
 use crate::commands::table::Command;
 use crate::planet::{PlanetContext, Context, validation::PlanetValidationError};
@@ -81,7 +79,7 @@ fn run_command(runner: &CommandRunner) -> Result<String, String> {
     // CommandRunner: command, account_id, space_id, path_yaml, possible command_file (when get from dir), planet context
     // I also need to create a context if not informed.
     if Some(&runner.path_yaml).is_some() {
-        let mut path_yaml: String = String::from("");
+        let path_yaml: String;
         if runner.path_yaml.is_none() {
             // In future case that we don't send path through shell
             path_yaml = String::from("");
@@ -91,7 +89,8 @@ fn run_command(runner: &CommandRunner) -> Result<String, String> {
         match runner.command {
             "CREATE TABLE" => {
                 let config: Result<CreateTableConfig, Vec<PlanetValidationError>> = 
-                    CreateTableConfig::import(&path_yaml);
+                    CreateTableConfig::import(&runner.planet_context, &path_yaml);
+                // println!("main :: config: {:#?}", config);
                 match config {
                     Ok(_) => {
                         let create_table = commands::table::schema::CreateTable{
@@ -103,7 +102,7 @@ fn run_command(runner: &CommandRunner) -> Result<String, String> {
                         };
                         // println!("{:?}", create_table_config);
                         // create_table.validate().unwrap();
-                        create_table.run();        
+                        create_table.run();
                     },
                     Err(errors) => {
                         println!();
@@ -119,7 +118,6 @@ fn run_command(runner: &CommandRunner) -> Result<String, String> {
                                 error.message
                             );
                             count += 1;
-                        println!();
                         }
                     }
                 }

@@ -2,10 +2,13 @@ extern crate colored;
 
 use colored::*;
 use serde::{Deserialize, Serialize};
+use validator::{ValidationErrors, ValidationErrorsKind, ValidationError};
 use validator::{Validate};
 use tr::tr;
+use std::collections::{BTreeMap};
 
 use crate::planet::constants;
+use crate::planet::PlanetContext;
 
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
 pub struct PlanetValidationError {
@@ -15,19 +18,39 @@ pub struct PlanetValidationError {
     pub message: String,
 }
 
-pub struct CommandImportConfig {
-    pub command: String,
+struct ValidationMessageFields {
+    field: String,
+    value: ColoredString,  
 }
 
-impl CommandImportConfig {
+pub struct CommandImportConfig<'a> {
+    pub command: &'a String,
+    pub planet_context: &'a PlanetContext
+}
+
+impl<'a> CommandImportConfig<'a> {
 
     pub fn parse_serde(&self, error: &serde_yaml::Error) -> PlanetValidationError {
+        println!("parse_serde :: error: {:#?}", error);
         let error_str: &str = &*error.to_string();
-        let error_fields: Vec<&str> = error_str.split(":").collect();
-        let field = error_fields[0];
-        let error_type = error_fields[1].trim();
-        let error_fields_next: Vec<&str> = error_fields[2].split(",").collect();
-        let field_value: &str = error_fields_next[0];
+        println!("parse_serde :: error str: {}", error_str);
+        let mut field: &str = "";
+        let mut error_type: &str = "";
+        let mut field_value: &str = "";
+        if error_str.find(":").is_some() {
+            let error_fields: Vec<&str> = error_str.split(":").collect();
+            field = error_fields[0];
+            error_type = error_fields[1].trim();
+            let error_fields_next: Vec<&str> = error_fields[2].split(",").collect();
+            field_value = error_fields_next[0];    
+        } else {
+            // duplicate field `command` at line 2 column 8
+            if Some(error_str.find(constants::SERDE_ERROR_TYPE_DUPLICATE_FIELD)).is_some() {
+                error_type = constants::SERDE_ERROR_TYPE_DUPLICATE_FIELD;
+                let items_error_str: Vec<&str> = error_str.split("`").collect();
+                field = items_error_str[1];
+            }
+        }
         let mut error: PlanetValidationError = PlanetValidationError{
             command: self.command.to_string(),
             field: String::from(field),
@@ -40,63 +63,71 @@ impl CommandImportConfig {
                 error.error_code = String::from(constants::SERDE_ERROR_TYPE_INVALID_TYPE);
                 error.message = tr!(
                     "{command}{sep} Invalid type for field {field} with value: {value}", 
-                    field=format!("{}{}{}", String::from("").green(), field.green(), String::from("").green()),
+                    field=format!("{}{}{}", String::from("").magenta(), field.magenta(), String::from("").magenta()),
                     value=field_value.green(),
                     command=self.command.blue(),
-                    sep=String::from(":").blue()
+                    sep=String::from(":").blue(),
                 );
                 return error;
             },
             constants::SERDE_ERROR_TYPE_INVALID_VALUE => {
                 error.error_code = String::from(constants::SERDE_ERROR_TYPE_INVALID_VALUE);
                 error.message = tr!(
-                    "{command}: Invalid value for field \"{field}\"", 
-                    field=field,
-                    command=self.command.blue()
+                    "{command}{sep} Invalid value for field {field}", 
+                    field=format!("{}{}{}", String::from("\"").magenta(), field.magenta(), String::from("\"").magenta()),
+                    command=self.command.blue(),
+                    sep=String::from(":").blue(),
                 );
                 return error;
             },
             constants::SERDE_ERROR_TYPE_INVALID_LENGTH => {
                 error.error_code = String::from(constants::SERDE_ERROR_TYPE_INVALID_LENGTH);
                 error.message = tr!(
-                    "{command}: Invalid length for field \"{field}\"", 
-                    field=field,
-                    command=self.command
+                    "{command}{sep} Invalid length for field {field}", 
+                    field=format!("{}{}{}", String::from("\"").magenta(), field.magenta(), String::from("\"").magenta()),
+                    command=self.command.blue(),
+                    sep=String::from(":").blue(),
                 );
                 return error;
             },
             constants::SERDE_ERROR_TYPE_UNKOWN_VARIANT => {
                 error.error_code = String::from(constants::SERDE_ERROR_TYPE_UNKOWN_VARIANT);
                 error.message = tr!(
-                    "{command}: Unknown variant for field \"{field}\"", 
-                    field=field,
+                    "{command}{sep} Unknown variant for field {field}", 
+                    field=format!("{}{}{}", String::from("\"").magenta(), field.magenta(), String::from("\"").magenta()),
                     value=field_value,
-                    command=self.command
+                    command=self.command.blue(),
+                    sep=String::from(":").blue(),
                 );
                 return error;
             },
             constants::SERDE_ERROR_TYPE_UNKNOWN_FIELD => {
                 error.error_code = String::from(constants::SERDE_ERROR_TYPE_UNKNOWN_FIELD);
                 error.message = tr!(
-                    "{command}: Unknown field for \"{field}\"", 
-                    field=field,
-                    command=self.command
+                    "{command}{sep} Unknown field for {field}", 
+                    field=format!("{}{}{}", String::from("\"").magenta(), field.magenta(), String::from("\"").magenta()),
+                    command=self.command.blue(),
+                    sep=String::from(":").blue(),
                 );
                 return error;
             },
             constants::SERDE_ERROR_TYPE_MISSING_FIELD => {
                 error.error_code = String::from(constants::SERDE_ERROR_TYPE_MISSING_FIELD);
                 error.message = tr!(
-                    "{command}: Missing field", 
-                    command=self.command
+                    "{command}{sep} Missing field", 
+                    command=self.command,
+                    sep=String::from(":").blue()
                 );
                 return error;
             },
             constants::SERDE_ERROR_TYPE_DUPLICATE_FIELD => {
+                // duplicate field `command` at line 2 column 8
                 error.error_code = String::from(constants::SERDE_ERROR_TYPE_DUPLICATE_FIELD);
                 error.message = tr!(
-                    "{command}: Duplicate field", 
-                    command=self.command
+                    "{command}{sep}: Duplicate field {field}", 
+                    command=self.command.blue(),
+                    field=format!("{}{}{}", String::from("\"").magenta(), field.magenta(), String::from("\"").magenta()),
+                    sep=String::from(":").blue()
                 );
                 return error;
             },
@@ -104,36 +135,202 @@ impl CommandImportConfig {
         }
     }
 
-    pub fn parse_validator(&self) -> Vec<PlanetValidationError> {
-        let errors: Vec<PlanetValidationError> = Vec::new();
-        // Here we parse the validator errors and inject into PlanetValidationError
-        return errors
+    fn get_validation_message_items(&self, main_error_field: &str, error_field: &str, error: &ValidationError) -> ValidationMessageFields {
+        if main_error_field.len() == 0 {
+            let message_field: ValidationMessageFields = ValidationMessageFields{
+                field: format!(
+                    "{}{}{}", 
+                    String::from("\"").magenta(), 
+                    error_field.magenta(),
+                    String::from("\"").magenta(), 
+                ),
+                value: error.params.get("equal").unwrap().to_string().green(),
+            };
+            return message_field;
+        } else {
+            let message_field: ValidationMessageFields = ValidationMessageFields{
+                field: format!(
+                    "{}{}{}.{}{}{}", 
+                    String::from("\"").magenta(), 
+                    main_error_field.magenta(),
+                    String::from("\"").magenta(),
+                    String::from("\"").magenta(), 
+                    error_field.magenta(),
+                    String::from("\"").magenta(), 
+                ),
+                value: error.params.get("equal").unwrap().to_string().green(),
+            };
+            return message_field;
+        }
     }
 
-    pub fn import<T>(&self, response: Result<T, serde_yaml::Error>) -> Result<T, Vec<PlanetValidationError>> {
-
-        match response {
-            Ok(_) => {
-                let errors: Vec<PlanetValidationError> = self.parse_validator();
-                let number_errors = errors.len();
-                match number_errors {
-                    0 => {
-                        println!("no validator errors, return");
-                        return Ok(response.unwrap());
-                    },
-                    _ => {
-                        println!("I got validator errors");
-                        return Err(errors)
-                    }
-                }                
-            },
-            Err(error) => {
-                let mut planet_errors: Vec<PlanetValidationError> = Vec::new();
-                planet_errors.push(self.parse_serde(&error));
-                return Err(planet_errors);
+    fn parse_field_validations(&self, 
+        command: &String,
+        main_error_field: &str,
+        error_field: &str,
+        errors: Vec<ValidationError>
+    ) -> Vec<PlanetValidationError> {
+        let mut planet_errors: Vec<PlanetValidationError> = Vec::new();
+        for error in errors {
+            let mut planet_error: PlanetValidationError = PlanetValidationError {
+                command: self.command.to_string(),
+                field: String::from(error_field),
+                error_code: format!("{}_equal", error.code),
+                message: String::from(""),
+                };
+            let message_fields: ValidationMessageFields = self.get_validation_message_items(
+                &main_error_field,
+                &error_field,
+                &error);
+            if error.code == "length" && error.params.contains_key("equal") {
+            planet_error.message = tr!(
+                "{command}{sep}: {field} has length not equal to {value}",
+                command=command.blue(),
+                sep=String::from(":").blue(),
+                field=message_fields.field,
+                value=message_fields.value,
+                );
+                planet_errors.push(planet_error);
+            } else if error.code == "length" && error.params.contains_key("min") {
+                    planet_error.message = tr!(
+                        "{command}{sep}: {field} has length lower than {value}",
+                        command=command.blue(),
+                        sep=String::from(":").blue(),
+                        field=message_fields.field,
+                        value=message_fields.value,
+                    );
+                    planet_errors.push(planet_error);
+            } else if error.code == "length" && error.params.contains_key("max") {
+                    planet_error.message = tr!(
+                        "{command}{sep}: {field} has length higher than {value}",
+                        command=command.blue(),
+                        sep=String::from(":").blue(),
+                        field=message_fields.field,
+                        value=message_fields.value,
+                    );
+                    planet_errors.push(planet_error);
+            } else if error.code == "required" {
+                planet_error.message = tr!(
+                    "{command}{sep}: {field} is required",
+                    command=command.blue(),
+                    sep=String::from(":").blue(),
+                    field=message_fields.field,
+                    );
+                    planet_errors.push(planet_error);
+            } else if error.code == "contains" {
+                planet_error.message = tr!(
+                    "{command}{sep}: {field} does not contain {value}.",
+                    command=command.blue(),
+                    sep=String::from(":").blue(),
+                    field=message_fields.field,
+                    value=message_fields.value,
+                    );
+                    planet_errors.push(planet_error);
+            } else if error.code == "regex" {
+                planet_error.message = tr!(
+                    "{command}{sep}: {field} string expression (regex) did not pass.",
+                    command=command.blue(),
+                    sep=String::from(":").blue(),
+                    field=message_fields.field,
+                );
+                planet_errors.push(planet_error);
+            } else if error.code == "range" && error.params.contains_key("min") {
+                planet_error.message = tr!(
+                    "{command}{sep}: {field} value {value} is lower than defined range.",
+                    command=command.blue(),
+                    sep=String::from(":").blue(),
+                    field=message_fields.field,
+                );
+                planet_errors.push(planet_error);
+            } else if error.code == "range" && error.params.contains_key("max") {
+                planet_error.message = tr!(
+                    "{command}{sep}: {field} value {value} is higher than defined range.",
+                    command=command.blue(),
+                    sep=String::from(":").blue(),
+                    field=message_fields.field,
+                );
+                planet_errors.push(planet_error);
             }
         }
+        return planet_errors;
+    }
 
+    fn parse_struct_validations(&self, 
+        command: &String,
+        main_error_field: &str, 
+        validation_errors: Box<ValidationErrors>
+    ) -> Vec<PlanetValidationError> {
+        let mut planet_errors: Vec<PlanetValidationError> = Vec::new();
+        let list_errors = validation_errors.into_errors();
+        for (error_field, error_kind) in list_errors {
+            if let ValidationErrorsKind::Field(errors) = error_kind {
+                planet_errors = self.parse_field_validations(
+                    command, 
+                    main_error_field, 
+                    error_field, 
+                    errors
+                );
+            }    
+        }
+        return planet_errors;
+    }
+
+    fn parse_list_validations(&self, 
+        command: &String,
+        main_error_field: &str, 
+        errors: BTreeMap<usize, Box<ValidationErrors>>
+    ) -> Vec<PlanetValidationError> {
+        let mut planet_errors: Vec<PlanetValidationError> = Vec::new();
+        for (_, validation_errors) in errors {
+            let list_errors = validation_errors.into_errors();
+            for (error_field, error_kind) in list_errors {
+                if let ValidationErrorsKind::Field(errors) = error_kind {
+                    for error in errors {
+                        let mut errors_: Vec<ValidationError> = Vec::new();
+                        errors_.push(error);
+                        let planet_errors_ = self.parse_field_validations(
+                            command, 
+                            main_error_field, 
+                            error_field, 
+                            errors_
+                        );
+                        planet_errors.extend(planet_errors_);
+                    }
+                }
+            }
+        }
+        return planet_errors;
+
+    }
+
+    pub fn parse_validator(&self, command: &String, errors: ValidationErrors) -> Vec<PlanetValidationError> {
+        let all_errors = errors.into_errors();
+        let mut planet_errors: Vec<PlanetValidationError> = Vec::new();
+        for (error_field, error_kind) in all_errors {
+            if let ValidationErrorsKind::List(errors) = error_kind {
+                let planet_errors_: Vec<PlanetValidationError> = self.parse_list_validations(
+                    command,
+                    error_field, 
+                    errors);
+                planet_errors.extend(planet_errors_);
+            } else if let ValidationErrorsKind::Field(errors) = error_kind {
+                let planet_errors_: Vec<PlanetValidationError> = self.parse_field_validations(
+                    command, 
+                    error_field,
+                    "",
+                    errors
+                );
+                planet_errors.extend(planet_errors_);
+            } else if let ValidationErrorsKind::Struct(errors) = error_kind {
+                let planet_errors_: Vec<PlanetValidationError> = self.parse_struct_validations(
+                    command, 
+                    error_field, 
+                    errors
+                );
+                planet_errors.extend(planet_errors_);
+            }
+        }
+        return planet_errors;
     }
 
 }
