@@ -14,7 +14,7 @@ use crate::planet::{
 };
 
 pub struct CreateTable<'a> {
-    pub planet_context: &'a PlanetContext,
+    pub planet_context: PlanetContext,
     pub context: &'a Context,
     pub config: CreateTableConfig,
     pub account_id: Option<&'a str>,
@@ -28,13 +28,16 @@ impl<'a> Command for CreateTable<'a> {
         println!("I run create table....");
     }
 
-    fn runner(runner: &CommandRunner, path_yaml: &String) -> () {
-        let config: Result<CreateTableConfig, Vec<PlanetValidationError>> = 
-        CreateTableConfig::import(&runner.planet_context, &path_yaml);
+    fn runner(runner: CommandRunner, path_yaml: String) -> () {
+        let planet_context: PlanetContext = runner.planet_context.clone();
+        let config_ = CreateTableConfig::defaults(path_yaml, planet_context);
+        let config: Result<CreateTableConfig, Vec<PlanetValidationError>> = config_.import();
+        // let config: Result<CreateTableConfig, Vec<PlanetValidationError>> = 
+        // CreateTableConfig::import(&runner.planet_context, &path_yaml);
         match config {
             Ok(_) => {
                 let create_table: CreateTable = CreateTable{
-                    planet_context: runner.planet_context,
+                    planet_context: runner.planet_context.clone(),
                     context: runner.context,
                     config: config.unwrap(),
                     account_id: runner.account_id,

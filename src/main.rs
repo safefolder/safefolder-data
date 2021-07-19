@@ -61,18 +61,18 @@ fn main() {
 
     if op.to_lowercase() == "run" && &scope.to_lowercase() == "command" {
         let command_runner: CommandRunner = CommandRunner{
-            planet_context: &planet_context,
+            planet_context: planet_context,
             context: &context,
             command: &command,
             space_id: Some(&space_id),
             account_id: Some(&account_id),
             path_yaml: Some(&path_yaml)
         };
-        run_command(&command_runner).unwrap();
+        run_command(command_runner).unwrap();
     }
 }
 
-fn run_command(runner: &CommandRunner) -> Result<String, String> {
+fn run_command(runner: CommandRunner) -> Result<String, String> {
     // CommandRunner: command, account_id, space_id, path_yaml, possible command_file (when get from dir), planet context
     // I also need to create a context if not informed.
     if Some(&runner.path_yaml).is_some() {
@@ -84,7 +84,7 @@ fn run_command(runner: &CommandRunner) -> Result<String, String> {
             path_yaml = runner.path_yaml.unwrap().to_string();
         }
         match runner.command {
-            "CREATE TABLE" => commands::table::schema::CreateTable::runner(&runner, &path_yaml),
+            "CREATE TABLE" => commands::table::schema::CreateTable::runner(runner, path_yaml),
             _ => println!("default")
         }
         Ok("Command executed".to_string())
