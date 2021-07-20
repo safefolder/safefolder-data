@@ -4,7 +4,7 @@ pub mod config;
 // use syn::{parse_quote, spanned::Spanned, GenericParam, Lifetime, LifetimeDef, Type};
 use validator::{ValidationErrors};
 use tr::tr;
-use std::fs;
+use std::{fs, io};
 // use proc_macro_error::{abort, proc_macro_error};
 
 
@@ -30,9 +30,9 @@ impl<T: ImportConfig> ImportConfig for &T {
 //     println!("derive_import....");
 // }
 
-pub trait Command {
+pub trait Command<T> {
     // fn validate(&self) -> Result<(), ValidationErrors>;
-    fn run(&self);
+    fn run(&self) -> Result<T, io::Error>;
     fn runner(runner: CommandRunner, path_yaml: String) -> ();
 }
 

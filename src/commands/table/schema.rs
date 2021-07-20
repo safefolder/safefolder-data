@@ -3,10 +3,12 @@ extern crate colored;
 
 use tr::tr;
 use colored::*;
+use std::io;
 
 use crate::commands::table::config::CreateTableConfig;
 use crate::commands::table::{Command};
 use crate::commands::CommandRunner;
+use crate::storage::table::{DbTable, DbTableConfig};
 use crate::planet::{
     PlanetContext, 
     Context, 
@@ -21,11 +23,25 @@ pub struct CreateTable<'a> {
     pub space_id: Option<&'a str>,
 }
 
-impl<'a> Command for CreateTable<'a> {
+impl<'a> Command<DbTable> for CreateTable<'a> {
 
-    fn run(&self) -> () {
+    fn run(&self) -> Result<DbTable, io::Error> {
         // Insert into account "tables" the config
-        println!("I run create table....");
+        let config: DbTableConfig = DbTableConfig{
+            language: self.config.language.clone(),
+            fields: self.config.fields.clone(),
+        };
+        let db_table: DbTable = DbTable::defaults(&String::from("My Table"), config);
+        let result = db_table.create();
+        match result {
+            Ok(_) => {
+                let response = result.unwrap();
+                Ok(response)
+            },
+            Err(error) => {
+                Err(error)
+            }
+        }
     }
 
     fn runner(runner: CommandRunner, path_yaml: String) -> () {

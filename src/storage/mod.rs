@@ -28,6 +28,13 @@ pub fn generate_id() -> Option<String> {
     }
 }
 
+pub fn generate_id_bytes() -> [u8; 12] {
+    let field_id = xid::new();
+    let field_id_bytes = field_id.as_bytes();
+    // let field_id_bytes = field_id_bytes.to_vec();
+    return *field_id_bytes
+}
+
 pub fn get_db_languages() -> Vec<&'static str> {
     let languages = vec![
         "spanish", 

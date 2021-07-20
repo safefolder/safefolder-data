@@ -3,6 +3,9 @@ extern crate xid;
 extern crate serde_yaml;
 extern crate colored;
 
+#[macro_use]
+extern crate json;
+
 pub mod commands;
 pub mod storage;
 pub mod planet;
