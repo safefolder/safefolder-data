@@ -1,10 +1,23 @@
+extern crate sled;
+
 // use serde_json::Value;
 use std::io;
+use std::str::FromStr;
 use std::{collections::HashMap, time::{SystemTime, UNIX_EPOCH}};
 use serde::{Deserialize, Serialize};
+use tr::tr;
 
-use crate::storage::{generate_id, generate_id_bytes};
+use crate::storage::{generate_id};
 use crate::storage::config::{FieldConfig, LanguageConfig};
+use crate::planet::{PlanetError, PlanetContext, Context};
+
+pub trait Schema {
+    fn defaults(name: &String, config: &DbTableConfig, planet_context: Option<&PlanetContext>, context: Option<&Context>) -> DbTable;
+    fn open(planet_context: &PlanetContext, context: &Context) -> Result<sled::Db, PlanetError>;
+    fn create(&self) -> Result<DbTable, PlanetError>;
+    fn get(id: &String, planet_context: &PlanetContext, context: &Context) -> Result<DbTable, PlanetError>;
+    // fn get_by_name(table_name: &str, account_id: Option<[u8; 12]>, space_id: Option<[u8; 12]>) -> Result<Option<DbTable>, PlanetError>;
+}
 
 pub trait Table {
     fn insert(&self, db_row: DbRow);
@@ -23,50 +36,153 @@ pub struct DbTableConfig {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DbTable {
-    pub id: Option<[u8; 12]>,
-    pub display_name: String,
+    pub id: Option<String>,
+    pub name: String,
     pub config: DbTableConfig,
+    pub context: Option<Context>,
+    pub planet_context: Option<PlanetContext>,
 }
 
-impl DbTable {
-    pub fn defaults(display_name: &String, config: DbTableConfig) -> DbTable {
+impl Schema for DbTable {
+
+    fn defaults(name: &String, config: &DbTableConfig, planet_context: Option<&PlanetContext>, context: Option<&Context>) -> DbTable {
+        let context = Some(context.unwrap().clone());
+        let planet_context = Some(planet_context.unwrap().clone());
+        let config = config.clone();
         let db_table: DbTable = DbTable{
-            id: Some(generate_id_bytes()),
-            display_name: format!("{}", display_name),
+            id: generate_id(),
+            name: format!("{}", name),
             config: config,
+            context: context,
+            planet_context: planet_context,
         };
         return db_table;
     }
-    pub fn create(&self) -> Result<DbTable, io::Error> {
-        let encoded: Vec<u8> = bincode::serialize(&self).unwrap();
-        let _config = sled::Config::default()
+
+    fn open(planet_context: &PlanetContext, context: &Context) -> Result<sled::Db, PlanetError> {
+        // I need to define how to build the path here, based on account, space or no space (planet scope)
+        let mut path: String = String::from("");
+        let home_dir = planet_context.home_path.clone().unwrap();
+        if *&context.account_id.is_some() && *&context.space_id.is_some() {
+            println!("DbTable.open :: account_id and space_id have been informed");
+        } else {
+            // .achiever-planet/tables/tables.db : platform wide table schemas
+            path = format!("{home}/tables/tables.db", home=&home_dir);
+            println!("DbTable.open :: path: {}", &path);
+        }
+        let config: sled::Config = sled::Config::default()
             .use_compression(true)
-            .path("my_tables_db");
-        let db: sled::Db = _config.open().unwrap();
-        let response = db.insert(&self.id.unwrap(), encoded);
+            .path(path);
+        let result: Result<sled::Db, sled::Error> = config.open();
+        match result {
+            Ok(_) => {
+                Ok(result.unwrap())
+            },
+            Err(_) => {
+                let planet_error = PlanetError::new(
+                    500, 
+                    Some(tr!("Could not open database")),
+                );
+                Err(planet_error)
+            }
+        }
+    }
+
+    // fn get_by_name(table_name: &str, account_id: Option<[u8; 12]>, space_id: Option<[u8; 12]>) -> Result<Option<DbTable>, PlanetError> {
+    //     // I travel table for account_id if any, space id if any and table name
+    //     let db: sled::Db = DbTable::open("tables", None, None).unwrap();
+    //     let iter = db.iter();
+    //     let mut number_items = 0;
+    //     let mut matched_item: Option<DbTable> = None;
+    //     for result in iter {
+    //         let tuple = result.unwrap();
+    //         let item_db = tuple.1;
+    //         let item: DbTable = bincode::deserialize(&item_db).unwrap();
+    //         let matches_name_none = item.name.to_lowercase() == table_name.to_lowercase() && 
+    //             account_id.is_none() && space_id.is_none();
+    //         let mut check_account: bool = true;
+    //         if account_id.is_some() && space_id.is_some() {
+    //             if (item.account_id.is_some() && item.account_id.unwrap() != account_id.unwrap()) || 
+    //             (item.space_id.is_some() && item.space_id.unwrap() != space_id.unwrap()) {
+    //                 check_account = false;
+    //             }
+    //         }
+    //         if matches_name_none && check_account {
+    //             number_items += 1;
+    //             matched_item = Some(item);
+    //         }
+    //     }
+    //     match number_items {
+    //         0 => {
+    //             return Ok(None)
+    //         },
+    //         1 => {
+    //             return Ok(matched_item)
+    //         },
+    //         2 => {
+    //             return Err(PlanetError::new(500, Some(tr!("Could not fetch item from database"))))
+    //         },
+    //         _ => {
+    //             return Err(PlanetError::new(500, Some(tr!("Could not fetch item from database"))))
+    //         }
+    //     }
+    // }
+
+    fn get(id: &String, planet_context: &PlanetContext, context: &Context) -> Result<DbTable, PlanetError> {
+        let db = DbTable::open(
+            &planet_context,
+            &context,
+        ).unwrap();
+        let id_db = xid::Id::from_str(id).unwrap();
+        let id_db = id_db.as_bytes();
+        let item_db = db.get(&id_db).unwrap().unwrap();
+        let item_: Result<DbTable, _> = bincode::deserialize(&item_db);
+        match item_ {
+            Ok(_) => {
+                let item = item_.unwrap();
+                Ok(item)
+            },
+            Err(_) => {
+                Err(PlanetError::new(500, Some(tr!("Could not fetch item from database"))))
+            }
+        }
+    }
+
+    fn create(&self) -> Result<DbTable, PlanetError> {
+        let encoded: Vec<u8> = bincode::serialize(&self).unwrap();
+        let planet_context = &self.planet_context.clone().unwrap();
+        let context = &self.context.clone().unwrap();
+        let db = DbTable::open(
+            &planet_context,
+            &context
+        ).unwrap();
+        let id = &self.id.clone().unwrap();
+        let id_db = xid::Id::from_str(id).unwrap();
+        let id_db = id_db.as_bytes();
+        let response = db.insert(&id_db, encoded);
         match response {
             Ok(_) => {
-                let item_db = db.get(&self.id.unwrap()).unwrap().unwrap();
+                println!("DbTable.create :: id: {:?}", &id);
+                let item_db = db.get(&id_db).unwrap().unwrap();
                 let item_: Result<DbTable, _> = bincode::deserialize(&item_db);
                 match item_ {
                     Ok(_) => {
                         let item = item_.unwrap();
                         Ok(item)
                     },
-                    Err(error) => {
-                        let my_error = io::Error::new(io::ErrorKind::ConnectionRefused, error);
-                        Err(my_error)
+                    Err(_) => {
+                        Err(PlanetError::new(500, Some(tr!("Could not fetch item from database"))))
                     }
                 }
             },
-            Err(error) => {
+            Err(_) => {
                 // I return io error, so is not linked to data provider, sled so far
-                let my_error = io::Error::new(io::ErrorKind::ConnectionRefused, error);
-                Err(my_error)
+                Err(PlanetError::new(500, Some(tr!("Could not write table schema"))))
             }
         }
     }
 }
+
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DbFieldValue {
@@ -104,60 +220,60 @@ impl DbRow {
     }
 }
 
-impl Table for DbTable{
+// impl Table for DbTable{
 
-    fn insert(&self, db_row: DbRow) {
-        println!("DbDoc.insert...");
-        // Bincode
-        let t_1 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-        let encoded: Vec<u8> = bincode::serialize(&db_row).unwrap();
-        let t_2 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-        // let diff = t_2-t_1;
-        println!("DbDoc.insert :: bincode perf encode: {:?}", &(t_2-t_1));
-        println!("DbDoc.insert :: encoded: {:?} length: {}", encoded, encoded.len());
-        let t_1 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-        let decoded: Result<DbTable, bincode::Error> = bincode::deserialize(&encoded[..]);
-        // println!("DbDoc.insert :: error: {:?}", decoded.unwrap_err());
-        let t_2 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-        println!("DbDoc.insert :: bincode perf decode: {:?}", &(t_2-t_1));
-        // JSON
-        // let t_1 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-        // let config_value = serde_json::to_value(&db_doc).unwrap();
-        // let json_encoded = serde_json::to_string(&config_value).unwrap();
-        // let t_2 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-        // let diff = t_2-t_1;
-        // println!("DbDoc.insert :: json perf encode: {:?}", &diff);
-        // println!("DbDoc.insert :: encoded json: length: {}", json_encoded.len());
-        // println!("DbDoc.insert :: {:?}", json_encoded);
-        // let t_1 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-        // let json_decoded: Result<Value, serde_json::Error> = serde_json::from_str(&json_encoded);
-        // let db_doc: Result<DbDoc, serde_json::Error> = serde_json::from_value(json_decoded.unwrap());
-        // let t_2 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-        // println!("DbDoc.insert :: json perf decode: {:?}", &(t_2-t_1));
-        // println!("DbDoc.insert :: json decoded: {:#?}", &db_doc.unwrap());
-    }
+//     fn insert(&self, db_row: DbRow) {
+//         println!("DbDoc.insert...");
+//         // Bincode
+//         let t_1 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+//         let encoded: Vec<u8> = bincode::serialize(&db_row).unwrap();
+//         let t_2 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+//         // let diff = t_2-t_1;
+//         println!("DbDoc.insert :: bincode perf encode: {:?}", &(t_2-t_1));
+//         println!("DbDoc.insert :: encoded: {:?} length: {}", encoded, encoded.len());
+//         let t_1 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+//         let decoded: Result<DbTable, bincode::Error> = bincode::deserialize(&encoded[..]);
+//         // println!("DbDoc.insert :: error: {:?}", decoded.unwrap_err());
+//         let t_2 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+//         println!("DbDoc.insert :: bincode perf decode: {:?}", &(t_2-t_1));
+//         // JSON
+//         // let t_1 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+//         // let config_value = serde_json::to_value(&db_doc).unwrap();
+//         // let json_encoded = serde_json::to_string(&config_value).unwrap();
+//         // let t_2 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+//         // let diff = t_2-t_1;
+//         // println!("DbDoc.insert :: json perf encode: {:?}", &diff);
+//         // println!("DbDoc.insert :: encoded json: length: {}", json_encoded.len());
+//         // println!("DbDoc.insert :: {:?}", json_encoded);
+//         // let t_1 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+//         // let json_decoded: Result<Value, serde_json::Error> = serde_json::from_str(&json_encoded);
+//         // let db_doc: Result<DbDoc, serde_json::Error> = serde_json::from_value(json_decoded.unwrap());
+//         // let t_2 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+//         // println!("DbDoc.insert :: json perf decode: {:?}", &(t_2-t_1));
+//         // println!("DbDoc.insert :: json decoded: {:#?}", &db_doc.unwrap());
+//     }
 
-    fn update(&self, id: &str, db_row: DbRow) {
-        println!("KeyValueTable.update ...");
-        println!("id: {}", id.to_string())
-    }
+//     fn update(&self, id: &str, db_row: DbRow) {
+//         println!("KeyValueTable.update ...");
+//         println!("id: {}", id.to_string())
+//     }
 
-    fn delete(&self, id: &str) {
-        println!("KeyValueTable.delete ...");
-        println!("id: {}", id)
-    }
+//     fn delete(&self, id: &str) {
+//         println!("KeyValueTable.delete ...");
+//         println!("id: {}", id)
+//     }
 
-    fn read(&self, id: &str) {
-        println!("KeyValueTable.read ...");
-        println!("id: {id}", id=id)
-    }
+//     fn read(&self, id: &str) {
+//         println!("KeyValueTable.read ...");
+//         println!("id: {id}", id=id)
+//     }
 
-    fn select(&self, query: DbQuery) {
-        println!("KeyValueTable.select ...");
-        println!("select...");
-    }
+//     fn select(&self, query: DbQuery) {
+//         println!("KeyValueTable.select ...");
+//         println!("select...");
+//     }
 
-}
+// }
 
 pub struct DbQuery {
     pub sql_where: String,

@@ -23,12 +23,12 @@ struct ValidationMessageFields {
     value: ColoredString,  
 }
 
-pub struct CommandImportConfig<'a> {
-    pub command: &'a String,
-    pub planet_context: &'a PlanetContext
+pub struct CommandImportConfig {
+    pub command: String,
+    pub planet_context: PlanetContext,
 }
 
-impl<'a> CommandImportConfig<'a> {
+impl CommandImportConfig {
 
     pub fn parse_serde(&self, error: &serde_yaml::Error) -> PlanetValidationError {
         println!("parse_serde :: error: {:#?}", error);

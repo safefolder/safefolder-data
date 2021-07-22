@@ -13,6 +13,7 @@ pub mod planet;
 use crate::commands::CommandRunner;
 use argparse::{ArgumentParser, StoreTrue, Store};
 use std::collections::HashMap;
+use std::str::FromStr;
 
 use crate::commands::table::Command;
 use crate::planet::{PlanetContext, Context};
@@ -24,12 +25,13 @@ fn main() {
     // achiever run journey ...
 
     let mut verbose = false;
-    let mut account_id = String::from("");
-    let mut space_id= String::from("");
+    let mut account_id: String = String::from("");
+    let mut space_id: String = String::from("");
     let mut path_yaml = String::from("");
     let mut command = String::from("");
     let mut op = String::from("run");
     let mut scope = String::from("");
+    // println!("account_id: {}", hex::encode_upper(account_id));
 
     { // this block limits scope of borrows by ap.refer() method
         let mut ap = ArgumentParser::new();
@@ -57,19 +59,22 @@ fn main() {
     let planet_context: PlanetContext = PlanetContext::import_context().unwrap();
 
     // Context: This is TEMP, simply context struct, but in future will come from shell, or we create a new one
+    // let space_id = hex::decode(space_id.unwrap()).unwrap();
+    // let account_id = hex::decode(account_id.unwrap()).unwrap();
+    // let space_id = space_id.unwrap().as_bytes();
     let context: Context = Context{
         id: None,
-        data: HashMap::new(),
+        data: Some(HashMap::new()),
+        space_id: None,
+        account_id: None,
     };
 
     if op.to_lowercase() == "run" && &scope.to_lowercase() == "command" {
         let command_runner: CommandRunner = CommandRunner{
             planet_context: planet_context,
-            context: &context,
-            command: &command,
-            space_id: Some(&space_id),
-            account_id: Some(&account_id),
-            path_yaml: Some(&path_yaml)
+            context: context,
+            command: command,
+            path_yaml: Some(path_yaml)
         };
         run_command(command_runner).unwrap();
     }
@@ -78,16 +83,13 @@ fn main() {
 fn run_command(runner: CommandRunner) -> Result<String, String> {
     // CommandRunner: command, account_id, space_id, path_yaml, possible command_file (when get from dir), planet context
     // I also need to create a context if not informed.
-    if Some(&runner.path_yaml).is_some() {
-        let path_yaml: String;
-        if runner.path_yaml.is_none() {
-            // In future case that we don't send path through shell
-            path_yaml = String::from("");
-        } else {
-            path_yaml = runner.path_yaml.unwrap().to_string();
-        }
-        match runner.command {
-            "CREATE TABLE" => commands::table::schema::CreateTable::runner(runner, path_yaml),
+    let runner = runner.clone();
+    let runner_path_yaml = &runner.path_yaml;
+    if runner_path_yaml.is_some() {
+        let path_yaml = format!("{}", runner_path_yaml.clone().unwrap());
+        let match_option = *&runner.command.as_str();
+        match match_option {
+            "CREATE TABLE" => commands::table::schema::CreateTable::runner(&runner, &path_yaml),
             _ => println!("default")
         }
         Ok("Command executed".to_string())

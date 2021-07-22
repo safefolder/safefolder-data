@@ -36,7 +36,7 @@ pub struct FieldConfig {
 
 impl StorageField for FieldConfig {
     fn defaults() -> FieldConfig {
-        return FieldConfig {
+        let object: FieldConfig = FieldConfig{
             id: None,
             name: None,
             field_type: None,
@@ -46,6 +46,7 @@ impl StorageField for FieldConfig {
             api_version: Some(String::from(FIELD_API_VERSION)),
             indexed: Some(true),
         };
+        return object;
     }
     fn version() -> Option<String> {
         return Some(String::from(FIELD_VERSION));

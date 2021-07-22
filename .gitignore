@@ -31,3 +31,5 @@ Cargo.lock
 
 /i18n/pot
 /i18n/mo
+
+.VSCodeCounter

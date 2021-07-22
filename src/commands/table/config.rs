@@ -24,7 +24,7 @@ pub struct CreateTableConfig {
 
 impl CreateTableConfig {
 
-    pub fn defaults(yaml_path: String, planet_context: PlanetContext) -> CreateTableConfig {
+    pub fn defaults(yaml_path: &String, planet_context: &PlanetContext) -> CreateTableConfig {
         let config: CreateTableConfig = CreateTableConfig{
             command: None,
             language: None,
@@ -41,8 +41,8 @@ impl CreateTableConfig {
         // Deseralize the config entity
         let response: Result<CreateTableConfig, serde_yaml::Error> = serde_yaml::from_str(&yaml_str);
         let import_config: CommandImportConfig = CommandImportConfig{
-            command: &String::from(""),
-            planet_context: &settings.planet_context.clone().unwrap(),
+            command: String::from(""),
+            planet_context: settings.planet_context.clone().unwrap(),
         };
         match response {
             Ok(_) => {

@@ -3,6 +3,8 @@ pub mod constants;
 
 extern crate serde_yaml;
 extern crate colored;
+extern crate dirs;
+extern crate xid;
 
 use serde::{Deserialize, Serialize};
 use validator::{Validate};
@@ -17,45 +19,26 @@ use std::io;
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
 pub struct PlanetContext {
     pub mission: String,
-    pub validation_errors: Option<HashMap<String, String>>,
+    pub home_path: Option<String>,
 }
 
 impl PlanetContext {
     pub fn import_context() -> Result<PlanetContext, io::Error> {
-        let home_path = env::current_dir();
-        if home_path.is_err() {
-            return Err(home_path.unwrap_err())
+        let app_path = env::current_dir();
+        if app_path.is_err() {
+            return Err(app_path.unwrap_err())
         }
-        let home_path_str = home_path.unwrap();
-        let home_path_str = home_path_str.to_str().unwrap();
-        let path_planet_context: &str = &*format!("{}/planet_context.yaml", home_path_str);
+        let app_path_str = app_path.unwrap();
+        let app_path_str = app_path_str.to_str().unwrap();
+        let path_planet_context: &str = &*format!("{}/planet_context.yaml", app_path_str);
         if Some(path_planet_context).is_some() {
             let planet_context_str = fs::read_to_string(&path_planet_context)
             .expect("Something went wrong reading the YAML file");
             let mut planet_context: PlanetContext = serde_yaml::from_str(&planet_context_str).unwrap();
-            
-            // Planet validation errors with i18m support
-            let mut validation_errors: HashMap<String, String> = HashMap::new();
-            validation_errors.insert(String::from("length_min"), 
-                tr!("{command}: Length for field \"{field}\" is higher than {value}."));
-            validation_errors.insert(String::from("length_max"), 
-                tr!("{command}: Length for field \"{field}\" is lower than {value}."));
-            validation_errors.insert(String::from("length_equal"), 
-                tr!("{command}: Length for field \"{field}\" is not equal to {value}."));
-            validation_errors.insert(String::from("range_min"), 
-                tr!("{command}: Range for field \"{field}\" does not meet. {} is lower than allowed range."));
-            validation_errors.insert(String::from("range_max"), 
-                tr!("{command}: Range for field \"{field}\" does not meet. {} is higher than allowed range"));
-            validation_errors.insert(String::from("must_match"), 
-                tr!("{command}: Value from field \"{field_origin}\" does not match with field \"{field_matched}\""));
-            validation_errors.insert(String::from("contains"), 
-                tr!("{command}: Field \"{field}\" does not contain \"{value}\""));
-            validation_errors.insert(String::from("regex"), 
-                tr!("{command}: String expression formula does not match (Regex) for field \"{field}\""));
-                validation_errors.insert(String::from("required"), 
-                tr!("{command}: Field \"{field}\" is required"));
-            
-            planet_context.validation_errors = Some(validation_errors);
+            let sys_home_dir = dirs::home_dir().unwrap();
+            let sys_home_dir_str = sys_home_dir.as_os_str().to_str().unwrap();
+            planet_context.home_path = Some(format!("{home_dir}/.achiever-planet", home_dir=sys_home_dir_str));
+            // println!("PlanetContext.import_context :: planet_context: {:#?}", planet_context);
             return Ok(planet_context);
         } else {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, 
@@ -65,7 +48,45 @@ impl PlanetContext {
 
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Context {
     pub id: Option<String>,
-    pub data: HashMap<String, String>,
+    pub data: Option<HashMap<String, String>>,
+    pub account_id: Option<String>,
+    pub space_id: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PlanetError {
+    pub error_code: u16,
+    pub reason: String,
+    pub message: String,
+}
+
+pub const REASON_INTERNAL_ERROR: &str= "INTERNAL_ERROR";
+pub const REASON_NOT_FOUND: &str= "NOT_FOUND";
+pub const REASON_OK: &str= "OK";
+
+impl PlanetError {
+    pub fn new(error_code: u16, message: Option<String>) -> PlanetError {
+        let mut error_reasons: HashMap<u16, (&str, String)> = HashMap::new();
+        error_reasons.insert(200, (REASON_OK, tr!("Ok")));
+        error_reasons.insert(500, (REASON_INTERNAL_ERROR, tr!("Internal Error")));
+        error_reasons.insert(404, (REASON_NOT_FOUND, tr!("Not Found")));
+        let reason_tuple = error_reasons.get(&error_code);
+        let reason: &str = reason_tuple.unwrap().0;
+        let reason_message: &String = &reason_tuple.unwrap().1;
+        let mut my_message: Option<String> = Some(String::from(""));
+        if message.is_none() {
+            my_message = Some(reason_message.to_string());
+        } else {
+            my_message = message;
+        };
+        let error: PlanetError = PlanetError{
+            error_code: error_code,
+            reason: reason.to_string(),
+            message: my_message.unwrap()
+        };
+        return error
+    }
 }

@@ -6,6 +6,7 @@ use validator::{ValidationErrors};
 use tr::tr;
 use std::{fs, io};
 // use proc_macro_error::{abort, proc_macro_error};
+use crate::planet::PlanetError;
 
 
 use crate::commands::CommandRunner;
@@ -32,8 +33,8 @@ impl<T: ImportConfig> ImportConfig for &T {
 
 pub trait Command<T> {
     // fn validate(&self) -> Result<(), ValidationErrors>;
-    fn run(&self) -> Result<T, io::Error>;
-    fn runner(runner: CommandRunner, path_yaml: String) -> ();
+    fn run(&self) -> Result<T, PlanetError>;
+    fn runner(runner: &CommandRunner, path_yaml: &String) -> ();
 }
 
 
