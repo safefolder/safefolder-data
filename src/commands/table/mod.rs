@@ -7,6 +7,7 @@ use tr::tr;
 use std::{fs, io};
 // use proc_macro_error::{abort, proc_macro_error};
 use crate::planet::PlanetError;
+use crate::storage::table::SchemaData;
 
 
 use crate::commands::CommandRunner;

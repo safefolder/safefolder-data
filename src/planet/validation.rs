@@ -1,16 +1,14 @@
 extern crate colored;
 
 use colored::*;
-use serde::{Deserialize, Serialize};
 use validator::{ValidationErrors, ValidationErrorsKind, ValidationError};
-use validator::{Validate};
 use tr::tr;
 use std::collections::{BTreeMap};
 
 use crate::planet::constants;
 use crate::planet::PlanetContext;
 
-#[derive(Debug, Serialize, Deserialize, Validate, Clone)]
+#[derive(Debug, Clone)]
 pub struct PlanetValidationError {
     pub command: String,
     pub field: String,
@@ -23,12 +21,12 @@ struct ValidationMessageFields {
     value: ColoredString,  
 }
 
-pub struct CommandImportConfig {
+pub struct CommandImportConfig<'gb> {
     pub command: String,
-    pub planet_context: PlanetContext,
+    pub planet_context: &'gb PlanetContext<'gb>,
 }
 
-impl CommandImportConfig {
+impl<'gb> CommandImportConfig<'gb> {
 
     pub fn parse_serde(&self, error: &serde_yaml::Error) -> PlanetValidationError {
         println!("parse_serde :: error: {:#?}", error);

@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use std::str::FromStr;
 
 use crate::commands::table::Command;
-use crate::planet::{PlanetContext, Context};
+use crate::planet::{PlanetContext, Context, ContextSource, PlanetContextSource};
 
 fn main() {
 
@@ -56,25 +56,39 @@ fn main() {
     }
 
     // Get planet context. I embed planet context into components
-    let planet_context: PlanetContext = PlanetContext::import_context().unwrap();
+    // let planet_context_source, planet_context: PlanetContext = PlanetContext::import_context().unwrap();
+
+    let planet_context_source = PlanetContext::import_context().unwrap();
+    let home_path = &planet_context_source.home_path.unwrap();
+    let planet_context = PlanetContext{
+        mission: &planet_context_source.mission,
+        home_path: Some(&home_path.as_str()),
+    };
 
     // Context: This is TEMP, simply context struct, but in future will come from shell, or we create a new one
     // let space_id = hex::decode(space_id.unwrap()).unwrap();
     // let account_id = hex::decode(account_id.unwrap()).unwrap();
     // let space_id = space_id.unwrap().as_bytes();
-    let context: Context = Context{
+    let context_source: ContextSource = ContextSource{
         id: None,
         data: Some(HashMap::new()),
         space_id: None,
         account_id: None,
     };
+    // let context: &'gb Context<'gb> = context_source.get_ref();
+    let context = Context{
+        id: None,
+        data: None,
+        account_id: None,
+        space_id: None,
+    };
 
     if op.to_lowercase() == "run" && &scope.to_lowercase() == "command" {
-        let command_runner: CommandRunner = CommandRunner{
-            planet_context: planet_context,
-            context: context,
-            command: command,
-            path_yaml: Some(path_yaml)
+        let command_runner =  CommandRunner{
+            planet_context: &planet_context,
+            context: &context,
+            command: &command,
+            path_yaml: Some(&path_yaml)
         };
         run_command(command_runner).unwrap();
     }

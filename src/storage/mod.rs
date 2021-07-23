@@ -2,11 +2,10 @@ extern crate xid;
 
 pub mod fields;
 pub mod table;
-pub mod config;
 pub mod constants;
 
 use validator::{ValidationErrors};
-use config::FieldConfig;
+use crate::commands::table::config::FieldConfig;
 use tr::tr;
 
 use crate::planet::PlanetError;

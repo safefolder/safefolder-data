@@ -5,62 +5,60 @@ use std::io;
 use std::str::FromStr;
 use std::{collections::HashMap, time::{SystemTime, UNIX_EPOCH}};
 use serde::{Deserialize, Serialize};
+use validator::{Validate};
 use tr::tr;
 
 use crate::storage::{generate_id};
-use crate::storage::config::{FieldConfig, LanguageConfig};
+use crate::commands::table::config::{FieldConfig, LanguageConfig};
 use crate::planet::{PlanetError, PlanetContext, Context};
+use crate::commands::table::config::DbTableConfig;
 
-pub trait Schema {
-    fn defaults(name: &String, config: &DbTableConfig, planet_context: Option<&PlanetContext>, context: Option<&Context>) -> DbTable;
-    fn open(planet_context: &PlanetContext, context: &Context) -> Result<sled::Db, PlanetError>;
-    fn create(&self) -> Result<DbTable, PlanetError>;
-    fn get(id: &String, planet_context: &PlanetContext, context: &Context) -> Result<DbTable, PlanetError>;
+pub trait Schema<'gb> {
+    fn defaults(planet_context: &'gb PlanetContext<'gb>, context: &'gb Context<'gb>) -> Result<DbTable<'gb>, PlanetError>;
+    fn create(&self, schema_data: &SchemaData) -> Result<SchemaData, PlanetError>;
+    // fn get(id: &String, planet_context: &PlanetContext, context: &Context) -> Result<DbTable<'db, 'gb>, PlanetError<'gb>>;
     // fn get_by_name(table_name: &str, account_id: Option<[u8; 12]>, space_id: Option<[u8; 12]>) -> Result<Option<DbTable>, PlanetError>;
 }
 
-pub trait Table {
-    fn insert(&self, db_row: DbRow);
-    fn update(&self, id: &str, db_row: DbRow);
-    fn delete(&self, id: &str);
-    fn read(&self, id: &str);
-    fn select(&self, query: DbQuery);
-}
+// pub trait Table {
+//     fn insert(&self, db_row: DbRow);
+//     fn update(&self, id: &str, db_row: DbRow);
+//     fn delete(&self, id: &str);
+//     fn read(&self, id: &str);
+//     fn select(&self, query: DbQuery);
+// }
+
+// lifetimes: gb (global, for contexts), db, bs
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct DbTableConfig {
-    pub language: Option<LanguageConfig>,
-    pub fields: Option<Vec<FieldConfig>>,
-}
-
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct DbTable {
+pub struct SchemaData {
     pub id: Option<String>,
     pub name: String,
     pub config: DbTableConfig,
-    pub context: Option<Context>,
-    pub planet_context: Option<PlanetContext>,
 }
 
-impl Schema for DbTable {
-
-    fn defaults(name: &String, config: &DbTableConfig, planet_context: Option<&PlanetContext>, context: Option<&Context>) -> DbTable {
-        let context = Some(context.unwrap().clone());
-        let planet_context = Some(planet_context.unwrap().clone());
-        let config = config.clone();
-        let db_table: DbTable = DbTable{
+impl SchemaData {
+    pub fn defaults(name: &String, config: &DbTableConfig) -> SchemaData {
+        let schema_data = SchemaData{
             id: generate_id(),
             name: format!("{}", name),
-            config: config,
-            context: context,
-            planet_context: planet_context,
+            config: config.clone(),
         };
-        return db_table;
+        return schema_data
     }
+}
 
-    fn open(planet_context: &PlanetContext, context: &Context) -> Result<sled::Db, PlanetError> {
-        // I need to define how to build the path here, based on account, space or no space (planet scope)
+#[derive(Debug, Clone)]
+pub struct DbTable<'gb> {
+    pub context: &'gb Context<'gb>,
+    pub planet_context: &'gb PlanetContext<'gb>,
+    db: sled::Db,
+}
+
+impl<'gb> Schema<'gb> for DbTable<'gb> {
+
+    fn defaults(planet_context: &'gb PlanetContext<'gb>, context: &'gb Context<'gb>) -> 
+        Result<DbTable<'gb>, PlanetError> {
         let mut path: String = String::from("");
         let home_dir = planet_context.home_path.clone().unwrap();
         if *&context.account_id.is_some() && *&context.space_id.is_some() {
@@ -76,7 +74,13 @@ impl Schema for DbTable {
         let result: Result<sled::Db, sled::Error> = config.open();
         match result {
             Ok(_) => {
-                Ok(result.unwrap())
+                let db = result.unwrap();
+                let db_table: DbTable = DbTable{
+                    context: context,
+                    planet_context: planet_context,
+                    db: db
+                };
+                Ok(db_table)
             },
             Err(_) => {
                 let planet_error = PlanetError::new(
@@ -86,6 +90,7 @@ impl Schema for DbTable {
                 Err(planet_error)
             }
         }
+
     }
 
     // fn get_by_name(table_name: &str, account_id: Option<[u8; 12]>, space_id: Option<[u8; 12]>) -> Result<Option<DbTable>, PlanetError> {
@@ -128,43 +133,37 @@ impl Schema for DbTable {
     //     }
     // }
 
-    fn get(id: &String, planet_context: &PlanetContext, context: &Context) -> Result<DbTable, PlanetError> {
-        let db = DbTable::open(
-            &planet_context,
-            &context,
-        ).unwrap();
-        let id_db = xid::Id::from_str(id).unwrap();
-        let id_db = id_db.as_bytes();
-        let item_db = db.get(&id_db).unwrap().unwrap();
-        let item_: Result<DbTable, _> = bincode::deserialize(&item_db);
-        match item_ {
-            Ok(_) => {
-                let item = item_.unwrap();
-                Ok(item)
-            },
-            Err(_) => {
-                Err(PlanetError::new(500, Some(tr!("Could not fetch item from database"))))
-            }
-        }
-    }
+    // fn get(id: &String, planet_context: &PlanetContext, context: &Context02) -> Result<DbTable, PlanetError> {
+    //     let db = DbTable::open(
+    //         &planet_context,
+    //         &context,
+    //     ).unwrap();
+    //     let id_db = xid::Id::from_str(id).unwrap();
+    //     let id_db = id_db.as_bytes();
+    //     let item_db = db.get(&id_db).unwrap().unwrap();
+    //     let item_: Result<DbTable, _> = bincode::deserialize(&item_db);
+    //     match item_ {
+    //         Ok(_) => {
+    //             let item = item_.unwrap();
+    //             Ok(item)
+    //         },
+    //         Err(_) => {
+    //             Err(PlanetError::new(500, Some(tr!("Could not fetch item from database"))))
+    //         }
+    //     }
+    // }
 
-    fn create(&self) -> Result<DbTable, PlanetError> {
-        let encoded: Vec<u8> = bincode::serialize(&self).unwrap();
-        let planet_context = &self.planet_context.clone().unwrap();
-        let context = &self.context.clone().unwrap();
-        let db = DbTable::open(
-            &planet_context,
-            &context
-        ).unwrap();
-        let id = &self.id.clone().unwrap();
+    fn create(&self, schema_data: &SchemaData) -> Result<SchemaData, PlanetError> {
+        let encoded: Vec<u8> = bincode::serialize(schema_data).unwrap();
+        let id = &schema_data.id.clone().unwrap();
         let id_db = xid::Id::from_str(id).unwrap();
         let id_db = id_db.as_bytes();
-        let response = db.insert(&id_db, encoded);
+        let response = &self.db.insert(&id_db, encoded);
         match response {
             Ok(_) => {
                 println!("DbTable.create :: id: {:?}", &id);
-                let item_db = db.get(&id_db).unwrap().unwrap();
-                let item_: Result<DbTable, _> = bincode::deserialize(&item_db);
+                let item_db = &self.db.get(&id_db).unwrap().unwrap();
+                let item_: Result<SchemaData, _> = bincode::deserialize(&item_db);
                 match item_ {
                     Ok(_) => {
                         let item = item_.unwrap();
@@ -184,99 +183,99 @@ impl Schema for DbTable {
 }
 
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct DbFieldValue {
-    pub id: Option<String>,
-    pub config_id: Option<String>,
-    pub name: Option<String>,
-    pub value: Option<String>,
-    pub options: Option<HashMap<String, String>>,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct DbRow {
-    pub id: Option<String>,
-    pub table: Option<DbTable>,
-    pub display_name: String,
-    pub fields: Option<Vec<DbFieldValue>>,
-    pub fields_stemming: Option<Vec<DbFieldValue>>,
-    pub options: Option<HashMap<String, String>>,
-}
-
-
-//TODO: I will need the schema from create table config, so I can apply some helper methods of conversion
-
-impl DbRow {
-    pub fn defaults(display_name: &String, table: &DbTable) -> DbRow {
-        let db_row: DbRow = DbRow{
-            id: generate_id(),
-            display_name: format!("{}", display_name),
-            fields: Some(Vec::new()),
-            fields_stemming: None,
-            options: None,
-            table: Some(table.clone()),
-        };
-        return db_row
-    }
-}
-
-// impl Table for DbTable{
-
-//     fn insert(&self, db_row: DbRow) {
-//         println!("DbDoc.insert...");
-//         // Bincode
-//         let t_1 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-//         let encoded: Vec<u8> = bincode::serialize(&db_row).unwrap();
-//         let t_2 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-//         // let diff = t_2-t_1;
-//         println!("DbDoc.insert :: bincode perf encode: {:?}", &(t_2-t_1));
-//         println!("DbDoc.insert :: encoded: {:?} length: {}", encoded, encoded.len());
-//         let t_1 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-//         let decoded: Result<DbTable, bincode::Error> = bincode::deserialize(&encoded[..]);
-//         // println!("DbDoc.insert :: error: {:?}", decoded.unwrap_err());
-//         let t_2 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-//         println!("DbDoc.insert :: bincode perf decode: {:?}", &(t_2-t_1));
-//         // JSON
-//         // let t_1 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-//         // let config_value = serde_json::to_value(&db_doc).unwrap();
-//         // let json_encoded = serde_json::to_string(&config_value).unwrap();
-//         // let t_2 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-//         // let diff = t_2-t_1;
-//         // println!("DbDoc.insert :: json perf encode: {:?}", &diff);
-//         // println!("DbDoc.insert :: encoded json: length: {}", json_encoded.len());
-//         // println!("DbDoc.insert :: {:?}", json_encoded);
-//         // let t_1 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-//         // let json_decoded: Result<Value, serde_json::Error> = serde_json::from_str(&json_encoded);
-//         // let db_doc: Result<DbDoc, serde_json::Error> = serde_json::from_value(json_decoded.unwrap());
-//         // let t_2 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-//         // println!("DbDoc.insert :: json perf decode: {:?}", &(t_2-t_1));
-//         // println!("DbDoc.insert :: json decoded: {:#?}", &db_doc.unwrap());
-//     }
-
-//     fn update(&self, id: &str, db_row: DbRow) {
-//         println!("KeyValueTable.update ...");
-//         println!("id: {}", id.to_string())
-//     }
-
-//     fn delete(&self, id: &str) {
-//         println!("KeyValueTable.delete ...");
-//         println!("id: {}", id)
-//     }
-
-//     fn read(&self, id: &str) {
-//         println!("KeyValueTable.read ...");
-//         println!("id: {id}", id=id)
-//     }
-
-//     fn select(&self, query: DbQuery) {
-//         println!("KeyValueTable.select ...");
-//         println!("select...");
-//     }
-
+// #[derive(Debug, Deserialize, Serialize, Clone)]
+// pub struct DbFieldValue {
+//     pub id: Option<String>,
+//     pub config_id: Option<String>,
+//     pub name: Option<String>,
+//     pub value: Option<String>,
+//     pub options: Option<HashMap<String, String>>,
 // }
 
-pub struct DbQuery {
-    pub sql_where: String,
-    pub page: u8,
-    pub number_items: u8,
-}
+// #[derive(Debug, Deserialize, Serialize, Clone)]
+// pub struct DbRow<'db, 'gb> {
+//     pub id: Option<String>,
+//     pub table: Option<DbTable<'db, 'gb>>,
+//     pub display_name: String,
+//     pub fields: Option<Vec<DbFieldValue>>,
+//     pub fields_stemming: Option<Vec<DbFieldValue>>,
+//     pub options: Option<HashMap<String, String>>,
+// }
+
+
+// //TODO: I will need the schema from create table config, so I can apply some helper methods of conversion
+
+// // impl DbRow {
+// //     pub fn defaults(display_name: &String, table: &DbTable) -> DbRow {
+// //         let db_row: DbRow = DbRow{
+// //             id: generate_id(),
+// //             display_name: format!("{}", display_name),
+// //             fields: Some(Vec::new()),
+// //             fields_stemming: None,
+// //             options: None,
+// //             table: Some(table.clone()),
+// //         };
+// //         return db_row
+// //     }
+// // }
+
+// // impl Table for DbTable{
+
+// //     fn insert(&self, db_row: DbRow) {
+// //         println!("DbDoc.insert...");
+// //         // Bincode
+// //         let t_1 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+// //         let encoded: Vec<u8> = bincode::serialize(&db_row).unwrap();
+// //         let t_2 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+// //         // let diff = t_2-t_1;
+// //         println!("DbDoc.insert :: bincode perf encode: {:?}", &(t_2-t_1));
+// //         println!("DbDoc.insert :: encoded: {:?} length: {}", encoded, encoded.len());
+// //         let t_1 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+// //         let decoded: Result<DbTable, bincode::Error> = bincode::deserialize(&encoded[..]);
+// //         // println!("DbDoc.insert :: error: {:?}", decoded.unwrap_err());
+// //         let t_2 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+// //         println!("DbDoc.insert :: bincode perf decode: {:?}", &(t_2-t_1));
+// //         // JSON
+// //         // let t_1 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+// //         // let config_value = serde_json::to_value(&db_doc).unwrap();
+// //         // let json_encoded = serde_json::to_string(&config_value).unwrap();
+// //         // let t_2 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+// //         // let diff = t_2-t_1;
+// //         // println!("DbDoc.insert :: json perf encode: {:?}", &diff);
+// //         // println!("DbDoc.insert :: encoded json: length: {}", json_encoded.len());
+// //         // println!("DbDoc.insert :: {:?}", json_encoded);
+// //         // let t_1 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+// //         // let json_decoded: Result<Value, serde_json::Error> = serde_json::from_str(&json_encoded);
+// //         // let db_doc: Result<DbDoc, serde_json::Error> = serde_json::from_value(json_decoded.unwrap());
+// //         // let t_2 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+// //         // println!("DbDoc.insert :: json perf decode: {:?}", &(t_2-t_1));
+// //         // println!("DbDoc.insert :: json decoded: {:#?}", &db_doc.unwrap());
+// //     }
+
+// //     fn update(&self, id: &str, db_row: DbRow) {
+// //         println!("KeyValueTable.update ...");
+// //         println!("id: {}", id.to_string())
+// //     }
+
+// //     fn delete(&self, id: &str) {
+// //         println!("KeyValueTable.delete ...");
+// //         println!("id: {}", id)
+// //     }
+
+// //     fn read(&self, id: &str) {
+// //         println!("KeyValueTable.read ...");
+// //         println!("id: {id}", id=id)
+// //     }
+
+// //     fn select(&self, query: DbQuery) {
+// //         println!("KeyValueTable.select ...");
+// //         println!("select...");
+// //     }
+
+// // }
+
+// pub struct DbQuery {
+//     pub sql_where: String,
+//     pub page: u8,
+//     pub number_items: u8,
+// }
