@@ -35,39 +35,37 @@ impl<'gb> Command<SchemaData> for CreateTable<'gb> {
         );
         match result {
             Ok(_) => {
-                // I need to grab this through Regex, the table name embedded into the command
+                //TODO: I need to grab this through Regex, the table name embedded into the command
                 let table_name = String::from("My Table");
-                let schema_data: SchemaData = SchemaData::defaults(&table_name, &config);
-                let db_table = result.unwrap();
-                let result = db_table.create(&schema_data);
-                match result {
+                let account_id = self.context.account_id.clone();
+                let account_id = account_id.clone().unwrap();
+                let space_id = self.context.space_id.clone().unwrap();
+                let schema_data: SchemaData = SchemaData::defaults(
+                    &table_name, 
+                    &config,
+                    &account_id,
+                    &space_id,
+                );
+                let db_table: DbTable<'gb> = result.unwrap();
+                let result02: Result<SchemaData, PlanetError> = db_table.create(&schema_data);
+                match result02 {
                     Ok(_) => {
-                        let response: SchemaData = result.unwrap();
+                        let response: SchemaData = result02.unwrap();
                         Ok(response)
                     },
-                    Err(_) => {
-                        Err(
-                            PlanetError::new(
-                                500, 
-                                Some(tr!("Could not create table")),
-                            )
-                        )
+                    Err(error) => {
+                        Err(error)
                     }
                 }        
             },
-            Err(_) => {
-                Err(
-                    PlanetError::new(
-                        500, 
-                        Some(tr!("Could not create table")),
-                    )
-                )
+            Err(error) => {
+                Err(error)
             }
         }
     }
 
     fn runner(runner: &CommandRunner, path_yaml: &String) -> () {
-        let config_ = CreateTableConfig::defaults(&path_yaml, runner.planet_context);
+        let config_ = CreateTableConfig::defaults();
         let config: Result<CreateTableConfig, Vec<PlanetValidationError>> = config_.import(
             runner.planet_context,
             &path_yaml
@@ -79,7 +77,15 @@ impl<'gb> Command<SchemaData> for CreateTable<'gb> {
                     context: runner.context,
                     config: config.unwrap(),
                 };
-                create_table.run();
+                let result = create_table.run();
+                match result {
+                    Ok(_) => {
+                        println!("runner :: I could create table");
+                    },
+                    Err(error) => {
+                        println!("runner :: Error: {:?}", error.message);
+                    }
+                }
             },
             Err(errors) => {
                 println!();

@@ -22,26 +22,6 @@ pub struct PlanetContextSource {
     pub home_path: Option<String>,
 }
 
-// impl<'gb> PlanetContextSource {
-//     fn get_ref(&self) -> &'gb PlanetContext<'gb> {
-//         let planet_context: &'gb PlanetContext<'gb> = PlanetContext{
-//             mission: "",
-//             home_path: Some(""),
-//         };
-//         return planet_context
-//     }
-// }
-
-impl<'gb> PlanetContextSource {
-    pub fn get_ref(&self, mission: &'gb String, home_path: &'gb String) -> PlanetContext<'gb> {
-        let planet_context: PlanetContext<'gb> = PlanetContext{
-            mission: mission,
-            home_path: Some(home_path.as_str()),
-        };
-        return planet_context
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct PlanetContext<'gb> {
     pub mission: &'gb str,
@@ -91,18 +71,6 @@ pub struct Context<'gb> {
     pub space_id: Option<&'gb String>,
 }
 
-impl<'gb> ContextSource {
-    fn get_ref(&self) -> Context<'gb> {
-        let context: Context<'gb> = Context{
-            id: None,
-            data: None,
-            account_id: None,
-            space_id: None,
-        };
-        return context
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct PlanetError {
     pub error_code: u16,
@@ -123,7 +91,7 @@ impl PlanetError {
         let reason_tuple = error_reasons.get(&error_code);
         let reason: &str = reason_tuple.unwrap().0;
         let reason_message: &String = &reason_tuple.unwrap().1;
-        let mut my_message: Option<String> = Some(String::from(""));
+        let my_message: Option<String>;
         if message.is_none() {
             my_message = Some(reason_message.to_string());
         } else {

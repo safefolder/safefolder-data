@@ -31,7 +31,7 @@ pub struct CreateTableConfig {
 
 impl CreateTableConfig {
 
-    pub fn defaults(yaml_path: &String, planet_context: &PlanetContext) -> CreateTableConfig {
+    pub fn defaults() -> CreateTableConfig {
         let config: CreateTableConfig = CreateTableConfig{
             command: None,
             language: None,

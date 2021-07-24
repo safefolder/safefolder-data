@@ -6,9 +6,6 @@ pub mod constants;
 
 use validator::{ValidationErrors};
 use crate::commands::table::config::FieldConfig;
-use tr::tr;
-
-use crate::planet::PlanetError;
 
 pub trait StorageField {
     fn defaults() -> FieldConfig;

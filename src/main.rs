@@ -3,9 +3,6 @@ extern crate xid;
 extern crate serde_yaml;
 extern crate colored;
 
-#[macro_use]
-extern crate json;
-
 pub mod commands;
 pub mod storage;
 pub mod planet;
@@ -13,10 +10,9 @@ pub mod planet;
 use crate::commands::CommandRunner;
 use argparse::{ArgumentParser, StoreTrue, Store};
 use std::collections::HashMap;
-use std::str::FromStr;
 
 use crate::commands::table::Command;
-use crate::planet::{PlanetContext, Context, ContextSource, PlanetContextSource};
+use crate::planet::{PlanetContext, Context, ContextSource};
 
 fn main() {
 
@@ -75,12 +71,13 @@ fn main() {
         space_id: None,
         account_id: None,
     };
-    // let context: &'gb Context<'gb> = context_source.get_ref();
+    let account_id = &context_source.account_id.unwrap_or_default();
+    let space_id = &context_source.space_id.unwrap_or_default();
     let context = Context{
         id: None,
         data: None,
-        account_id: None,
-        space_id: None,
+        account_id: Some(&account_id),
+        space_id: Some(&space_id),
     };
 
     if op.to_lowercase() == "run" && &scope.to_lowercase() == "command" {

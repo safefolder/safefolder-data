@@ -1,23 +1,19 @@
 extern crate sled;
 
-// use serde_json::Value;
-use std::io;
 use std::str::FromStr;
-use std::{collections::HashMap, time::{SystemTime, UNIX_EPOCH}};
+// use std::{collections::HashMap, time::{SystemTime, UNIX_EPOCH}};
 use serde::{Deserialize, Serialize};
-use validator::{Validate};
 use tr::tr;
 
 use crate::storage::{generate_id};
-use crate::commands::table::config::{FieldConfig, LanguageConfig};
 use crate::planet::{PlanetError, PlanetContext, Context};
 use crate::commands::table::config::DbTableConfig;
 
 pub trait Schema<'gb> {
     fn defaults(planet_context: &'gb PlanetContext<'gb>, context: &'gb Context<'gb>) -> Result<DbTable<'gb>, PlanetError>;
     fn create(&self, schema_data: &SchemaData) -> Result<SchemaData, PlanetError>;
-    // fn get(id: &String, planet_context: &PlanetContext, context: &Context) -> Result<DbTable<'db, 'gb>, PlanetError<'gb>>;
-    // fn get_by_name(table_name: &str, account_id: Option<[u8; 12]>, space_id: Option<[u8; 12]>) -> Result<Option<DbTable>, PlanetError>;
+    fn get(&self, id: &String) -> Result<SchemaData, PlanetError>;
+    fn get_by_name(&self, table_name: &str) -> Result<Option<SchemaData>, PlanetError>;
 }
 
 // pub trait Table {
@@ -33,16 +29,20 @@ pub trait Schema<'gb> {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SchemaData {
     pub id: Option<String>,
+    pub account_id: Option<String>,
+    pub space_id: Option<String>,
     pub name: String,
     pub config: DbTableConfig,
 }
 
 impl SchemaData {
-    pub fn defaults(name: &String, config: &DbTableConfig) -> SchemaData {
+    pub fn defaults(name: &String, config: &DbTableConfig, account_id: &String, space_id: &String) -> SchemaData {
         let schema_data = SchemaData{
             id: generate_id(),
             name: format!("{}", name),
             config: config.clone(),
+            account_id: Some(account_id.clone()),
+            space_id: Some(space_id.clone()),
         };
         return schema_data
     }
@@ -61,7 +61,7 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
         Result<DbTable<'gb>, PlanetError> {
         let mut path: String = String::from("");
         let home_dir = planet_context.home_path.clone().unwrap();
-        if *&context.account_id.is_some() && *&context.space_id.is_some() {
+        if *&context.account_id.unwrap() != "" && *&context.space_id.unwrap() != "" {
             println!("DbTable.open :: account_id and space_id have been informed");
         } else {
             // .achiever-planet/tables/tables.db : platform wide table schemas
@@ -93,67 +93,80 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
 
     }
 
-    // fn get_by_name(table_name: &str, account_id: Option<[u8; 12]>, space_id: Option<[u8; 12]>) -> Result<Option<DbTable>, PlanetError> {
-    //     // I travel table for account_id if any, space id if any and table name
-    //     let db: sled::Db = DbTable::open("tables", None, None).unwrap();
-    //     let iter = db.iter();
-    //     let mut number_items = 0;
-    //     let mut matched_item: Option<DbTable> = None;
-    //     for result in iter {
-    //         let tuple = result.unwrap();
-    //         let item_db = tuple.1;
-    //         let item: DbTable = bincode::deserialize(&item_db).unwrap();
-    //         let matches_name_none = item.name.to_lowercase() == table_name.to_lowercase() && 
-    //             account_id.is_none() && space_id.is_none();
-    //         let mut check_account: bool = true;
-    //         if account_id.is_some() && space_id.is_some() {
-    //             if (item.account_id.is_some() && item.account_id.unwrap() != account_id.unwrap()) || 
-    //             (item.space_id.is_some() && item.space_id.unwrap() != space_id.unwrap()) {
-    //                 check_account = false;
-    //             }
-    //         }
-    //         if matches_name_none && check_account {
-    //             number_items += 1;
-    //             matched_item = Some(item);
-    //         }
-    //     }
-    //     match number_items {
-    //         0 => {
-    //             return Ok(None)
-    //         },
-    //         1 => {
-    //             return Ok(matched_item)
-    //         },
-    //         2 => {
-    //             return Err(PlanetError::new(500, Some(tr!("Could not fetch item from database"))))
-    //         },
-    //         _ => {
-    //             return Err(PlanetError::new(500, Some(tr!("Could not fetch item from database"))))
-    //         }
-    //     }
-    // }
+    fn get_by_name(&self, table_name: &str) -> Result<Option<SchemaData>, PlanetError> {
+        // I travel table for account_id if any, space id if any and table name
+        let iter = self.db.iter();
+        let mut number_items = 0;
+        let mut matched_item: Option<SchemaData> = None;
+        for result in iter {
+            let tuple = result.unwrap();
+            let item_db = tuple.1;
+            let item: SchemaData = bincode::deserialize(&item_db).unwrap();
+            let item_source = item.clone();
+            let matches_name_none = &item.name.to_lowercase() == &table_name.to_lowercase();
+            let mut check_account: bool = true;
+            let ctx_account_id = self.context.account_id.clone().unwrap();
+            let ctx_space_id = self.context.space_id.clone().unwrap();
+            if self.context.account_id.is_some() && self.context.space_id.is_some() {
+                if (item.account_id.is_some() && &item.account_id.unwrap() != ctx_account_id) || 
+                (item.space_id.is_some() && &item.space_id.unwrap() != ctx_space_id) {
+                    check_account = false;
+                }
+            }
+            
+            if matches_name_none && check_account {
+                number_items += 1;
+                matched_item = Some(item_source);
+            }
+        }
+        match number_items {
+            0 => {
+                return Ok(None)
+            },
+            1 => {
+                return Ok(matched_item)
+            },
+            2 => {
+                return Err(PlanetError::new(500, Some(tr!("Could not fetch item from database"))))
+            },
+            _ => {
+                return Err(PlanetError::new(500, Some(tr!("Could not fetch item from database"))))
+            }
+        }
+    }
 
-    // fn get(id: &String, planet_context: &PlanetContext, context: &Context02) -> Result<DbTable, PlanetError> {
-    //     let db = DbTable::open(
-    //         &planet_context,
-    //         &context,
-    //     ).unwrap();
-    //     let id_db = xid::Id::from_str(id).unwrap();
-    //     let id_db = id_db.as_bytes();
-    //     let item_db = db.get(&id_db).unwrap().unwrap();
-    //     let item_: Result<DbTable, _> = bincode::deserialize(&item_db);
-    //     match item_ {
-    //         Ok(_) => {
-    //             let item = item_.unwrap();
-    //             Ok(item)
-    //         },
-    //         Err(_) => {
-    //             Err(PlanetError::new(500, Some(tr!("Could not fetch item from database"))))
-    //         }
-    //     }
-    // }
+    fn get(&self, id: &String) -> Result<SchemaData, PlanetError> {
+        let id_db = xid::Id::from_str(id).unwrap();
+        let id_db = id_db.as_bytes();
+        let item_db = &self.db.get(&id_db).unwrap().unwrap();
+        let item_: Result<SchemaData, _> = bincode::deserialize(&item_db);
+        match item_ {
+            Ok(_) => {
+                let item = item_.unwrap();
+                Ok(item)
+            },
+            Err(_) => {
+                Err(PlanetError::new(500, Some(tr!("Could not fetch item from database"))))
+            }
+        }
+    }
 
     fn create(&self, schema_data: &SchemaData) -> Result<SchemaData, PlanetError> {
+        let table_name = &schema_data.name;
+        let result_table_exists: Result<Option<SchemaData>, PlanetError> = self.get_by_name(
+            &table_name.as_str()
+        );
+        let table_exists_error = *&result_table_exists.is_err();
+        let table_exists = *&table_exists_error == false && *&result_table_exists.unwrap().is_some();
+        if table_exists == true {
+            return Err(PlanetError::new(
+                500, 
+                Some(tr!("Table \"{}\" already exists", &table_name))));
+        } else if *&table_exists_error == true {
+            return Err(PlanetError::new(
+                500, 
+                Some(tr!("Error checking table \"{}\"", &table_name))));
+        }
         let encoded: Vec<u8> = bincode::serialize(schema_data).unwrap();
         let id = &schema_data.id.clone().unwrap();
         let id_db = xid::Id::from_str(id).unwrap();
@@ -162,20 +175,18 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
         match response {
             Ok(_) => {
                 println!("DbTable.create :: id: {:?}", &id);
-                let item_db = &self.db.get(&id_db).unwrap().unwrap();
-                let item_: Result<SchemaData, _> = bincode::deserialize(&item_db);
+                let item_ = self.get(id);
                 match item_ {
                     Ok(_) => {
                         let item = item_.unwrap();
                         Ok(item)
                     },
-                    Err(_) => {
-                        Err(PlanetError::new(500, Some(tr!("Could not fetch item from database"))))
+                    Err(error) => {
+                        Err(error)
                     }
                 }
             },
             Err(_) => {
-                // I return io error, so is not linked to data provider, sled so far
                 Err(PlanetError::new(500, Some(tr!("Could not write table schema"))))
             }
         }
