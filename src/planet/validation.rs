@@ -134,8 +134,9 @@ impl<'gb> CommandImportConfig<'gb> {
     }
 
     fn get_validation_message_items(&self, main_error_field: &str, error_field: &str, error: &ValidationError) -> ValidationMessageFields {
+        let message_field: ValidationMessageFields;
         if main_error_field.len() == 0 {
-            let message_field: ValidationMessageFields = ValidationMessageFields{
+            message_field = ValidationMessageFields{
                 field: format!(
                     "{}{}{}", 
                     String::from("\"").magenta(), 
@@ -144,22 +145,36 @@ impl<'gb> CommandImportConfig<'gb> {
                 ),
                 value: error.params.get("equal").unwrap().to_string().green(),
             };
-            return message_field;
         } else {
-            let message_field: ValidationMessageFields = ValidationMessageFields{
-                field: format!(
-                    "{}{}{}.{}{}{}", 
-                    String::from("\"").magenta(), 
-                    main_error_field.magenta(),
-                    String::from("\"").magenta(),
-                    String::from("\"").magenta(), 
-                    error_field.magenta(),
-                    String::from("\"").magenta(), 
-                ),
-                value: error.params.get("equal").unwrap().to_string().green(),
-            };
-            return message_field;
+            // main_error_field: command
+            let error_field_equal = error.params.get("equal");
+            if error_field_equal.is_some() {
+                message_field = ValidationMessageFields{
+                    field: format!(
+                        "{}{}{}.{}{}{}", 
+                        String::from("\"").magenta(), 
+                        main_error_field.magenta(),
+                        String::from("\"").magenta(),
+                        String::from("\"").magenta(), 
+                        error_field.magenta(),
+                        String::from("\"").magenta(), 
+                    ),
+                    value: error.params.get("equal").unwrap().to_string().green(),
+                };
+            } else {
+                // main_error_field: command
+                message_field = ValidationMessageFields{
+                    field: format!(
+                        "{}{}{}", 
+                        String::from("\"").magenta(), 
+                        main_error_field.magenta(),
+                        String::from("\"").magenta(),
+                    ),
+                    value: String::from("Hola").green(),
+                };
+            }
         }
+        return message_field;
     }
 
     fn parse_field_validations(&self, 
@@ -225,8 +240,9 @@ impl<'gb> CommandImportConfig<'gb> {
                     );
                     planet_errors.push(planet_error);
             } else if error.code == "regex" {
+                // [ValidationError { code: "regex", message: None, params: {"value": String("CREATE TABLE")} }]
                 planet_error.message = tr!(
-                    "{command}{sep}: {field} string expression (regex) did not pass.",
+                    "{command}{sep}: {field} did not pass formatting validation. Check documentation.",
                     command=command.blue(),
                     sep=String::from(":").blue(),
                     field=message_fields.field,

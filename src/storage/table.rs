@@ -1,6 +1,7 @@
 extern crate sled;
 
 use std::str::FromStr;
+use colored::Colorize;
 // use std::{collections::HashMap, time::{SystemTime, UNIX_EPOCH}};
 use serde::{Deserialize, Serialize};
 use tr::tr;
@@ -68,7 +69,6 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
         } else {
             // .achiever-planet/tables/tables.db : platform wide table schemas
             path = format!("{home}/tables/tables.db", home=&home_dir);
-            println!("DbTable.open :: path: {}", &path);
         }
         let config: sled::Config = sled::Config::default()
             .use_compression(true)
@@ -162,9 +162,10 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
         let table_exists_error = *&result_table_exists.is_err();
         let table_exists = *&table_exists_error == false && *&result_table_exists.unwrap().is_some();
         if table_exists == true {
+            let table_name_str = format!("\"{}\"", &table_name).magenta();
             return Err(PlanetError::new(
                 500, 
-                Some(tr!("Table \"{}\" already exists", &table_name))));
+                Some(tr!("Table {} already exists", &table_name_str))));
         } else if *&table_exists_error == true {
             return Err(PlanetError::new(
                 500, 
@@ -177,7 +178,7 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
         let response = &self.db.insert(&id_db, encoded);
         match response {
             Ok(_) => {
-                println!("DbTable.create :: id: {:?}", &id);
+                // println!("DbTable.create :: id: {:?}", &id);
                 let item_ = self.get(id);
                 match item_ {
                     Ok(_) => {

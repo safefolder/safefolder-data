@@ -3,6 +3,7 @@ extern crate colored;
 
 use tr::tr;
 use colored::*;
+use regex::Regex;
 
 use crate::commands::table::config::{CreateTableConfig, DbTableConfig};
 use crate::commands::table::{Command};
@@ -35,8 +36,10 @@ impl<'gb> Command<SchemaData> for CreateTable<'gb> {
         );
         match result {
             Ok(_) => {
-                //TODO: I need to grab this through Regex, the table name embedded into the command
-                let table_name = String::from("My Table");
+                let command = self.config.command.clone().unwrap_or_default();
+                let expr = Regex::new(r#"(CREATE TABLE) "(?P<table_name>[a-zA-Z0-9_ ]+)"#).unwrap();
+                let table_name_match = expr.captures(&command).unwrap();
+                let table_name = &table_name_match["table_name"].to_string();
                 let account_id = self.context.account_id.unwrap_or_default();
                 let space_id = self.context.space_id.unwrap_or_default();
                 let schema_data: SchemaData = SchemaData::defaults(
@@ -47,8 +50,21 @@ impl<'gb> Command<SchemaData> for CreateTable<'gb> {
                 );
                 let db_table: DbTable<'gb> = result.unwrap();
 
-                let response = db_table.create(&schema_data)?;
-                Ok(response)
+                let response: SchemaData = db_table.create(&schema_data)?;
+                let response_src = response.clone();
+                // response.id
+                let table_name = &response.name;
+                let table_id = &response.id.unwrap();
+
+                println!();
+                let quote_color = format!("{}", String::from("\""));
+                println!("Created table {} :: {} => {}",
+                    format!("{}{}{}", &quote_color.blue(), &table_name.blue(), &quote_color.blue()),
+                    &table_id.magenta(),
+                    format!("{}{}{}", &quote_color.green(), &table_name.green(), &quote_color.green()),
+                );
+
+                Ok(response_src)
             },
             Err(error) => {
                 Err(error)
@@ -72,10 +88,21 @@ impl<'gb> Command<SchemaData> for CreateTable<'gb> {
                 let result = create_table.run();
                 match result {
                     Ok(_) => {
-                        println!("runner :: I could create table");
+                        println!();
+                        println!("{}", String::from("[OK]").green());
                     },
                     Err(error) => {
-                        println!("runner :: Error: {:?}", error.message);
+                        let count = 1;
+                        println!();
+                        println!("{}", tr!("I found these errors").red().bold());
+                        println!("{}", "--------------------".red());
+                        println!();
+                        println!(
+                            "{}{} {}", 
+                            count.to_string().blue(),
+                            String::from('.').blue(),
+                            error.message
+                        );
                     }
                 }
             },

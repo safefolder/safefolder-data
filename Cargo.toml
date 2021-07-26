@@ -23,8 +23,9 @@ i18n-embed = {version="0.10"}
 xtr = {version="0.1.6"}
 tr = {version="0.1.6"}
 xid = {version="1.0.0"}
-regex = {version="1"}
+regex = {version="1.5.4"}
 colored = {version="2.0.0"}
 json = {version="0.12.4"}
 bincode = {version="1.3.3"}
 serde_json = {version = "1.0.64"}
+lazy_static = {version="1.4.0"}

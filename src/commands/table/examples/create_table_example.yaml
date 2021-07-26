@@ -1,5 +1,5 @@
 ---
-command: CREATE TABLE "My Table"
+command: CREATE TABLE "Super Table"
 language:
   codes: ["english", "spanish"]
   default: "english"

@@ -2,6 +2,8 @@ extern crate xid;
 
 use serde::{Deserialize, Serialize};
 use validator::{Validate, ValidationErrors, ValidationError};
+use lazy_static::lazy_static;
+use regex::Regex;
 
 use crate::planet::validation::{CommandImportConfig, PlanetValidationError};
 use crate::planet::PlanetContext;
@@ -18,10 +20,13 @@ pub struct DbTableConfig {
     pub fields: Option<Vec<FieldConfig>>,
 }
 
+lazy_static! {
+    static ref RE_COMMAND_CREATE_TABLE: Regex = Regex::new(r#"(CREATE TABLE) "([a-zA-Z0-9_ ]+)"#).unwrap();
+}
 
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
 pub struct CreateTableConfig {
-    #[validate(required)]
+    #[validate(required, regex="RE_COMMAND_CREATE_TABLE")]
     pub command: Option<String>,
     #[validate]
     pub language: Option<LanguageConfig>,

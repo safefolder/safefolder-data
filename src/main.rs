@@ -2,6 +2,7 @@ extern crate argparse;
 extern crate xid;
 extern crate serde_yaml;
 extern crate colored;
+extern crate lazy_static;
 
 pub mod commands;
 pub mod storage;
