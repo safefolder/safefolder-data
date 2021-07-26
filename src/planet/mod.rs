@@ -65,10 +65,10 @@ pub struct ContextSource {
 
 #[derive(Debug, Clone)]
 pub struct Context<'gb> {
-    pub id: Option<&'gb String>,
+    pub id: Option<&'gb str>,
     pub data: Option<&'gb HashMap<String, String>>,
-    pub account_id: Option<&'gb String>,
-    pub space_id: Option<&'gb String>,
+    pub account_id: Option<&'gb str>,
+    pub space_id: Option<&'gb str>,
 }
 
 #[derive(Debug, Clone)]

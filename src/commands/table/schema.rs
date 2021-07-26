@@ -30,33 +30,25 @@ impl<'gb> Command<SchemaData> for CreateTable<'gb> {
             fields: self.config.fields.clone(),
         };
         let result: Result<DbTable<'gb>, PlanetError> = DbTable::defaults(
-            &self.planet_context,
-            &self.context,
+            self.planet_context,
+            self.context,
         );
         match result {
             Ok(_) => {
                 //TODO: I need to grab this through Regex, the table name embedded into the command
                 let table_name = String::from("My Table");
-                let account_id = self.context.account_id.clone();
-                let account_id = account_id.clone().unwrap();
-                let space_id = self.context.space_id.clone().unwrap();
+                let account_id = self.context.account_id.unwrap_or_default();
+                let space_id = self.context.space_id.unwrap_or_default();
                 let schema_data: SchemaData = SchemaData::defaults(
                     &table_name, 
                     &config,
-                    &account_id,
-                    &space_id,
+                    account_id,
+                    space_id,
                 );
                 let db_table: DbTable<'gb> = result.unwrap();
-                let result02: Result<SchemaData, PlanetError> = db_table.create(&schema_data);
-                match result02 {
-                    Ok(_) => {
-                        let response: SchemaData = result02.unwrap();
-                        Ok(response)
-                    },
-                    Err(error) => {
-                        Err(error)
-                    }
-                }        
+
+                let response = db_table.create(&schema_data)?;
+                Ok(response)
             },
             Err(error) => {
                 Err(error)

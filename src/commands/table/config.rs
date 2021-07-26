@@ -160,19 +160,3 @@ fn validate_language_codes(languages: &Vec<String>) -> Result<(), ValidationErro
     }
 
 }
-
-// fn validate_str(_: &str) -> Result<(), ValidationError> {
-//     if std::any::type_name::<&str>() == "&str" {
-//         return Ok(())
-//     } else {
-//         return Err(ValidationError::new("Invalid String"));
-//     }
-// }
-
-// fn validate_string(_: String) -> Result<(), ValidationError> {
-//     if std::any::type_name::<&str>() == "String" {
-//         return Ok(())
-//     } else {
-//         return Err(ValidationError::new("Invalid String"));
-//     }
-// }

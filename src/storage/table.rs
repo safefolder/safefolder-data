@@ -36,13 +36,13 @@ pub struct SchemaData {
 }
 
 impl SchemaData {
-    pub fn defaults(name: &String, config: &DbTableConfig, account_id: &String, space_id: &String) -> SchemaData {
+    pub fn defaults(name: &String, config: &DbTableConfig, account_id: &str, space_id: &str) -> SchemaData {
         let schema_data = SchemaData{
             id: generate_id(),
             name: format!("{}", name),
             config: config.clone(),
-            account_id: Some(account_id.clone()),
-            space_id: Some(space_id.clone()),
+            account_id: Some(account_id.to_string()),
+            space_id: Some(space_id.to_string()),
         };
         return schema_data
     }
@@ -60,8 +60,10 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
     fn defaults(planet_context: &'gb PlanetContext<'gb>, context: &'gb Context<'gb>) -> 
         Result<DbTable<'gb>, PlanetError> {
         let mut path: String = String::from("");
-        let home_dir = planet_context.home_path.clone().unwrap();
-        if *&context.account_id.unwrap() != "" && *&context.space_id.unwrap() != "" {
+        let home_dir = planet_context.home_path.unwrap_or_default();
+        let account_id = context.account_id.unwrap_or_default();
+        let space_id = context.space_id.unwrap_or_default();
+        if account_id != "" && space_id != "" {
             println!("DbTable.open :: account_id and space_id have been informed");
         } else {
             // .achiever-planet/tables/tables.db : platform wide table schemas
@@ -90,7 +92,6 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
                 Err(planet_error)
             }
         }
-
     }
 
     fn get_by_name(&self, table_name: &str) -> Result<Option<SchemaData>, PlanetError> {
@@ -98,6 +99,8 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
         let iter = self.db.iter();
         let mut number_items = 0;
         let mut matched_item: Option<SchemaData> = None;
+        let ctx_account_id = self.context.account_id.unwrap_or_default();
+        let ctx_space_id = self.context.space_id.unwrap_or_default();
         for result in iter {
             let tuple = result.unwrap();
             let item_db = tuple.1;
@@ -105,11 +108,11 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
             let item_source = item.clone();
             let matches_name_none = &item.name.to_lowercase() == &table_name.to_lowercase();
             let mut check_account: bool = true;
-            let ctx_account_id = self.context.account_id.clone().unwrap();
-            let ctx_space_id = self.context.space_id.clone().unwrap();
-            if self.context.account_id.is_some() && self.context.space_id.is_some() {
-                if (item.account_id.is_some() && &item.account_id.unwrap() != ctx_account_id) || 
-                (item.space_id.is_some() && &item.space_id.unwrap() != ctx_space_id) {
+            let account_id = &item.account_id.unwrap_or_default();
+            let space_id = &item.space_id.unwrap_or_default();
+            if ctx_account_id != "" && ctx_space_id != "" {
+                if (account_id != "" && account_id != ctx_account_id) || 
+                (space_id != "" && space_id != ctx_space_id) {
                     check_account = false;
                 }
             }
