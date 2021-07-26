@@ -5,10 +5,15 @@ use colored::Colorize;
 // use std::{collections::HashMap, time::{SystemTime, UNIX_EPOCH}};
 use serde::{Deserialize, Serialize};
 use tr::tr;
+use serde_encrypt::{
+    serialize::impls::BincodeSerializer, shared_key::SharedKey, traits::SerdeEncryptSharedKey,
+    AsSharedKey, EncryptedMessage,
+};
 
 use crate::storage::{generate_id};
 use crate::planet::{PlanetError, PlanetContext, Context};
 use crate::commands::table::config::DbTableConfig;
+use crate::storage::constants::CHILD_PRIVATE_KEY_ARRAY;
 
 pub trait Schema<'gb> {
     fn defaults(planet_context: &'gb PlanetContext<'gb>, context: &'gb Context<'gb>) -> Result<DbTable<'gb>, PlanetError>;
@@ -48,6 +53,11 @@ impl SchemaData {
         return schema_data
     }
 }
+
+impl SerdeEncryptSharedKey for SchemaData {
+    type S = BincodeSerializer<Self>;  // you can specify serializer implementation (or implement it by yourself).
+}
+
 
 #[derive(Debug, Clone)]
 pub struct DbTable<'gb> {
@@ -96,6 +106,7 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
 
     fn get_by_name(&self, table_name: &str) -> Result<Option<SchemaData>, PlanetError> {
         // I travel table for account_id if any, space id if any and table name
+        let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let iter = self.db.iter();
         let mut number_items = 0;
         let mut matched_item: Option<SchemaData> = None;
@@ -103,8 +114,12 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
         let ctx_space_id = self.context.space_id.unwrap_or_default();
         for result in iter {
             let tuple = result.unwrap();
-            let item_db = tuple.1;
-            let item: SchemaData = bincode::deserialize(&item_db).unwrap();
+            let item_db = tuple.1.to_vec();
+            let item_ = EncryptedMessage::deserialize(item_db).unwrap();
+            let item_ = SchemaData::decrypt_owned(
+                &item_, 
+                &shared_key);
+            let item = item_.unwrap();
             let item_source = item.clone();
             let matches_name_none = &item.name.to_lowercase() == &table_name.to_lowercase();
             let mut check_account: bool = true;
@@ -139,13 +154,18 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
     }
 
     fn get(&self, id: &String) -> Result<SchemaData, PlanetError> {
+        let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let id_db = xid::Id::from_str(id).unwrap();
         let id_db = id_db.as_bytes();
-        let item_db = &self.db.get(&id_db).unwrap().unwrap();
-        let item_: Result<SchemaData, _> = bincode::deserialize(&item_db);
+        let item_db = self.db.get(&id_db).unwrap().unwrap().to_vec();
+        let item_ = EncryptedMessage::deserialize(item_db).unwrap();
+        let item_ = SchemaData::decrypt_owned(
+            &item_, 
+            &shared_key);
         match item_ {
             Ok(_) => {
                 let item = item_.unwrap();
+                // println!("get :: item: {:?}", &item);
                 Ok(item)
             },
             Err(_) => {
@@ -171,15 +191,17 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
                 500, 
                 Some(tr!("Error checking table \"{}\"", &table_name))));
         }
-        let encoded: Vec<u8> = bincode::serialize(schema_data).unwrap();
-        let id = &schema_data.id.clone().unwrap();
-        let id_db = xid::Id::from_str(id).unwrap();
+        let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
+        let encrypted_schema = schema_data.encrypt(&shared_key).unwrap();
+        let encoded: Vec<u8> = encrypted_schema.serialize();
+        let id = schema_data.id.clone().unwrap();
+        let id_db = xid::Id::from_str(id.as_str()).unwrap();
         let id_db = id_db.as_bytes();
-        let response = &self.db.insert(&id_db, encoded);
+        let response = &self.db.insert(id_db, encoded);
         match response {
             Ok(_) => {
                 // println!("DbTable.create :: id: {:?}", &id);
-                let item_ = self.get(id);
+                let item_ = self.get(&id);
                 match item_ {
                     Ok(_) => {
                         let item = item_.unwrap();

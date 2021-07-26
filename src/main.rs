@@ -8,10 +8,17 @@ pub mod commands;
 pub mod storage;
 pub mod planet;
 
-use crate::commands::CommandRunner;
+// use bip32::{Mnemonic, Prefix, XPrv};
+// use bip32::secp256k1::ecdsa::{
+//     signature::{Signer, Verifier},
+//     Signature
+// };
+// use rand_core::OsRng;
+
 use argparse::{ArgumentParser, StoreTrue, Store};
 use std::collections::HashMap;
 
+use crate::commands::CommandRunner;
 use crate::commands::table::Command;
 use crate::planet::{PlanetContext, Context, ContextSource};
 
@@ -80,6 +87,32 @@ fn main() {
         account_id: Some(&account_id),
         space_id: Some(&space_id),
     };
+
+    // // bip32 and encryption
+    // let mnemonic = Mnemonic::random(&mut OsRng, Default::default());
+    // let seed = mnemonic.to_seed("password");
+    // // let root_xprv = XPrv::new(&seed).unwrap();
+    // // println!("root_xprv: {:?}", root_xprv);
+    // // println!("private key: {:?}", root_xprv.to_string(Prefix::XPRV));
+    // // println!("public key: {:?}", root_xprv.public_key().to_string(Prefix::XPUB));
+    // let child_path = "m/0/2147483647'/1/2147483646'";
+    // let child_xprv = XPrv::derive_from_path(
+    //     &seed, &child_path.parse().unwrap()).unwrap();
+    // let child_xpub = child_xprv.public_key();
+    // let child_xprv_str = &child_xprv.to_string(Prefix::XPRV).to_string();
+    // let child_xpub_str = &child_xpub.to_string(Prefix::XPUB);
+    // let child_xprv_array = &child_xprv.to_bytes();
+    // println!("child private key: {:?} [{}]", &child_xprv_str, &child_xprv_str.len());
+    // println!("child public key: {:?} [{}]", &child_xpub_str, &child_xpub_str.len());
+    // println!("child private key array: {:?} [{}]", &child_xprv_array, &child_xprv_array.len());
+    // let signing_key = child_xprv.private_key();
+    // let verification_key = child_xpub.public_key();
+    // let example_msg = b"Hello, worlds!";
+    // let signature: Signature = signing_key.sign(example_msg);
+    // // println!("Signature: {:?}", signature);
+    // println!("Veritifcation signature: {:?}", 
+    //     verification_key.verify(example_msg, &signature).is_ok(), 
+    // );
 
     if op.to_lowercase() == "run" && &scope.to_lowercase() == "command" {
         let command_runner =  CommandRunner{
