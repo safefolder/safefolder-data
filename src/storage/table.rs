@@ -1,6 +1,8 @@
 extern crate sled;
 
 use std::str::FromStr;
+use std::collections::HashMap;
+// use achiever::commands::table::config::FieldConfig;
 use colored::Colorize;
 // use std::{collections::HashMap, time::{SystemTime, UNIX_EPOCH}};
 use serde::{Deserialize, Serialize};
@@ -14,6 +16,7 @@ use crate::storage::{generate_id};
 use crate::planet::{PlanetError, PlanetContext, Context};
 use crate::commands::table::config::DbTableConfig;
 use crate::storage::constants::CHILD_PRIVATE_KEY_ARRAY;
+use crate::storage::fields::*;
 
 pub trait Schema<'gb> {
     fn defaults(planet_context: &'gb PlanetContext<'gb>, context: &'gb Context<'gb>) -> Result<DbTable<'gb>, PlanetError>;
@@ -22,21 +25,32 @@ pub trait Schema<'gb> {
     fn get_by_name(&self, table_name: &str) -> Result<Option<SchemaData>, PlanetError>;
 }
 
-// pub trait Table {
-//     fn insert(&self, db_row: DbRow);
-//     fn update(&self, id: &str, db_row: DbRow);
-//     fn delete(&self, id: &str);
-//     fn read(&self, id: &str);
-//     fn select(&self, query: DbQuery);
-// }
+pub trait Row<'gb> {
+    fn defaults(
+        table_file: &str, 
+        planet_context: &'gb PlanetContext<'gb>, 
+        context: &'gb Context<'gb>
+    ) -> Result<DbRow<'gb>, PlanetError>;
+    fn insert(&self, row_data: &RowData) -> Result<RowData, PlanetError>;
+    // fn update(&self, id: &str, db_row: RowData);
+    // fn delete(&self, id: &str);
+    // fn get(&self, id: &str);
+    // fn select(&self, query: DbQuery);
+}
 
 // lifetimes: gb (global, for contexts), db, bs
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct SchemaData {
-    pub id: Option<String>,
+pub struct RoutingData {
     pub account_id: Option<String>,
     pub space_id: Option<String>,
+    pub ipfs_cid: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SchemaData {
+    pub id: Option<String>,
+    pub routing: RoutingData,
     pub name: String,
     pub config: DbTableConfig,
 }
@@ -45,10 +59,13 @@ impl SchemaData {
     pub fn defaults(name: &String, config: &DbTableConfig, account_id: &str, space_id: &str) -> SchemaData {
         let schema_data = SchemaData{
             id: generate_id(),
+            routing: RoutingData{
+                account_id: Some(account_id.to_string()),
+                space_id: Some(space_id.to_string()),
+                ipfs_cid: None,
+            },
             name: format!("{}", name),
             config: config.clone(),
-            account_id: Some(account_id.to_string()),
-            space_id: Some(space_id.to_string()),
         };
         return schema_data
     }
@@ -123,8 +140,9 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
             let item_source = item.clone();
             let matches_name_none = &item.name.to_lowercase() == &table_name.to_lowercase();
             let mut check_account: bool = true;
-            let account_id = &item.account_id.unwrap_or_default();
-            let space_id = &item.space_id.unwrap_or_default();
+            let routing = item.routing;
+            let account_id = routing.account_id.unwrap_or_default();
+            let space_id = routing.space_id.unwrap_or_default();
             if ctx_account_id != "" && ctx_space_id != "" {
                 if (account_id != "" && account_id != ctx_account_id) || 
                 (space_id != "" && space_id != ctx_space_id) {
@@ -229,6 +247,7 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
 //     pub options: Option<HashMap<String, String>>,
 // }
 
+
 // #[derive(Debug, Deserialize, Serialize, Clone)]
 // pub struct DbRow<'db, 'gb> {
 //     pub id: Option<String>,
@@ -239,6 +258,124 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
 //     pub options: Option<HashMap<String, String>>,
 // }
 
+// #[derive(Debug, Serialize, Deserialize, Clone)]
+// pub struct SchemaData {
+//     pub id: Option<String>,
+//     pub routing: RoutingData,
+//     pub name: String,
+//     pub config: DbTableConfig, (FieldConfig)
+// }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RowItem(pub FieldType);
+
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RowData {
+    pub id: Option<String>,
+    pub routing: RoutingData,
+    pub data: Option<Vec<RowItem>>,
+}
+impl RowData {
+    pub fn defaults(account_id: &String, space_id: &String) -> Self {
+        return Self{
+            id: None,
+            routing: RoutingData{
+                account_id: Some(account_id.clone()),
+                space_id: Some(space_id.clone()),
+                ipfs_cid: None
+            },
+            data: None,
+        };
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DbRow<'gb> {
+    pub context: &'gb Context<'gb>,
+    pub planet_context: &'gb PlanetContext<'gb>,
+    db: sled::Db,
+}
+
+impl<'gb> Row<'gb> for DbRow<'gb> {
+
+    fn defaults(
+        table_file: &str,
+        planet_context: &'gb PlanetContext<'gb>, 
+        context: &'gb Context<'gb>
+    ) -> Result<DbRow<'gb>, PlanetError> {
+        let mut path: String = String::from("");
+        let home_dir = planet_context.home_path.unwrap_or_default();
+        let account_id = context.account_id.unwrap_or_default();
+        let space_id = context.space_id.unwrap_or_default();
+        if account_id != "" && space_id != "" {
+            println!("DbRow.defaults :: account_id and space_id have been informed");
+        } else {
+            // .achiever-planet/{table_file} : platform wide table (slug with underscore)
+            path = format!("{home}/{table_file}.db", home=&home_dir, table_file=table_file);
+        }
+        eprintln!("DbRow.defaults :: path: {:?}", path);
+        let config: sled::Config = sled::Config::default()
+            .use_compression(true)
+            .path(path);
+        let result: Result<sled::Db, sled::Error> = config.open();
+        match result {
+            Ok(_) => {
+                let db = result.unwrap();
+                let db_row: DbRow = DbRow{
+                    context: context,
+                    planet_context: planet_context,
+                    db: db
+                };
+                Ok(db_row)
+            },
+            Err(_) => {
+                let planet_error = PlanetError::new(
+                    500, 
+                    Some(tr!("Could not open database")),
+                );
+                Err(planet_error)
+            }
+        }
+    }
+
+    fn insert(&self, row_data: &RowData) -> Result<RowData, PlanetError> {
+        /*
+        insert :: row_data: RowData {
+            id: None,
+            routing: RoutingData {
+                account_id: Some(
+                    "",
+                ),
+                space_id: Some(
+                    "",
+                ),
+                ipfs_cid: None,
+            },
+            data: Some(
+                [
+                    RowItem {
+                        field_name: Some(
+                            "My Field",
+                        ),
+                        field_type: Some(
+                            SmallText(
+                                "pepito,",
+                            ),
+                        ),
+                        value: Some(
+                            "pepito,",
+                        ),
+                    },
+                ],
+            ),
+        }
+        */
+        let row_data_response = row_data.clone();
+        eprintln!("insert :: row_data: {:#?}", row_data);
+        return Ok(row_data_response);
+    }
+}
 
 // //TODO: I will need the schema from create table config, so I can apply some helper methods of conversion
 
@@ -311,8 +448,8 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
 
 // // }
 
-// pub struct DbQuery {
-//     pub sql_where: String,
-//     pub page: u8,
-//     pub number_items: u8,
-// }
+pub struct DbQuery {
+    pub sql_where: String,
+    pub page: u8,
+    pub number_items: u8,
+}

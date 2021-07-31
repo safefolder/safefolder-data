@@ -1,5 +1,6 @@
 pub mod schema;
 pub mod config;
+pub mod data;
 
 use validator::{ValidationErrors};
 use tr::tr;

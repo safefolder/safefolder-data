@@ -11,3 +11,5 @@ fields:
     field_type: "Long Text"
   - name: "Is Published"
     field_type: "Checkbox"
+  - name: "Counter"
+    field_type: "Number"

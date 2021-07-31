@@ -1,0 +1,6 @@
+---
+command: INSERT INTO TABLE "Super Table"
+data:
+  My Field: pepito,
+  Description: This is some description I want to include,
+  Is Published: true

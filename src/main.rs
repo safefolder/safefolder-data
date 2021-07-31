@@ -3,10 +3,14 @@ extern crate xid;
 extern crate serde_yaml;
 extern crate colored;
 extern crate lazy_static;
+extern crate tokio;
 
 pub mod commands;
 pub mod storage;
 pub mod planet;
+
+// use ipfs_api::IpfsClient;
+// use std::io::Cursor;
 
 // use bip32::{Mnemonic, Prefix, XPrv};
 // use bip32::secp256k1::ecdsa::{
@@ -15,6 +19,24 @@ pub mod planet;
 // };
 // use rand_core::OsRng;
 
+// use async_std::task;
+// use libp2p::{
+//     Multiaddr,
+//     swarm::{Swarm, SwarmEvent},
+//     PeerId,
+//     identity,
+//     development_transport
+// };
+// use libp2p::kad::{
+//     Kademlia,
+//     KademliaConfig,
+//     KademliaEvent,
+//     GetClosestPeersError,
+//     QueryResult,
+// };
+// use libp2p::kad::record::store::MemoryStore;
+// use std::{env, error::Error, str::FromStr, time::Duration};
+
 use argparse::{ArgumentParser, StoreTrue, Store};
 use std::collections::HashMap;
 
@@ -22,8 +44,41 @@ use crate::commands::CommandRunner;
 use crate::commands::table::Command;
 use crate::planet::{PlanetContext, Context, ContextSource};
 
-fn main() {
+// async fn swarm() {
+//     const BOOTNODES: [&'static str; 4] = [
+//         "QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN",
+//         "QmQCU2EcMqAqQPR2i9bChDtGNJchTbq5TbXJJ16u19uLTa",
+//         "QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb",
+//         "QmcZf59bWwK5XFi76CZX8cbJ4BhTzzA3gU1ZjYZcYW3dwt"
+//     ];
+//     let local_key = identity::Keypair::generate_ed25519();
+//     eprintln!("swarm :: local_key: {:?}", &local_key.public());
+//     let local_peer_id = PeerId::from(local_key.public());
+//     eprintln!("swarm :: local_peer_id: {:?}", &local_peer_id);
+//     let transport = development_transport(local_key).await.unwrap();
+//     let swarm = {
+//         // Create a Kademlia behaviour.
+//         let mut cfg = KademliaConfig::default();
+//         cfg.set_query_timeout(Duration::from_secs(5 * 60));
+//         let store = MemoryStore::new(local_peer_id);
+//         let mut behaviour = Kademlia::with_config(local_peer_id, store, cfg);
 
+//         // Add the bootnodes to the local routing table. `libp2p-dns` built
+//         // into the `transport` resolves the `dnsaddr` when Kademlia tries
+//         // to dial these nodes.
+//         let bootaddr = Multiaddr::from_str("/dnsaddr/bootstrap.libp2p.io").unwrap();
+//         for peer in &BOOTNODES {
+//             behaviour.add_address(&PeerId::from_str(peer).unwrap(), bootaddr.clone());
+//         }
+
+//         Swarm::new(transport, behaviour, local_peer_id)
+//     };
+//     //eprintln!("swarm :: swarm: {:?}", swarm);
+// }
+
+
+#[tokio::main]
+async fn main() {
     // achiever run command ...
     // achiever run action ...
     // achiever run journey ...
@@ -114,6 +169,18 @@ fn main() {
     //     verification_key.verify(example_msg, &signature).is_ok(), 
     // );
 
+    // IPFS
+    // let mine = swarm();
+
+    // IPFS API (5001)
+    // println!("IPFS API....");
+    // let client = IpfsClient::default();
+    // let data = Cursor::new("Hello World!");
+    // match client.add(data).await {
+    //     Ok(res) => println!("{}", res.hash),
+    //     Err(e) => eprintln!("error adding file: {}", e)
+    // }    
+
     if op.to_lowercase() == "run" && &scope.to_lowercase() == "command" {
         let command_runner =  CommandRunner{
             planet_context: &planet_context,
@@ -135,6 +202,7 @@ fn run_command(runner: CommandRunner) -> Result<String, String> {
         let match_option = *&runner.command.as_str();
         match match_option {
             "CREATE TABLE" => commands::table::schema::CreateTable::runner(&runner, &path_yaml),
+            "INSERT INTO TABLE" => commands::table::data::InsertIntoTable::runner(&runner, &path_yaml),
             _ => println!("default")
         }
         Ok("Command executed".to_string())

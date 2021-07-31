@@ -126,4 +126,3 @@ impl<'gb> Command<SchemaData> for CreateTable<'gb> {
     }
 
 }
-

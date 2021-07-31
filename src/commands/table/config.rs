@@ -1,5 +1,6 @@
 extern crate xid;
 
+use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use validator::{Validate, ValidationErrors, ValidationError};
 use lazy_static::lazy_static;
@@ -22,6 +23,7 @@ pub struct DbTableConfig {
 
 lazy_static! {
     static ref RE_COMMAND_CREATE_TABLE: Regex = Regex::new(r#"(CREATE TABLE) "([a-zA-Z0-9_ ]+)"#).unwrap();
+    static ref RE_COMMAND_INSERT_INTO_TABLE: Regex = Regex::new(r#"(INSERT INTO TABLE) "([a-zA-Z0-9_ ]+)"#).unwrap();
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
@@ -162,6 +164,63 @@ fn validate_language_codes(languages: &Vec<String>) -> Result<(), ValidationErro
         return Ok(())
     } else {
         return Err(ValidationError::new("Invalid Language"));
+    }
+
+}
+
+
+#[derive(Debug, Serialize, Deserialize, Validate, Clone)]
+pub struct InsertIntoTableConfig {
+    #[validate(required, regex="RE_COMMAND_INSERT_INTO_TABLE")]
+    pub command: Option<String>,
+    #[validate(required)]
+    pub data: Option<HashMap<String, String>>,
+}
+
+impl InsertIntoTableConfig {
+
+    pub fn defaults() -> InsertIntoTableConfig {
+        let config: InsertIntoTableConfig = InsertIntoTableConfig{
+            command: None,
+            data: Some(HashMap::new()),
+        };
+        return config
+    }
+
+    pub fn import(
+        &self, 
+        planet_context: &PlanetContext, 
+        yaml_path: &String
+    ) -> Result<InsertIntoTableConfig, Vec<PlanetValidationError>> {
+        let yaml_str: String = fetch_yaml_config(&yaml_path);
+        // Deseralize the config entity
+        let response: Result<InsertIntoTableConfig, serde_yaml::Error> = serde_yaml::from_str(&yaml_str);
+        let import_config: CommandImportConfig = CommandImportConfig{
+            command: String::from(""),
+            planet_context: planet_context,
+        };
+        match response {
+            Ok(_) => {
+                let config_model: InsertIntoTableConfig = response.unwrap();
+                let validate: Result<(), ValidationErrors> = config_model.validate();
+                match validate {
+                    Ok(_) => {
+                        return Ok(config_model)
+                    },
+                    Err(errors) => {
+                        let command = &config_model.command.unwrap();
+                        let planet_errors: Vec<PlanetValidationError> = import_config.parse_validator(
+                            command, errors);
+                        return Err(planet_errors);
+                    }
+                }
+            },
+            Err(error) => {
+                let mut planet_errors: Vec<PlanetValidationError> = Vec::new();
+                planet_errors.push(import_config.parse_serde(&error));
+                return Err(planet_errors);
+            }
+        }
     }
 
 }
