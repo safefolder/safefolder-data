@@ -76,7 +76,7 @@ impl<'gb> Command<RowData> for InsertIntoTable<'gb> {
                 let table = table.unwrap();
                 let mut row_data: RowData = RowData::defaults(&account_id, &space_id);
                 let fields: Vec<FieldConfig> = table.config.fields.unwrap();
-                let mut insert_data: Vec<RowItem> = Vec::new();
+                let mut insert_data: HashMap<String, RowItem> = HashMap::new();
                 let data_map = self.config.data.clone().unwrap();
                 for field in fields {
                     let field_type = field.field_type.unwrap_or_default();
