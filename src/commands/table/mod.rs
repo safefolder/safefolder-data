@@ -1,6 +1,7 @@
 pub mod schema;
 pub mod config;
 pub mod data;
+pub mod constants;
 
 use validator::{ValidationErrors};
 use tr::tr;

@@ -8,6 +8,7 @@ use tr::tr;
 
 use crate::planet::{PlanetError};
 use crate::storage::table::{RowItem};
+use crate::commands::table::config::FieldConfig;
 
 /*
 These are the core fields implemented so we can tackle the security and permissions system
@@ -15,8 +16,8 @@ These are the core fields implemented so we can tackle the security and permissi
 * 01. SmallTextField                [impl]
 * 02. LongTextField                 [impl]
 * 03. CheckBoxField                 [impl]
-* 04. MultipleSelectField
-* 05. SingleSelectField
+* 04. MultipleSelectField           [impl]
+* 05. SingleSelectField             [impl]
 * 06. DateField
 * 07. NumberField                   [impl]
 * 08. AuditTimeField
@@ -83,15 +84,16 @@ pub trait ValidateField {
 pub trait ProcessField {
     fn process(
         data_map: &HashMap<String, String>, 
-        required: bool, 
-        version: String, 
-        field_name: String,
+        field: &FieldConfig,
         insert_data: HashMap<String, RowItem>
     ) -> Result<HashMap<String, RowItem>, PlanetError>;
 }
 
 pub trait StringValueField {
     fn get_value(&self, value: Option<&String>) -> Option<String>;
+}
+pub trait StringVectorValueField {
+    fn get_value(&self, value: Option<&String>) -> Option<Vec<String>>;
 }
 
 pub trait NumberValueField {
@@ -101,6 +103,32 @@ pub trait BoolValueField {
     fn get_value(&self, value: Option<&String>) -> Option<bool>;
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum FieldType {
+    SmallText(String),
+    LongText(String),
+    CheckBox(bool),
+    NumberField(i32),
+    SingleSelectField(String),
+    MultipleSelectField(Vec<String>),
+}
+
+// SingleSelectField which type on enum???
+// All fields would go into String, Number and basic types?????
+
+pub fn error_validate_process(field_type: &str, field_name: &str) -> PlanetError {
+    let error = PlanetError::new(
+        500, 
+        Some(tr!(
+            "Could not validate \"{field_type}\" field {}{}{}", 
+            String::from("\"").blue(), &field_name.blue(), String::from("\"").blue(),
+            field_type=field_type
+        )),
+    );
+    return error;
+}
+
+// Fieldds
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SmallTextField {
@@ -128,11 +156,13 @@ impl ValidateField for SmallTextField {
 impl ProcessField for SmallTextField {
     fn process(
         data_map: &HashMap<String, String>, 
-        required: bool, 
-        version: String, 
-        field_name: String,
+        field: &FieldConfig,
         mut insert_data: HashMap<String, RowItem>
     ) -> Result<HashMap<String, RowItem>, PlanetError> {
+        let field = field.clone();
+        let required = field.required.unwrap_or_default();
+        let version = field.version.unwrap_or_default();
+        let field_name = field.name.unwrap_or_default();
         let value_string_ = data_map.get(&field_name).unwrap().clone();
         let field = Self{
             name: field_name.clone(),
@@ -168,7 +198,7 @@ impl StringValueField for SmallTextField {
 //     pub version: String,
 //     pub required: bool,
 // }
-// impl VerifyProcessField for LongTextField {
+// impl ValidateField for LongTextField {
 //     fn is_valid(&self, value: Option<&String>) -> Result<bool, PlanetError> {
 //         if value.is_none() && self.required == true {
 //             return Err(
@@ -184,13 +214,17 @@ impl StringValueField for SmallTextField {
 //             return Ok(true)
 //         }
 //     }
+// }
+// impl ProcessField for LongTextField {
 //     fn process(
 //         data_map: &HashMap<String, String>, 
-//         required: bool, 
-//         version: String, 
-//         field_name: String,
-//         mut insert_data: Vec<RowItem>
-//     ) -> Result<Vec<RowItem>, PlanetError> {
+//         field: &FieldConfig,
+//         mut insert_data: HashMap<String, RowItem>
+//     ) -> Result<HashMap<String, RowItem>, PlanetError> {
+//         let field = field.clone();
+//         let field_name = field.name.unwrap_or_default();
+//         let required = field.required.unwrap_or_default();
+//         let version = field.version.unwrap_or_default();
 //         let value_string_ = data_map.get(&field_name).unwrap().clone();
 //         let field = Self{
 //             name: field_name.clone(),
@@ -201,7 +235,7 @@ impl StringValueField for SmallTextField {
 //         if is_valid == true {
 //             let value = field.get_value(Some(&value_string_)).unwrap_or_default();
 //             let row_item: RowItem = RowItem(FieldType::LongText(value.clone()));
-//             insert_data.push(row_item);
+//             insert_data.insert(field.name, row_item);
 //             return Ok(insert_data);
 //         } else {
 //             return Err(error_validate_process("Long Text", &field_name))
@@ -225,7 +259,7 @@ impl StringValueField for SmallTextField {
 //     pub version: String,
 //     pub required: bool,
 // }
-// impl VerifyProcessField for CheckBoxField {
+// impl ValidateField for CheckBoxField {
 //     fn is_valid(&self, value: Option<&String>) -> Result<bool, PlanetError> {
 //         if value.is_none() && self.required == true {
 //             return Err(
@@ -246,13 +280,17 @@ impl StringValueField for SmallTextField {
 //             }
 //         }
 //     }
+// }
+// impl ProcessField for CheckBoxField {
 //     fn process(
 //         data_map: &HashMap<String, String>, 
-//         required: bool, 
-//         version: String, 
-//         field_name: String,
-//         mut insert_data: Vec<RowItem>
-//     ) -> Result<Vec<RowItem>, PlanetError> {
+//         field: &FieldConfig,
+//         mut insert_data: HashMap<String, RowItem>
+//     ) -> Result<HashMap<String, RowItem>, PlanetError> {
+//         let field = field.clone();
+//         let field_name = field.name.unwrap_or_default();
+//         let required = field.required.unwrap_or_default();
+//         let version = field.version.unwrap_or_default();
 //         let value_string_ = data_map.get(&field_name).unwrap().clone();
 //         let field = Self{
 //             name: field_name.clone(),
@@ -263,7 +301,7 @@ impl StringValueField for SmallTextField {
 //         if is_valid == true {
 //             let value = field.get_value(Some(&value_string_)).unwrap_or_default();
 //             let row_item: RowItem = RowItem(FieldType::CheckBox(value.clone()));
-//             insert_data.push(row_item);
+//             insert_data.insert(field.name, row_item);
 //             return Ok(insert_data);
 //         } else {
 //             return Err(error_validate_process("CheckBox", &field_name))
@@ -291,7 +329,7 @@ impl StringValueField for SmallTextField {
 //     pub version: String,
 //     pub required: bool,
 // }
-// impl VerifyProcessField for NumberField {
+// impl ValidateField for NumberField {
 //     fn is_valid(&self, value: Option<&String>) -> Result<bool, PlanetError> {
 //         if value.is_none() && self.required == true {
 //             return Err(
@@ -308,7 +346,7 @@ impl StringValueField for SmallTextField {
 //             let result = i32::from_str(value_str);
 //             match result {
 //                 Ok(_) => {
-//                     let value: i32 = result.unwrap();
+//                     // let value: i32 = result.unwrap();
 //                     return Ok(true);
 //                 },
 //                 Err(_) => {
@@ -317,13 +355,17 @@ impl StringValueField for SmallTextField {
 //             }
 //         }
 //     }
+// }
+// impl ProcessField for NumberField {
 //     fn process(
 //         data_map: &HashMap<String, String>, 
-//         required: bool, 
-//         version: String, 
-//         field_name: String,
-//         mut insert_data: Vec<RowItem>
-//     ) -> Result<Vec<RowItem>, PlanetError> {
+//         field: &FieldConfig,
+//         mut insert_data: HashMap<String, RowItem>
+//     ) -> Result<HashMap<String, RowItem>, PlanetError> {
+//         let field = field.clone();
+//         let field_name = field.name.unwrap_or_default();
+//         let required = field.required.unwrap_or_default();
+//         let version = field.version.unwrap_or_default();
 //         let value_string_ = data_map.get(&field_name).unwrap().clone();
 //         let field = Self{
 //             name: field_name.clone(),
@@ -334,14 +376,13 @@ impl StringValueField for SmallTextField {
 //         if is_valid == true {
 //             let value = field.get_value(Some(&value_string_)).unwrap_or_default();
 //             let row_item: RowItem = RowItem(FieldType::NumberField(value.clone()));
-//             insert_data.push(row_item);
+//             insert_data.insert(field.name, row_item);
 //             return Ok(insert_data);
 //         } else {
 //             return Err(error_validate_process("Number", &field_name))
 //         }
 //     }
 // }
-
 // impl NumberValueField for NumberField {
 //     fn get_value(&self, value: Option<&String>) -> Option<i32> {
 //         if value.is_none() {
@@ -354,23 +395,190 @@ impl StringValueField for SmallTextField {
 //     }
 // }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum FieldType {
-    SmallText(String),
-    LongText(String),
-    CheckBox(bool),
-    NumberField(i32),
-}
+// #[derive(Debug, Serialize, Deserialize, Clone)]
+// pub struct SingleSelectField {
+//     pub field: FieldConfig,
+// }
+// impl ValidateField for SingleSelectField {
+//     fn is_valid(&self, value: Option<&String>) -> Result<bool, PlanetError> {
+//         // value represents the id for the option selected, like id->name
+//         let field_name = self.field.name.clone().unwrap_or_default();
+//         if value.is_none() && self.field.required.unwrap() == true {
+//             return Err(
+//                 PlanetError::new(
+//                     500, 
+//                     Some(tr!(
+//                         "Field {}{}{} is required", 
+//                         String::from("\"").blue(), &field_name.blue(), String::from("\"").blue()
+//                     )),
+//                 )
+//             );
+//         } else {            
+//             let value_id = value.unwrap();
+//             let field = self.field.clone();
+//             // Check that value appears on the config for choices id -> value
+//             let tuples = field.select_data.unwrap();
+//             eprintln!("SingleSelectField.is_valid :: tuples: {:#?}", tuples);
+//             let mut verified = false;
+//             for (select_id, _) in tuples.iter() {
+//                 if select_id == value_id {
+//                     verified = true;
+//                     break;
+//                 }
+//             }
+//             if verified == true {
+//                 eprintln!("SingleSelectField.is_valid :: Verified OK!");
+//                 return Ok(true)
+//             } else {
+//                 return Err(
+//                     PlanetError::new(
+//                         500, 
+//                         Some(tr!(
+//                             "Field {}{}{} is not configured with select id {}{}{}", 
+//                             String::from("\"").blue(), &field_name.blue(), String::from("\"").blue(),
+//                             String::from("\"").blue(), value_id, String::from("\"").blue(),
+//                         )),
+//                     )
+//                 );
+//             }            
+//         }
+//     }
+// }
+// impl ProcessField for SingleSelectField {
+//     fn process(
+//         data_map: &HashMap<String, String>, 
+//         field: &FieldConfig,
+//         mut insert_data: HashMap<String, RowItem>
+//     ) -> Result<HashMap<String, RowItem>, PlanetError> {
+//         let field_name = field.name.clone().unwrap_or_default();
+//         let field_obj = Self{
+//             field: field.clone(),
+//         };
+//         let value_string_ = data_map.get(&field_name).unwrap().clone();
+//         let is_valid = field_obj.is_valid(Some(&value_string_))?;
+//         if is_valid == true {
+//             let value = field_obj.get_value(Some(&value_string_)).unwrap_or_default();
+//             let row_item: RowItem = RowItem(FieldType::SingleSelectField(value.clone()));
+//             insert_data.insert(field_name, row_item);
+//             return Ok(insert_data);
+//         } else {
+//             return Err(error_validate_process("Number", &field_name))
+//         }
+//     }
+// }
+// impl StringValueField for SingleSelectField {
+//     fn get_value(&self, value: Option<&String>) -> Option<String> {
+//         if value.is_none() {
+//             return None
+//         } else {
+//             // I return the id for the select option
+//             let value = value.unwrap();
+//             let tuples = self.field.select_data.clone().unwrap();
+//             let mut resolved_id: Option<String> = None;
+//             for (select_id, select_value) in tuples.iter() {
+//                 let select_id = select_id.clone();
+//                 if select_value == value {
+//                     resolved_id = Some(select_id);
+//                 }
+//             }
+//             return resolved_id;
+//         }
+//     }
+// }
 
-
-pub fn error_validate_process(field_type: &str, field_name: &str) -> PlanetError {
-    let error = PlanetError::new(
-        500, 
-        Some(tr!(
-            "Could not validate \"{field_type}\" field {}{}{}", 
-            String::from("\"").blue(), &field_name.blue(), String::from("\"").blue(),
-            field_type=field_type
-        )),
-    );
-    return error;
-}
+// #[derive(Debug, Serialize, Deserialize, Clone)]
+// pub struct MultipleSelectField {
+//     pub field: FieldConfig,
+// }
+// impl ValidateField for MultipleSelectField {
+//     fn is_valid(&self, value: Option<&String>) -> Result<bool, PlanetError> {
+//         // ids are sent separated by commas.
+//         let field_name = self.field.name.clone().unwrap_or_default();
+//         if value.is_none() && self.field.required.unwrap() == true {
+//             return Err(
+//                 PlanetError::new(
+//                     500, 
+//                     Some(tr!(
+//                         "Field {}{}{} is required", 
+//                         String::from("\"").blue(), &field_name.blue(), String::from("\"").blue()
+//                     )),
+//                 )
+//             );
+//         } else {
+//             let ids = value.unwrap().split(",");
+//             let value_ = value.unwrap();
+//             let field = self.field.clone();
+//             // Check that value appears on the config for choices id -> value
+//             let tuples = field.select_data.unwrap();
+//             eprintln!("MultupleSelectField.is_valid :: tuples: {:#?}", tuples);
+//             let mut verified = false;
+//             for (select_id, _) in tuples.iter() {
+//                 for id in ids.clone() {
+//                     if select_id == id {
+//                         verified = true;
+//                         break;
+//                     }
+//                 }
+//             }
+//             if verified == true {
+//                 eprintln!("MultupleSelectField.is_valid :: Verified OK!");
+//                 return Ok(true)
+//             } else {
+//                 return Err(
+//                     PlanetError::new(
+//                         500, 
+//                         Some(tr!(
+//                             "Field {}{}{} is not configured with values {}{}{}", 
+//                             String::from("\"").blue(), &field_name.blue(), String::from("\"").blue(),
+//                             String::from("\"").blue(), value_, String::from("\"").blue(),
+//                         )),
+//                     )
+//                 );
+//             }            
+//         }
+//     }
+// }
+// impl ProcessField for MultipleSelectField {
+//     fn process(
+//         data_map: &HashMap<String, String>, 
+//         field: &FieldConfig,
+//         mut insert_data: HashMap<String, RowItem>
+//     ) -> Result<HashMap<String, RowItem>, PlanetError> {
+//         let field_name = field.name.clone().unwrap_or_default();
+//         let field_obj = Self{
+//             field: field.clone(),
+//         };
+//         let ids = data_map.get(&field_name).unwrap().clone();
+//         let is_valid = field_obj.is_valid(Some(&ids))?;
+//         if is_valid == true {
+//             let value = field_obj.get_value(Some(&ids)).unwrap_or_default();
+//             let row_item: RowItem = RowItem(FieldType::MultipleSelectField(value.clone()));
+//             insert_data.insert(field_name, row_item);
+//             return Ok(insert_data);
+//         } else {
+//             return Err(error_validate_process("Number", &field_name))
+//         }
+//     }
+// }
+// impl StringVectorValueField for MultipleSelectField {
+//     fn get_value(&self, value: Option<&String>) -> Option<Vec<String>> {
+//         if value.is_none() {
+//             return None
+//         } else {
+//             // I return the id for the select option
+//             // let value = value.unwrap();
+//             let ids = value.unwrap().split(",");
+//             let tuples = self.field.select_data.clone().unwrap();
+//             let mut resolved_ids: Vec<String> = Vec::new();
+//             for (select_id, _) in tuples.iter() {
+//                 let select_id = select_id.as_str();
+//                 for id in ids.clone() {
+//                     if id == select_id {
+//                         resolved_ids.push(select_id.to_string());
+//                     }
+//                 }
+//             }
+//             return Some(resolved_ids);
+//         }
+//     }
+// }

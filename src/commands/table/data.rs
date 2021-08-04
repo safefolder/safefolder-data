@@ -14,7 +14,7 @@ use slug::slugify;
 use crate::commands::table::config::{InsertIntoTableConfig, FieldConfig};
 use crate::commands::table::{Command};
 use crate::commands::{CommandRunner};
-use crate::storage::table::{DbTable, DbRow, Row, RowData, RoutingData, Schema, RowItem};
+use crate::storage::table::{DbTable, DbRow, Row, RowData, RoutingData, Schema, RowItem, DbData};
 use crate::storage::table::*;
 use crate::planet::{
     PlanetContext, 
@@ -30,9 +30,9 @@ pub struct InsertIntoTable<'gb> {
     pub config: InsertIntoTableConfig,
 }
 
-impl<'gb> Command<RowData> for InsertIntoTable<'gb> {
+impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
 
-    fn run(&self) -> Result<RowData, PlanetError> {
+    fn run(&self) -> Result<DbData, PlanetError> {
         let command = self.config.command.clone().unwrap_or_default();
         let expr = Regex::new(r#"(INSERT INTO TABLE) "(?P<table_name>[a-zA-Z0-9_ ]+)"#).unwrap();
         let table_name_match = expr.captures(&command).unwrap();
@@ -74,29 +74,37 @@ impl<'gb> Command<RowData> for InsertIntoTable<'gb> {
                 }
 
                 let table = table.unwrap();
-                let mut row_data: RowData = RowData::defaults(&account_id, &space_id);
-                let fields: Vec<FieldConfig> = table.config.fields.unwrap();
-                let mut insert_data: HashMap<String, RowItem> = HashMap::new();
-                let data_map = self.config.data.clone().unwrap();
-                for field in fields {
-                    let field_type = field.field_type.unwrap_or_default();
-                    let field_type = field_type.as_str();
-                    let required = field.required.unwrap_or_default();
-                    let version = field.version.unwrap_or_default();
-                    let field_name = field.name.unwrap_or_default();
-                    match field_type {
-                        "Small Text" => {
-                            insert_data = SmallTextField::process(&data_map, required, version, field_name, insert_data)?;
-                        },
-                        _ => {
-                        }
-                    }
-                }
-                row_data.data = Some(insert_data);
-                // Insert RowData into database
-                let response: RowData = db_row.insert(&row_data)?;
-                // let response_src = response.clone();
-                return Ok(response);
+                eprintln!("InsertIntoTable.run :: table: {:#?}", table);
+                // let mut row_data: RowData = RowData::defaults(&account_id, &space_id);
+                // I need a way to get list of instance FieldConfig (fields)
+                // FieldConfig.parse_db(db_data: DbData) -> Vec<FieldConfig>
+                // let fields: Vec<FieldConfig> = table.config.fields.unwrap();
+                // let mut insert_data: HashMap<String, RowItem> = HashMap::new();
+                // let data_map = self.config.data.clone().unwrap();
+                // for field in fields {
+                //     let field_ = field.clone();
+                //     let field_type = field.field_type.unwrap_or_default();
+                //     let field_type = field_type.as_str();
+                //     match field_type {
+                //         "Small Text" => {
+                //             insert_data = SmallTextField::process(&data_map, &field_, insert_data)?;
+                //         },
+                //         _ => {
+                //         }
+                //     }
+                // }
+                // row_data.data = Some(insert_data);
+                // // Insert RowData into database
+                // let response: RowData = db_row.insert(&row_data)?;
+                // // let response_src = response.clone();
+                // return Ok(response);
+
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("This is a dumb message")),
+                    )
+                );
             },
             Err(error) => {
                 return Err(error);

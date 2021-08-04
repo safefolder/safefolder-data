@@ -11,14 +11,32 @@ use crate::planet::PlanetContext;
 
 use crate::storage::constants::{FIELD_VERSION, FIELD_API_VERSION};
 use crate::storage::*;
+use crate::storage::table::DbData;
+use crate::planet::constants::*;
+use crate::planet::make_bool_str;
 
+use super::constants::FIELDS;
 use super::fetch_yaml_config;
 
+pub struct DbTableConfig02 {
+    pub language: HashMap<String, String>,
+    pub fields: Option<Vec<HashMap<String, String>>>,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DbTableConfig {
     pub language: Option<LanguageConfig>,
     pub fields: Option<Vec<FieldConfig>>,
+}
+impl DbTableConfig {
+    pub fn to_hashmap(&self) -> HashMap<String, String> {
+        // separate fields by "__" in objects, so I can have it plain.
+        // field1__field2_opt
+        let mut map: HashMap<String, String>  =HashMap::new();
+        let language = self.language.clone().unwrap();
+        let fields = self.fields.clone().unwrap();
+        return map
+    }
 }
 
 lazy_static! {
@@ -107,11 +125,15 @@ pub struct FieldConfig {
     #[serde(default="FieldConfig::api_version")]
     pub api_version: Option<String>,
     pub indexed: Option<bool>,
+    pub many: Option<bool>,
+    pub select_data: Option<Vec<(String, String)>>,
 }
 
-impl StorageField for FieldConfig {
-    fn defaults() -> FieldConfig {
-        let object: FieldConfig = FieldConfig{
+impl ConfigStorageField for FieldConfig {
+    fn defaults(
+        select_data: Option<Vec<(String, String)>>,
+    ) -> FieldConfig {
+        let mut object: FieldConfig = FieldConfig{
             id: None,
             name: None,
             field_type: None,
@@ -120,7 +142,12 @@ impl StorageField for FieldConfig {
             required: Some(false),
             api_version: Some(String::from(FIELD_API_VERSION)),
             indexed: Some(true),
+            select_data: None,
+            many: None,
         };
+        if select_data.is_some() {
+            object.select_data = Some(select_data.unwrap());
+        }
         return object;
     }
     fn version() -> Option<String> {
@@ -136,7 +163,85 @@ impl StorageField for FieldConfig {
             Err(errors) => {
                 return Err(errors);
             },
-          };
+        };
+    }
+    fn parse_from_db(db_data: DbData) -> Vec<FieldConfig> {
+        // let select_data: Option<Vec<(String, String)>> = None;
+        let fields: Vec<FieldConfig> = Vec::new();
+        // I use data_collections, where we store the fields
+        let data_collections = db_data.data_collections;
+        if data_collections.is_some() {
+            let data_collections = data_collections.unwrap();
+            let db_fields = data_collections.get(FIELDS).unwrap();
+            for db_field in db_fields {
+                let required = make_bool_str(db_field.get("required").unwrap().clone());
+                let indexed = make_bool_str(db_field.get("indexed").unwrap().clone());
+                let many = make_bool_str(db_field.get("many").unwrap().clone());
+                // select_data is (id,option)::(id,option)::(id,option)
+                let select_data_str = db_field.get("select_data").unwrap().clone();
+                let select_data: Option<Vec<(String, String)>> = None;
+                let mut select_data_list: Vec<(String, String)> = Vec::new();
+                if select_data_str != String::from("") {
+                    let select_data_items = select_data_str.split("::");
+                }
+                let field: FieldConfig = FieldConfig{
+                    id: Some(db_field.get("id").unwrap().clone()),
+                    name: Some(db_field.get("name").unwrap().clone()),
+                    field_type: Some(db_field.get("field_type").unwrap().clone()),
+                    default: Some(db_field.get("default").unwrap().clone()),
+                    version: Some(db_field.get("version").unwrap().clone()),
+                    required: Some(required),
+                    api_version: Some(db_field.get("api_version").unwrap().clone()),
+                    indexed: Some(indexed),
+                    many: Some(many),
+                    select_data: select_data,
+                };
+            }
+        }
+        return fields
+    }
+    fn map_object_db(&self) -> HashMap<String, String> {
+        let field = self.clone();
+        let mut map: HashMap<String, String> = HashMap::new();
+        let required = field.required.unwrap_or_default();
+        let indexed = field.indexed.unwrap_or_default();
+        let many = field.many.unwrap_or_default();
+        map.insert(String::from("id"), field.id.unwrap_or_default());
+        map.insert(String::from("name"), field.name.unwrap_or_default());
+        map.insert(String::from("field_type"), field.field_type.unwrap_or_default());
+        map.insert(String::from("default"), field.default.unwrap_or_default());
+        map.insert(String::from("version"), field.version.unwrap_or_default());
+        map.insert(String::from("required"), required.to_string());
+        map.insert(String::from("api_version"), field.api_version.unwrap_or_default());
+        map.insert(String::from("indexed"), indexed.to_string());
+        map.insert(String::from("many"), many.to_string());
+        return map;
+    }
+
+    fn map_collections_db(&self) -> HashMap<String, Vec<HashMap<String, String>>> {
+        let field = self.clone();
+        // select_data
+        let select_data = field.select_data.unwrap_or_default();
+        let mut map: HashMap<String, Vec<HashMap<String, String>>> = HashMap::new();
+        let mut select_options: Vec<HashMap<String, String>> = Vec::new();
+        for (select_id, select_value) in select_data {
+            let mut map: HashMap<String, String> = HashMap::new();
+            map.insert(String::from("key"), select_id);
+            map.insert(String::from("value"), select_value);
+            select_options.push(map);
+        }
+        if select_options.len() != 0 {
+            let field_name = field.name.unwrap_or_default();
+            map.insert(format!("{}__select_data", field_name), select_options);    
+        }
+        return map
+    }
+   
+    fn map_objects_db(&self) -> HashMap<String, Vec<HashMap<String, String>>> {
+        let field = self.clone();
+        let mut map: HashMap<String, Vec<HashMap<String, String>>> = HashMap::new();
+        // Include here items where you need field -> object in field configuration
+        return map
     }
 }
 

@@ -1,14 +1,18 @@
 extern crate tr;
 extern crate colored;
 
+use std::collections::HashMap;
+
 use tr::tr;
 use colored::*;
 use regex::Regex;
 
-use crate::commands::table::config::{CreateTableConfig, DbTableConfig};
+use crate::commands::table::config::{CreateTableConfig};
 use crate::commands::table::{Command};
 use crate::commands::{CommandRunner};
-use crate::storage::table::{DbTable, Schema, SchemaData};
+use crate::commands::table::constants::*;
+use crate::storage::{ConfigStorageField};
+use crate::storage::table::{DbTable, Schema, DbData, RoutingData};
 use crate::planet::{
     PlanetContext, 
     PlanetError,
@@ -22,14 +26,9 @@ pub struct CreateTable<'gb> {
     pub config: CreateTableConfig,
 }
 
-impl<'gb> Command<SchemaData> for CreateTable<'gb> {
+impl<'gb> Command<DbData> for CreateTable<'gb> {
 
-    fn run(&self) -> Result<SchemaData, PlanetError> {
-        // Insert into account "tables" the config
-        let config: DbTableConfig = DbTableConfig{
-            language: self.config.language.clone(),
-            fields: self.config.fields.clone(),
-        };
+    fn run(&self) -> Result<DbData, PlanetError> {
         let result: Result<DbTable<'gb>, PlanetError> = DbTable::defaults(
             self.planet_context,
             self.context,
@@ -42,18 +41,64 @@ impl<'gb> Command<SchemaData> for CreateTable<'gb> {
                 let table_name = &table_name_match["table_name"].to_string();
                 let account_id = self.context.account_id.unwrap_or_default();
                 let space_id = self.context.space_id.unwrap_or_default();
-                let schema_data: SchemaData = SchemaData::defaults(
+                let config = self.config.clone();
+
+                // db table options with language data
+                let mut data: HashMap<String, String> = HashMap::new();
+                let language = config.language.unwrap();
+                let language_codes_list = language.codes.unwrap();
+                let language_codes_str = language_codes_list.join(",");
+                let language_default = language.default;
+                data.insert(String::from(LANGUAGE_CODES), language_codes_str);
+                data.insert(String::from(LANGUAGE_DEFAULT), language_default);
+                
+                // config data
+                let mut data_objects: HashMap<String, HashMap<String, String>> = HashMap::new();
+                let mut data_collections: HashMap<String, Vec<HashMap<String, String>>> = HashMap::new();
+                let fields = config.fields.unwrap().clone();
+                for field in fields.iter() {
+                    // field simple attributes
+                    let field_attrs = field.clone();
+                    let field_name = field_attrs.name.unwrap_or_default().clone();
+                    let map = &field.map_object_db();
+                    data_objects.insert(String::from(field_name.clone()), map.clone());
+                    // field complex attributes like select_data
+                    let map_list = &field.map_collections_db();
+                    data_collections = map_list.clone();
+                }
+                let routing: RoutingData = RoutingData{
+                    account_id: Some(account_id.to_string()),
+                    space_id: Some(space_id.to_string()),
+                    ipfs_cid: None,
+                };
+                let mut data_wrap: Option<HashMap<String, String>> = None;
+                let mut data_collections_wrap: Option<HashMap<String, Vec<HashMap<String, String>>>> = None;
+                let mut data_objects_wrap: Option<HashMap<String, HashMap<String, String>>> = None;
+                if data.len() > 0 {
+                    data_wrap = Some(data);
+                }
+                if data_collections.len() > 0 {
+                    data_collections_wrap = Some(data_collections);
+                }
+                if data_objects.len() > 0 {
+                    data_objects_wrap = Some(data_objects);
+                }
+                let db_data: DbData = DbData::defaults(
                     &table_name, 
-                    &config,
-                    account_id,
-                    space_id,
+                    data_wrap,
+                    data_collections_wrap,
+                    data_objects_wrap,
+                    None,
+                    Some(&routing),
                 );
+                eprintln!("CreateTable.run :: db_data: {:#?}", &db_data);
+
                 let db_table: DbTable<'gb> = result.unwrap();
 
-                let response: SchemaData = db_table.create(&schema_data)?;
+                let response: DbData = db_table.create(&db_data)?;
                 let response_src = response.clone();
                 // response.id
-                let table_name = &response.name;
+                let table_name = &response.name.unwrap_or_default();
                 let table_id = &response.id.unwrap();
 
                 println!();

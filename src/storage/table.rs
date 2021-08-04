@@ -1,6 +1,7 @@
 extern crate sled;
 
 use std::str::FromStr;
+use serde_json;
 use std::collections::HashMap;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
@@ -10,6 +11,7 @@ use serde_encrypt::{
     AsSharedKey, EncryptedMessage,
 };
 
+use crate::planet::constants::*;
 use crate::storage::{generate_id};
 use crate::planet::{PlanetError, PlanetContext, Context};
 use crate::commands::table::config::DbTableConfig;
@@ -18,9 +20,9 @@ use crate::storage::fields::*;
 
 pub trait Schema<'gb> {
     fn defaults(planet_context: &'gb PlanetContext<'gb>, context: &'gb Context<'gb>) -> Result<DbTable<'gb>, PlanetError>;
-    fn create(&self, schema_data: &SchemaData) -> Result<SchemaData, PlanetError>;
-    fn get(&self, id: &String) -> Result<SchemaData, PlanetError>;
-    fn get_by_name(&self, table_name: &str) -> Result<Option<SchemaData>, PlanetError>;
+    fn create(&self, db_data: &DbData) -> Result<DbData, PlanetError>;
+    fn get(&self, id: &String) -> Result<DbData, PlanetError>;
+    fn get_by_name(&self, table_name: &str) -> Result<Option<DbData>, PlanetError>;
 }
 
 pub trait Row<'gb> {
@@ -29,8 +31,8 @@ pub trait Row<'gb> {
         planet_context: &'gb PlanetContext<'gb>, 
         context: &'gb Context<'gb>
     ) -> Result<DbRow<'gb>, PlanetError>;
-    fn insert(&self, row_data: &RowData) -> Result<RowData, PlanetError>;
-    fn get(&self, id: &String) -> Result<RowData, PlanetError>;
+    fn insert(&self, db_data: &DbData) -> Result<DbData, PlanetError>;
+    fn get(&self, id: &String) -> Result<DbData, PlanetError>;
 }
 
 // lifetimes: gb (global, for contexts), db, bs
@@ -41,6 +43,60 @@ pub struct RoutingData {
     pub space_id: Option<String>,
     pub ipfs_cid: Option<String>,
 }
+
+// pub struct RowData {
+//     pub id: Option<String>,
+//     pub routing: RoutingData,
+//     pub data: Option<HashMap<String, RowItem>>,
+// }
+
+// This structure would apply for SchemaData and RowData, we would need to convert from one to the other
+// data has field_id -> value, so if we change field name would not be affected
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DbData {
+    pub id: Option<String>,
+    pub name: Option<String>,
+    pub routing: Option<HashMap<String, String>>,
+    pub options: Option<HashMap<String, String>>,
+    pub data: Option<HashMap<String, String>>,
+    pub data_collections: Option<HashMap<String, Vec<HashMap<String, String>>>>,
+    pub data_objects: Option<HashMap<String, HashMap<String, String>>>,
+}
+impl DbData {
+    pub fn defaults(
+        name: &String, 
+        data: Option<HashMap<String, String>>, 
+        data_collections: Option<HashMap<String, Vec<HashMap<String, String>>>>, 
+        data_objects: Option<HashMap<String, HashMap<String, String>>>, 
+        options: Option<HashMap<String, String>>, 
+        routing: Option<&RoutingData>, 
+    ) -> DbData {
+        let mut routing_map_: Option<HashMap<String, String>> = None;
+        if routing.is_some() {
+            let mut routing_map: HashMap<String, String> = HashMap::new();
+            let routing = routing.unwrap();
+            let account_id = routing.account_id.clone().unwrap_or_default();
+            let space_id = routing.space_id.clone().unwrap_or_default();
+            let ipfs_cid = routing.ipfs_cid.clone().unwrap_or_default();
+            routing_map.insert(String::from(ACCOUNT_ID), account_id.to_string());
+            routing_map.insert(String::from(SPACE_ID), space_id.to_string());
+            routing_map.insert(String::from(IPFS_CID), ipfs_cid);
+            let routing_map_ = Some(routing_map);
+        }
+        let db_data = Self{
+            id: generate_id(),
+            name: Some(format!("{}", name)),
+            routing: routing_map_,
+            options: options,
+            data: data,
+            data_collections: data_collections,
+            data_objects: data_objects,
+        };
+        return db_data
+    }
+}
+
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SchemaData {
@@ -66,14 +122,9 @@ impl SchemaData {
     }
 }
 
-impl SerdeEncryptSharedKey for SchemaData {
+impl SerdeEncryptSharedKey for DbData {
     type S = BincodeSerializer<Self>;  // you can specify serializer implementation (or implement it by yourself).
 }
-
-impl SerdeEncryptSharedKey for RowData {
-    type S = BincodeSerializer<Self>;  // you can specify serializer implementation (or implement it by yourself).
-}
-
 
 #[derive(Debug, Clone)]
 pub struct DbTable<'gb> {
@@ -120,35 +171,37 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
         }
     }
 
-    fn get_by_name(&self, table_name: &str) -> Result<Option<SchemaData>, PlanetError> {
+    fn get_by_name(&self, table_name: &str) -> Result<Option<DbData>, PlanetError> {
         // I travel table for account_id if any, space id if any and table name
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let iter = self.db.iter();
         let mut number_items = 0;
-        let mut matched_item: Option<SchemaData> = None;
+        let mut matched_item: Option<DbData> = None;
         let ctx_account_id = self.context.account_id.unwrap_or_default();
         let ctx_space_id = self.context.space_id.unwrap_or_default();
         for result in iter {
             let tuple = result.unwrap();
             let item_db = tuple.1.to_vec();
             let item_ = EncryptedMessage::deserialize(item_db).unwrap();
-            let item_ = SchemaData::decrypt_owned(
+            let item_ = DbData::decrypt_owned(
                 &item_, 
                 &shared_key);
             let item = item_.unwrap();
             let item_source = item.clone();
-            let matches_name_none = &item.name.to_lowercase() == &table_name.to_lowercase();
+            let matches_name_none = &item.name.unwrap().to_lowercase() == &table_name.to_lowercase();
             let mut check_account: bool = true;
-            let routing = item.routing;
-            let account_id = routing.account_id.unwrap_or_default();
-            let space_id = routing.space_id.unwrap_or_default();
-            if ctx_account_id != "" && ctx_space_id != "" {
-                if (account_id != "" && account_id != ctx_account_id) || 
-                (space_id != "" && space_id != ctx_space_id) {
-                    check_account = false;
+            let routing_response = item.routing;
+            if routing_response.is_some() {
+                let routing = routing_response.unwrap();
+                let account_id = routing.get(ACCOUNT_ID).unwrap();
+                let space_id = routing.get(SPACE_ID).unwrap();
+                if ctx_account_id != "" && ctx_space_id != "" {
+                    if (account_id != "" && account_id != ctx_account_id) || 
+                    (space_id != "" && space_id != ctx_space_id) {
+                        check_account = false;
+                    }
                 }
             }
-            
             if matches_name_none && check_account {
                 number_items += 1;
                 matched_item = Some(item_source);
@@ -170,13 +223,13 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
         }
     }
 
-    fn get(&self, id: &String) -> Result<SchemaData, PlanetError> {
+    fn get(&self, id: &String) -> Result<DbData, PlanetError> {
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let id_db = xid::Id::from_str(id).unwrap();
         let id_db = id_db.as_bytes();
         let item_db = self.db.get(&id_db).unwrap().unwrap().to_vec();
         let item_ = EncryptedMessage::deserialize(item_db).unwrap();
-        let item_ = SchemaData::decrypt_owned(
+        let item_ = DbData::decrypt_owned(
             &item_, 
             &shared_key);
         match item_ {
@@ -191,9 +244,9 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
         }
     }
 
-    fn create(&self, schema_data: &SchemaData) -> Result<SchemaData, PlanetError> {
-        let table_name = &schema_data.name;
-        let result_table_exists: Result<Option<SchemaData>, PlanetError> = self.get_by_name(
+    fn create(&self, db_data: &DbData) -> Result<DbData, PlanetError> {
+        let table_name = db_data.name.clone().unwrap();
+        let result_table_exists: Result<Option<DbData>, PlanetError> = self.get_by_name(
             &table_name.as_str()
         );
         let table_exists_error = *&result_table_exists.is_err();
@@ -209,9 +262,9 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
                 Some(tr!("Error checking table \"{}\"", &table_name))));
         }
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
-        let encrypted_schema = schema_data.encrypt(&shared_key).unwrap();
+        let encrypted_schema = db_data.encrypt(&shared_key).unwrap();
         let encoded: Vec<u8> = encrypted_schema.serialize();
-        let id = schema_data.id.clone().unwrap();
+        let id = db_data.id.clone().unwrap();
         let id_db = xid::Id::from_str(id.as_str()).unwrap();
         let id_db = id_db.as_bytes();
         let response = &self.db.insert(id_db, encoded);
@@ -308,19 +361,20 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
         }
     }
 
-    fn insert(&self, row_data: &RowData) -> Result<RowData, PlanetError> {
-        eprintln!("insert :: row_data: {:#?}", row_data);
+    fn insert(&self, db_data: &DbData) -> Result<DbData, PlanetError> {
+        eprintln!("insert :: row_data: {:#?}", db_data);
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
-        let encrypted_data = row_data.encrypt(&shared_key).unwrap();
+        let encrypted_data = db_data.encrypt(&shared_key).unwrap();
         let encoded: Vec<u8> = encrypted_data.serialize();
         eprintln!("insert :: data size: {}", encoded.len());
-        let id = row_data.id.clone().unwrap();
+        let id = db_data.id.clone().unwrap();
         let id_db = xid::Id::from_str(id.as_str()).unwrap();
         let id_db = id_db.as_bytes();
         let response = &self.db.insert(id_db, encoded);
         match response {
             Ok(_) => {
-                // eprintln!("DbRow.insert :: id: {:?}", &id);
+                eprintln!("DbRow.insert :: id: {:?}", &id);
+                eprintln!("DbRow.insert :: Will get item...");
                 let item_ = self.get(&id);
                 match item_ {
                     Ok(_) => {
@@ -338,13 +392,13 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
         }
     }
 
-    fn get(&self, id: &String) -> Result<RowData, PlanetError> {
+    fn get(&self, id: &String) -> Result<DbData, PlanetError> {
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let id_db = xid::Id::from_str(id).unwrap();
         let id_db = id_db.as_bytes();
         let item_db = self.db.get(&id_db).unwrap().unwrap().to_vec();
         let item_ = EncryptedMessage::deserialize(item_db).unwrap();
-        let item_ = RowData::decrypt_owned(
+        let item_ = DbData::decrypt_owned(
             &item_, 
             &shared_key);
         match item_ {

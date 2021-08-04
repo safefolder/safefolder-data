@@ -4,17 +4,26 @@ pub mod fields;
 pub mod table;
 pub mod constants;
 
+use std::collections::HashMap;
+
 use validator::{ValidationErrors};
 use crate::commands::table::config::FieldConfig;
+use crate::storage::table::DbData;
 
-pub trait StorageField {
-    fn defaults() -> FieldConfig;
+pub trait ConfigStorageField {
+    fn defaults(
+        select_data: Option<Vec<(String, String)>>
+    ) -> FieldConfig;
     fn version() -> Option<String>;
     fn api_version() -> Option<String>;
     fn is_valid(&self) -> Result<(), ValidationErrors>;
     fn generate_id() -> Option<String> {
         return generate_id();
     }
+    fn map_object_db(&self) -> HashMap<String, String>;
+    fn map_collections_db(&self) -> HashMap<String, Vec<HashMap<String, String>>>;
+    fn parse_from_db(db_data: DbData) -> Vec<FieldConfig>;
+    fn map_objects_db(&self) -> HashMap<String, Vec<HashMap<String, String>>>;
 }
 
 pub fn generate_id() -> Option<String> {

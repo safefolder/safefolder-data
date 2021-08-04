@@ -105,3 +105,11 @@ impl PlanetError {
         return error
     }
 }
+
+pub fn make_bool_str(literal: String) -> bool {
+    let mut check: bool = true;
+    if literal.to_lowercase() == "false" {
+        check = false
+    }
+    return check
+}
