@@ -10,3 +10,4 @@ pub const SERDE_ERROR_TYPE_DUPLICATE_FIELD: &str = "duplicate field";
 pub const ACCOUNT_ID: &str = "account_id";
 pub const SPACE_ID: &str = "space_id";
 pub const IPFS_CID : &str = "ipfs_cid";
+pub const ID: &str = "id";

@@ -14,12 +14,13 @@ use slug::slugify;
 use crate::commands::table::config::{InsertIntoTableConfig, FieldConfig};
 use crate::commands::table::{Command};
 use crate::commands::{CommandRunner};
-use crate::storage::table::{DbTable, DbRow, Row, RowData, RoutingData, Schema, RowItem, DbData};
+use crate::storage::table::{DbTable, DbRow, Row, RowData, Schema, RowItem, DbData};
 use crate::storage::table::*;
+use crate::storage::ConfigStorageField;
 use crate::planet::{
     PlanetContext, 
     PlanetError,
-    Context, 
+    Context,
     validation::PlanetValidationError,
 };
 use crate::storage::fields::*;
@@ -40,12 +41,6 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
         let table_file = slugify(&table_name);
         let table_file = table_file.as_str().replace("-", "_");
 
-        // Insert into account "tables" the config
-        // let config: DbTableConfig = DbTableConfig{
-        //     language: self.config.language.clone(),
-        //     fields: self.config.fields.clone(),
-        // };
-        
         let result: Result<DbRow<'gb>, PlanetError> = DbRow::defaults(
             &table_file,
             self.planet_context,
@@ -58,7 +53,7 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                 // let data_config = self.config.data.clone();
                 let db_row: DbRow<'gb> = result.unwrap();
                 // I need to get SchemaData and schema for the table
-                // I go through fields in order to build RowData
+                // I go through fields in order to build RowData                
                 let db_table: DbTable = DbTable::defaults(
                     self.planet_context,
                     self.context,
@@ -72,39 +67,57 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                         )
                     );
                 }
+                let routing_data: RoutingData = RoutingData{
+                    account_id: Some(account_id),
+                    space_id: Some(space_id),
+                    ipfs_cid: None
+                };
 
                 let table = table.unwrap();
                 eprintln!("InsertIntoTable.run :: table: {:#?}", table);
-                // let mut row_data: RowData = RowData::defaults(&account_id, &space_id);
                 // I need a way to get list of instance FieldConfig (fields)
-                // FieldConfig.parse_db(db_data: DbData) -> Vec<FieldConfig>
-                // let fields: Vec<FieldConfig> = table.config.fields.unwrap();
-                // let mut insert_data: HashMap<String, RowItem> = HashMap::new();
-                // let data_map = self.config.data.clone().unwrap();
-                // for field in fields {
-                //     let field_ = field.clone();
-                //     let field_type = field.field_type.unwrap_or_default();
-                //     let field_type = field_type.as_str();
-                //     match field_type {
-                //         "Small Text" => {
-                //             insert_data = SmallTextField::process(&data_map, &field_, insert_data)?;
-                //         },
-                //         _ => {
-                //         }
-                //     }
-                // }
-                // row_data.data = Some(insert_data);
-                // // Insert RowData into database
-                // let response: RowData = db_row.insert(&row_data)?;
-                // // let response_src = response.clone();
-                // return Ok(response);
-
-                return Err(
-                    PlanetError::new(
-                        500, 
-                        Some(tr!("This is a dumb message")),
-                    )
+                let config_fields = FieldConfig::parse_from_db(table);
+                eprintln!("InsertIntoTable.run :: config_fields: {:#?}", &config_fields);
+                
+                let data_map: HashMap<String, String> = self.config.data.clone().unwrap();
+                eprintln!("InsertIntoTable.run :: data_map: {:#?}", &data_map);
+                // TODO: Change for the item name
+                // We will use this when we have the Name field, which is required in all tables
+                let name: &String = &String::from("hello");
+                let mut db_data = DbData::defaults(
+                    name,
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some(&routing_data),
+                    None,
                 );
+                for field in config_fields {
+                    let field_ = field.clone();
+                    let field_type = field.field_type.unwrap_or_default();
+                    let field_type = field_type.as_str();
+                    eprintln!("InsertIntoTable.run :: field_type: {}", &field_type);
+                    match field_type {
+                        "Small Text" => {
+                            db_data = SmallTextField::process(&field_, data_map.clone(), db_data)?;
+                        },
+                        "Long Text" => {
+                            db_data = LongTextField::process(&field_, data_map.clone(), db_data)?;
+                        },
+                        "Checkbox" => {
+                            db_data = CheckBoxField::process(&field_, data_map.clone(), db_data)?;
+                        },
+                        "Number" => {
+                            db_data = NumberField::process(&field_, data_map.clone(), db_data)?;
+                        },
+                        _ => {
+                        }
+                    }
+                }
+                eprintln!("InsertIntoTable.run :: I will write: {:#?}", &db_data);
+                let response: DbData = db_row.insert(&db_data)?;
+                return Ok(response);
             },
             Err(error) => {
                 return Err(error);

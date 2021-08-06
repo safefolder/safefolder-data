@@ -59,6 +59,7 @@ pub struct DbData {
     pub name: Option<String>,
     pub routing: Option<HashMap<String, String>>,
     pub options: Option<HashMap<String, String>>,
+    pub context: Option<HashMap<String, String>>,
     pub data: Option<HashMap<String, String>>,
     pub data_collections: Option<HashMap<String, Vec<HashMap<String, String>>>>,
     pub data_objects: Option<HashMap<String, HashMap<String, String>>>,
@@ -71,6 +72,7 @@ impl DbData {
         data_objects: Option<HashMap<String, HashMap<String, String>>>, 
         options: Option<HashMap<String, String>>, 
         routing: Option<&RoutingData>, 
+        context: Option<HashMap<String, String>>
     ) -> DbData {
         let mut routing_map_: Option<HashMap<String, String>> = None;
         if routing.is_some() {
@@ -92,6 +94,7 @@ impl DbData {
             data: data,
             data_collections: data_collections,
             data_objects: data_objects,
+            context: context,
         };
         return db_data
     }

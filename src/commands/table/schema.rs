@@ -11,6 +11,7 @@ use crate::commands::table::config::{CreateTableConfig};
 use crate::commands::table::{Command};
 use crate::commands::{CommandRunner};
 use crate::commands::table::constants::*;
+use crate::planet::constants::ID;
 use crate::storage::{ConfigStorageField};
 use crate::storage::table::{DbTable, Schema, DbData, RoutingData};
 use crate::planet::{
@@ -56,16 +57,23 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                 let mut data_objects: HashMap<String, HashMap<String, String>> = HashMap::new();
                 let mut data_collections: HashMap<String, Vec<HashMap<String, String>>> = HashMap::new();
                 let fields = config.fields.unwrap().clone();
+                let mut field_ids: Vec<HashMap<String, String>> = Vec::new();
                 for field in fields.iter() {
                     // field simple attributes
                     let field_attrs = field.clone();
+                    let mut field_id_map: HashMap<String, String> = HashMap::new();
+                    field_id_map.insert(String::from(ID), field_attrs.id.unwrap());
+                    &field_ids.push(field_id_map);
                     let field_name = field_attrs.name.unwrap_or_default().clone();
                     let map = &field.map_object_db();
                     data_objects.insert(String::from(field_name.clone()), map.clone());
                     // field complex attributes like select_data
                     let map_list = &field.map_collections_db();
-                    data_collections = map_list.clone();
+                    let map_list = map_list.clone();
+                    // data_collections = map_list.clone();
+                    data_collections.extend(map_list);
                 }
+                data_collections.insert(String::from(FIELD_IDS), field_ids);
                 let routing: RoutingData = RoutingData{
                     account_id: Some(account_id.to_string()),
                     space_id: Some(space_id.to_string()),
@@ -90,6 +98,7 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                     data_objects_wrap,
                     None,
                     Some(&routing),
+                    None,
                 );
                 eprintln!("CreateTable.run :: db_data: {:#?}", &db_data);
 

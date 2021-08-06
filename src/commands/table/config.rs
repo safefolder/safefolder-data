@@ -6,6 +6,8 @@ use validator::{Validate, ValidationErrors, ValidationError};
 use lazy_static::lazy_static;
 use regex::Regex;
 
+use crate::commands::table::constants::FIELD_IDS;
+use crate::commands::table::data;
 use crate::planet::validation::{CommandImportConfig, PlanetValidationError};
 use crate::planet::PlanetContext;
 
@@ -167,37 +169,119 @@ impl ConfigStorageField for FieldConfig {
     }
     fn parse_from_db(db_data: DbData) -> Vec<FieldConfig> {
         // let select_data: Option<Vec<(String, String)>> = None;
-        let fields: Vec<FieldConfig> = Vec::new();
+        let mut fields: Vec<FieldConfig> = Vec::new();
         // I use data_collections, where we store the fields
         let data_collections = db_data.data_collections;
-        if data_collections.is_some() {
-            let data_collections = data_collections.unwrap();
-            let db_fields = data_collections.get(FIELDS).unwrap();
-            for db_field in db_fields {
-                let required = make_bool_str(db_field.get("required").unwrap().clone());
-                let indexed = make_bool_str(db_field.get("indexed").unwrap().clone());
-                let many = make_bool_str(db_field.get("many").unwrap().clone());
-                // select_data is (id,option)::(id,option)::(id,option)
-                let select_data_str = db_field.get("select_data").unwrap().clone();
-                let select_data: Option<Vec<(String, String)>> = None;
-                let mut select_data_list: Vec<(String, String)> = Vec::new();
-                if select_data_str != String::from("") {
-                    let select_data_items = select_data_str.split("::");
-                }
-                let field: FieldConfig = FieldConfig{
-                    id: Some(db_field.get("id").unwrap().clone()),
-                    name: Some(db_field.get("name").unwrap().clone()),
-                    field_type: Some(db_field.get("field_type").unwrap().clone()),
-                    default: Some(db_field.get("default").unwrap().clone()),
-                    version: Some(db_field.get("version").unwrap().clone()),
+        let data = db_data.data;
+        let data_objects = db_data.data_objects;
+        eprintln!("parse_from_db :: data: {:#?}", &data);
+        eprintln!("parse_from_db :: data_objects: {:#?}", &data_objects);
+        eprintln!("parse_from_db :: data_collections: {:#?}", &data_collections);
+
+        // 1. Go through data_objects and make map field names field_name -> FieldConfig. Also
+        //   vector for order in 
+        let mut map_fields_by_id: HashMap<String, FieldConfig> = HashMap::new();
+        let mut map_fields_by_name: HashMap<String, FieldConfig> = HashMap::new();
+        if data_objects.is_some() {
+            let data_objects = data_objects.unwrap();
+            for field_name in data_objects.keys() {
+                let field_config_map = data_objects.get(field_name).unwrap();
+                // Populate FieldConfig with attributes from map, which would do simple fields
+                // Add to map_fields_by_id, already having FieldConfig map
+                let required = make_bool_str(field_config_map.get("required").unwrap().clone());
+                let indexed = make_bool_str(field_config_map.get("indexed").unwrap().clone());
+                let many = make_bool_str(field_config_map.get("many").unwrap().clone());
+                let field_id = field_config_map.get(ID).unwrap().clone();
+                let field_config: FieldConfig = FieldConfig{
+                    id: Some(field_id.clone()),
+                    name: Some(field_config_map.get("name").unwrap().clone()),
+                    field_type: Some(field_config_map.get("field_type").unwrap().clone()),
+                    default: Some(field_config_map.get("default").unwrap().clone()),
+                    version: Some(field_config_map.get("version").unwrap().clone()),
                     required: Some(required),
-                    api_version: Some(db_field.get("api_version").unwrap().clone()),
+                    api_version: Some(field_config_map.get("api_version").unwrap().clone()),
                     indexed: Some(indexed),
                     many: Some(many),
-                    select_data: select_data,
+                    select_data: None,
                 };
+                &map_fields_by_id.insert(field_id, field_config.clone());
+                &map_fields_by_name.insert(field_name.clone(), field_config.clone());
             }
         }
+
+        // 2. Go through data_collections for select_data and other complex structures. Add fields fo
+        //      fields at map_fields_by_id
+        let data_collections_1 = data_collections.clone();
+        let data_collections_2 = data_collections.clone();
+        if data_collections_1.is_some() {
+            let data_collections = data_collections.unwrap();
+            for data_collection_field in data_collections.keys() {
+                let data_collection_field = data_collection_field.clone();
+                eprintln!("parse_from_db :: data_collection_field: {:?}", &data_collection_field);
+                let data_collection_field_str = &data_collection_field.as_str();
+                let index = &data_collection_field_str.find("__");
+                if index.is_none() {
+                    continue;
+                }
+                // {field_name}__{attr}
+                let pieces = &data_collection_field.split("__");
+                let pieces: Vec<&str> = pieces.clone().collect();
+                let field_name = pieces[0];
+                let attr_name = pieces[1];
+                eprintln!("parse_from_db :: field_name: {:?} attr_name: {:?}", &field_name, &attr_name);
+                // if &data_collection_field != FIELD_IDS {
+                //     // select_data, and other structures
+                //     let field_list = 
+                //         data_collections.get(&data_collection_field).unwrap().clone();
+                //     if &data_collection_field == "select_data" {
+                //         let field_config_ = &map_fields_by_id.get()
+                //     }
+                // }
+            }
+        }
+
+        // 3. Go through fields_ids (data_collections) having list of ids and add to Vec fields and return
+        if data_collections_2.is_some() {
+            let data_collections_2 = data_collections_2.unwrap().clone();
+            let field_ids = &data_collections_2.get(FIELD_IDS).unwrap();
+            for field_id_data in field_ids.iter() {
+                let field_id = &field_id_data.get(ID).unwrap().clone();
+                let field_config = map_fields_by_id.get(field_id).unwrap().clone();
+                &fields.push(field_config);
+            }
+        }
+
+        // if data_collections.is_some() {
+        //     let data_collections = data_collections.unwrap();
+        //     let db_fields = data_collections.get(FIELDS).unwrap();
+        //     for db_field in db_fields {
+        //         let required = make_bool_str(db_field.get("required").unwrap().clone());
+        //         let indexed = make_bool_str(db_field.get("indexed").unwrap().clone());
+        //         let many = make_bool_str(db_field.get("many").unwrap().clone());
+        //         // select_data is (id,option)::(id,option)::(id,option)
+        //         let select_data_str = db_field.get("select_data").unwrap().clone();
+        //         let select_data: Option<Vec<(String, String)>> = None;
+        //         let mut select_data_list: Vec<(String, String)> = Vec::new();
+        //         if select_data_str != String::from("") {
+        //             let select_data_items = select_data_str.split("::");
+        //         }
+        //         let field: FieldConfig = FieldConfig{
+        //             id: Some(db_field.get("id").unwrap().clone()),
+        //             name: Some(db_field.get("name").unwrap().clone()),
+        //             field_type: Some(db_field.get("field_type").unwrap().clone()),
+        //             default: Some(db_field.get("default").unwrap().clone()),
+        //             version: Some(db_field.get("version").unwrap().clone()),
+        //             required: Some(required),
+        //             api_version: Some(db_field.get("api_version").unwrap().clone()),
+        //             indexed: Some(indexed),
+        //             many: Some(many),
+        //             select_data: select_data,
+        //         };
+        //     }
+        // }
+        // if data.is_some() {
+
+        // }
         return fields
     }
     fn map_object_db(&self) -> HashMap<String, String> {
