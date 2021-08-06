@@ -7,14 +7,13 @@ use std::collections::HashMap;
 use tr::tr;
 use colored::*;
 use regex::Regex;
-use serde::{Deserialize, Serialize};
 use slug::slugify;
 
 
 use crate::commands::table::config::{InsertIntoTableConfig, FieldConfig};
 use crate::commands::table::{Command};
 use crate::commands::{CommandRunner};
-use crate::storage::table::{DbTable, DbRow, Row, RowData, Schema, RowItem, DbData};
+use crate::storage::table::{DbTable, DbRow, Row, Schema, DbData};
 use crate::storage::table::*;
 use crate::storage::ConfigStorageField;
 use crate::planet::{

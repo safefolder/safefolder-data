@@ -7,7 +7,6 @@ use lazy_static::lazy_static;
 use regex::Regex;
 
 use crate::commands::table::constants::FIELD_IDS;
-use crate::commands::table::data;
 use crate::planet::validation::{CommandImportConfig, PlanetValidationError};
 use crate::planet::PlanetContext;
 
@@ -17,7 +16,6 @@ use crate::storage::table::DbData;
 use crate::planet::constants::*;
 use crate::planet::make_bool_str;
 
-use super::constants::FIELDS;
 use super::fetch_yaml_config;
 
 pub struct DbTableConfig02 {
@@ -29,16 +27,6 @@ pub struct DbTableConfig02 {
 pub struct DbTableConfig {
     pub language: Option<LanguageConfig>,
     pub fields: Option<Vec<FieldConfig>>,
-}
-impl DbTableConfig {
-    pub fn to_hashmap(&self) -> HashMap<String, String> {
-        // separate fields by "__" in objects, so I can have it plain.
-        // field1__field2_opt
-        let mut map: HashMap<String, String>  =HashMap::new();
-        let language = self.language.clone().unwrap();
-        let fields = self.fields.clone().unwrap();
-        return map
-    }
 }
 
 lazy_static! {

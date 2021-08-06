@@ -1,7 +1,6 @@
 extern crate sled;
 
 use std::str::FromStr;
-use serde_json;
 use std::collections::HashMap;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
@@ -84,7 +83,7 @@ impl DbData {
             routing_map.insert(String::from(ACCOUNT_ID), account_id.to_string());
             routing_map.insert(String::from(SPACE_ID), space_id.to_string());
             routing_map.insert(String::from(IPFS_CID), ipfs_cid);
-            let routing_map_ = Some(routing_map);
+            routing_map_ = Some(routing_map);
         }
         let db_data = Self{
             id: generate_id(),
