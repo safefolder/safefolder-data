@@ -43,6 +43,23 @@ pub struct RoutingData {
     pub ipfs_cid: Option<String>,
 }
 
+impl RoutingData {
+    pub fn defaults(account_id: Option<String>, space_id: Option<String>, ipfs_cid: Option<String>) -> Option<RoutingData> {
+        let mut routing_wrap: Option<RoutingData> = None;
+        let account_id = account_id.unwrap_or_default();
+        let space_id = space_id.unwrap_or_default();
+        if account_id != "" && space_id != "" {
+            let routing = RoutingData{
+                account_id: Some(account_id.to_string()),
+                space_id: Some(space_id.to_string()),
+                ipfs_cid: ipfs_cid,
+            };
+            routing_wrap = Some(routing);
+        }
+        return routing_wrap
+    }
+}
+
 // pub struct RowData {
 //     pub id: Option<String>,
 //     pub routing: RoutingData,
@@ -70,7 +87,7 @@ impl DbData {
         data_collections: Option<HashMap<String, Vec<HashMap<String, String>>>>, 
         data_objects: Option<HashMap<String, HashMap<String, String>>>, 
         options: Option<HashMap<String, String>>, 
-        routing: Option<&RoutingData>, 
+        routing: Option<RoutingData>, 
         context: Option<HashMap<String, String>>
     ) -> DbData {
         let mut routing_map_: Option<HashMap<String, String>> = None;
@@ -364,11 +381,11 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
     }
 
     fn insert(&self, db_data: &DbData) -> Result<DbData, PlanetError> {
-        eprintln!("insert :: row_data: {:#?}", db_data);
+        // eprintln!("insert :: row_data: {:#?}", db_data);
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let encrypted_data = db_data.encrypt(&shared_key).unwrap();
         let encoded: Vec<u8> = encrypted_data.serialize();
-        eprintln!("insert :: data size: {}", encoded.len());
+        // eprintln!("insert :: data size: {}", encoded.len());
         let id = db_data.id.clone().unwrap();
         let id_db = xid::Id::from_str(id.as_str()).unwrap();
         let id_db = id_db.as_bytes();
@@ -406,7 +423,7 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
         match item_ {
             Ok(_) => {
                 let item = item_.unwrap();
-                eprintln!("get :: item: {:?}", &item);
+                // eprintln!("get :: item: {:?}", &item);
                 Ok(item)
             },
             Err(_) => {

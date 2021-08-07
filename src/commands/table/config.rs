@@ -30,8 +30,9 @@ pub struct DbTableConfig {
 }
 
 lazy_static! {
-    static ref RE_COMMAND_CREATE_TABLE: Regex = Regex::new(r#"(CREATE TABLE) "([a-zA-Z0-9_ ]+)"#).unwrap();
-    static ref RE_COMMAND_INSERT_INTO_TABLE: Regex = Regex::new(r#"(INSERT INTO TABLE) "([a-zA-Z0-9_ ]+)"#).unwrap();
+    static ref RE_COMMAND_CREATE_TABLE: Regex = Regex::new(r#"(CREATE TABLE) "([a-zA-Z0-9_ ]+)""#).unwrap();
+    static ref RE_COMMAND_INSERT_INTO_TABLE: Regex = Regex::new(r#"(INSERT INTO TABLE) "([a-zA-Z0-9_ ]+)""#).unwrap();
+    static ref RE_COMMAND_GET_FROM_TABLE: Regex = Regex::new(r#"(GET FROM TABLE) "([a-zA-Z0-9_ ]+)"#).unwrap();
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
@@ -162,9 +163,9 @@ impl ConfigStorageField for FieldConfig {
         let data_collections = db_data.data_collections;
         let data = db_data.data;
         let data_objects = db_data.data_objects;
-        eprintln!("parse_from_db :: data: {:#?}", &data);
-        eprintln!("parse_from_db :: data_objects: {:#?}", &data_objects);
-        eprintln!("parse_from_db :: data_collections: {:#?}", &data_collections);
+        // eprintln!("parse_from_db :: data: {:#?}", &data);
+        // eprintln!("parse_from_db :: data_objects: {:#?}", &data_objects);
+        // eprintln!("parse_from_db :: data_collections: {:#?}", &data_collections);
 
         // 1. Go through data_objects and make map field names field_name -> FieldConfig. Also
         //   vector for order in 
@@ -205,7 +206,7 @@ impl ConfigStorageField for FieldConfig {
             let data_collections = data_collections.unwrap();
             for data_collection_field in data_collections.keys() {
                 let data_collection_field = data_collection_field.clone();
-                eprintln!("parse_from_db :: data_collection_field: {:?}", &data_collection_field);
+                // eprintln!("parse_from_db :: data_collection_field: {:?}", &data_collection_field);
                 let data_collection_field_str = &data_collection_field.as_str();
                 let index = &data_collection_field_str.find("__");
                 if index.is_none() {
@@ -216,7 +217,7 @@ impl ConfigStorageField for FieldConfig {
                 let pieces: Vec<&str> = pieces.clone().collect();
                 let field_name = pieces[0];
                 let attr_name = pieces[1];
-                eprintln!("parse_from_db :: field_name: {:?} attr_name: {:?}", &field_name, &attr_name);
+                // eprintln!("parse_from_db :: field_name: {:?} attr_name: {:?}", &field_name, &attr_name);
                 // if &data_collection_field != FIELD_IDS {
                 //     // select_data, and other structures
                 //     let field_list = 
@@ -315,6 +316,16 @@ impl ConfigStorageField for FieldConfig {
         // Include here items where you need field -> object in field configuration
         return map
     }
+
+    fn get_field_id_map(fields: &Vec<FieldConfig>) -> HashMap<String, FieldConfig> {
+        let mut map: HashMap<String, FieldConfig> = HashMap::new();
+        for field in fields {
+            let field_ = field.clone();
+            let field_id = field.id.clone().unwrap_or_default();
+            map.insert(field_id, field_);
+        }
+        return map
+    }
 }
 
 fn validate_default_language(language: &String) -> Result<(), ValidationError> {
@@ -379,6 +390,70 @@ impl InsertIntoTableConfig {
         match response {
             Ok(_) => {
                 let config_model: InsertIntoTableConfig = response.unwrap();
+                let validate: Result<(), ValidationErrors> = config_model.validate();
+                match validate {
+                    Ok(_) => {
+                        return Ok(config_model)
+                    },
+                    Err(errors) => {
+                        let command = &config_model.command.unwrap();
+                        let planet_errors: Vec<PlanetValidationError> = import_config.parse_validator(
+                            command, errors);
+                        return Err(planet_errors);
+                    }
+                }
+            },
+            Err(error) => {
+                let mut planet_errors: Vec<PlanetValidationError> = Vec::new();
+                planet_errors.push(import_config.parse_serde(&error));
+                return Err(planet_errors);
+            }
+        }
+    }
+
+}
+
+#[derive(Debug, Serialize, Deserialize, Validate, Clone)]
+pub struct DataId {
+    pub id: Option<String>
+}
+
+#[derive(Debug, Serialize, Deserialize, Validate, Clone)]
+pub struct GetFromTableConfig {
+    #[validate(required, regex="RE_COMMAND_GET_FROM_TABLE")]
+    pub command: Option<String>,
+    #[validate(required)]
+    pub data: Option<DataId>,
+}
+
+impl GetFromTableConfig {
+
+    pub fn defaults(id: String) -> GetFromTableConfig {
+        let data_id: DataId = DataId{
+            id: Some(id)
+        };
+        let config: GetFromTableConfig = GetFromTableConfig{
+            command: Some(String::from("GET FROM TABLE")),
+            data: Some(data_id)
+        };
+        return config
+    }
+
+    pub fn import(
+        &self, 
+        planet_context: &PlanetContext, 
+        yaml_path: &String
+    ) -> Result<GetFromTableConfig, Vec<PlanetValidationError>> {
+        let yaml_str: String = fetch_yaml_config(&yaml_path);
+        // Deseralize the config entity
+        let response: Result<GetFromTableConfig, serde_yaml::Error> = serde_yaml::from_str(&yaml_str);
+        let import_config: CommandImportConfig = CommandImportConfig{
+            command: String::from(""),
+            planet_context: planet_context,
+        };
+        match response {
+            Ok(_) => {
+                let config_model: GetFromTableConfig = response.unwrap();
                 let validate: Result<(), ValidationErrors> = config_model.validate();
                 match validate {
                     Ok(_) => {

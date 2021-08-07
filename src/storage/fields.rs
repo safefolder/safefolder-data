@@ -76,17 +76,26 @@ Then on the app, we have a visual way to add functions, helper content, etc...
 
 */
 
-
 pub trait ValidateField {
     fn is_valid(&self, value: Option<&String>) -> Result<bool, PlanetError>;
 }
 
 pub trait ProcessField {
     fn process(
-        field: &FieldConfig,
+        &self,
         data_map: HashMap<String, String>,
         db_data: DbData
     ) -> Result<DbData, PlanetError>;
+}
+
+pub trait DbDumpString {
+    fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String;
+}
+pub trait DbDumpBool {
+    fn get_yaml_out(&self, yaml_string: &String, value: bool) -> String;
+}
+pub trait DbDumpNumber {
+    fn get_yaml_out(&self, yaml_string: &String, value: &i32) -> String;
 }
 
 pub trait StringValueField {
@@ -133,19 +142,60 @@ pub fn error_validate_process(field_type: &str, field_name: &str) -> PlanetError
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SmallTextField {
-    pub name: String,
-    pub version: String,
-    pub required: bool,
+    pub field_config: FieldConfig
 }
+
+impl SmallTextField {
+    pub fn defaults(field_config: &FieldConfig) -> Self {
+        let field_config = field_config.clone();
+        let field_obj = Self{
+            field_config: field_config
+        };
+        return field_obj
+    }
+    pub fn init_do(field_config: &FieldConfig, data_map: HashMap<String, String>, mut db_data: DbData) -> Result<DbData, PlanetError> {
+        let field_object = Self::defaults(field_config);
+        db_data = field_object.process(data_map.clone(), db_data)?;
+        return Ok(db_data)
+    }
+    pub fn init_get(
+        field_config: &FieldConfig, 
+        data: Option<&HashMap<String, String>>, 
+        yaml_out_str: &String
+    ) -> Result<String, PlanetError> {
+        let field_config_ = field_config.clone();
+        let field_id = field_config_.id.unwrap();
+        let data = data.unwrap().clone();
+        let field_obj = Self::defaults(&field_config);
+        let value_db = data.get(&field_id).unwrap().clone();
+        let value = field_obj.get_value(Some(&value_db)).unwrap();
+        let yaml_out_str = field_obj.get_yaml_out(yaml_out_str, &value);
+        return Ok(yaml_out_str)
+    }
+}
+
+impl DbDumpString for SmallTextField {
+    fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
+        let field_config = self.field_config.clone();
+        let field_name = field_config.name.unwrap();
+        let mut yaml_string = yaml_string.clone();
+        yaml_string.push_str(format!("{field}: \"{value}\"\n", field=&field_name, value=value).as_str());
+        return yaml_string;
+    }
+}
+
 impl ValidateField for SmallTextField {
     fn is_valid(&self, value: Option<&String>) -> Result<bool, PlanetError> {
-        if value.is_none() && self.required == true {
+        let field_config = self.field_config.clone();
+        let required = field_config.required.unwrap();
+        let name = field_config.name.unwrap();
+        if value.is_none() && required == true {
             return Err(
                 PlanetError::new(
                     500, 
                     Some(tr!(
                         "Field {}{}{} is required", 
-                        String::from("\"").blue(), self.name.blue(), String::from("\"").blue()
+                        String::from("\"").blue(), name.blue(), String::from("\"").blue()
                     )),
                 )
             );
@@ -156,21 +206,17 @@ impl ValidateField for SmallTextField {
 }
 impl ProcessField for SmallTextField {
     fn process(
-        field: &FieldConfig,
+        &self,
         data_map: HashMap<String, String>,
         mut db_data: DbData
     ) -> Result<DbData, PlanetError> {
-        let field = field.clone();
-        let field_id = field.id.unwrap_or_default();
-        let required = field.required.unwrap_or_default();
-        let version = field.version.unwrap_or_default();
-        let field_name = field.name.unwrap_or_default();
+        let field_config = self.field_config.clone();
+        let field_id = field_config.id.unwrap_or_default();
+        let field_name = field_config.name.unwrap_or_default();
         let value_entry = data_map.get(&field_name).unwrap().clone();
         let value_db = value_entry.clone();
         let field = Self{
-            name: field_name.clone(),
-            required: required,
-            version: version,
+            field_config: self.field_config.clone()
         };
         let mut data: HashMap<String, String> = HashMap::new();
         if db_data.data.is_some() {
@@ -207,19 +253,60 @@ impl StringValueField for SmallTextField {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LongTextField {
-    pub name: String,
-    pub version: String,
-    pub required: bool,
+    pub field_config: FieldConfig
 }
+
+impl LongTextField {
+    pub fn defaults(field_config: &FieldConfig) -> Self {
+        let field_config = field_config.clone();
+        let field_obj = Self{
+            field_config: field_config
+        };
+        return field_obj
+    }
+    pub fn init_do(field_config: &FieldConfig, data_map: HashMap<String, String>, mut db_data: DbData) -> Result<DbData, PlanetError> {
+        let field_object = Self::defaults(field_config);
+        db_data = field_object.process(data_map.clone(), db_data)?;
+        return Ok(db_data)
+    }
+    pub fn init_get(
+        field_config: &FieldConfig, 
+        data: Option<&HashMap<String, String>>, 
+        yaml_out_str: &String
+    ) -> Result<String, PlanetError> {
+        let field_config_ = field_config.clone();
+        let field_id = field_config_.id.unwrap();
+        let data = data.unwrap().clone();
+        let field_obj = Self::defaults(&field_config);
+        let value_db = data.get(&field_id).unwrap().clone();
+        let value = field_obj.get_value(Some(&value_db)).unwrap();
+        let yaml_out_str = field_obj.get_yaml_out(yaml_out_str, &value);
+        return Ok(yaml_out_str)
+    }
+}
+
+impl DbDumpString for LongTextField {
+    fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
+        let field_config = self.field_config.clone();
+        let field_name = field_config.name.unwrap();
+        let mut yaml_string = yaml_string.clone();
+        yaml_string.push_str(format!("{field}: \"{value}\"\n", field=&field_name, value=value).as_str());
+        return yaml_string;
+    }
+}
+
 impl ValidateField for LongTextField {
     fn is_valid(&self, value: Option<&String>) -> Result<bool, PlanetError> {
-        if value.is_none() && self.required == true {
+        let field_config = self.field_config.clone();
+        let required = field_config.required.unwrap();
+        let name = field_config.name.unwrap();
+        if value.is_none() && required == true {
             return Err(
                 PlanetError::new(
                     500, 
                     Some(tr!(
                         "Field {}{}{} is required", 
-                        String::from("\"").blue(), self.name.blue(), String::from("\"").blue()
+                        String::from("\"").blue(), name.blue(), String::from("\"").blue()
                     )),
                 )
             );
@@ -230,21 +317,17 @@ impl ValidateField for LongTextField {
 }
 impl ProcessField for LongTextField {
     fn process(
-        field: &FieldConfig,
+        &self,
         data_map: HashMap<String, String>,
         mut db_data: DbData
     ) -> Result<DbData, PlanetError> {
-        let field = field.clone();
-        let field_name = field.name.unwrap_or_default();
-        let field_id = field.id.unwrap_or_default();
-        let required = field.required.unwrap_or_default();
-        let version = field.version.unwrap_or_default();
+        let field_config = self.field_config.clone();
+        let field_name = field_config.name.unwrap_or_default();
+        let field_id = field_config.id.unwrap_or_default();
         let value_entry = data_map.get(&field_name).unwrap().clone();
         let value_db = value_entry.clone();
         let field = Self{
-            name: field_name.clone(),
-            required: required,
-            version: version,
+            field_config: self.field_config.clone()
         };
         let mut data: HashMap<String, String> = HashMap::new();
         if db_data.data.is_some() {
@@ -280,20 +363,61 @@ impl StringValueField for LongTextField {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CheckBoxField {
-    pub name: String,
-    pub version: String,
-    pub required: bool,
+    pub field_config: FieldConfig
 }
+
+impl CheckBoxField {
+    pub fn defaults(field_config: &FieldConfig) -> Self {
+        let field_config = field_config.clone();
+        let field_obj = Self{
+            field_config: field_config
+        };
+        return field_obj
+    }
+    pub fn init_do(field_config: &FieldConfig, data_map: HashMap<String, String>, mut db_data: DbData) -> Result<DbData, PlanetError> {
+        let field_object = Self::defaults(field_config);
+        db_data = field_object.process(data_map.clone(), db_data)?;
+        return Ok(db_data)
+    }
+    pub fn init_get(
+        field_config: &FieldConfig, 
+        data: Option<&HashMap<String, String>>, 
+        yaml_out_str: &String
+    ) -> Result<String, PlanetError> {
+        let field_config_ = field_config.clone();
+        let field_id = field_config_.id.unwrap();
+        let data = data.unwrap().clone();
+        let field_obj = Self::defaults(&field_config);
+        let value_db = data.get(&field_id).unwrap().clone();
+        let value = field_obj.get_value(Some(&value_db)).unwrap();
+        let yaml_out_str = field_obj.get_yaml_out(yaml_out_str, value);
+        return Ok(yaml_out_str)
+    }
+}
+
+impl DbDumpBool for CheckBoxField {
+    fn get_yaml_out(&self, yaml_string: &String, value: bool) -> String {
+        let field_config = self.field_config.clone();
+        let field_name = field_config.name.unwrap();
+        let mut yaml_string = yaml_string.clone();
+        yaml_string.push_str(format!("{field}: {value}\n", field=&field_name, value=value).as_str());
+        return yaml_string;
+    }
+}
+
 impl ValidateField for CheckBoxField {
     fn is_valid(&self, value: Option<&String>) -> Result<bool, PlanetError> {
+        let field_config = self.field_config.clone();
+        let required = field_config.required.unwrap();
+        let name = field_config.name.unwrap();
         eprintln!("CheckBoxField.is_valid :: value: {:?}", &value);
-        if value.is_none() && self.required == true {
+        if value.is_none() && required == true {
             return Err(
                 PlanetError::new(
                     500, 
                     Some(tr!(
                         "Field {}{}{} is required", 
-                        String::from("\"").blue(), self.name.blue(), String::from("\"").blue()
+                        String::from("\"").blue(), name.blue(), String::from("\"").blue()
                     )),
                 )
             );
@@ -310,21 +434,17 @@ impl ValidateField for CheckBoxField {
 }
 impl ProcessField for CheckBoxField {
     fn process(
-        field: &FieldConfig,
+        &self,
         data_map: HashMap<String, String>,
         mut db_data: DbData
     ) -> Result<DbData, PlanetError> {
-        let field = field.clone();
-        let field_name = field.name.unwrap_or_default();
-        let field_id = field.id.unwrap_or_default();
-        let required = field.required.unwrap_or_default();
-        let version = field.version.unwrap_or_default();
+        let field_config = self.field_config.clone();
+        let field_name = field_config.name.unwrap_or_default();
+        let field_id = field_config.id.unwrap_or_default();
         let value_entry = data_map.get(&field_name).unwrap().clone();
         let value_db = value_entry.clone();
         let field = Self{
-            name: field_name.clone(),
-            required: required,
-            version: version,
+            field_config: self.field_config.clone()
         };
         let mut data: HashMap<String, String> = HashMap::new();
         if db_data.data.is_some() {
@@ -369,19 +489,57 @@ impl BoolValueField for CheckBoxField {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NumberField {
-    pub name: String,
-    pub version: String,
-    pub required: bool,
+    pub field_config: FieldConfig
+}
+impl NumberField {
+    pub fn defaults(field_config: &FieldConfig) -> Self {
+        let field_config = field_config.clone();
+        let field_obj = Self{
+            field_config: field_config
+        };
+        return field_obj
+    }
+    pub fn init_do(field_config: &FieldConfig, data_map: HashMap<String, String>, mut db_data: DbData) -> Result<DbData, PlanetError> {
+        let field_object = Self::defaults(field_config);
+        db_data = field_object.process(data_map.clone(), db_data)?;
+        return Ok(db_data)
+    }
+    pub fn init_get(
+        field_config: &FieldConfig, 
+        data: Option<&HashMap<String, String>>, 
+        yaml_out_str: &String
+    ) -> Result<String, PlanetError> {
+        let field_config_ = field_config.clone();
+        let field_id = field_config_.id.unwrap();
+        let data = data.unwrap().clone();
+        let field_obj = Self::defaults(&field_config);
+        let value_db = data.get(&field_id).unwrap().clone();
+        let value = field_obj.get_value(Some(&value_db)).unwrap();
+        let yaml_out_str = field_obj.get_yaml_out(yaml_out_str, &value);
+        return Ok(yaml_out_str)
+    }
+}
+impl DbDumpNumber for NumberField {
+    fn get_yaml_out(&self, yaml_string: &String, value: &i32) -> String {
+        let field_config = self.field_config.clone();
+        let field_name = field_config.name.unwrap();
+        let mut yaml_string = yaml_string.clone();
+        yaml_string.push_str(format!("{field}: {value}\n", field=&field_name, value=value).as_str());
+        return yaml_string;
+    }
 }
 impl ValidateField for NumberField {
     fn is_valid(&self, value: Option<&String>) -> Result<bool, PlanetError> {
-        if value.is_none() && self.required == true {
+        let field_config = self.field_config.clone();
+        let required = field_config.required.unwrap();
+        let name = field_config.name.unwrap();
+        if value.is_none() && required == true {
             return Err(
                 PlanetError::new(
                     500, 
                     Some(tr!(
                         "Field {}{}{} is required", 
-                        String::from("\"").blue(), self.name.blue(), String::from("\"").blue()
+                        String::from("\"").blue(), name.blue(), String::from("\"").blue()
                     )),
                 )
             );
@@ -402,21 +560,17 @@ impl ValidateField for NumberField {
 }
 impl ProcessField for NumberField {
     fn process(
-        field: &FieldConfig,
+        &self,
         data_map: HashMap<String, String>,
         mut db_data: DbData
     ) -> Result<DbData, PlanetError> {
-        let field = field.clone();
-        let field_name = field.name.unwrap_or_default();
-        let field_id = field.id.unwrap_or_default();
-        let required = field.required.unwrap_or_default();
-        let version = field.version.unwrap_or_default();
+        let field_config = self.field_config.clone();
+        let field_name = field_config.name.unwrap_or_default();
+        let field_id = field_config.id.unwrap_or_default();
         let value_entry = data_map.get(&field_name).unwrap().clone();
         let value_db = value_entry.clone();
         let field = Self{
-            name: field_name.clone(),
-            required: required,
-            version: version,
+            field_config: self.field_config.clone()
         };
         let mut data: HashMap<String, String> = HashMap::new();
         if db_data.data.is_some() {

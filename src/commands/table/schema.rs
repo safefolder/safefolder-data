@@ -40,8 +40,6 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                 let expr = Regex::new(r#"(CREATE TABLE) "(?P<table_name>[a-zA-Z0-9_ ]+)"#).unwrap();
                 let table_name_match = expr.captures(&command).unwrap();
                 let table_name = &table_name_match["table_name"].to_string();
-                let account_id = self.context.account_id.unwrap_or_default();
-                let space_id = self.context.space_id.unwrap_or_default();
                 let config = self.config.clone();
 
                 // db table options with language data
@@ -74,11 +72,14 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                     data_collections.extend(map_list);
                 }
                 data_collections.insert(String::from(FIELD_IDS), field_ids);
-                let routing: RoutingData = RoutingData{
-                    account_id: Some(account_id.to_string()),
-                    space_id: Some(space_id.to_string()),
-                    ipfs_cid: None,
-                };
+                // routing
+                let account_id = Some(self.context.account_id.unwrap_or_default().to_string());
+                let space_id = Some(self.context.space_id.unwrap_or_default().to_string());
+                let routing_wrap = RoutingData::defaults(
+                    account_id, 
+                    space_id, 
+                    None
+                );
                 let mut data_wrap: Option<HashMap<String, String>> = None;
                 let mut data_collections_wrap: Option<HashMap<String, Vec<HashMap<String, String>>>> = None;
                 let mut data_objects_wrap: Option<HashMap<String, HashMap<String, String>>> = None;
@@ -97,7 +98,7 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                     data_collections_wrap,
                     data_objects_wrap,
                     None,
-                    Some(&routing),
+                    routing_wrap,
                     None,
                 );
                 eprintln!("CreateTable.run :: db_data: {:#?}", &db_data);
