@@ -643,7 +643,6 @@ impl SingleSelectField {
         };
         if table.is_some() {
             let table = table.unwrap();
-            eprintln!("SingleSelectField.defaults :: table: {:#?}", table);
             let mut options_id_map: HashMap<String, String> = HashMap::new();
             let mut options_name_map: HashMap<String, String> = HashMap::new();
             let field_config = &field_obj.field_config;
@@ -652,13 +651,10 @@ impl SingleSelectField {
                 // key for ordering: field_ids
                 for key in data_collection.keys() {
                     if key.to_lowercase() != String::from(FIELD_IDS) {
-                        eprintln!("SingleSelectField.defaults :: key: {}", key);
                         // key: Status__select_options
                         let key_items: Vec<&str> = key.split("__").collect();
                         let key_field_name = key_items[0];
                         let key_field_type = key_items[1];
-                        eprintln!("SingleSelectField.defaults :: key_field_type: {} key_field_name: {} field_name: {}", 
-                        &key_field_type, &key_field_name, &field_name);
                         if key_field_type == SELECT_OPTIONS && key_field_name.to_lowercase() == field_name.to_lowercase() {
                             // Process, since we have a simple select field
                             // "Status__select_options": [
@@ -686,7 +682,6 @@ impl SingleSelectField {
             field_obj.options_id_map = Some(options_id_map);
             field_obj.options_name_map = Some(options_name_map);
         }
-        eprintln!("SingleSelectField.defaults :: field_obj: {:#?}", &field_obj);
         return field_obj;
     }
     pub fn init_do(
@@ -733,7 +728,6 @@ impl DbDumpSingleSelect for SingleSelectField {
 impl ValidateField for SingleSelectField {
     fn is_valid(&self, value: Option<&String>) -> Result<bool, PlanetError> {
         // value represents the id for the option selected, like id->name
-        eprintln!("SingleSelectField.is_valid :: Self: {:#?}", &self);
         let field_config = self.field_config.clone();
         let required = field_config.required.unwrap();
         let name = field_config.name.unwrap();
@@ -754,7 +748,6 @@ impl ValidateField for SingleSelectField {
             // Check that value appears on the config for choices id -> value
             // The option id is obtained from the table config
             let options = field_config.options.unwrap();
-            eprintln!("SingleSelectField.is_valid :: options: {:?} options_name_map: {:?}", &options, &self.options_name_map);
             let options_name_map = &self.options_name_map.clone().unwrap();
             // eprintln!("SingleSelectField.is_valid :: options: {:#?}", &options);
             let mut verified = false;
@@ -850,11 +843,96 @@ impl StringValueField for SingleSelectField {
 
 // #[derive(Debug, Serialize, Deserialize, Clone)]
 // pub struct MultipleSelectField {
-//     pub field: FieldConfig,
+//     pub field_config: FieldConfig,
+//     pub options_id_map: Option<HashMap<String, String>>,
+//     pub options_name_map: Option<HashMap<String, String>>,
+// }
+// impl MultipleSelectField {
+//     pub fn defaults(field_config: &FieldConfig, table: Option<&DbData>) -> Self {
+//         let field_config = field_config.clone();
+//         let mut field_obj = Self{
+//             field_config: field_config,
+//             options_id_map: None,
+//             options_name_map: None,
+//         };
+//         if table.is_some() {
+//             let table = table.unwrap();
+//             eprintln!("MultipleSelectField.defaults :: table: {:#?}", table);
+//             let mut options_id_map: HashMap<String, String> = HashMap::new();
+//             let mut options_name_map: HashMap<String, String> = HashMap::new();
+//             let field_config = &field_obj.field_config;
+//             let field_name = field_config.name.clone().unwrap();
+//             for data_collection in table.data_collections.clone() {
+//                 // key for ordering: field_ids
+//                 for key in data_collection.keys() {
+//                     if key.to_lowercase() != String::from(FIELD_IDS) {
+//                         eprintln!("MultipleSelectField.defaults :: key: {}", key);
+//                         // key: Status__select_options
+//                         let key_items: Vec<&str> = key.split("__").collect();
+//                         let key_field_name = key_items[0];
+//                         let key_field_type = key_items[1];
+//                         eprintln!("MultipleSelectField.defaults :: key_field_type: {} key_field_name: {} field_name: {}", 
+//                         &key_field_type, &key_field_name, &field_name);
+//                         if key_field_type == SELECT_OPTIONS && key_field_name.to_lowercase() == field_name.to_lowercase() {
+//                             // Process, since we have a simple select field
+//                             // "Status__select_options": [
+//                             //     {
+//                             //         "key": "c48kg78smpv5gct3hfqg",
+//                             //         "value": "Draft",
+//                             //     },
+//                             //     ...
+//                             // ],
+//                             let options: &Vec<HashMap<String, String>> = data_collection.get(key).unwrap();
+//                             for option in options {
+//                                 options_id_map.insert(
+//                                     option.get(KEY).unwrap().clone(), 
+//                                     option.get(VALUE).unwrap().clone()
+//                                 );
+//                                 options_name_map.insert(
+//                                     option.get(VALUE).unwrap().clone(), 
+//                                     option.get(KEY).unwrap().clone()
+//                                 );
+//                             }
+//                         }
+//                     }
+//                 }
+//             }
+//             field_obj.options_id_map = Some(options_id_map);
+//             field_obj.options_name_map = Some(options_name_map);
+//         }
+//         eprintln!("MultipleSelectField.defaults :: field_obj: {:#?}", &field_obj);
+//         return field_obj;
+//     }
+//     pub fn init_do(
+//         field_config: &FieldConfig, 
+//         table: &DbData,
+//         data_map: HashMap<String, String>, 
+//         mut db_data: DbData
+//     ) -> Result<DbData, PlanetError> {
+//         let field_object = Self::defaults(field_config, Some(table));
+//         db_data = field_object.process(data_map.clone(), db_data)?;
+//         return Ok(db_data)
+//     }
+//     // pub fn init_get(
+//     //     field_config: &FieldConfig, 
+//     //     table: &DbData,
+//     //     data: Option<&HashMap<String, String>>, 
+//     //     yaml_out_str: &String
+//     // ) -> Result<String, PlanetError> {
+//     //     let field_config_ = field_config.clone();
+//     //     let field_id = field_config_.id.unwrap();
+//     //     let data = data.unwrap().clone();
+//     //     let field_obj = Self::defaults(&field_config, Some(table));
+//     //     let value_db = data.get(&field_id).unwrap().clone();
+//     //     let value = field_obj.get_value(Some(&value_db)).unwrap();
+//     //     let yaml_out_str = field_obj.get_yaml_out(yaml_out_str, &value);
+//     //     return Ok(yaml_out_str)
+//     // }
 // }
 // impl ValidateField for MultipleSelectField {
-//     fn is_valid(&self, value: Option<&String>) -> Result<bool, PlanetError> {
-//         // ids are sent separated by commas.
+//     fn is_valid(&self, value: Option<&Vec<String>>) -> Result<bool, PlanetError> {
+//         // ids are sent in a vector
+//         eprintln!("MultupleSelectField.is_valid :: value: {:?}", &value);
 //         let field_name = self.field.name.clone().unwrap_or_default();
 //         if value.is_none() && self.field.required.unwrap() == true {
 //             return Err(
@@ -867,18 +945,21 @@ impl StringValueField for SingleSelectField {
 //                 )
 //             );
 //         } else {
-//             let ids = value.unwrap().split(",");
-//             let value_ = value.unwrap();
-//             let field = self.field.clone();
+//             let ids = value.unwrap().clone();
+//             let value_ = &ids.clone();
+//             // let ids = value.unwrap().split(",");
+//             // let value_ = value.unwrap();
+//             let field_config = self.field_config.clone();
 //             // Check that value appears on the config for choices id -> value
-//             let tuples = field.select_data.unwrap();
-//             eprintln!("MultupleSelectField.is_valid :: tuples: {:#?}", tuples);
-//             let mut verified = false;
-//             for (select_id, _) in tuples.iter() {
-//                 for id in ids.clone() {
-//                     if select_id == id {
-//                         verified = true;
-//                         break;
+//             let options = field_config.options.unwrap();
+//             let options_name_map = &self.options_name_map.clone().unwrap();
+//             eprintln!("MultupleSelectField.is_valid :: tuples: {:#?}", options);
+//             let mut verified = true;
+//             for select_option in options {
+//                 let select_id = options_name_map.get(&select_option).unwrap();
+//                 for value_id in ids {
+//                     if select_id == value_id {
+//                         verified = false;
 //                     }
 //                 }
 //             }
@@ -900,47 +981,47 @@ impl StringValueField for SingleSelectField {
 //         }
 //     }
 // }
-// impl ProcessField for MultipleSelectField {
-//     fn process(
-//         data_map: &HashMap<String, String>, 
-//         field: &FieldConfig,
-//         mut insert_data: HashMap<String, RowItem>
-//     ) -> Result<HashMap<String, RowItem>, PlanetError> {
-//         let field_name = field.name.clone().unwrap_or_default();
-//         let field_obj = Self{
-//             field: field.clone(),
-//         };
-//         let ids = data_map.get(&field_name).unwrap().clone();
-//         let is_valid = field_obj.is_valid(Some(&ids))?;
-//         if is_valid == true {
-//             let value = field_obj.get_value(Some(&ids)).unwrap_or_default();
-//             let row_item: RowItem = RowItem(FieldType::MultipleSelectField(value.clone()));
-//             insert_data.insert(field_name, row_item);
-//             return Ok(insert_data);
-//         } else {
-//             return Err(error_validate_process("Number", &field_name))
-//         }
-//     }
-// }
-// impl StringVectorValueField for MultipleSelectField {
-//     fn get_value(&self, value: Option<&String>) -> Option<Vec<String>> {
-//         if value.is_none() {
-//             return None
-//         } else {
-//             // I return the id for the select option
-//             // let value = value.unwrap();
-//             let ids = value.unwrap().split(",");
-//             let tuples = self.field.select_data.clone().unwrap();
-//             let mut resolved_ids: Vec<String> = Vec::new();
-//             for (select_id, _) in tuples.iter() {
-//                 let select_id = select_id.as_str();
-//                 for id in ids.clone() {
-//                     if id == select_id {
-//                         resolved_ids.push(select_id.to_string());
-//                     }
-//                 }
-//             }
-//             return Some(resolved_ids);
-//         }
-//     }
-// }
+// // impl ProcessField for MultipleSelectField {
+// //     fn process(
+// //         data_map: &HashMap<String, String>, 
+// //         field: &FieldConfig,
+// //         mut insert_data: HashMap<String, RowItem>
+// //     ) -> Result<HashMap<String, RowItem>, PlanetError> {
+// //         let field_name = field.name.clone().unwrap_or_default();
+// //         let field_obj = Self{
+// //             field: field.clone(),
+// //         };
+// //         let ids = data_map.get(&field_name).unwrap().clone();
+// //         let is_valid = field_obj.is_valid(Some(&ids))?;
+// //         if is_valid == true {
+// //             let value = field_obj.get_value(Some(&ids)).unwrap_or_default();
+// //             let row_item: RowItem = RowItem(FieldType::MultipleSelectField(value.clone()));
+// //             insert_data.insert(field_name, row_item);
+// //             return Ok(insert_data);
+// //         } else {
+// //             return Err(error_validate_process("Number", &field_name))
+// //         }
+// //     }
+// // }
+// // impl StringVectorValueField for MultipleSelectField {
+// //     fn get_value(&self, value: Option<&String>) -> Option<Vec<String>> {
+// //         if value.is_none() {
+// //             return None
+// //         } else {
+// //             // I return the id for the select option
+// //             // let value = value.unwrap();
+// //             let ids = value.unwrap().split(",");
+// //             let tuples = self.field.select_data.clone().unwrap();
+// //             let mut resolved_ids: Vec<String> = Vec::new();
+// //             for (select_id, _) in tuples.iter() {
+// //                 let select_id = select_id.as_str();
+// //                 for id in ids.clone() {
+// //                     if id == select_id {
+// //                         resolved_ids.push(select_id.to_string());
+// //                     }
+// //                 }
+// //             }
+// //             return Some(resolved_ids);
+// //         }
+// //     }
+// // }

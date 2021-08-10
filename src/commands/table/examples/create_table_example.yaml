@@ -19,3 +19,9 @@ fields:
       - Draft
       - Published
       - Deleted
+  - name: "Locations"
+    field_type: "Multi Select"
+    options:
+      - Madrid
+      - Barcelona
+      - Valencia

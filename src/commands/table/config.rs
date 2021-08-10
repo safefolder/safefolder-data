@@ -309,9 +309,10 @@ impl ConfigStorageField for FieldConfig {
     }
 
     fn map_collections_db(&self) -> HashMap<String, Vec<HashMap<String, String>>> {
-        let field = self.clone();
-        // select_data
-        let options = field.options.unwrap_or_default();
+        let field_config = self.clone();
+        let field_type = &field_config.field_type.unwrap();
+        // select_options and multi_select_options
+        let options = field_config.options.unwrap_or_default();
         let mut map: HashMap<String, Vec<HashMap<String, String>>> = HashMap::new();
         let mut select_options: Vec<HashMap<String, String>> = Vec::new();
         for select_value in options {
@@ -322,8 +323,14 @@ impl ConfigStorageField for FieldConfig {
             select_options.push(map);
         }
         if select_options.len() != 0 {
-            let field_name = field.name.unwrap_or_default();
-            map.insert(format!("{}__select_options", field_name), select_options);    
+            let field_name = field_config.name.unwrap_or_default();
+            let mut collection_field = String::from("");
+            if field_type.to_lowercase() == "select" {
+                collection_field = format!("{}__select_options", field_name);
+            } else if field_type.to_lowercase() == "multi select" {
+                collection_field = format!("{}__multi_select_options", field_name);
+            }
+            map.insert(collection_field, select_options);    
         }
         return map
     }
