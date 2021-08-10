@@ -13,3 +13,9 @@ fields:
     field_type: "Checkbox"
   - name: "Counter"
     field_type: "Number"
+  - name: "Status"
+    field_type: "Select"
+    options:
+      - Draft
+      - Published
+      - Deleted

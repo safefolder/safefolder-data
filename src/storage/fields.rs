@@ -6,6 +6,7 @@ use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use tr::tr;
 
+use crate::commands::table::constants::{FIELD_IDS, KEY, SELECT_OPTIONS, VALUE};
 use crate::planet::{PlanetError};
 use crate::storage::table::{DbData};
 use crate::commands::table::config::FieldConfig;
@@ -97,6 +98,9 @@ pub trait DbDumpBool {
 pub trait DbDumpNumber {
     fn get_yaml_out(&self, yaml_string: &String, value: &i32) -> String;
 }
+pub trait DbDumpSingleSelect {
+    fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String;
+}
 
 pub trait StringValueField {
     fn get_value(&self, value_db: Option<&String>) -> Option<String>;
@@ -179,7 +183,13 @@ impl DbDumpString for SmallTextField {
         let field_config = self.field_config.clone();
         let field_name = field_config.name.unwrap();
         let mut yaml_string = yaml_string.clone();
-        yaml_string.push_str(format!("{field}: \"{value}\"\n", field=&field_name, value=value).as_str());
+        let field = &field_name.blue();
+        let value = format!("{}{}{}", 
+            String::from("\"").truecolor(255, 165, 0), 
+            value.truecolor(255, 165, 0), 
+            String::from("\"").truecolor(255, 165, 0)
+        );
+        yaml_string.push_str(format!("{field}: {value}\n", field=field, value=value).as_str());
         return yaml_string;
     }
 }
@@ -290,7 +300,13 @@ impl DbDumpString for LongTextField {
         let field_config = self.field_config.clone();
         let field_name = field_config.name.unwrap();
         let mut yaml_string = yaml_string.clone();
-        yaml_string.push_str(format!("{field}: \"{value}\"\n", field=&field_name, value=value).as_str());
+        let field = &field_name.blue();
+        let value = format!("{}{}{}", 
+            String::from("\"").truecolor(255, 165, 0), 
+            value.truecolor(255, 165, 0), 
+            String::from("\"").truecolor(255, 165, 0)
+        );
+        yaml_string.push_str(format!("{field}: {value}\n", field=field, value=value).as_str());
         return yaml_string;
     }
 }
@@ -400,7 +416,9 @@ impl DbDumpBool for CheckBoxField {
         let field_config = self.field_config.clone();
         let field_name = field_config.name.unwrap();
         let mut yaml_string = yaml_string.clone();
-        yaml_string.push_str(format!("{field}: {value}\n", field=&field_name, value=value).as_str());
+        let field = &field_name.blue();
+        let value = format!("{}", value.to_string().blue());
+        yaml_string.push_str(format!("{field}: {value}\n", field=field, value=value).as_str());
         return yaml_string;
     }
 }
@@ -524,7 +542,9 @@ impl DbDumpNumber for NumberField {
         let field_config = self.field_config.clone();
         let field_name = field_config.name.unwrap();
         let mut yaml_string = yaml_string.clone();
-        yaml_string.push_str(format!("{field}: {value}\n", field=&field_name, value=value).as_str());
+        let field = &field_name.blue();
+        let value = format!("{}", value.to_string().truecolor(255, 255, 200));
+        yaml_string.push_str(format!("{field}: {value}\n", field=field, value=value).as_str());
         return yaml_string;
     }
 }
@@ -607,96 +627,226 @@ impl NumberValueField for NumberField {
     }
 }
 
-// #[derive(Debug, Serialize, Deserialize, Clone)]
-// pub struct SingleSelectField {
-//     pub field: FieldConfig,
-// }
-// impl ValidateField for SingleSelectField {
-//     fn is_valid(&self, value: Option<&String>) -> Result<bool, PlanetError> {
-//         // value represents the id for the option selected, like id->name
-//         let field_name = self.field.name.clone().unwrap_or_default();
-//         if value.is_none() && self.field.required.unwrap() == true {
-//             return Err(
-//                 PlanetError::new(
-//                     500, 
-//                     Some(tr!(
-//                         "Field {}{}{} is required", 
-//                         String::from("\"").blue(), &field_name.blue(), String::from("\"").blue()
-//                     )),
-//                 )
-//             );
-//         } else {            
-//             let value_id = value.unwrap();
-//             let field = self.field.clone();
-//             // Check that value appears on the config for choices id -> value
-//             let tuples = field.select_data.unwrap();
-//             eprintln!("SingleSelectField.is_valid :: tuples: {:#?}", tuples);
-//             let mut verified = false;
-//             for (select_id, _) in tuples.iter() {
-//                 if select_id == value_id {
-//                     verified = true;
-//                     break;
-//                 }
-//             }
-//             if verified == true {
-//                 eprintln!("SingleSelectField.is_valid :: Verified OK!");
-//                 return Ok(true)
-//             } else {
-//                 return Err(
-//                     PlanetError::new(
-//                         500, 
-//                         Some(tr!(
-//                             "Field {}{}{} is not configured with select id {}{}{}", 
-//                             String::from("\"").blue(), &field_name.blue(), String::from("\"").blue(),
-//                             String::from("\"").blue(), value_id, String::from("\"").blue(),
-//                         )),
-//                     )
-//                 );
-//             }            
-//         }
-//     }
-// }
-// impl ProcessField for SingleSelectField {
-//     fn process(
-//         data_map: &HashMap<String, String>, 
-//         field: &FieldConfig,
-//         mut insert_data: HashMap<String, RowItem>
-//     ) -> Result<HashMap<String, RowItem>, PlanetError> {
-//         let field_name = field.name.clone().unwrap_or_default();
-//         let field_obj = Self{
-//             field: field.clone(),
-//         };
-//         let value_string_ = data_map.get(&field_name).unwrap().clone();
-//         let is_valid = field_obj.is_valid(Some(&value_string_))?;
-//         if is_valid == true {
-//             let value = field_obj.get_value(Some(&value_string_)).unwrap_or_default();
-//             let row_item: RowItem = RowItem(FieldType::SingleSelectField(value.clone()));
-//             insert_data.insert(field_name, row_item);
-//             return Ok(insert_data);
-//         } else {
-//             return Err(error_validate_process("Number", &field_name))
-//         }
-//     }
-// }
-// impl StringValueField for SingleSelectField {
-//     fn get_value(&self, value: Option<&String>) -> Option<String> {
-//         if value.is_none() {
-//             return None
-//         } else {
-//             // I return the id for the select option
-//             let value = value.unwrap();
-//             let tuples = self.field.select_data.clone().unwrap();
-//             let mut resolved_id: Option<String> = None;
-//             for (select_id, select_value) in tuples.iter() {
-//                 let select_id = select_id.clone();
-//                 if select_value == value {
-//                     resolved_id = Some(select_id);
-//                 }
-//             }
-//             return resolved_id;
-//         }
-//     }
-// }
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SingleSelectField {
+    pub field_config: FieldConfig,
+    pub options_id_map: Option<HashMap<String, String>>,
+    pub options_name_map: Option<HashMap<String, String>>,
+}
+impl SingleSelectField {
+    pub fn defaults(field_config: &FieldConfig, table: Option<&DbData>) -> Self {
+        let field_config = field_config.clone();
+        let mut field_obj = Self{
+            field_config: field_config,
+            options_id_map: None,
+            options_name_map: None,
+        };
+        if table.is_some() {
+            let table = table.unwrap();
+            eprintln!("SingleSelectField.defaults :: table: {:#?}", table);
+            let mut options_id_map: HashMap<String, String> = HashMap::new();
+            let mut options_name_map: HashMap<String, String> = HashMap::new();
+            let field_config = &field_obj.field_config;
+            let field_name = field_config.name.clone().unwrap();
+            for data_collection in table.data_collections.clone() {
+                // key for ordering: field_ids
+                for key in data_collection.keys() {
+                    if key.to_lowercase() != String::from(FIELD_IDS) {
+                        eprintln!("SingleSelectField.defaults :: key: {}", key);
+                        // key: Status__select_options
+                        let key_items: Vec<&str> = key.split("__").collect();
+                        let key_field_name = key_items[0];
+                        let key_field_type = key_items[1];
+                        eprintln!("SingleSelectField.defaults :: key_field_type: {} key_field_name: {} field_name: {}", 
+                        &key_field_type, &key_field_name, &field_name);
+                        if key_field_type == SELECT_OPTIONS && key_field_name.to_lowercase() == field_name.to_lowercase() {
+                            // Process, since we have a simple select field
+                            // "Status__select_options": [
+                            //     {
+                            //         "key": "c48kg78smpv5gct3hfqg",
+                            //         "value": "Draft",
+                            //     },
+                            //     ...
+                            // ],
+                            let options: &Vec<HashMap<String, String>> = data_collection.get(key).unwrap();
+                            for option in options {
+                                options_id_map.insert(
+                                    option.get(KEY).unwrap().clone(), 
+                                    option.get(VALUE).unwrap().clone()
+                                );
+                                options_name_map.insert(
+                                    option.get(VALUE).unwrap().clone(), 
+                                    option.get(KEY).unwrap().clone()
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+            field_obj.options_id_map = Some(options_id_map);
+            field_obj.options_name_map = Some(options_name_map);
+        }
+        eprintln!("SingleSelectField.defaults :: field_obj: {:#?}", &field_obj);
+        return field_obj;
+    }
+    pub fn init_do(
+        field_config: &FieldConfig, 
+        table: &DbData,
+        data_map: HashMap<String, String>, 
+        mut db_data: DbData
+    ) -> Result<DbData, PlanetError> {
+        let field_object = Self::defaults(field_config, Some(table));
+        db_data = field_object.process(data_map.clone(), db_data)?;
+        return Ok(db_data)
+    }
+    pub fn init_get(
+        field_config: &FieldConfig, 
+        table: &DbData,
+        data: Option<&HashMap<String, String>>, 
+        yaml_out_str: &String
+    ) -> Result<String, PlanetError> {
+        let field_config_ = field_config.clone();
+        let field_id = field_config_.id.unwrap();
+        let data = data.unwrap().clone();
+        let field_obj = Self::defaults(&field_config, Some(table));
+        let value_db = data.get(&field_id).unwrap().clone();
+        let value = field_obj.get_value(Some(&value_db)).unwrap();
+        let yaml_out_str = field_obj.get_yaml_out(yaml_out_str, &value);
+        return Ok(yaml_out_str)
+    }
+}
+impl DbDumpSingleSelect for SingleSelectField {
+    fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
+        let field_config = self.field_config.clone();
+        let field_name = field_config.name.unwrap();
+        let mut yaml_string = yaml_string.clone();
+        let field = &field_name.blue();
+        let value = format!("{}{}{}", 
+            String::from("\"").truecolor(255, 165, 0), 
+            value.truecolor(255, 165, 0), 
+            String::from("\"").truecolor(255, 165, 0)
+        );
+        yaml_string.push_str(format!("{field}: {value}\n", field=&field, value=value).as_str());
+        return yaml_string;
+    }
+}
+impl ValidateField for SingleSelectField {
+    fn is_valid(&self, value: Option<&String>) -> Result<bool, PlanetError> {
+        // value represents the id for the option selected, like id->name
+        eprintln!("SingleSelectField.is_valid :: Self: {:#?}", &self);
+        let field_config = self.field_config.clone();
+        let required = field_config.required.unwrap();
+        let name = field_config.name.unwrap();
+        // let field_name = self.field.name.clone().unwrap_or_default();
+        if value.is_none() && required == true {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!(
+                        "Field {}{}{} is required", 
+                        String::from("\"").blue(), &name.blue(), String::from("\"").blue()
+                    )),
+                )
+            );
+        } else {            
+            let value_id = value.unwrap();
+            let field_config = self.field_config.clone();
+            // Check that value appears on the config for choices id -> value
+            // The option id is obtained from the table config
+            let options = field_config.options.unwrap();
+            eprintln!("SingleSelectField.is_valid :: options: {:?} options_name_map: {:?}", &options, &self.options_name_map);
+            let options_name_map = &self.options_name_map.clone().unwrap();
+            // eprintln!("SingleSelectField.is_valid :: options: {:#?}", &options);
+            let mut verified = false;
+            for select_option in options {
+                let select_id = options_name_map.get(&select_option).unwrap();
+                if select_id == value_id {
+                    verified = true;
+                    break;
+                }
+            }
+            if verified == true {
+                eprintln!("SingleSelectField.is_valid :: Verified OK!");
+                return Ok(true)
+            } else {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!(
+                            "Field {}{}{} is not configured with select id {}{}{}", 
+                            String::from("\"").blue(), &name.blue(), String::from("\"").blue(),
+                            String::from("\"").blue(), value_id, String::from("\"").blue(),
+                        )),
+                    )
+                );
+            }            
+        }
+    }
+}
+impl ProcessField for SingleSelectField {
+    fn process(
+        &self,
+        data_map: HashMap<String, String>,
+        mut db_data: DbData
+    ) -> Result<DbData, PlanetError> {
+        let field_config = self.field_config.clone();
+        let field_name = field_config.name.unwrap_or_default();
+        let field_id = field_config.id.unwrap_or_default();
+        let value_entry = data_map.get(&field_name).unwrap().clone();
+        let value_db = value_entry.clone();
+        let mut data: HashMap<String, String> = HashMap::new();
+        if db_data.data.is_some() {
+            data = db_data.data.unwrap();
+        }
+        let value_string_ = data_map.get(&field_name).unwrap().clone();
+        let is_valid = self.is_valid(Some(&value_string_))?;
+        if is_valid == true {
+            &data.insert(field_id, value_db);
+            db_data.data = Some(data);
+            return Ok(db_data);
+        } else {
+            return Err(error_validate_process("Single Select", &field_name))
+        }
+    }
+}
+impl StringValueField for SingleSelectField {
+    fn get_value(&self, value: Option<&String>) -> Option<String> {
+        if value.is_none() {
+            return None
+        } else {
+            let value = value.unwrap();
+            let options = self.field_config.options.clone().unwrap();
+            let mut resolved_id: Option<String> = None;
+            let options_map = self.options_name_map.clone().unwrap();
+            for option_value in options.iter() {
+                let select_id = options_map.get(option_value).unwrap().clone();
+                if select_id.to_lowercase() == value.to_lowercase() {
+                    resolved_id = Some(option_value.clone());
+                }
+            }
+            return resolved_id;
+        }
+    }
+    fn get_value_db(&self, value: Option<&String>) -> Option<String> {
+        // value is the literal, the option string literal
+        // I return the option id
+        if *&value.is_some() {
+            let value = value.unwrap();
+            let options = self.field_config.options.clone().unwrap();
+            let options_map = self.options_name_map.clone().unwrap();
+            let mut select_id: Option<String> = None;
+            for option_value in options.iter() {
+                if option_value.to_lowercase() == value.to_lowercase() {
+                    select_id = Some(options_map.get(option_value).unwrap().clone());
+                    break
+                }
+            }
+            return select_id;
+        } else {
+            return None
+        }
+    }
+}
 
 // #[derive(Debug, Serialize, Deserialize, Clone)]
 // pub struct MultipleSelectField {

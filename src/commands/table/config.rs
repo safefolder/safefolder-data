@@ -6,7 +6,7 @@ use validator::{Validate, ValidationErrors, ValidationError};
 use lazy_static::lazy_static;
 use regex::Regex;
 
-use crate::commands::table::constants::FIELD_IDS;
+use crate::commands::table::constants::{FIELD_IDS, KEY, SELECT_OPTIONS, VALUE};
 use crate::planet::validation::{CommandImportConfig, PlanetValidationError};
 use crate::planet::PlanetContext;
 
@@ -117,12 +117,12 @@ pub struct FieldConfig {
     pub api_version: Option<String>,
     pub indexed: Option<bool>,
     pub many: Option<bool>,
-    pub select_data: Option<Vec<(String, String)>>,
+    pub options: Option<Vec<String>>,
 }
 
 impl ConfigStorageField for FieldConfig {
     fn defaults(
-        select_data: Option<Vec<(String, String)>>,
+        options: Option<Vec<String>>,
     ) -> FieldConfig {
         let mut object: FieldConfig = FieldConfig{
             id: None,
@@ -133,11 +133,11 @@ impl ConfigStorageField for FieldConfig {
             required: Some(false),
             api_version: Some(String::from(FIELD_API_VERSION)),
             indexed: Some(true),
-            select_data: None,
+            options: None,
             many: None,
         };
-        if select_data.is_some() {
-            object.select_data = Some(select_data.unwrap());
+        if options.is_some() {
+            object.options = Some(options.unwrap());
         }
         return object;
     }
@@ -156,15 +156,16 @@ impl ConfigStorageField for FieldConfig {
             },
         };
     }
-    fn parse_from_db(db_data: DbData) -> Vec<FieldConfig> {
+    fn parse_from_db(db_data: &DbData) -> Vec<FieldConfig> {
         // let select_data: Option<Vec<(String, String)>> = None;
+        let db_data = db_data.clone();
         let mut fields: Vec<FieldConfig> = Vec::new();
         // I use data_collections, where we store the fields
         let data_collections = db_data.data_collections;
         let data = db_data.data;
         let data_objects = db_data.data_objects;
         // eprintln!("parse_from_db :: data: {:#?}", &data);
-        // eprintln!("parse_from_db :: data_objects: {:#?}", &data_objects);
+        eprintln!("parse_from_db :: data_objects: {:#?}", &data_objects);
         // eprintln!("parse_from_db :: data_collections: {:#?}", &data_collections);
 
         // 1. Go through data_objects and make map field names field_name -> FieldConfig. Also
@@ -191,7 +192,7 @@ impl ConfigStorageField for FieldConfig {
                     api_version: Some(field_config_map.get("api_version").unwrap().clone()),
                     indexed: Some(indexed),
                     many: Some(many),
-                    select_data: None,
+                    options: None,
                 };
                 &map_fields_by_id.insert(field_id, field_config.clone());
                 &map_fields_by_name.insert(field_name.clone(), field_config.clone());
@@ -217,15 +218,30 @@ impl ConfigStorageField for FieldConfig {
                 let pieces: Vec<&str> = pieces.clone().collect();
                 let field_name = pieces[0];
                 let attr_name = pieces[1];
-                // eprintln!("parse_from_db :: field_name: {:?} attr_name: {:?}", &field_name, &attr_name);
-                // if &data_collection_field != FIELD_IDS {
-                //     // select_data, and other structures
-                //     let field_list = 
-                //         data_collections.get(&data_collection_field).unwrap().clone();
-                //     if &data_collection_field == "select_data" {
-                //         let field_config_ = &map_fields_by_id.get()
-                //     }
-                // }
+                eprintln!("parse_from_db :: field_name: {:?} attr_name: {:?}", &field_name, &attr_name);
+                if &data_collection_field != FIELD_IDS {
+                    // select_options, and other structures
+                    let field_list = 
+                        data_collections.get(&data_collection_field).unwrap().clone();
+                    eprintln!("parse_from_db :: field_list: {:?}", &field_list);
+                    // I need to get the Status field config, get by name
+                    eprintln!("parse_from_db :: data_collection_field: {}", &data_collection_field);
+                    // data_collection_field: Status__select_options
+                    if *&attr_name.to_lowercase() == SELECT_OPTIONS.to_lowercase() {
+                        eprintln!("parse_from_db :: I get into the options process",);
+                        let mut field_config_ = map_fields_by_name.get(field_name).unwrap().clone();
+                        let field_id = &field_config_.id.clone().unwrap();
+                        let field_id = field_id.clone();
+                        let mut field_options: Vec<String> = Vec::new();
+                        for field_item in field_list {
+                            let field_value = field_item.get(VALUE).unwrap().clone();
+                            field_options.push(field_value);
+                        }
+                        eprintln!("parse_from_db :: options: {:#?}", &field_options);
+                        field_config_.options = Some(field_options);
+                        map_fields_by_id.insert(field_id, field_config_);
+                    }
+                }
             }
         }
 
@@ -271,6 +287,7 @@ impl ConfigStorageField for FieldConfig {
         // if data.is_some() {
 
         // }
+        eprintln!("parse_from_db :: !!!!!!!!!!!!!!! fields: {:#?}", &fields);
         return fields
     }
     fn map_object_db(&self) -> HashMap<String, String> {
@@ -294,10 +311,11 @@ impl ConfigStorageField for FieldConfig {
     fn map_collections_db(&self) -> HashMap<String, Vec<HashMap<String, String>>> {
         let field = self.clone();
         // select_data
-        let select_data = field.select_data.unwrap_or_default();
+        let options = field.options.unwrap_or_default();
         let mut map: HashMap<String, Vec<HashMap<String, String>>> = HashMap::new();
         let mut select_options: Vec<HashMap<String, String>> = Vec::new();
-        for (select_id, select_value) in select_data {
+        for select_value in options {
+            let select_id = generate_id().unwrap();
             let mut map: HashMap<String, String> = HashMap::new();
             map.insert(String::from("key"), select_id);
             map.insert(String::from("value"), select_value);
@@ -305,7 +323,7 @@ impl ConfigStorageField for FieldConfig {
         }
         if select_options.len() != 0 {
             let field_name = field.name.unwrap_or_default();
-            map.insert(format!("{}__select_data", field_name), select_options);    
+            map.insert(format!("{}__select_options", field_name), select_options);    
         }
         return map
     }

@@ -12,7 +12,7 @@ use crate::storage::table::DbData;
 
 pub trait ConfigStorageField {
     fn defaults(
-        select_data: Option<Vec<(String, String)>>
+        options: Option<Vec<String>>
     ) -> FieldConfig;
     fn version() -> Option<String>;
     fn api_version() -> Option<String>;
@@ -22,7 +22,7 @@ pub trait ConfigStorageField {
     }
     fn map_object_db(&self) -> HashMap<String, String>;
     fn map_collections_db(&self) -> HashMap<String, Vec<HashMap<String, String>>>;
-    fn parse_from_db(db_data: DbData) -> Vec<FieldConfig>;
+    fn parse_from_db(db_data: &DbData) -> Vec<FieldConfig>;
     fn map_objects_db(&self) -> HashMap<String, Vec<HashMap<String, String>>>;
     fn get_field_id_map(fields: &Vec<FieldConfig>) -> HashMap<String, FieldConfig>;
 }

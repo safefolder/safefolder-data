@@ -78,9 +78,9 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                     None
                 );
                 let table = table.unwrap();
-                eprintln!("InsertIntoTable.run :: table: {:#?}", table);
+                eprintln!("InsertIntoTable.run :: table: {:#?}", &table);
                 // I need a way to get list of instance FieldConfig (fields)
-                let config_fields = FieldConfig::parse_from_db(table);
+                let config_fields = FieldConfig::parse_from_db(&table);
                 eprintln!("InsertIntoTable.run :: config_fields: {:#?}", &config_fields);
                 
                 let data_map: HashMap<String, String> = self.config.data.clone().unwrap();
@@ -115,6 +115,9 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                         },
                         "Number" => {
                             db_data = NumberField::init_do(&field_config, data_map.clone(), db_data)?
+                        },
+                        "Select" => {
+                            db_data = SingleSelectField::init_do(&field_config, &table, data_map.clone(), db_data)?
                         },
                         _ => {
                             return Ok(db_data);
@@ -226,7 +229,7 @@ impl<'gb> Command<String> for GetFromTable<'gb> {
                     );
                 }
                 let table = table.unwrap();
-                let config_fields = FieldConfig::parse_from_db(table.clone());
+                let config_fields = FieldConfig::parse_from_db(&table);
                 let field_id_map: HashMap<String, FieldConfig> = FieldConfig::get_field_id_map(&config_fields);
                 // routing
                 let account_id = Some(self.context.account_id.unwrap_or_default().to_string());
@@ -264,6 +267,9 @@ impl<'gb> Command<String> for GetFromTable<'gb> {
                             },
                             "Number" => {
                                 yaml_out_str = NumberField::init_get(&field_config_, Some(&data), &yaml_out_str)?;
+                            },
+                            "Select" => {
+                                yaml_out_str = SingleSelectField::init_get(&field_config_, &table, Some(&data), &yaml_out_str)?
                             },
                             _ => {
                                 yaml_out_str = yaml_out_str;
