@@ -11,3 +11,4 @@ pub const ACCOUNT_ID: &str = "account_id";
 pub const SPACE_ID: &str = "space_id";
 pub const IPFS_CID : &str = "ipfs_cid";
 pub const ID: &str = "id";
+pub const VALUE: &str = "value";

@@ -2,3 +2,7 @@
 command: GET FROM TABLE "Super Table"
 data:
   id: c49re5gsmpve7dgdkqhg
+  fields:
+    - My Field
+    - Is Published
+    - Counter

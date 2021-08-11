@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use tr::tr;
 
 use crate::commands::table::constants::{FIELD_IDS, KEY, SELECT_OPTIONS, VALUE};
+use crate::planet::constants::ID;
 use crate::planet::{PlanetError};
 use crate::storage::table::{DbData};
 use crate::commands::table::config::FieldConfig;
@@ -728,14 +729,59 @@ impl DbDumpSingleSelect for SelectField {
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
         let field_config = self.field_config.clone();
         let field_name = field_config.name.unwrap();
+        let many = field_config.many.unwrap();
         let mut yaml_string = yaml_string.clone();
         let field = &field_name.blue();
-        let value = format!("{}{}{}", 
-            String::from("\"").truecolor(255, 165, 0), 
-            value.truecolor(255, 165, 0), 
-            String::from("\"").truecolor(255, 165, 0)
-        );
-        yaml_string.push_str(format!("{field}: {value}\n", field=&field, value=value).as_str());
+        let select_id = value;
+        let options_name_map = &self.options_name_map.clone().unwrap();
+        let options_id_map = &self.options_id_map.clone().unwrap();
+        if many == false {
+            let select_name = options_id_map.get(select_id).unwrap();
+            let select_id = format!("{}{}{}", 
+                String::from("\"").truecolor(255, 165, 0), 
+                value.truecolor(255, 165, 0), 
+                String::from("\"").truecolor(255, 165, 0)
+            );
+            let select_name = format!("{}{}{}", 
+                String::from("\"").truecolor(255, 165, 0), 
+                select_name.truecolor(255, 165, 0), 
+                String::from("\"").truecolor(255, 165, 0)
+            );
+            yaml_string.push_str(format!("{field}:\n  {id}: {select_id}\n  {value}: {select_name}\n", 
+                field=&field, 
+                select_id=select_id,
+                select_name=select_name,
+                id=String::from(ID).blue(),
+                value=String::from(VALUE).blue(),
+            ).as_str());
+        } else {
+            // Check we have fields
+            let select_ids: Vec<&str> = value.split(",").collect();
+            if select_ids.len() > 1 {
+                yaml_string.push_str(format!("{field}:\n", 
+                    field=&field, 
+                ).as_str());
+                for select_id in select_ids {
+                    let select_name = options_id_map.get(select_id).unwrap();
+                    let select_id = format!("{}{}{}", 
+                        String::from("\"").truecolor(255, 165, 0), 
+                        select_id.truecolor(255, 165, 0), 
+                        String::from("\"").truecolor(255, 165, 0)
+                    );
+                    let select_name = format!("{}{}{}", 
+                        String::from("\"").truecolor(255, 165, 0), 
+                        select_name.truecolor(255, 165, 0), 
+                        String::from("\"").truecolor(255, 165, 0)
+                    );
+                    yaml_string.push_str(format!("  - {id}: {select_id}\n    {value}: {select_name}\n", 
+                        select_id=select_id,
+                        select_name=select_name,
+                        id=String::from(ID).blue(),
+                        value=String::from(VALUE).blue(),
+                    ).as_str());
+                }
+            }
+        }
         return yaml_string;
     }
 }

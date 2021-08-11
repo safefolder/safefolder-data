@@ -168,7 +168,7 @@ impl ConfigStorageField for FieldConfig {
         let data = db_data.data;
         let data_objects = db_data.data_objects;
         // eprintln!("parse_from_db :: data: {:#?}", &data);
-        eprintln!("parse_from_db :: data_objects: {:#?}", &data_objects);
+        // eprintln!("parse_from_db :: data_objects: {:#?}", &data_objects);
         // eprintln!("parse_from_db :: data_collections: {:#?}", &data_collections);
 
         // 1. Go through data_objects and make map field names field_name -> FieldConfig. Also
@@ -194,7 +194,7 @@ impl ConfigStorageField for FieldConfig {
                     let options_str = field_config_map.get("options").unwrap().clone();
                     let options_str = options_str.as_str();
                     let options: Vec<String> = serde_yaml::from_str(options_str).unwrap();
-                    eprintln!("parse_from_db :: objects: {:?}", &options);
+                    // eprintln!("parse_from_db :: objects: {:?}", &options);
                     // let options_: Vec<&str> = options_str.split(",").collect();
                     // let mut options: Vec<String> = Vec::new();
                     // for option_ in options_ {
@@ -238,17 +238,17 @@ impl ConfigStorageField for FieldConfig {
                 let pieces: Vec<&str> = pieces.clone().collect();
                 let field_name = pieces[0];
                 let attr_name = pieces[1];
-                eprintln!("parse_from_db :: field_name: {:?} attr_name: {:?}", &field_name, &attr_name);
+                // eprintln!("parse_from_db :: field_name: {:?} attr_name: {:?}", &field_name, &attr_name);
                 if &data_collection_field != FIELD_IDS {
                     // select_options, and other structures
                     let field_list = 
                         data_collections.get(&data_collection_field).unwrap().clone();
-                    eprintln!("parse_from_db :: field_list: {:?}", &field_list);
+                    // eprintln!("parse_from_db :: field_list: {:?}", &field_list);
                     // I need to get the Status field config, get by name
-                    eprintln!("parse_from_db :: data_collection_field: {}", &data_collection_field);
+                    // eprintln!("parse_from_db :: data_collection_field: {}", &data_collection_field);
                     // data_collection_field: Status__select_options
                     if *&attr_name.to_lowercase() == SELECT_OPTIONS.to_lowercase() {
-                        eprintln!("parse_from_db :: I get into the options process",);
+                        // eprintln!("parse_from_db :: I get into the options process",);
                         let mut field_config_ = map_fields_by_name.get(field_name).unwrap().clone();
                         let field_id = &field_config_.id.clone().unwrap();
                         let field_id = field_id.clone();
@@ -257,7 +257,7 @@ impl ConfigStorageField for FieldConfig {
                             let field_value = field_item.get(VALUE).unwrap().clone();
                             field_options.push(field_value);
                         }
-                        eprintln!("parse_from_db :: options: {:#?}", &field_options);
+                        // eprintln!("parse_from_db :: options: {:#?}", &field_options);
                         field_config_.options = Some(field_options);
                         map_fields_by_id.insert(field_id, field_config_);
                     }
@@ -307,7 +307,7 @@ impl ConfigStorageField for FieldConfig {
         // if data.is_some() {
 
         // }
-        eprintln!("parse_from_db :: !!!!!!!!!!!!!!! fields: {:#?}", &fields);
+        // eprintln!("parse_from_db :: !!!!!!!!!!!!!!! fields: {:#?}", &fields);
         return fields
     }
     fn map_object_db(&self) -> HashMap<String, String> {
@@ -470,7 +470,8 @@ impl InsertIntoTableConfig {
 
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
 pub struct DataId {
-    pub id: Option<String>
+    pub id: Option<String>,
+    pub fields: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
@@ -485,11 +486,12 @@ impl GetFromTableConfig {
 
     pub fn defaults(id: String) -> GetFromTableConfig {
         let data_id: DataId = DataId{
-            id: Some(id)
+            id: Some(id),
+            fields: None,
         };
         let config: GetFromTableConfig = GetFromTableConfig{
             command: Some(String::from("GET FROM TABLE")),
-            data: Some(data_id)
+            data: Some(data_id),
         };
         return config
     }

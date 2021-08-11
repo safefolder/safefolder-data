@@ -15,8 +15,10 @@ use crate::commands::table::config::{
     GetFromTableConfig,
     FieldConfig
 };
+use crate::commands::table::constants::FIELD_IDS;
 use crate::commands::table::{Command};
 use crate::commands::{CommandRunner};
+use crate::planet::constants::ID;
 use crate::storage::table::{DbTable, DbRow, Row, Schema, DbData};
 use crate::storage::table::*;
 use crate::storage::ConfigStorageField;
@@ -231,6 +233,8 @@ impl<'gb> Command<String> for GetFromTable<'gb> {
                     );
                 }
                 let table = table.unwrap();
+                let data_collections = table.clone().data_collections;
+                let field_ids = data_collections.unwrap().get(FIELD_IDS).unwrap().clone();
                 let config_fields = FieldConfig::parse_from_db(&table);
                 let field_id_map: HashMap<String, FieldConfig> = FieldConfig::get_field_id_map(&config_fields);
                 // routing
@@ -243,7 +247,7 @@ impl<'gb> Command<String> for GetFromTable<'gb> {
                 );
                 let item_id = self.config.data.clone().unwrap().id.unwrap();
                 // Get item from database
-                let db_data = db_row.get(&item_id)?;
+                let db_data = db_row.get(&item_id, None)?;
                 // data and basic fields
                 let data = db_data.data;
                 let mut yaml_out_str = String::from("---\n");
@@ -251,7 +255,8 @@ impl<'gb> Command<String> for GetFromTable<'gb> {
                     // field_id -> string value
                     let data = data.unwrap();
                     // I need to go through in same order as fields were registered in FieldConfig when creating schema
-                    for field_id in data.keys() {
+                    for field_id_data in field_ids {
+                        let field_id = field_id_data.get(ID).unwrap();
                         let field_config = field_id_map.get(field_id).unwrap().clone();
                         let field_config_ = field_config.clone();
                         let field_type = field_config.field_type.unwrap();

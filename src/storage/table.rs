@@ -31,7 +31,7 @@ pub trait Row<'gb> {
         context: &'gb Context<'gb>
     ) -> Result<DbRow<'gb>, PlanetError>;
     fn insert(&self, db_data: &DbData) -> Result<DbData, PlanetError>;
-    fn get(&self, id: &String) -> Result<DbData, PlanetError>;
+    fn get(&self, id: &String, fields: Option<Vec<String>>) -> Result<DbData, PlanetError>;
 }
 
 // lifetimes: gb (global, for contexts), db, bs
@@ -394,7 +394,7 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
             Ok(_) => {
                 eprintln!("DbRow.insert :: id: {:?}", &id);
                 eprintln!("DbRow.insert :: Will get item...");
-                let item_ = self.get(&id);
+                let item_ = self.get(&id, None);
                 match item_ {
                     Ok(_) => {
                         let item = item_.unwrap();
@@ -411,7 +411,7 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
         }
     }
 
-    fn get(&self, id: &String) -> Result<DbData, PlanetError> {
+    fn get(&self, id: &String, fields: Option<Vec<String>>) -> Result<DbData, PlanetError> {
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let id_db = xid::Id::from_str(id).unwrap();
         let id_db = id_db.as_bytes();
@@ -423,8 +423,23 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
         match item_ {
             Ok(_) => {
                 let item = item_.unwrap();
-                // eprintln!("get :: item: {:?}", &item);
-                Ok(item)
+                if fields.is_none() {
+                    Ok(item)    
+                } else {
+                    // eprintln!("get :: item: {:#?}", &item);
+                    // If fields is informed, then I need to remove from item.data fields not requested
+                    // data: Some(
+                    //     {
+                    //         "c49qh6osmpv69nnrt33g": "pepito",
+                    //         "c49qh6osmpv69nnrt35g": "c49qh6osmpv69nnrt370",
+                    //         "c49qh6osmpv69nnrt34g": "true",
+                    //         "c49qh6osmpv69nnrt350": "34",
+                    //         "c49qh6osmpv69nnrt360": "c49qh6osmpv69nnrt380,c49qh6osmpv69nnrt390",
+                    //         "c49qh6osmpv69nnrt340": "This is some description I want to include",
+                    //     },
+                    // ),
+                    Ok(item)
+                }
             },
             Err(_) => {
                 Err(PlanetError::new(500, Some(tr!("Could not fetch item from database"))))
