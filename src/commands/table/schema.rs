@@ -50,6 +50,14 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                 let language_default = language.default;
                 data.insert(String::from(LANGUAGE_CODES), language_codes_str);
                 data.insert(String::from(LANGUAGE_DEFAULT), language_default);
+
+                // many structures updated often
+                // I can get into thing of needing many structures, that users may change often from single
+                // to many, like the Select Option. In this case, the data would go into data and not 
+                // data_collections
+                // Actually structure is the same, a list, only that for single only one item
+                // It goes into option
+                // We save as string with yaml encoding, so we do encode / decode using yaml library
                 
                 // config data
                 let mut data_objects: HashMap<String, HashMap<String, String>> = HashMap::new();

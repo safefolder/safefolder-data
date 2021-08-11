@@ -20,7 +20,8 @@ fields:
       - Published
       - Deleted
   - name: "Locations"
-    field_type: "Multi Select"
+    field_type: "Select"
+    many: true
     options:
       - Madrid
       - Barcelona

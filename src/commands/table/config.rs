@@ -2,9 +2,11 @@ extern crate xid;
 
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use serde_yaml;
 use validator::{Validate, ValidationErrors, ValidationError};
 use lazy_static::lazy_static;
 use regex::Regex;
+use tr::tr;
 
 use crate::commands::table::constants::{FIELD_IDS, KEY, SELECT_OPTIONS, VALUE};
 use crate::planet::validation::{CommandImportConfig, PlanetValidationError};
@@ -291,47 +293,60 @@ impl ConfigStorageField for FieldConfig {
         return fields
     }
     fn map_object_db(&self) -> HashMap<String, String> {
-        let field = self.clone();
+        let field_config = self.clone();
         let mut map: HashMap<String, String> = HashMap::new();
-        let required = field.required.unwrap_or_default();
-        let indexed = field.indexed.unwrap_or_default();
-        let many = field.many.unwrap_or_default();
-        map.insert(String::from("id"), field.id.unwrap_or_default());
-        map.insert(String::from("name"), field.name.unwrap_or_default());
-        map.insert(String::from("field_type"), field.field_type.unwrap_or_default());
-        map.insert(String::from("default"), field.default.unwrap_or_default());
-        map.insert(String::from("version"), field.version.unwrap_or_default());
+        let required = field_config.required.unwrap_or_default();
+        let indexed = field_config.indexed.unwrap_or_default();
+        let many = field_config.many.unwrap_or_default();
+        let field_name = field_config.name.unwrap_or_default();
+        map.insert(String::from("id"), field_config.id.unwrap_or_default());
+        map.insert(String::from("name"), field_name.clone());
+        map.insert(String::from("field_type"), field_config.field_type.unwrap_or_default());
+        map.insert(String::from("default"), field_config.default.unwrap_or_default());
+        map.insert(String::from("version"), field_config.version.unwrap_or_default());
         map.insert(String::from("required"), required.to_string());
-        map.insert(String::from("api_version"), field.api_version.unwrap_or_default());
+        map.insert(String::from("api_version"), field_config.api_version.unwrap_or_default());
         map.insert(String::from("indexed"), indexed.to_string());
         map.insert(String::from("many"), many.to_string());
+        // Here we encode as string the options as string using yaml encoding
+        let options = field_config.options;
+        if options.is_some() {
+            let options_yaml = serde_yaml::to_string(&options);
+            if options_yaml.is_ok() {
+                map.insert(String::from("options"), options_yaml.unwrap());
+            } else {
+                panic!("Could not parse options for field \"{}\"", &field_name);
+            }
+        }
         return map;
     }
 
     fn map_collections_db(&self) -> HashMap<String, Vec<HashMap<String, String>>> {
-        let field_config = self.clone();
-        let field_type = &field_config.field_type.unwrap();
+        // 08/11/2021 We remove options from here, since is many structure often swapped
+        // let field_config = self.clone();
+        // let field_type = &field_config.field_type.unwrap();
+        let map: HashMap<String, Vec<HashMap<String, String>>> = HashMap::new();
         // select_options and multi_select_options
-        let options = field_config.options.unwrap_or_default();
-        let mut map: HashMap<String, Vec<HashMap<String, String>>> = HashMap::new();
-        let mut select_options: Vec<HashMap<String, String>> = Vec::new();
-        for select_value in options {
-            let select_id = generate_id().unwrap();
-            let mut map: HashMap<String, String> = HashMap::new();
-            map.insert(String::from("key"), select_id);
-            map.insert(String::from("value"), select_value);
-            select_options.push(map);
-        }
-        if select_options.len() != 0 {
-            let field_name = field_config.name.unwrap_or_default();
-            let mut collection_field = String::from("");
-            if field_type.to_lowercase() == "select" {
-                collection_field = format!("{}__select_options", field_name);
-            } else if field_type.to_lowercase() == "multi select" {
-                collection_field = format!("{}__multi_select_options", field_name);
-            }
-            map.insert(collection_field, select_options);    
-        }
+        // let options = field_config.options.unwrap_or_default();
+        // let mut map: HashMap<String, Vec<HashMap<String, String>>> = HashMap::new();
+        // let mut select_options: Vec<HashMap<String, String>> = Vec::new();
+        // for select_value in options {
+        //     let select_id = generate_id().unwrap();
+        //     let mut map: HashMap<String, String> = HashMap::new();
+        //     map.insert(String::from("key"), select_id);
+        //     map.insert(String::from("value"), select_value);
+        //     select_options.push(map);
+        // }
+        // if select_options.len() != 0 {
+        //     let field_name = field_config.name.unwrap_or_default();
+        //     let mut collection_field = String::from("");
+        //     if field_type.to_lowercase() == "select" {
+        //         collection_field = format!("{}__select_options", field_name);
+        //     } else if field_type.to_lowercase() == "multi select" {
+        //         collection_field = format!("{}__multi_select_options", field_name);
+        //     }
+        //     map.insert(collection_field, select_options);    
+        // }
         return map
     }
    
@@ -388,6 +403,7 @@ pub struct InsertIntoTableConfig {
     pub command: Option<String>,
     #[validate(required)]
     pub data: Option<HashMap<String, String>>,
+    pub data_collections: Option<HashMap<String, Vec<String>>>,
 }
 
 impl InsertIntoTableConfig {
@@ -396,6 +412,7 @@ impl InsertIntoTableConfig {
         let config: InsertIntoTableConfig = InsertIntoTableConfig{
             command: None,
             data: Some(HashMap::new()),
+            data_collections: None
         };
         return config
     }

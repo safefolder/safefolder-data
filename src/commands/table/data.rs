@@ -83,8 +83,10 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                 let config_fields = FieldConfig::parse_from_db(&table);
                 eprintln!("InsertIntoTable.run :: config_fields: {:#?}", &config_fields);
                 
-                let data_map: HashMap<String, String> = self.config.data.clone().unwrap();
-                eprintln!("InsertIntoTable.run :: data_map: {:#?}", &data_map);
+                let insert_data_map: HashMap<String, String> = self.config.data.clone().unwrap();
+                eprintln!("InsertIntoTable.run :: insert_data_map: {:#?}", &insert_data_map);
+                let insert_data_collections_map = self.config.data_collections.clone().unwrap();
+                eprintln!("InsertIntoTable.run :: insert_data__collections_map: {:#?}", &insert_data_collections_map);
                 // TODO: Change for the item name
                 // We will use this when we have the Name field, which is required in all tables
                 eprintln!("InsertIntoTable.run :: routing_wrap: {:#?}", &routing_wrap);
@@ -105,19 +107,19 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                     eprintln!("InsertIntoTable.run :: field_type: {}", &field_type);
                     match field_type {
                         "Small Text" => {
-                            db_data = SmallTextField::init_do(&field_config, data_map.clone(), db_data)?
+                            db_data = SmallTextField::init_do(&field_config, insert_data_map.clone(), db_data)?
                         },
                         "Long Text" => {
-                            db_data = LongTextField::init_do(&field_config, data_map.clone(), db_data)?
+                            db_data = LongTextField::init_do(&field_config, insert_data_map.clone(), db_data)?
                         },
                         "Checkbox" => {
-                            db_data = CheckBoxField::init_do(&field_config, data_map.clone(), db_data)?
+                            db_data = CheckBoxField::init_do(&field_config, insert_data_map.clone(), db_data)?
                         },
                         "Number" => {
-                            db_data = NumberField::init_do(&field_config, data_map.clone(), db_data)?
+                            db_data = NumberField::init_do(&field_config, insert_data_map.clone(), db_data)?
                         },
                         "Select" => {
-                            db_data = SingleSelectField::init_do(&field_config, &table, data_map.clone(), db_data)?
+                            db_data = SingleSelectField::init_do(&field_config, &table, insert_data_map.clone(), db_data)?
                         },
                         _ => {
                             return Ok(db_data);
