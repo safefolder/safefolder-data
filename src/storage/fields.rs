@@ -790,7 +790,6 @@ impl ValidateField for SelectField {
                 }
             }
             if verified == true {
-                eprintln!("SingleSelectField.is_valid :: Verified OK!");
                 return Ok(true)
             } else {
                 return Err(
@@ -834,18 +833,35 @@ impl ProcessField for SelectField {
     }
 }
 impl StringValueField for SelectField {
-    fn get_value(&self, value: Option<&String>) -> Option<String> {
-        if value.is_none() {
+    fn get_value(&self, value_db: Option<&String>) -> Option<String> {
+        // value_db can be either single or multiple separated by commas
+        let mut resolved_id: Option<String> = None;
+        let options = self.field_config.options.clone().unwrap();
+        let options_map = self.options_name_map.clone().unwrap();
+        let options_id_map = self.options_id_map.clone().unwrap();
+        if value_db.is_none() {
             return None
         } else {
-            let value = value.unwrap();
-            let options = self.field_config.options.clone().unwrap();
-            let mut resolved_id: Option<String> = None;
-            let options_map = self.options_name_map.clone().unwrap();
-            for option_value in options.iter() {
-                let select_id = options_map.get(option_value).unwrap().clone();
-                if select_id.to_lowercase() == value.to_lowercase() {
-                    resolved_id = Some(option_value.clone());
+            let value = value_db.unwrap();
+            let value_items: Vec<&str> = value.split(",").collect();
+            if *&value_items.len() == 1 {                
+                for option_value in options.iter() {
+                    let select_id = options_map.get(option_value).unwrap().clone();
+                    if select_id.to_lowercase() == value.to_lowercase() {
+                        resolved_id = Some(select_id);
+                    }
+                }
+            } else {
+                let mut resolved_ids: Vec<String> = Vec::new();
+                for item_select_id in value_items {
+                    // let select_option = options_id_map.get(value_item_id).unwrap().clone();
+                    let item_select_id = &item_select_id.to_string();
+                    let select_option = options_id_map.get(item_select_id);
+                    if select_option.is_some() {
+                        let select_option = select_option.unwrap().clone();
+                        resolved_ids.push(item_select_id.clone());
+                    }
+                    resolved_id = Some(resolved_ids.join(","));
                 }
             }
             return resolved_id;
