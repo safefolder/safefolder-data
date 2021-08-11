@@ -3,6 +3,7 @@ extern crate xid;
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_yaml;
+use std::collections::BTreeMap;
 use validator::{Validate, ValidationErrors, ValidationError};
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -184,6 +185,23 @@ impl ConfigStorageField for FieldConfig {
                 let indexed = make_bool_str(field_config_map.get("indexed").unwrap().clone());
                 let many = make_bool_str(field_config_map.get("many").unwrap().clone());
                 let field_id = field_config_map.get(ID).unwrap().clone();
+                // Process options, which come as one string id item, or many separated by commas
+                let options_str = field_config_map.get("options");
+                let mut options_wrap: Option<Vec<String>> = None;
+                if options_str.is_some() {
+                    // I need to deserialize from yaml
+                    // let options_yaml = serde_yaml::to_string(&options);
+                    let options_str = field_config_map.get("options").unwrap().clone();
+                    let options_str = options_str.as_str();
+                    let options: Vec<String> = serde_yaml::from_str(options_str).unwrap();
+                    eprintln!("parse_from_db :: objects: {:?}", &options);
+                    // let options_: Vec<&str> = options_str.split(",").collect();
+                    // let mut options: Vec<String> = Vec::new();
+                    // for option_ in options_ {
+                    //    options.push(option_.to_string())
+                    //}
+                    options_wrap = Some(options);
+                }
                 let field_config: FieldConfig = FieldConfig{
                     id: Some(field_id.clone()),
                     name: Some(field_config_map.get("name").unwrap().clone()),
@@ -194,7 +212,7 @@ impl ConfigStorageField for FieldConfig {
                     api_version: Some(field_config_map.get("api_version").unwrap().clone()),
                     indexed: Some(indexed),
                     many: Some(many),
-                    options: None,
+                    options: options_wrap,
                 };
                 &map_fields_by_id.insert(field_id, field_config.clone());
                 &map_fields_by_name.insert(field_name.clone(), field_config.clone());
@@ -323,30 +341,25 @@ impl ConfigStorageField for FieldConfig {
 
     fn map_collections_db(&self) -> HashMap<String, Vec<HashMap<String, String>>> {
         // 08/11/2021 We remove options from here, since is many structure often swapped
-        // let field_config = self.clone();
+        let field_config = self.clone();
         // let field_type = &field_config.field_type.unwrap();
-        let map: HashMap<String, Vec<HashMap<String, String>>> = HashMap::new();
+        // let map: HashMap<String, Vec<HashMap<String, String>>> = HashMap::new();
         // select_options and multi_select_options
-        // let options = field_config.options.unwrap_or_default();
-        // let mut map: HashMap<String, Vec<HashMap<String, String>>> = HashMap::new();
-        // let mut select_options: Vec<HashMap<String, String>> = Vec::new();
-        // for select_value in options {
-        //     let select_id = generate_id().unwrap();
-        //     let mut map: HashMap<String, String> = HashMap::new();
-        //     map.insert(String::from("key"), select_id);
-        //     map.insert(String::from("value"), select_value);
-        //     select_options.push(map);
-        // }
-        // if select_options.len() != 0 {
-        //     let field_name = field_config.name.unwrap_or_default();
-        //     let mut collection_field = String::from("");
-        //     if field_type.to_lowercase() == "select" {
-        //         collection_field = format!("{}__select_options", field_name);
-        //     } else if field_type.to_lowercase() == "multi select" {
-        //         collection_field = format!("{}__multi_select_options", field_name);
-        //     }
-        //     map.insert(collection_field, select_options);    
-        // }
+        let options = field_config.options.unwrap_or_default();
+        let mut map: HashMap<String, Vec<HashMap<String, String>>> = HashMap::new();
+        let mut select_options: Vec<HashMap<String, String>> = Vec::new();
+        for select_value in options {
+            let select_id = generate_id().unwrap();
+            let mut map: HashMap<String, String> = HashMap::new();
+            map.insert(String::from("key"), select_id);
+            map.insert(String::from("value"), select_value);
+            select_options.push(map);
+        }
+        if select_options.len() != 0 {
+            let field_name = field_config.name.unwrap_or_default();
+            let collection_field = format!("{}__select_options", field_name);
+            map.insert(collection_field, select_options);    
+        }
         return map
     }
    

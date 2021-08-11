@@ -85,8 +85,8 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                 
                 let insert_data_map: HashMap<String, String> = self.config.data.clone().unwrap();
                 eprintln!("InsertIntoTable.run :: insert_data_map: {:#?}", &insert_data_map);
-                let insert_data_collections_map = self.config.data_collections.clone().unwrap();
-                eprintln!("InsertIntoTable.run :: insert_data__collections_map: {:#?}", &insert_data_collections_map);
+                // let insert_data_collections_map = self.config.data_collections.clone().unwrap();
+                // eprintln!("InsertIntoTable.run :: insert_data__collections_map: {:#?}", &insert_data_collections_map);
                 // TODO: Change for the item name
                 // We will use this when we have the Name field, which is required in all tables
                 eprintln!("InsertIntoTable.run :: routing_wrap: {:#?}", &routing_wrap);
@@ -119,7 +119,7 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                             db_data = NumberField::init_do(&field_config, insert_data_map.clone(), db_data)?
                         },
                         "Select" => {
-                            db_data = SingleSelectField::init_do(&field_config, &table, insert_data_map.clone(), db_data)?
+                            db_data = SelectField::init_do(&field_config, &table, insert_data_map.clone(), db_data)?
                         },
                         _ => {
                             return Ok(db_data);
@@ -271,7 +271,7 @@ impl<'gb> Command<String> for GetFromTable<'gb> {
                                 yaml_out_str = NumberField::init_get(&field_config_, Some(&data), &yaml_out_str)?;
                             },
                             "Select" => {
-                                yaml_out_str = SingleSelectField::init_get(&field_config_, &table, Some(&data), &yaml_out_str)?
+                                yaml_out_str = SelectField::init_get(&field_config_, &table, Some(&data), &yaml_out_str)?
                             },
                             _ => {
                                 yaml_out_str = yaml_out_str;
