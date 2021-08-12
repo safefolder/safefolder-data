@@ -25,6 +25,7 @@ pub trait ConfigStorageField {
     fn parse_from_db(db_data: &DbData) -> Vec<FieldConfig>;
     fn map_objects_db(&self) -> HashMap<String, Vec<HashMap<String, String>>>;
     fn get_field_id_map(fields: &Vec<FieldConfig>) -> HashMap<String, FieldConfig>;
+    fn get_name_field(db_data: &DbData) -> Option<FieldConfig>;
 }
 
 pub fn generate_id() -> Option<String> {

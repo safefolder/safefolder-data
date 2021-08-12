@@ -1,14 +1,17 @@
 extern crate sled;
+extern crate slug;
 
 use std::str::FromStr;
 use std::collections::HashMap;
 use colored::Colorize;
+use validator::{Validate, ValidationErrors};
 use serde::{Deserialize, Serialize};
 use tr::tr;
 use serde_encrypt::{
     serialize::impls::BincodeSerializer, shared_key::SharedKey, traits::SerdeEncryptSharedKey,
     AsSharedKey, EncryptedMessage,
 };
+use slug::slugify;
 
 use crate::planet::constants::*;
 use crate::storage::{generate_id};
@@ -69,9 +72,13 @@ impl RoutingData {
 // This structure would apply for SchemaData and RowData, we would need to convert from one to the other
 // data has field_id -> value, so if we change field name would not be affected
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Validate, Clone)]
 pub struct DbData {
+    #[validate(required)]
     pub id: Option<String>,
+    #[validate(required)]
+    pub slug: Option<String>,
+    #[validate(required)]
     pub name: Option<String>,
     pub routing: Option<HashMap<String, String>>,
     pub options: Option<HashMap<String, String>>,
@@ -89,7 +96,8 @@ impl DbData {
         options: Option<HashMap<String, String>>, 
         routing: Option<RoutingData>, 
         context: Option<HashMap<String, String>>
-    ) -> DbData {
+    ) -> Result<DbData, PlanetError> {
+        let slug = slugify(name);
         let mut routing_map_: Option<HashMap<String, String>> = None;
         if routing.is_some() {
             let mut routing_map: HashMap<String, String> = HashMap::new();
@@ -104,6 +112,7 @@ impl DbData {
         }
         let db_data = Self{
             id: generate_id(),
+            slug: Some(slug),
             name: Some(format!("{}", name)),
             routing: routing_map_,
             options: options,
@@ -112,7 +121,20 @@ impl DbData {
             data_objects: data_objects,
             context: context,
         };
-        return db_data
+        let validate: Result<(), ValidationErrors> = db_data.validate();
+        match validate {
+            Ok(_) => {
+                return Ok(db_data);
+            },
+            Err(_) => {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Could not validate table data")),
+                    )
+                );
+            }
+        }
     }
 }
 

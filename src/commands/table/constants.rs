@@ -6,3 +6,4 @@ pub const FIELD_IDS: &str = "field_ids";
 pub const SELECT_OPTIONS: &str = "select_options";
 pub const KEY: &str = "key";
 pub const VALUE: &str = "value";
+pub const NAME_CAMEL: &str = "Name";

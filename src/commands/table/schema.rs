@@ -51,19 +51,15 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                 data.insert(String::from(LANGUAGE_CODES), language_codes_str);
                 data.insert(String::from(LANGUAGE_DEFAULT), language_default);
 
-                // many structures updated often
-                // I can get into thing of needing many structures, that users may change often from single
-                // to many, like the Select Option. In this case, the data would go into data and not 
-                // data_collections
-                // Actually structure is the same, a list, only that for single only one item
-                // It goes into option
-                // We save as string with yaml encoding, so we do encode / decode using yaml library
-                
                 // config data
                 let mut data_objects: HashMap<String, HashMap<String, String>> = HashMap::new();
                 let mut data_collections: HashMap<String, Vec<HashMap<String, String>>> = HashMap::new();
-                let fields = config.fields.unwrap().clone();
+                let mut fields = config.fields.unwrap().clone();
                 let mut field_ids: Vec<HashMap<String, String>> = Vec::new();
+
+                // name field
+                let name_field_config = config.name.unwrap();
+                fields.insert(0, name_field_config);
                 for field in fields.iter() {
                     // field simple attributes
                     let field_attrs = field.clone();
@@ -71,6 +67,7 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                     field_id_map.insert(String::from(ID), field_attrs.id.unwrap());
                     &field_ids.push(field_id_map);
                     let field_name = field_attrs.name.unwrap_or_default().clone();
+                    eprintln!("CreateTable.run :: field_name: {}", &field_name);
                     let map = &field.map_object_db();
                     data_objects.insert(String::from(field_name.clone()), map.clone());
                     // field complex attributes like select_data
@@ -108,7 +105,7 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                     None,
                     routing_wrap,
                     None,
-                );
+                )?;
                 eprintln!("CreateTable.run :: db_data: {:#?}", &db_data);
 
                 let db_table: DbTable<'gb> = result.unwrap();
@@ -136,7 +133,7 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
     }
 
     fn runner(runner: &CommandRunner, path_yaml: &String) -> () {
-        let config_ = CreateTableConfig::defaults();
+        let config_ = CreateTableConfig::defaults(None);
         let config: Result<CreateTableConfig, Vec<PlanetValidationError>> = config_.import(
             runner.planet_context,
             &path_yaml

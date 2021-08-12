@@ -3,13 +3,12 @@ extern crate xid;
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_yaml;
-use std::collections::BTreeMap;
 use validator::{Validate, ValidationErrors, ValidationError};
 use lazy_static::lazy_static;
 use regex::Regex;
 use tr::tr;
 
-use crate::commands::table::constants::{FIELD_IDS, KEY, SELECT_OPTIONS, VALUE};
+use crate::commands::table::constants::{FIELD_IDS, NAME_CAMEL, SELECT_OPTIONS, VALUE};
 use crate::planet::validation::{CommandImportConfig, PlanetValidationError};
 use crate::planet::PlanetContext;
 
@@ -44,16 +43,19 @@ pub struct CreateTableConfig {
     pub command: Option<String>,
     #[validate]
     pub language: Option<LanguageConfig>,
+    #[validate(required)]
+    pub name: Option<FieldConfig>,
     #[validate]
     pub fields: Option<Vec<FieldConfig>>,
 }
 
 impl CreateTableConfig {
 
-    pub fn defaults() -> CreateTableConfig {
+    pub fn defaults(name: Option<FieldConfig>) -> CreateTableConfig {
         let config: CreateTableConfig = CreateTableConfig{
             command: None,
             language: None,
+            name: name,
             fields: None,
         };
         return config
@@ -69,11 +71,34 @@ impl CreateTableConfig {
         };
         match response {
             Ok(_) => {
-                let config_model: CreateTableConfig = response.unwrap();
+                let mut config_model: CreateTableConfig = response.unwrap();
+                let fields = config_model.clone().fields.unwrap();
                 let validate: Result<(), ValidationErrors> = config_model.validate();
                 match validate {
                     Ok(_) => {
-                        return Ok(config_model)
+                        let mut name_field = config_model.name.clone().unwrap();
+                        name_field.required = Some(true);
+                        name_field.name = Some(String::from(NAME_CAMEL));
+                        config_model.name = Some(name_field);
+                        eprintln!("CreateTableConfig.import :: config_model: {:#?}", &config_model);
+                        // Go through fields and check if any has name "Name", raising an error since
+                        // is not allowed, reserved field.
+                        for field in fields {
+                            let field_name = field.name.clone().unwrap();
+                            if field_name.to_lowercase() == NAME_CAMEL.to_lowercase() {
+                                let mut planet_errors: Vec<PlanetValidationError> = Vec::new();
+                                let error = PlanetValidationError{
+                                    command: String::from("Create Table"),
+                                    field: String::from("Name"),
+                                    error_code: String::from("401"),
+                                    message: tr!("Name is reserved field name. You cannot add it into 
+                                    your fields. Use \"name\"")
+                                };
+                                planet_errors.push(error);
+                                return Err(planet_errors);
+                            }
+                        }
+                        return Ok(config_model);
                     },
                     Err(errors) => {
                         let command = &config_model.command.unwrap();
@@ -159,6 +184,36 @@ impl ConfigStorageField for FieldConfig {
             },
         };
     }
+    fn get_name_field(db_data: &DbData) -> Option<FieldConfig> {
+        let db_data = db_data.clone();
+        let data_objects = db_data.data_objects;
+        if data_objects.is_some() {
+            let data_objects = data_objects.unwrap();
+            for field_name in data_objects.keys() {
+                if field_name == NAME_CAMEL {
+                    let field_config_map = data_objects.get(field_name).unwrap();
+                    let required = make_bool_str(field_config_map.get("required").unwrap().clone());
+                    let indexed = make_bool_str(field_config_map.get("indexed").unwrap().clone());
+                    let many = make_bool_str(field_config_map.get("many").unwrap().clone());
+                    let field_id = field_config_map.get(ID).unwrap().clone();
+                    let field_config = FieldConfig{
+                        id: Some(field_id.clone()),
+                        name: Some(field_config_map.get("name").unwrap().clone()),
+                        field_type: Some(field_config_map.get("field_type").unwrap().clone()),
+                        default: Some(field_config_map.get("default").unwrap().clone()),
+                        version: Some(field_config_map.get("version").unwrap().clone()),
+                        required: Some(required),
+                        api_version: Some(field_config_map.get("api_version").unwrap().clone()),
+                        indexed: Some(indexed),
+                        many: Some(many),
+                        options: None,
+                    };
+                    return Some(field_config);
+                }
+            }
+        }
+        return None
+    }
     fn parse_from_db(db_data: &DbData) -> Vec<FieldConfig> {
         // let select_data: Option<Vec<(String, String)>> = None;
         let db_data = db_data.clone();
@@ -177,6 +232,29 @@ impl ConfigStorageField for FieldConfig {
         let mut map_fields_by_name: HashMap<String, FieldConfig> = HashMap::new();
         if data_objects.is_some() {
             let data_objects = data_objects.unwrap();
+            // I need to add Name field to containers, maps
+            // let field_config_map = data_objects.get(NAME).unwrap();
+            // let required = make_bool_str(field_config_map.get("required").unwrap().clone());
+            // let indexed = make_bool_str(field_config_map.get("indexed").unwrap().clone());
+            // let many = make_bool_str(field_config_map.get("many").unwrap().clone());
+            // let field_id = field_config_map.get(ID).unwrap().clone();
+            // let mut options_wrap: Option<Vec<String>> = None;
+            // let field_name = String::from("");
+            // let name_field_config: FieldConfig = FieldConfig{
+            //     id: Some(field_id.clone()),
+            //     name: Some(field_config_map.get("name").unwrap().clone()),
+            //     field_type: Some(field_config_map.get("field_type").unwrap().clone()),
+            //     default: Some(field_config_map.get("default").unwrap().clone()),
+            //     version: Some(field_config_map.get("version").unwrap().clone()),
+            //     required: Some(required),
+            //     api_version: Some(field_config_map.get("api_version").unwrap().clone()),
+            //     indexed: Some(indexed),
+            //     many: Some(many),
+            //     options: options_wrap,
+            // };
+            // &map_fields_by_id.insert(field_id, name_field_config.clone());
+            // &map_fields_by_name.insert(field_name.clone(), name_field_config.clone());
+
             for field_name in data_objects.keys() {
                 let field_config_map = data_objects.get(field_name).unwrap();
                 // Populate FieldConfig with attributes from map, which would do simple fields
@@ -415,15 +493,18 @@ pub struct InsertIntoTableConfig {
     #[validate(required, regex="RE_COMMAND_INSERT_INTO_TABLE")]
     pub command: Option<String>,
     #[validate(required)]
+    pub name: Option<String>,
+    #[validate(required)]
     pub data: Option<HashMap<String, String>>,
     pub data_collections: Option<HashMap<String, Vec<String>>>,
 }
 
 impl InsertIntoTableConfig {
 
-    pub fn defaults() -> InsertIntoTableConfig {
+    pub fn defaults(name: Option<String>) -> InsertIntoTableConfig {
         let config: InsertIntoTableConfig = InsertIntoTableConfig{
             command: None,
+            name: name,
             data: Some(HashMap::new()),
             data_collections: None
         };

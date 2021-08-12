@@ -3,6 +3,8 @@ command: CREATE TABLE "Super Table"
 language:
   codes: ["english", "spanish"]
   default: "english"
+name:
+  field_type: "Small Text"
 fields:
   - name: "My Field"
     field_type: "Small Text"

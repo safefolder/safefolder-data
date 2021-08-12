@@ -18,14 +18,13 @@ These are the core fields implemented so we can tackle the security and permissi
 * 01. SmallTextField                [impl]
 * 02. LongTextField                 [impl]
 * 03. CheckBoxField                 [impl]
-* 04. MultipleSelectField           [doing]
-* 05. SingleSelectField             [impl]
+* 05. SelectField                   [impl]
 * 06. DateField
 * 07. NumberField                   [impl]
 * 08. AuditTimeField
 * 09. AuditByField
 * 10. LinkField (This probably later once I have more ops from DbRow to get items, etc...)
-* 11. NameField (*)
+* 11. NameField                     [doing]
 * 12. CurrencyField
 * 13. PercentField
 * 14. EmailField ???? Maybe move to master fields when we do
@@ -238,22 +237,29 @@ impl ProcessField for SmallTextField {
         let field_config = self.field_config.clone();
         let field_id = field_config.id.unwrap_or_default();
         let field_name = field_config.name.unwrap_or_default();
-        let value_entry = insert_data_map.get(&field_name).unwrap().clone();
-        let value_db = value_entry.clone();
-        let field = Self{
-            field_config: self.field_config.clone()
-        };
-        let mut data: HashMap<String, String> = HashMap::new();
-        if db_data.data.is_some() {
-            data = db_data.data.unwrap();
-        }
-        let is_valid = field.is_valid(Some(&value_db))?;
-        if is_valid == true {
-            &data.insert(field_id, value_db);
-            db_data.data = Some(data);
-            return Ok(db_data);
+        let value_entry = insert_data_map.get(&field_name);
+        // Name Small Text would not be included into insert data (from YAML file data object, since has name attr)
+        if value_entry.is_some() {
+            let value_entry = value_entry.unwrap().clone();
+            let value_db = value_entry.clone();
+            let field = Self{
+                field_config: self.field_config.clone()
+            };
+            let mut data: HashMap<String, String> = HashMap::new();
+            if db_data.data.is_some() {
+                data = db_data.data.unwrap();
+            }
+            let is_valid = field.is_valid(Some(&value_db))?;
+            if is_valid == true {
+                &data.insert(field_id, value_db);
+                db_data.data = Some(data);
+                return Ok(db_data);
+            } else {
+                return Err(error_validate_process("Small Text", &field_name))
+            }    
         } else {
-            return Err(error_validate_process("Small Text", &field_name))
+            // We skip processing since we have name field
+            return Ok(db_data);
         }
     }
 }
@@ -274,7 +280,6 @@ impl StringValueField for SmallTextField {
         return None
     }
 }
-
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LongTextField {

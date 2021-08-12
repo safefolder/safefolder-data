@@ -15,10 +15,11 @@ use crate::commands::table::config::{
     GetFromTableConfig,
     FieldConfig
 };
-use crate::commands::table::constants::FIELD_IDS;
+use crate::commands::table::constants::{FIELD_IDS, NAME_CAMEL};
 use crate::commands::table::{Command};
 use crate::commands::{CommandRunner};
-use crate::planet::constants::ID;
+use crate::planet::constants::{ID, NAME};
+use crate::storage::constants::FIELD_SMALL_TEXT;
 use crate::storage::table::{DbTable, DbRow, Row, Schema, DbData};
 use crate::storage::table::*;
 use crate::storage::ConfigStorageField;
@@ -85,23 +86,46 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                 let config_fields = FieldConfig::parse_from_db(&table);
                 eprintln!("InsertIntoTable.run :: config_fields: {:#?}", &config_fields);
                 
-                let insert_data_map: HashMap<String, String> = self.config.data.clone().unwrap();
-                eprintln!("InsertIntoTable.run :: insert_data_map: {:#?}", &insert_data_map);
+                let mut insert_data_map: HashMap<String, String> = self.config.data.clone().unwrap();
+                
                 // let insert_data_collections_map = self.config.data_collections.clone().unwrap();
                 // eprintln!("InsertIntoTable.run :: insert_data__collections_map: {:#?}", &insert_data_collections_map);
                 // TODO: Change for the item name
                 // We will use this when we have the Name field, which is required in all tables
                 eprintln!("InsertIntoTable.run :: routing_wrap: {:#?}", &routing_wrap);
-                let name: &String = &String::from("hello");
+
+                // Keep in mind on name attribute for DbData
+                // 1. Can be small text or any other field, so we need to do validation and generation of data...
+                // 2. Becaouse if formula is generated from other fields, is generated number or id is also generated
+                // I also need a set of fields allowed to be name (Small Text, Formula), but this in future....
+                // name on YAML not required, since can be generated
+                // Check field type and attribute to validate
+                // So far only take Small Text
+                let name_field: FieldConfig = FieldConfig::get_name_field(&table).unwrap();
+                let name_field_type = name_field.field_type.unwrap().clone();
+                let insert_name = self.config.name.clone();
+                // Only support so far Small Text and needs to be informed in YAML with name
+                if name_field_type != FIELD_SMALL_TEXT.to_string() || insert_name.is_none() {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!("You need to include name field when inserting data into database.
+                             Only \"Small Text\" supported so far")),
+                        )
+                    );
+                }
+                let name = insert_name.unwrap();
+
+                // Instantiate DbData and validate
                 let mut db_data = DbData::defaults(
-                    name,
+                    &name,
                     None,
                     None,
                     None,
                     None,
                     routing_wrap,
                     None,
-                );
+                )?;
                 for field in config_fields {
                     let field_config = field.clone();
                     let field_type = field.field_type.unwrap_or_default();
@@ -139,7 +163,7 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
     }
 
     fn runner(runner: &CommandRunner, path_yaml: &String) -> () {
-        let config_ = InsertIntoTableConfig::defaults();
+        let config_ = InsertIntoTableConfig::defaults(None);
         let config: Result<InsertIntoTableConfig, Vec<PlanetValidationError>> = config_.import(
             runner.planet_context,
             &path_yaml
