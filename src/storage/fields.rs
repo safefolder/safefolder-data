@@ -135,8 +135,7 @@ pub enum FieldType {
     LongText(String),
     CheckBox(bool),
     NumberField(i32),
-    SingleSelectField(String),
-    MultipleSelectField(Vec<String>),
+    SelectField(String),
 }
 
 // SingleSelectField => 
@@ -185,9 +184,14 @@ impl SmallTextField {
         let field_id = field_config_.id.unwrap();
         let data = data.unwrap().clone();
         let field_obj = Self::defaults(&field_config);
-        let value_db = data.get(&field_id).unwrap().clone();
-        let value = field_obj.get_value(Some(&value_db)).unwrap();
-        let yaml_out_str = field_obj.get_yaml_out(yaml_out_str, &value);
+        let value_db = data.get(&field_id);
+        if value_db.is_some() {
+            let value_db = value_db.unwrap().clone();
+            let value = field_obj.get_value(Some(&value_db)).unwrap();
+            let yaml_out_str = field_obj.get_yaml_out(yaml_out_str, &value);    
+            return Ok(yaml_out_str)
+        }
+        let yaml_out_str = yaml_out_str.clone();
         return Ok(yaml_out_str)
     }
 }
@@ -308,9 +312,14 @@ impl LongTextField {
         let field_id = field_config_.id.unwrap();
         let data = data.unwrap().clone();
         let field_obj = Self::defaults(&field_config);
-        let value_db = data.get(&field_id).unwrap().clone();
-        let value = field_obj.get_value(Some(&value_db)).unwrap();
-        let yaml_out_str = field_obj.get_yaml_out(yaml_out_str, &value);
+        let value_db = data.get(&field_id);
+        if value_db.is_some() {
+            let value_db = value_db.unwrap().clone();
+            let value = field_obj.get_value(Some(&value_db)).unwrap();
+            let yaml_out_str = field_obj.get_yaml_out(yaml_out_str, &value);    
+            return Ok(yaml_out_str)
+        }
+        let yaml_out_str = yaml_out_str.clone();
         return Ok(yaml_out_str)
     }
 }
@@ -724,10 +733,16 @@ impl SelectField {
         let field_id = field_config_.id.unwrap();
         let data = data.unwrap().clone();
         let field_obj = Self::defaults(&field_config, Some(table));
-        let value_db = data.get(&field_id).unwrap().clone();
-        let value = field_obj.get_value(Some(&value_db)).unwrap();
-        let yaml_out_str = field_obj.get_yaml_out(yaml_out_str, &value);
+        let value_db = data.get(&field_id);
+        if value_db.is_some() {
+            let value_db = value_db.unwrap().clone();
+            let value = field_obj.get_value(Some(&value_db)).unwrap();
+            let yaml_out_str = field_obj.get_yaml_out(yaml_out_str, &value);    
+            return Ok(yaml_out_str)
+        }
+        let yaml_out_str = yaml_out_str.clone();
         return Ok(yaml_out_str)
+
     }
 }
 impl DbDumpSingleSelect for SelectField {

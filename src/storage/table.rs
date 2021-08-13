@@ -29,12 +29,13 @@ pub trait Schema<'gb> {
 
 pub trait Row<'gb> {
     fn defaults(
-        table_file: &str, 
+        table_file: &str,
+        db_table: &'gb DbTable<'gb>,
         planet_context: &'gb PlanetContext<'gb>, 
         context: &'gb Context<'gb>
     ) -> Result<DbRow<'gb>, PlanetError>;
-    fn insert(&self, db_data: &DbData) -> Result<DbData, PlanetError>;
-    fn get(&self, id: &String, fields: Option<Vec<String>>) -> Result<DbData, PlanetError>;
+    fn insert(&self, table_name: &String, db_data: &DbData) -> Result<DbData, PlanetError>;
+    fn get(&self, table_name: &String, by: GetItemOption, fields: Option<Vec<String>>) -> Result<DbData, PlanetError>;
 }
 
 // lifetimes: gb (global, for contexts), db, bs
@@ -63,11 +64,14 @@ impl RoutingData {
     }
 }
 
-// pub struct RowData {
-//     pub id: Option<String>,
-//     pub routing: RoutingData,
-//     pub data: Option<HashMap<String, RowItem>>,
-// }
+impl SerdeEncryptSharedKey for NameTree {
+    type S = BincodeSerializer<Self>;  // you can specify serializer implementation (or implement it by yourself).
+}
+
+#[derive(Debug, Serialize, Deserialize, Validate, Clone)]
+pub struct NameTree {
+    name: String
+}
 
 // This structure would apply for SchemaData and RowData, we would need to convert from one to the other
 // data has field_id -> value, so if we change field name would not be affected
@@ -195,7 +199,7 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
         match result {
             Ok(_) => {
                 let db = result.unwrap();
-                let db_table: DbTable = DbTable{
+                let db_table: DbTable= DbTable{
                     context: context,
                     planet_context: planet_context,
                     db: db
@@ -330,6 +334,24 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
     }
 }
 
+impl<'gb> DbTable<'gb> {
+    pub fn get_field_id_map(
+        db_table: &DbTable,
+        table_name: &String
+    ) -> Result<HashMap<String, String>, PlanetError> {
+        let table = db_table.get_by_name(table_name).unwrap().unwrap();
+        let db_fields = table.data_objects.unwrap();
+        let mut field_id_map: HashMap<String, String> = HashMap::new();
+        for db_field in db_fields.keys() {
+            let field_config = db_fields.get(db_field).unwrap();
+            let field_id = field_config.get(ID).unwrap().clone();
+            let field_name = db_field.clone();
+            field_id_map.insert(field_id, field_name);
+        }
+        Ok(field_id_map)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RowItem(pub FieldType);
 
@@ -353,10 +375,16 @@ impl RowData {
     }
 }
 
+pub enum GetItemOption {
+    ById(String),
+    ByName(String),
+}
+
 #[derive(Debug, Clone)]
 pub struct DbRow<'gb> {
     pub context: &'gb Context<'gb>,
     pub planet_context: &'gb PlanetContext<'gb>,
+    pub db_table: &'gb DbTable<'gb>,
     db: sled::Db,
 }
 
@@ -364,6 +392,7 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
 
     fn defaults(
         table_file: &str,
+        db_table: &'gb DbTable<'gb>,
         planet_context: &'gb PlanetContext<'gb>, 
         context: &'gb Context<'gb>
     ) -> Result<DbRow<'gb>, PlanetError> {
@@ -388,7 +417,8 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
                 let db_row: DbRow = DbRow{
                     context: context,
                     planet_context: planet_context,
-                    db: db
+                    db: db,
+                    db_table: db_table,
                 };
                 Ok(db_row)
             },
@@ -402,7 +432,7 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
         }
     }
 
-    fn insert(&self, db_data: &DbData) -> Result<DbData, PlanetError> {
+    fn insert(&self, table_name: &String, db_data: &DbData) -> Result<DbData, PlanetError> {
         // eprintln!("insert :: row_data: {:#?}", db_data);
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let encrypted_data = db_data.encrypt(&shared_key).unwrap();
@@ -414,9 +444,10 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
         let response = &self.db.insert(id_db, encoded);
         match response {
             Ok(_) => {
+                // Get item
                 eprintln!("DbRow.insert :: id: {:?}", &id);
                 eprintln!("DbRow.insert :: Will get item...");
-                let item_ = self.get(&id, None);
+                let item_ = self.get(&table_name, GetItemOption::ById(id), None);
                 match item_ {
                     Ok(_) => {
                         let item = item_.unwrap();
@@ -428,46 +459,164 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
                 }
             },
             Err(_) => {
-                Err(PlanetError::new(500, Some(tr!("Could not write table schema"))))
+                Err(PlanetError::new(500, Some(tr!("Could not insert data"))))
             }
         }
     }
 
-    fn get(&self, id: &String, fields: Option<Vec<String>>) -> Result<DbData, PlanetError> {
+    // We can get items by id (not changing string), and name (we search for slugified name)
+    fn get(&self, table_name: &String, by: GetItemOption, fields: Option<Vec<String>>) -> Result<DbData, PlanetError> {
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
-        let id_db = xid::Id::from_str(id).unwrap();
-        let id_db = id_db.as_bytes();
-        let item_db = self.db.get(&id_db).unwrap().unwrap().to_vec();
-        let item_ = EncryptedMessage::deserialize(item_db).unwrap();
-        let item_ = DbData::decrypt_owned(
-            &item_, 
-            &shared_key);
-        match item_ {
-            Ok(_) => {
-                let item = item_.unwrap();
-                if fields.is_none() {
-                    Ok(item)    
-                } else {
-                    // eprintln!("get :: item: {:#?}", &item);
-                    // If fields is informed, then I need to remove from item.data fields not requested
-                    // data: Some(
-                    //     {
-                    //         "c49qh6osmpv69nnrt33g": "pepito",
-                    //         "c49qh6osmpv69nnrt35g": "c49qh6osmpv69nnrt370",
-                    //         "c49qh6osmpv69nnrt34g": "true",
-                    //         "c49qh6osmpv69nnrt350": "34",
-                    //         "c49qh6osmpv69nnrt360": "c49qh6osmpv69nnrt380,c49qh6osmpv69nnrt390",
-                    //         "c49qh6osmpv69nnrt340": "This is some description I want to include",
-                    //     },
-                    // ),
-                    Ok(item)
+        let item_db: Vec<u8>;
+        match by {
+            GetItemOption::ById(id) => {
+                let id_db = xid::Id::from_str(&id).unwrap();
+                let id_db = id_db.as_bytes();
+                let db_result = self.db.get(&id_db);
+                if db_result.is_err() {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!("Could not fetch item from database"))
+                        )
+                    );
+                }
+                let item_exsists = db_result.unwrap();
+                if item_exsists.is_none() {
+                    return Err(
+                        PlanetError::new(
+                            404, 
+                            Some(tr!("Item does not exist"))
+                        )
+                    );
+                }
+                item_db = item_exsists.unwrap().to_vec();
+                let item_ = EncryptedMessage::deserialize(item_db).unwrap();
+                let item_ = DbData::decrypt_owned(
+                    &item_, 
+                    &shared_key);
+                match item_ {
+                    Ok(_) => {
+                        let mut item = item_.unwrap();
+                        if fields.is_none() {
+                            Ok(item)    
+                        } else {
+                            // eprintln!("get :: item: {:#?}", &item);
+                            // If fields is informed, then I need to remove from item.data fields not requested
+                            // data: Some(
+                            //     {
+                            //         "c49qh6osmpv69nnrt33g": "pepito",
+                            //         "c49qh6osmpv69nnrt35g": "c49qh6osmpv69nnrt370",
+                            //         "c49qh6osmpv69nnrt34g": "true",
+                            //         "c49qh6osmpv69nnrt350": "34",
+                            //         "c49qh6osmpv69nnrt360": "c49qh6osmpv69nnrt380,c49qh6osmpv69nnrt390",
+                            //         "c49qh6osmpv69nnrt340": "This is some description I want to include",
+                            //     },
+                            // ),
+                            let fields = fields.unwrap();
+                            item = self.filter_fields(&table_name, &fields, &item)?;
+                            Ok(item)
+                        }
+                    },
+                    Err(_) => {
+                        Err(PlanetError::new(500, Some(tr!("Could not fetch item from database"))))
+                    }
                 }
             },
-            Err(_) => {
-                Err(PlanetError::new(500, Some(tr!("Could not fetch item from database"))))
+            GetItemOption::ByName(name) => {
+                let mut found = false;
+                let mut wrap_db_data: Option<DbData> = None;
+                for db_result in self.db.iter() {
+                    let (_, db_item) = db_result.unwrap();
+                    let db_item = db_item.to_vec();
+                    let item_ = EncryptedMessage::deserialize(db_item).unwrap();
+                    let item_ = DbData::decrypt_owned(
+                        &item_, 
+                        &shared_key);
+                    let item_db_data = item_.unwrap();
+                    let item_db_data_ = item_db_data.clone();
+                    let item_db_name = &item_db_data.name.unwrap();
+                    if item_db_name == &name {
+                        found = true;
+                        wrap_db_data = Some(item_db_data_);
+                        break
+                    }
+                }
+                if found == false {
+                    return Err(
+                        PlanetError::new(
+                            404, 
+                            Some(tr!("Item does not exist"))
+                        )
+                    );    
+                }
+                return Ok(wrap_db_data.unwrap())
             }
         }
     }
+}
+
+impl<'gb> DbRow<'gb> {
+
+    pub fn filter_fields(&self, table_name: &String, fields: &Vec<String>, item: &DbData) -> Result<DbData, PlanetError> {
+        let fields = fields.clone();
+        let mut item = item.clone();
+        // field_id => field_name
+        let field_id_map= DbTable::get_field_id_map(
+            &self.db_table,
+            table_name
+        )?;
+        // data
+        let mut data_new: HashMap<String, String> = HashMap::new();
+        let db_data = item.data;
+        if db_data.is_some() {
+            for (field_db_id, field_value) in db_data.unwrap() {
+                let field_db_name = &field_id_map.get(&field_db_id).unwrap().clone();
+                for field in &fields {
+                    if field.to_lowercase() == field_db_name.to_lowercase() {
+                        data_new.insert(field_db_id.clone(), field_value.clone());
+                    }
+                }
+            }
+            item.data = Some(data_new);
+        } else {
+            item.data = None;
+        }
+        // data_collections
+        let mut data_collections_new: HashMap<String, Vec<HashMap<String, String>>> = HashMap::new();
+        let db_data_collections = item.data_collections;
+        if db_data_collections.is_some() {
+            for (field_db_id, items) in db_data_collections.unwrap() {
+                let field_db_name = &field_id_map.get(&field_db_id).unwrap().clone();
+                for field in &fields {
+                    if field.to_lowercase() == field_db_name.to_lowercase() {
+                        data_collections_new.insert(field_db_id.clone(), items.clone());
+                    }
+                }
+            }
+            item.data_collections = Some(data_collections_new);
+        } else {
+            item.data_collections = None;
+        }
+        // data_objects
+        let mut data_objects_new: HashMap<String, HashMap<String, String>> = HashMap::new();
+        let db_data_objects = item.data_objects;
+        if db_data_objects.is_some() {
+            for (field_db_id, map) in db_data_objects.unwrap() {
+                let field_db_name = &field_id_map.get(&field_db_id).unwrap().clone();
+                for field in &fields {
+                    if field.to_lowercase() == field_db_name.to_lowercase() {
+                        data_objects_new.insert(field_db_id.clone(), map.clone());
+                    }
+                }
+            }
+            item.data_objects = Some(data_objects_new);
+        } else {
+            item.data_objects = None;
+        }
+        return Ok(item);
+    }
+
 }
 
 pub struct DbQuery {

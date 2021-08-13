@@ -15,12 +15,12 @@ use crate::commands::table::config::{
     GetFromTableConfig,
     FieldConfig
 };
-use crate::commands::table::constants::{FIELD_IDS, NAME_CAMEL};
+use crate::commands::table::constants::{FIELD_IDS, TABLE_NAME};
 use crate::commands::table::{Command};
 use crate::commands::{CommandRunner};
-use crate::planet::constants::{ID, NAME};
+use crate::planet::constants::{ID};
 use crate::storage::constants::FIELD_SMALL_TEXT;
-use crate::storage::table::{DbTable, DbRow, Row, Schema, DbData};
+use crate::storage::table::{DbTable, DbRow, Row, Schema, DbData, GetItemOption};
 use crate::storage::table::*;
 use crate::storage::ConfigStorageField;
 use crate::planet::{
@@ -34,6 +34,7 @@ use crate::storage::fields::*;
 pub struct InsertIntoTable<'gb> {
     pub planet_context: &'gb PlanetContext<'gb>,
     pub context: &'gb Context<'gb>,
+    pub db_table: &'gb DbTable<'gb>,
     pub config: InsertIntoTableConfig,
 }
 
@@ -49,6 +50,7 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
 
         let result: Result<DbRow<'gb>, PlanetError> = DbRow::defaults(
             &table_file,
+            self.db_table,
             self.planet_context,
             self.context,
         );
@@ -58,11 +60,7 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                 let db_row: DbRow<'gb> = result.unwrap();
                 // I need to get SchemaData and schema for the table
                 // I go through fields in order to build RowData
-                let db_table: DbTable = DbTable::defaults(
-                    self.planet_context,
-                    self.context,
-                )?;
-                let table = db_table.get_by_name(table_name)?;
+                let table = self.db_table.get_by_name(table_name)?;
                 if *&table.is_none() {
                     return Err(
                         PlanetError::new(
@@ -81,7 +79,9 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                     None
                 );
                 let table = table.unwrap();
+                let table_name = &table.clone().name.unwrap();
                 eprintln!("InsertIntoTable.run :: table: {:#?}", &table);
+
                 // I need a way to get list of instance FieldConfig (fields)
                 let config_fields = FieldConfig::parse_from_db(&table);
                 eprintln!("InsertIntoTable.run :: config_fields: {:#?}", &config_fields);
@@ -115,8 +115,22 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                     );
                 }
                 let name = insert_name.unwrap();
+                // Check name does not exist
+                eprintln!("InsertIntoTable.run :: name: {}", &name);
+                let name_exists = self.check_name_exists(&table_name, &name, &db_row);
+                eprintln!("InsertIntoTable.run :: name_exists: {}", &name_exists);
+                if name_exists {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!("A record with name \"{}\" already exists in database", &name)),
+                        )
+                    );
+                }
 
                 // Instantiate DbData and validate
+                let mut db_context: HashMap<String, String> = HashMap::new();
+                db_context.insert(TABLE_NAME.to_string(), table_name.clone());
                 let mut db_data = DbData::defaults(
                     &name,
                     None,
@@ -153,7 +167,7 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                     };
                 }
                 eprintln!("InsertIntoTable.run :: I will write: {:#?}", &db_data);
-                let response: DbData = db_row.insert(&db_data)?;
+                let response: DbData = db_row.insert(&table_name, &db_data)?;
                 return Ok(response);
             },
             Err(error) => {
@@ -170,10 +184,16 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
         );
         match config {
             Ok(_) => {
+                let db_table= DbTable::defaults(
+                    runner.planet_context,
+                    runner.context,
+                ).unwrap();
+        
                 let insert_into_table: InsertIntoTable = InsertIntoTable{
                     planet_context: runner.planet_context,
                     context: runner.context,
                     config: config.unwrap(),
+                    db_table: &db_table,
                 };
                 let result: Result<_, PlanetError> = insert_into_table.run();
                 match result {
@@ -216,9 +236,28 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
     }
 }
 
+impl<'gb> InsertIntoTable<'gb> {
+    pub fn check_name_exists(&self, table_name: &String, name: &String, db_row: &DbRow) -> bool {
+        let check: bool;
+        let name = name.clone();
+        let result = db_row.get(&table_name, GetItemOption::ByName(name), None);
+        eprintln!("InsertIntoTable.check_name_exists :: get response: {:#?}", &result);
+        match result {
+            Ok(_) => {
+                check = true
+            },
+            Err(_) => {
+                check = false
+            }
+        }
+        return check
+    }
+}
+
 pub struct GetFromTable<'gb> {
     pub planet_context: &'gb PlanetContext<'gb>,
     pub context: &'gb Context<'gb>,
+    pub db_table: &'gb DbTable<'gb>,
     pub config: GetFromTableConfig,
 }
 
@@ -234,6 +273,7 @@ impl<'gb> Command<String> for GetFromTable<'gb> {
 
         let result: Result<DbRow<'gb>, PlanetError> = DbRow::defaults(
             &table_file,
+            self.db_table,
             self.planet_context,
             self.context,
         );
@@ -243,11 +283,7 @@ impl<'gb> Command<String> for GetFromTable<'gb> {
                 let db_row: DbRow<'gb> = result.unwrap();
                 // I need to get SchemaData and schema for the table
                 // I go through fields in order to build RowData                
-                let db_table: DbTable = DbTable::defaults(
-                    self.planet_context,
-                    self.context,
-                )?;
-                let table = db_table.get_by_name(table_name)?;
+                let table = self.db_table.get_by_name(table_name)?;
                 if *&table.is_none() {
                     return Err(
                         PlanetError::new(
@@ -269,9 +305,11 @@ impl<'gb> Command<String> for GetFromTable<'gb> {
                     space_id, 
                     None
                 );
+                let fields = self.config.data.clone().unwrap().fields;
+                eprintln!("GetFromTable.run :: fields: {:?}", &fields);
                 let item_id = self.config.data.clone().unwrap().id.unwrap();
                 // Get item from database
-                let db_data = db_row.get(&item_id, None)?;
+                let db_data = db_row.get(&table_name, GetItemOption::ById(item_id), fields)?;
                 // data and basic fields
                 let data = db_data.data;
                 let mut yaml_out_str = String::from("---\n");
@@ -333,10 +371,16 @@ impl<'gb> Command<String> for GetFromTable<'gb> {
         );
         match config {
             Ok(_) => {
+                let db_table= DbTable::defaults(
+                    runner.planet_context,
+                    runner.context,
+                ).unwrap();
+
                 let insert_into_table: GetFromTable = GetFromTable{
                     planet_context: runner.planet_context,
                     context: runner.context,
                     config: config.unwrap(),
+                    db_table: &db_table,
                 };
                 let result: Result<_, PlanetError> = insert_into_table.run();
                 match result {

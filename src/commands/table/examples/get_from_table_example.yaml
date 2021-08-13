@@ -1,7 +1,7 @@
 ---
 command: GET FROM TABLE "Super Table"
 data:
-  id: c49re5gsmpve7dgdkqhg
+  id: c4b8ul0smpvcvn1vmefg
   fields:
     - My Field
     - Is Published

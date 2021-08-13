@@ -30,7 +30,7 @@ pub struct CreateTable<'gb> {
 impl<'gb> Command<DbData> for CreateTable<'gb> {
 
     fn run(&self) -> Result<DbData, PlanetError> {
-        let result: Result<DbTable<'gb>, PlanetError> = DbTable::defaults(
+        let result: Result<DbTable, PlanetError> = DbTable::defaults(
             self.planet_context,
             self.context,
         );
@@ -108,7 +108,7 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                 )?;
                 eprintln!("CreateTable.run :: db_data: {:#?}", &db_data);
 
-                let db_table: DbTable<'gb> = result.unwrap();
+                let db_table: DbTable = result.unwrap();
 
                 let response: DbData = db_table.create(&db_data)?;
                 let response_src = response.clone();
