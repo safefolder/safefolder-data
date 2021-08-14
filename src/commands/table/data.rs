@@ -18,7 +18,7 @@ use crate::commands::table::config::{
 use crate::commands::table::constants::{FIELD_IDS, TABLE_NAME};
 use crate::commands::table::{Command};
 use crate::commands::{CommandRunner};
-use crate::planet::constants::{ID};
+use crate::planet::constants::{ID, NAME};
 use crate::storage::constants::FIELD_SMALL_TEXT;
 use crate::storage::table::{DbTable, DbRow, Row, Schema, DbData, GetItemOption};
 use crate::storage::table::*;
@@ -313,6 +313,25 @@ impl<'gb> Command<String> for GetFromTable<'gb> {
                 // data and basic fields
                 let data = db_data.data;
                 let mut yaml_out_str = String::from("---\n");
+                // id
+                let id_yaml_value = self.config.data.clone().unwrap().id.unwrap().blue();
+                let id_yaml = format!("{}{}{}", 
+                    String::from("\"").truecolor(255, 165, 0), 
+                    id_yaml_value.truecolor(255, 165, 0), 
+                    String::from("\"").truecolor(255, 165, 0)
+                );
+                yaml_out_str.push_str(format!("{field}: {value}\n", field=String::from(ID).blue(), value=&id_yaml).as_str());
+                // name
+                let name_yaml_value = &db_data.name.unwrap().clone();
+                let name_yaml = format!("{}{}{}", 
+                    String::from("\"").truecolor(255, 165, 0), 
+                    name_yaml_value.truecolor(255, 165, 0), 
+                    String::from("\"").truecolor(255, 165, 0)
+                );
+                yaml_out_str.push_str(format!("{field}: {value}\n", field=String::from(NAME).blue(), value=&name_yaml).as_str());
+                yaml_out_str.push_str(format!("{}\n", 
+                    String::from("data:").blue(),
+                ).as_str());
                 if data.is_some() {
                     // field_id -> string value
                     let data = data.unwrap();

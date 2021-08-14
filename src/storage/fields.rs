@@ -24,20 +24,17 @@ These are the core fields implemented so we can tackle the security and permissi
 * 08. AuditTimeField
 * 09. AuditByField
 * 10. LinkField (This probably later once I have more ops from DbRow to get items, etc...)
-* 11. NameField                     [doing]
-* 12. CurrencyField
-* 13. PercentField
-* 14. EmailField ???? Maybe move to master fields when we do
-* 15. UrlField ???? Maybe move to master fields when we do
-* 16. CountField (This is parameters of COUNT() query when we go seq in table, defines query)
-* 17. GenerateIdField
-* 18. GenerateNumberField
-* 19. LanguageField
-* 20. NumberCollectionField
-* 21. SmallTextCollectionField
-* 22. FormulaField (*)
-* 23. SetField: List of items in a field, strings, numbers, etc... All same type, which goes into the definition on the schema table
-* 24. ObjectField: Object embedded with additional information, to group data into objects.
+* 11. CurrencyField
+* 12. PercentField
+* 13. CountField (This is parameters of COUNT() query when we go seq in table, defines query)
+* 14. GenerateIdField
+* 15. GenerateNumberField
+* 16. LanguageField
+* 17. NumberCollectionField
+* 18. SmallTextCollectionField
+* 19. FormulaField (*)
+* 20. SetField: List of items in a field, strings, numbers, etc... All same type, which goes into the definition on the schema table
+* 21. ObjectField: Object embedded with additional information, to group data into objects.
 
 Functions / Formulas
 
@@ -207,7 +204,7 @@ impl DbDumpString for SmallTextField {
             value.truecolor(255, 165, 0), 
             String::from("\"").truecolor(255, 165, 0)
         );
-        yaml_string.push_str(format!("{field}: {value}\n", field=field, value=value).as_str());
+        yaml_string.push_str(format!("  {field}: {value}\n", field=field, value=value).as_str());
         return yaml_string;
     }
 }
@@ -335,7 +332,7 @@ impl DbDumpString for LongTextField {
             value.truecolor(255, 165, 0), 
             String::from("\"").truecolor(255, 165, 0)
         );
-        yaml_string.push_str(format!("{field}: {value}\n", field=field, value=value).as_str());
+        yaml_string.push_str(format!("  {field}: {value}\n", field=field, value=value).as_str());
         return yaml_string;
     }
 }
@@ -433,9 +430,14 @@ impl CheckBoxField {
         let field_id = field_config_.id.unwrap();
         let data = data.unwrap().clone();
         let field_obj = Self::defaults(&field_config);
-        let value_db = data.get(&field_id).unwrap().clone();
-        let value = field_obj.get_value(Some(&value_db)).unwrap();
-        let yaml_out_str = field_obj.get_yaml_out(yaml_out_str, value);
+        let value_db = data.get(&field_id);
+        if value_db.is_some() {
+            let value_db = value_db.unwrap().clone();
+            let value = field_obj.get_value(Some(&value_db)).unwrap();
+            let yaml_out_str = field_obj.get_yaml_out(yaml_out_str, value);    
+            return Ok(yaml_out_str)
+        }
+        let yaml_out_str = yaml_out_str.clone();
         return Ok(yaml_out_str)
     }
 }
@@ -447,7 +449,7 @@ impl DbDumpBool for CheckBoxField {
         let mut yaml_string = yaml_string.clone();
         let field = &field_name.blue();
         let value = format!("{}", value.to_string().blue());
-        yaml_string.push_str(format!("{field}: {value}\n", field=field, value=value).as_str());
+        yaml_string.push_str(format!("  {field}: {value}\n", field=field, value=value).as_str());
         return yaml_string;
     }
 }
@@ -560,9 +562,14 @@ impl NumberField {
         let field_id = field_config_.id.unwrap();
         let data = data.unwrap().clone();
         let field_obj = Self::defaults(&field_config);
-        let value_db = data.get(&field_id).unwrap().clone();
-        let value = field_obj.get_value(Some(&value_db)).unwrap();
-        let yaml_out_str = field_obj.get_yaml_out(yaml_out_str, &value);
+        let value_db = data.get(&field_id);
+        if value_db.is_some() {
+            let value_db = value_db.unwrap().clone();
+            let value = field_obj.get_value(Some(&value_db)).unwrap();
+            let yaml_out_str = field_obj.get_yaml_out(yaml_out_str, &value);    
+            return Ok(yaml_out_str)
+        }
+        let yaml_out_str = yaml_out_str.clone();
         return Ok(yaml_out_str)
     }
 }
@@ -573,7 +580,7 @@ impl DbDumpNumber for NumberField {
         let mut yaml_string = yaml_string.clone();
         let field = &field_name.blue();
         let value = format!("{}", value.to_string().truecolor(255, 255, 200));
-        yaml_string.push_str(format!("{field}: {value}\n", field=field, value=value).as_str());
+        yaml_string.push_str(format!("  {field}: {value}\n", field=field, value=value).as_str());
         return yaml_string;
     }
 }
@@ -767,7 +774,7 @@ impl DbDumpSingleSelect for SelectField {
                 select_name.truecolor(255, 165, 0), 
                 String::from("\"").truecolor(255, 165, 0)
             );
-            yaml_string.push_str(format!("{field}:\n  {id}: {select_id}\n  {value}: {select_name}\n", 
+            yaml_string.push_str(format!("  {field}:\n  {id}: {select_id}\n  {value}: {select_name}\n", 
                 field=&field, 
                 select_id=select_id,
                 select_name=select_name,
@@ -778,7 +785,7 @@ impl DbDumpSingleSelect for SelectField {
             // Check we have fields
             let select_ids: Vec<&str> = value.split(",").collect();
             if select_ids.len() > 1 {
-                yaml_string.push_str(format!("{field}:\n", 
+                yaml_string.push_str(format!("  {field}:\n", 
                     field=&field, 
                 ).as_str());
                 for select_id in select_ids {
@@ -793,7 +800,7 @@ impl DbDumpSingleSelect for SelectField {
                         select_name.truecolor(255, 165, 0), 
                         String::from("\"").truecolor(255, 165, 0)
                     );
-                    yaml_string.push_str(format!("  - {id}: {select_id}\n    {value}: {select_name}\n", 
+                    yaml_string.push_str(format!("    - {id}: {select_id}\n    {value}: {select_name}\n", 
                         select_id=select_id,
                         select_name=select_name,
                         id=String::from(ID).blue(),
