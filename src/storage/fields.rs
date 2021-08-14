@@ -760,7 +760,7 @@ impl DbDumpSingleSelect for SelectField {
         let mut yaml_string = yaml_string.clone();
         let field = &field_name.blue();
         let select_id = value;
-        let options_name_map = &self.options_name_map.clone().unwrap();
+        // let options_name_map = &self.options_name_map.clone().unwrap();
         let options_id_map = &self.options_id_map.clone().unwrap();
         if many == false {
             let select_name = options_id_map.get(select_id).unwrap();
@@ -931,7 +931,7 @@ impl StringValueField for SelectField {
                     let item_select_id = &item_select_id.to_string();
                     let select_option = options_id_map.get(item_select_id);
                     if select_option.is_some() {
-                        let select_option = select_option.unwrap().clone();
+                        // let select_option = select_option.unwrap().clone();
                         resolved_ids.push(item_select_id.clone());
                     }
                     resolved_id = Some(resolved_ids.join(","));

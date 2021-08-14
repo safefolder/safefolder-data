@@ -86,7 +86,7 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                 let config_fields = FieldConfig::parse_from_db(&table);
                 eprintln!("InsertIntoTable.run :: config_fields: {:#?}", &config_fields);
                 
-                let mut insert_data_map: HashMap<String, String> = self.config.data.clone().unwrap();
+                let insert_data_map: HashMap<String, String> = self.config.data.clone().unwrap();
                 
                 // let insert_data_collections_map = self.config.data_collections.clone().unwrap();
                 // eprintln!("InsertIntoTable.run :: insert_data__collections_map: {:#?}", &insert_data_collections_map);
@@ -297,14 +297,6 @@ impl<'gb> Command<String> for GetFromTable<'gb> {
                 let field_ids = data_collections.unwrap().get(FIELD_IDS).unwrap().clone();
                 let config_fields = FieldConfig::parse_from_db(&table);
                 let field_id_map: HashMap<String, FieldConfig> = FieldConfig::get_field_id_map(&config_fields);
-                // routing
-                let account_id = Some(self.context.account_id.unwrap_or_default().to_string());
-                let space_id = Some(self.context.space_id.unwrap_or_default().to_string());
-                let routing_wrap = RoutingData::defaults(
-                    account_id, 
-                    space_id, 
-                    None
-                );
                 let fields = self.config.data.clone().unwrap().fields;
                 eprintln!("GetFromTable.run :: fields: {:?}", &fields);
                 let item_id = self.config.data.clone().unwrap().id.unwrap();

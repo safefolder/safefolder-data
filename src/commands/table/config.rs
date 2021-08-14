@@ -220,7 +220,7 @@ impl ConfigStorageField for FieldConfig {
         let mut fields: Vec<FieldConfig> = Vec::new();
         // I use data_collections, where we store the fields
         let data_collections = db_data.data_collections;
-        let data = db_data.data;
+        // let data = db_data.data;
         let data_objects = db_data.data_objects;
         // eprintln!("parse_from_db :: data: {:#?}", &data);
         // eprintln!("parse_from_db :: data_objects: {:#?}", &data_objects);
@@ -442,8 +442,8 @@ impl ConfigStorageField for FieldConfig {
     }
    
     fn map_objects_db(&self) -> HashMap<String, Vec<HashMap<String, String>>> {
-        let field = self.clone();
-        let mut map: HashMap<String, Vec<HashMap<String, String>>> = HashMap::new();
+        // let field = self.clone();
+        let map: HashMap<String, Vec<HashMap<String, String>>> = HashMap::new();
         // Include here items where you need field -> object in field configuration
         return map
     }
