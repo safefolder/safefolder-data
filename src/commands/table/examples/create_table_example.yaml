@@ -28,3 +28,6 @@ fields:
       - Madrid
       - Barcelona
       - Valencia
+  - name: "Super Counter"
+    field_type: "Formula"
+    formula: "{Counter} * 2"

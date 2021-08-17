@@ -3,6 +3,7 @@ extern crate xid;
 pub mod fields;
 pub mod table;
 pub mod constants;
+pub mod functions;
 
 use std::collections::HashMap;
 

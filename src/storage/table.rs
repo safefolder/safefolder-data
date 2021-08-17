@@ -350,6 +350,25 @@ impl<'gb> DbTable<'gb> {
         }
         Ok(field_id_map)
     }
+    // Get field_name -> field_type map
+    pub fn get_field_type_map(
+        table: &DbData,
+    ) -> Result<HashMap<String, String>, PlanetError> {
+        let db_fields = table.data_objects.clone().unwrap();
+        let mut field_type_map: HashMap<String, String> = HashMap::new();
+        for db_field in db_fields.keys() {
+            let field_name = db_field.clone();
+            let field_map = db_fields.get(&field_name);
+            if field_map.is_some() {
+                let field_type = field_map.unwrap().get("field_type");
+                if field_type.is_some() {
+                    let field_type = field_type.unwrap().clone();
+                    field_type_map.insert(field_name, field_type);
+                }
+            }
+        }
+        Ok(field_type_map)
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

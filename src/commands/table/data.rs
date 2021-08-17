@@ -161,6 +161,9 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                         "Select" => {
                             db_data = SelectField::init_do(&field_config, &table, insert_data_map.clone(), db_data)?
                         },
+                        "Formula" => {
+                            db_data = FormulaField::init_do(&field_config, &table, insert_data_map.clone(), db_data)?
+                        },
                         _ => {
                             return Ok(db_data);
                         }

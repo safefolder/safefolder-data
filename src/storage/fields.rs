@@ -1,16 +1,21 @@
 extern crate sled;
+extern crate xlformula_engine;
 
 use std::str::FromStr;
 use std::collections::HashMap;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use tr::tr;
+use xlformula_engine::{calculate, parse_formula, NoReference, NoCustomFunction, types};
+use regex::Regex;
 
 use crate::commands::table::constants::{FIELD_IDS, KEY, SELECT_OPTIONS, VALUE};
 use crate::planet::constants::ID;
 use crate::planet::{PlanetError};
-use crate::storage::table::{DbData};
+use crate::storage::table::{DbData, DbTable};
 use crate::commands::table::config::FieldConfig;
+use crate::storage::constants::{FIELD_SMALL_TEXT, FIELD_LONG_TEXT};
+use crate::storage::functions::base::{check_achiever_function, get_function_name};
 
 /*
 These are the core fields implemented so we can tackle the security and permissions system
@@ -82,6 +87,10 @@ pub trait ValidateField {
 pub trait ValidateManyField {
     fn is_valid(&self, value: Option<Vec<String>>) -> Result<bool, PlanetError>;
 }
+pub trait ValidateFormulaField {
+    fn is_valid(&self, value: Option<&String>, formula_obj: &Formula) -> Result<bool, PlanetError>;
+}
+
 pub trait ProcessField {
     fn process(
         &self,
@@ -958,5 +967,270 @@ impl StringValueField for SelectField {
         } else {
             return None
         }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FormulaField {
+    pub field_config: FieldConfig,
+    pub table: DbData,
+    pub data_map: HashMap<String, String>,
+}
+
+impl FormulaField {
+    pub fn defaults(field_config: &FieldConfig, table: &DbData, data_map: &HashMap<String, String>) -> Self {
+        let field_config = field_config.clone();
+        let table = table.clone();
+        let data_map = data_map.clone();
+        let field_obj = Self{
+            field_config: field_config,
+            table: table,
+            data_map: data_map,
+        };
+        return field_obj
+    }
+    pub fn init_do(
+        field_config: &FieldConfig, 
+        table: &DbData, 
+        data_map: HashMap<String, String>, 
+        mut db_data: DbData
+    ) -> Result<DbData, PlanetError> {
+        let field_object = Self::defaults(field_config, table, &data_map);
+        db_data = field_object.process(data_map.clone(), db_data)?;
+        return Ok(db_data)
+    }
+    pub fn init_get(
+        field_config: &FieldConfig, 
+        table: &DbData,
+        data: Option<&HashMap<String, String>>, 
+        yaml_out_str: &String
+    ) -> Result<String, PlanetError> {
+        let field_config_ = field_config.clone();
+        let field_id = field_config_.id.unwrap();
+        let data = data.unwrap().clone();
+        let field_obj = Self::defaults(&field_config, table, &data);
+        let value_db = data.get(&field_id);
+        if value_db.is_some() {
+            let value_db = value_db.unwrap().clone();
+            let value = field_obj.get_value(Some(&value_db)).unwrap();
+            let yaml_out_str = field_obj.get_yaml_out(yaml_out_str, &value);    
+            return Ok(yaml_out_str)
+        }
+        let yaml_out_str = yaml_out_str.clone();
+        return Ok(yaml_out_str)
+    }
+}
+
+impl DbDumpString for FormulaField {
+    fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
+        let field_config = self.field_config.clone();
+        let field_name = field_config.name.unwrap();
+        let mut yaml_string = yaml_string.clone();
+        let field = &field_name.blue();
+        let value = format!("{}{}{}", 
+            String::from("\"").truecolor(255, 165, 0), 
+            value.truecolor(255, 165, 0), 
+            String::from("\"").truecolor(255, 165, 0)
+        );
+        yaml_string.push_str(format!("  {field}: {value}\n", field=field, value=value).as_str());
+        return yaml_string;
+    }
+}
+
+impl ValidateFormulaField for FormulaField {
+    fn is_valid(&self, value: Option<&String>, formula_obj: &Formula) -> Result<bool, PlanetError> {
+        let field_config = self.field_config.clone();
+        let required = field_config.required.unwrap();
+        let name = field_config.name.unwrap();
+        if value.is_none() && required == true {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!(
+                        "Field {}{}{} is required", 
+                        String::from("\"").blue(), name.blue(), String::from("\"").blue()
+                    )),
+                )
+            );
+        } else {
+            let data_map = self.data_map.clone();
+            let is_valid = formula_obj.validate_data(data_map)?;
+            return Ok(is_valid)
+        }
+    }
+}
+
+impl ProcessField for FormulaField {
+    fn process(
+        &self,
+        insert_data_map: HashMap<String, String>,
+        mut db_data: DbData
+    ) -> Result<DbData, PlanetError> {
+        let field_config = self.field_config.clone();
+        let field_id = field_config.id.unwrap_or_default();
+        let table = self.table.clone();
+        let formula = self.field_config.formula.clone();
+        if formula.is_some() {
+            let mut formula = formula.unwrap();
+            let formula_obj = Formula::defaults(&formula);
+            let mut data: HashMap<String, String> = HashMap::new();
+            if db_data.data.is_some() {
+                data = db_data.data.clone().unwrap();
+            }
+            let is_valid = self.is_valid(Some(&formula), &formula_obj)?;
+            if is_valid == true {
+                formula = String::from("CONCAT(\"23\",\"-\", 45)");
+                eprintln!("FormulaField.process :: formula: {}", &formula);
+                // First process the achiever functions, then rest
+                let expr = Regex::new(r"[A-Z]+\(.+\)").unwrap();
+                for capture in expr.captures_iter(&formula) {
+                    let function_text = capture.get(0).unwrap().as_str();
+                    // Check function is achiever one
+                    eprintln!("FormulaField.process :: function_text: {}", &function_text);
+                    let check_achiever = check_achiever_function(&function_text);
+                    eprintln!("FormulaField.process :: check_achiever: {}", &check_achiever);
+                    if &check_achiever == true {
+                        let function_name = get_function_name(&function_text);
+                        eprintln!("FormulaField.process :: function_name: {}", &function_name);
+                    }
+                }
+                // This injects references without achiever functions
+                let formula_wrap = formula_obj.inyect_data_formula(&table, insert_data_map);
+                if formula_wrap.is_some() {
+                    formula = formula_wrap.unwrap();
+                    formula = format!("={}", &formula);
+                    // How to do when I have custom functions????
+                    // Check (...)
+                    let formula_ = parse_formula::parse_string_to_formula(
+                        &formula, 
+                        None::<NoCustomFunction>
+                    );
+                    let result = calculate::calculate_formula(formula_, None::<NoReference>);
+                    &data.insert(field_id, calculate::result_to_string(result));
+                    db_data.data = Some(data);
+                    return Ok(db_data);
+                }
+            } else {
+                return Ok(db_data);
+            }
+            return Ok(db_data);
+        } else {
+            return Ok(db_data);
+        }
+    }
+}
+impl StringValueField for FormulaField {
+    fn get_value(&self, value_db: Option<&String>) -> Option<String> {
+        if value_db.is_none() {
+            return None
+        } else {
+            let value_final = value_db.unwrap().clone();
+            return Some(value_final);
+        }
+    }
+    fn get_value_db(&self, value: Option<&String>) -> Option<String> {
+        if *&value.is_some() {
+            let value = value.unwrap().clone();
+            return Some(value);
+        }
+        return None
+    }
+}
+
+pub struct Formula {
+    formula: String,
+    regex: String,
+}
+impl Formula{
+    pub fn defaults(formula: &String) -> Formula {
+        let regex: &str = r"(?im:\{[\w\s]+\})";
+        let obj = Self{
+            formula: formula.clone(),
+            regex: regex.to_string(),
+        };        
+        return obj
+    }
+    pub fn validate_data(&self, data_map: HashMap<String, String>) -> Result<bool, PlanetError> {
+        let expr = Regex::new(self.regex.as_str()).unwrap();
+        let mut check = true;
+        for capture in expr.captures_iter(self.formula.as_str()) {
+            let field_ref = capture.get(0).unwrap().as_str();
+            let field_ref = field_ref.replace("{", "").replace("}", "");
+            let field_ref_value = data_map.get(&field_ref);
+            if field_ref_value.is_none() {
+                check = false;
+                break;
+            }
+        }
+        return Ok(check)
+    }
+    pub fn inyect_data_formula(&self, table: &DbData, data_map: HashMap<String, String>) -> Option<String> {
+        // This replaces the column data with its value and return the formula to be processed
+        let field_type_map = DbTable::get_field_type_map(table);
+        if field_type_map.is_ok() {
+            let field_type_map = field_type_map.unwrap();
+            let expr = Regex::new(self.regex.as_str()).unwrap();
+            let mut formula = self.formula.clone();
+            for capture in expr.captures_iter(self.formula.as_str()) {
+                let field_ref = capture.get(0).unwrap().as_str();
+                let field_ref = field_ref.replace("{", "").replace("}", "");
+                let field_ref_value = data_map.get(&field_ref);
+                if field_ref_value.is_some() {
+                    let field_ref_value = field_ref_value.unwrap();
+                    // Check is we have string field_type or not string one
+                    let field_type = field_type_map.get(&field_ref.to_string());
+                    if field_type.is_some() {
+                        let field_type = field_type.unwrap().clone();
+                        let replace_string: String;
+                        match field_type.as_str() {
+                            FIELD_SMALL_TEXT => {
+                                replace_string = format!("\"{}\"", &field_ref_value);
+                            },
+                            FIELD_LONG_TEXT => {
+                                replace_string = format!("\"{}\"", &field_ref_value);
+                            },
+                            _ => {
+                                replace_string = field_ref_value.clone();
+                            }
+                        }
+                        let field_to_replace = format!("{}{}{}", 
+                            String::from("{"),
+                            &field_ref,
+                            String::from("}"),
+                        );
+                        formula = formula.replace(&field_to_replace, &replace_string);
+                    }
+                }
+            }
+            return Some(formula);
+        }
+        return None
+    }
+    pub fn execute_formula(formula: &String) -> types::Value {
+        // Built functions
+        // AND, OR, NOT, XOR, ABS, SUM, PRODUCT, AVERAGE, RIGHT, LEFT, DAYS, NEGATE
+        let number_custom_functions = |s: String, params: Vec<f32>| match s.as_str() {
+            "Increase" => types::Value::Number(params[0] + 1.0),
+            "SimpleSum" => types::Value::Number(params[0] + params[1]),
+            "EqualFive" => types::Value::Number(5.0),
+            _ => types::Value::Error(types::Error::Value),
+        };
+        let string_custom_functions = |s: String, params: Vec<f32>| match s.as_str() {
+            "Increase" => types::Value::Number(params[0] + 1.0),
+            "SimpleSum" => types::Value::Number(params[0] + params[1]),
+            "EqualFive" => types::Value::Number(5.0),
+            _ => types::Value::Error(types::Error::Value),
+        };
+        let formula = format!("={}", formula);
+        // How to do when I have custom functions????
+        // Check (...) with regex to execute with or without functions checking function name is on
+        // map or list of our functions, since we also have base functions.
+        // One problem is the library only does custom functions with numbers in params, so cannot be strings
+        let formula_ = parse_formula::parse_string_to_formula(
+            &formula, 
+            None::<NoCustomFunction>
+        );
+        let result = calculate::calculate_formula(formula_, None::<NoReference>);
+        return result
     }
 }

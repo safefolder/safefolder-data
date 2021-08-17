@@ -67,7 +67,6 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                     field_id_map.insert(String::from(ID), field_attrs.id.unwrap());
                     &field_ids.push(field_id_map);
                     let field_name = field_attrs.name.unwrap_or_default().clone();
-                    eprintln!("CreateTable.run :: field_name: {}", &field_name);
                     let map = &field.map_object_db();
                     data_objects.insert(String::from(field_name.clone()), map.clone());
                     // field complex attributes like select_data

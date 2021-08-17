@@ -146,6 +146,7 @@ pub struct FieldConfig {
     pub indexed: Option<bool>,
     pub many: Option<bool>,
     pub options: Option<Vec<String>>,
+    pub formula: Option<String>,
 }
 
 impl ConfigStorageField for FieldConfig {
@@ -163,6 +164,7 @@ impl ConfigStorageField for FieldConfig {
             indexed: Some(true),
             options: None,
             many: None,
+            formula: None,
         };
         if options.is_some() {
             object.options = Some(options.unwrap());
@@ -207,6 +209,7 @@ impl ConfigStorageField for FieldConfig {
                         indexed: Some(indexed),
                         many: Some(many),
                         options: None,
+                        formula: None,
                     };
                     return Some(field_config);
                 }
@@ -232,28 +235,6 @@ impl ConfigStorageField for FieldConfig {
         let mut map_fields_by_name: HashMap<String, FieldConfig> = HashMap::new();
         if data_objects.is_some() {
             let data_objects = data_objects.unwrap();
-            // I need to add Name field to containers, maps
-            // let field_config_map = data_objects.get(NAME).unwrap();
-            // let required = make_bool_str(field_config_map.get("required").unwrap().clone());
-            // let indexed = make_bool_str(field_config_map.get("indexed").unwrap().clone());
-            // let many = make_bool_str(field_config_map.get("many").unwrap().clone());
-            // let field_id = field_config_map.get(ID).unwrap().clone();
-            // let mut options_wrap: Option<Vec<String>> = None;
-            // let field_name = String::from("");
-            // let name_field_config: FieldConfig = FieldConfig{
-            //     id: Some(field_id.clone()),
-            //     name: Some(field_config_map.get("name").unwrap().clone()),
-            //     field_type: Some(field_config_map.get("field_type").unwrap().clone()),
-            //     default: Some(field_config_map.get("default").unwrap().clone()),
-            //     version: Some(field_config_map.get("version").unwrap().clone()),
-            //     required: Some(required),
-            //     api_version: Some(field_config_map.get("api_version").unwrap().clone()),
-            //     indexed: Some(indexed),
-            //     many: Some(many),
-            //     options: options_wrap,
-            // };
-            // &map_fields_by_id.insert(field_id, name_field_config.clone());
-            // &map_fields_by_name.insert(field_name.clone(), name_field_config.clone());
 
             for field_name in data_objects.keys() {
                 let field_config_map = data_objects.get(field_name).unwrap();
@@ -267,18 +248,17 @@ impl ConfigStorageField for FieldConfig {
                 let options_str = field_config_map.get("options");
                 let mut options_wrap: Option<Vec<String>> = None;
                 if options_str.is_some() {
-                    // I need to deserialize from yaml
-                    // let options_yaml = serde_yaml::to_string(&options);
                     let options_str = field_config_map.get("options").unwrap().clone();
                     let options_str = options_str.as_str();
                     let options: Vec<String> = serde_yaml::from_str(options_str).unwrap();
-                    // eprintln!("parse_from_db :: objects: {:?}", &options);
-                    // let options_: Vec<&str> = options_str.split(",").collect();
-                    // let mut options: Vec<String> = Vec::new();
-                    // for option_ in options_ {
-                    //    options.push(option_.to_string())
-                    //}
                     options_wrap = Some(options);
+                }
+                // Process formula
+                let formula = field_config_map.get("formula");
+                let mut formula_wrap: Option<String> = None;
+                if formula.is_some() {
+                    let formula = formula.unwrap().clone();
+                    formula_wrap = Some(formula);
                 }
                 let field_config: FieldConfig = FieldConfig{
                     id: Some(field_id.clone()),
@@ -291,6 +271,7 @@ impl ConfigStorageField for FieldConfig {
                     indexed: Some(indexed),
                     many: Some(many),
                     options: options_wrap,
+                    formula: formula_wrap,
                 };
                 &map_fields_by_id.insert(field_id, field_config.clone());
                 &map_fields_by_name.insert(field_name.clone(), field_config.clone());
@@ -404,6 +385,11 @@ impl ConfigStorageField for FieldConfig {
         map.insert(String::from("api_version"), field_config.api_version.unwrap_or_default());
         map.insert(String::from("indexed"), indexed.to_string());
         map.insert(String::from("many"), many.to_string());
+        let formula = field_config.formula;
+        if formula.is_some() {
+            let formula = formula.unwrap();
+            map.insert(String::from("formula"), formula);
+        }
         // Here we encode as string the options as string using yaml encoding
         let options = field_config.options;
         if options.is_some() {
