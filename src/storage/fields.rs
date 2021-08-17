@@ -15,7 +15,7 @@ use crate::planet::{PlanetError};
 use crate::storage::table::{DbData, DbTable};
 use crate::commands::table::config::FieldConfig;
 use crate::storage::constants::{FIELD_SMALL_TEXT, FIELD_LONG_TEXT};
-use crate::storage::functions::base::{check_achiever_function, get_function_name};
+use crate::functions::{check_achiever_function, get_function_name, FunctionsHanler};
 
 /*
 These are the core fields implemented so we can tackle the security and permissions system
@@ -1079,19 +1079,23 @@ impl ProcessField for FormulaField {
             }
             let is_valid = self.is_valid(Some(&formula), &formula_obj)?;
             if is_valid == true {
-                formula = String::from("CONCAT(\"23\",\"-\", 45)");
-                eprintln!("FormulaField.process :: formula: {}", &formula);
                 // First process the achiever functions, then rest
                 let expr = Regex::new(r"[A-Z]+\(.+\)").unwrap();
-                for capture in expr.captures_iter(&formula) {
+                let formula_str = formula.clone();
+                for capture in expr.captures_iter(formula_str.as_str()) {
                     let function_text = capture.get(0).unwrap().as_str();
-                    // Check function is achiever one
-                    eprintln!("FormulaField.process :: function_text: {}", &function_text);
-                    let check_achiever = check_achiever_function(&function_text);
-                    eprintln!("FormulaField.process :: check_achiever: {}", &check_achiever);
-                    if &check_achiever == true {
-                        let function_name = get_function_name(&function_text);
-                        eprintln!("FormulaField.process :: function_name: {}", &function_name);
+                    let function_text_string = function_text.to_string();
+                    // Check function is achiever one, then process achiever function
+                    let check_achiever = check_achiever_function(function_text_string.clone());
+                    if check_achiever == true {
+                        let function_name = get_function_name(function_text_string.clone());
+                        // let function_name_str = function_name.as_str();
+                        let handler = FunctionsHanler{
+                            function_name: function_name.clone(),
+                            function_text: function_text_string,
+                            data_map: insert_data_map.clone()
+                        };
+                        formula = handler.do_functions(formula);
                     }
                 }
                 // This injects references without achiever functions
@@ -1099,8 +1103,6 @@ impl ProcessField for FormulaField {
                 if formula_wrap.is_some() {
                     formula = formula_wrap.unwrap();
                     formula = format!("={}", &formula);
-                    // How to do when I have custom functions????
-                    // Check (...)
                     let formula_ = parse_formula::parse_string_to_formula(
                         &formula, 
                         None::<NoCustomFunction>
@@ -1209,18 +1211,6 @@ impl Formula{
     pub fn execute_formula(formula: &String) -> types::Value {
         // Built functions
         // AND, OR, NOT, XOR, ABS, SUM, PRODUCT, AVERAGE, RIGHT, LEFT, DAYS, NEGATE
-        let number_custom_functions = |s: String, params: Vec<f32>| match s.as_str() {
-            "Increase" => types::Value::Number(params[0] + 1.0),
-            "SimpleSum" => types::Value::Number(params[0] + params[1]),
-            "EqualFive" => types::Value::Number(5.0),
-            _ => types::Value::Error(types::Error::Value),
-        };
-        let string_custom_functions = |s: String, params: Vec<f32>| match s.as_str() {
-            "Increase" => types::Value::Number(params[0] + 1.0),
-            "SimpleSum" => types::Value::Number(params[0] + params[1]),
-            "EqualFive" => types::Value::Number(5.0),
-            _ => types::Value::Error(types::Error::Value),
-        };
         let formula = format!("={}", formula);
         // How to do when I have custom functions????
         // Check (...) with regex to execute with or without functions checking function name is on

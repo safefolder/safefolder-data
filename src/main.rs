@@ -8,6 +8,7 @@ extern crate tokio;
 pub mod commands;
 pub mod storage;
 pub mod planet;
+pub mod functions;
 
 // use ipfs_api::IpfsClient;
 // use std::io::Cursor;
