@@ -1080,6 +1080,7 @@ impl ProcessField for FormulaField {
             let is_valid = self.is_valid(Some(&formula), &formula_obj)?;
             if is_valid == true {
                 // First process the achiever functions, then rest
+                formula = String::from("FORMAT(\"{My Field}-42-pepito\")");
                 let expr = Regex::new(r"[A-Z]+\(.+\)").unwrap();
                 let formula_str = formula.clone();
                 for capture in expr.captures_iter(formula_str.as_str()) {
@@ -1089,12 +1090,14 @@ impl ProcessField for FormulaField {
                     let check_achiever = check_achiever_function(function_text_string.clone());
                     if check_achiever == true {
                         let function_name = get_function_name(function_text_string.clone());
+                        eprintln!("FormulaField.process :: function_name: {}", &function_name);
                         // let function_name_str = function_name.as_str();
                         let handler = FunctionsHanler{
                             function_name: function_name.clone(),
                             function_text: function_text_string,
                             data_map: insert_data_map.clone()
                         };
+                        eprintln!("FormulaField.process :: handler: {:#?}", &handler);
                         formula = handler.do_functions(formula);
                     }
                 }

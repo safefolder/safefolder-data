@@ -59,3 +59,50 @@ impl ConcatenateFunction{
         return formula
     }
 }
+
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FormatFunction {
+    pub format: String,
+    pub function_text: String,
+}
+impl FormatFunction{
+    pub fn defaults(function_text: &String, data_map: HashMap<String, String>) -> FormatFunction {
+        let data_map = data_map.clone();
+        let mut formula = function_text.replace("FORMAT(\"", "").replace("\")", "");
+        let expr = Regex::new(r"(\{[\w\s-]+\})").unwrap();
+        for capture in expr.captures_iter(function_text) {
+            let mut item = capture.get(0).unwrap().as_str().to_string();
+            item = item.replace("{", "").replace("}", "");
+            let item_value = data_map.get(&item);
+            if item_value.is_some() {
+                let item_value = item_value.unwrap();
+                let replace_value = format!("{}{}{}", 
+                    String::from("{"),
+                    &item,
+                    String::from("}"),
+                );
+                formula = formula.replace(&replace_value, &item_value);
+            }
+        }
+        let obj = Self{
+            format: formula.clone(),
+            function_text: function_text.clone(),
+        };
+        return obj
+    }
+    pub fn replace(&self, formula: String) -> String {
+        let mut formula = formula.clone();
+        formula = formula.replace(self.function_text.as_str(), self.format.as_str());
+        return formula
+    }
+    pub fn init_do(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
+        let data_map = data_map.clone();
+        let concat_obj = FormatFunction::defaults(
+            &function_text, 
+            data_map
+        );
+        formula = concat_obj.replace(formula);
+        return formula
+    }
+}

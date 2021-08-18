@@ -8,8 +8,56 @@ use crate::functions::constants::*;
 use crate::functions::text::*;
 
 // achiever planet functions
-pub const FORMULA_FUNCTIONS: [&str; 1] = [
+pub const FORMULA_FUNCTIONS: [&str; 49] = [
     FUNCTION_CONCAT,
+    FUNCTION_FORMAT,
+    FUNCTION_JOINLIST,
+    FUNCTION_LENGTH,
+    FUNCTION_LOWER,
+    FUNCTION_UPPER,
+    FUNCTION_REPLACE,
+    FUNCTION_DATE,
+    FUNCTION_DAY,
+    FUNCTION_DAYS,
+    FUNCTION_HOUR,
+    FUNCTION_MONTH,
+    FUNCTION_NOW,
+    FUNCTION_SECOND,
+    FUNCTION_MINUTE,
+    FUNCTION_TODAY,
+    FUNCTION_WEEK,
+    FUNCTION_YEAR,
+    FUNCTION_IF,
+    FUNCTION_MID,
+    FUNCTION_REPT,
+    FUNCTION_SUBSTITUTE,
+    FUNCTION_TRIM,
+    FUNCTION_CEILING,
+    FUNCTION_COUNT,
+    FUNCTION_COUNTA,
+    FUNCTION_COUNTALL,
+    FUNCTION_EVEN,
+    FUNCTION_EXP,
+    FUNCTION_FLOOR,
+    FUNCTION_INT,
+    FUNCTION_LOG,
+    FUNCTION_MAX,
+    FUNCTION_MIN,
+    FUNCTION_MOD,
+    FUNCTION_POWER,
+    FUNCTION_ROUND,
+    FUNCTION_ROUNDDOWN,
+    FUNCTION_ROUNDUP,
+    FUNCTION_SQRT,
+    FUNCTION_VALUE,
+    FUNCTION_CREATED_TIME,
+    FUNCTION_DATEADD,
+    FUNCTION_DATETDIF,
+    FUNCTION_DATETIME_FORMAT,
+    FUNCTION_LAST_MODIFIED_TIME,
+    FUNCTION_RECORD_ID,
+    FUNCTION_TRUE,
+    FUNCTION_FALSE,
 ];
 
 pub fn check_achiever_function(function_text: String) -> bool {
@@ -46,10 +94,13 @@ impl FunctionsHanler{
                 formula = ConcatenateFunction::init_do(
                     &self.function_text, self.data_map.clone(), formula);
             },
+            FUNCTION_FORMAT => {
+                formula = FormatFunction::init_do(
+                    &self.function_text, self.data_map.clone(), formula);
+            }
             _ => {
             }
         }
         return formula
     }
 }
-
