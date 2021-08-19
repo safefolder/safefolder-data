@@ -1,8 +1,10 @@
 ---
 command: GET FROM TABLE "Super Table"
 data:
-  id: c4b8ul0smpvcvn1vmefg
+  id: c4f9btgsmpvashobpbrg
   fields:
     - My Field
     - Is Published
     - Counter
+    - Concat
+    - Counter Multiply

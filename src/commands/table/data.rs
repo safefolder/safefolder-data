@@ -354,6 +354,9 @@ impl<'gb> Command<String> for GetFromTable<'gb> {
                             "Select" => {
                                 yaml_out_str = SelectField::init_get(&field_config_, &table, Some(&data), &yaml_out_str)?
                             },
+                            "Formula" => {
+                                yaml_out_str = FormulaField::init_get(&field_config_, &table, Some(&data), &yaml_out_str)?
+                            },
                             _ => {
                                 yaml_out_str = yaml_out_str;
                             }

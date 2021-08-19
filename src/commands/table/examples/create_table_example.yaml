@@ -2,32 +2,35 @@
 command: CREATE TABLE "Super Table"
 language:
   codes: ["english", "spanish"]
-  default: "english"
+  default: english
 name:
-  field_type: "Small Text"
+  field_type: Small Text
 fields:
-  - name: "My Field"
-    field_type: "Small Text"
+  - name: My Field
+    field_type: Small Text
     required: true
-  - name: "Description"
-    field_type: "Long Text"
-  - name: "Is Published"
-    field_type: "Checkbox"
-  - name: "Counter"
-    field_type: "Number"
-  - name: "Status"
-    field_type: "Select"
+  - name: Description
+    field_type: Long Text
+  - name: Is Published
+    field_type: Checkbox
+  - name: Counter
+    field_type: Number
+  - name: Status
+    field_type: Select
     options:
       - Draft
       - Published
       - Deleted
-  - name: "Locations"
-    field_type: "Select"
+  - name: Locations
+    field_type: Select
     many: true
     options:
       - Madrid
       - Barcelona
       - Valencia
-  - name: "Super Counter"
-    field_type: "Formula"
+  - name: Counter Multiply
+    field_type: Formula
     formula: "{Counter} * 2"
+  - name: Concat
+    field_type: Formula
+    formula: CONCAT("this-is-some-slug", " ", {My Field})

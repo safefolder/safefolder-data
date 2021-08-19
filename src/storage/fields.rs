@@ -1072,46 +1072,55 @@ impl ProcessField for FormulaField {
         let formula = self.field_config.formula.clone();
         if formula.is_some() {
             let mut formula = formula.unwrap();
+            eprintln!("FormulaField.process :: formula initial: {}", &formula);
+            // First process the achiever functions, then rest
+            let expr = Regex::new(r"[A-Z]+\(.+\)").unwrap();
+            let formula_str = formula.clone();
+            for capture in expr.captures_iter(formula_str.as_str()) {
+                let function_text = capture.get(0).unwrap().as_str();
+                let function_text_string = function_text.to_string();
+                // Check function is achiever one, then process achiever function
+                let check_achiever = check_achiever_function(function_text_string.clone());
+                eprintln!("FormulaField.process :: check_achiever: {}", &check_achiever);
+                if check_achiever == true {
+                    let function_name = get_function_name(function_text_string.clone());
+                    eprintln!("FormulaField.process :: function_name: {}", &function_name);
+                    // let function_name_str = function_name.as_str();
+                    let handler = FunctionsHanler{
+                        function_name: function_name.clone(),
+                        function_text: function_text_string,
+                        data_map: insert_data_map.clone()
+                    };
+                    eprintln!("FormulaField.process :: handler: {:#?}", &handler);
+                    formula = handler.do_functions(formula);
+                    eprintln!("FormulaField.process :: formula: {:#?}", &formula);
+                    // FormulaField.process :: formula: "this-is-some-slug pepito"
+                }
+            }
             let formula_obj = Formula::defaults(&formula);
+            eprintln!("FormulaField.process :: formula_obj: {:#?}", formula_obj);
             let mut data: HashMap<String, String> = HashMap::new();
             if db_data.data.is_some() {
                 data = db_data.data.clone().unwrap();
             }
             let is_valid = self.is_valid(Some(&formula), &formula_obj)?;
+            eprintln!("FormulaField.process :: is_valid: {}", &is_valid);
             if is_valid == true {
-                // First process the achiever functions, then rest
-                formula = String::from("FORMAT(\"{My Field}-42-pepito\")");
-                let expr = Regex::new(r"[A-Z]+\(.+\)").unwrap();
-                let formula_str = formula.clone();
-                for capture in expr.captures_iter(formula_str.as_str()) {
-                    let function_text = capture.get(0).unwrap().as_str();
-                    let function_text_string = function_text.to_string();
-                    // Check function is achiever one, then process achiever function
-                    let check_achiever = check_achiever_function(function_text_string.clone());
-                    if check_achiever == true {
-                        let function_name = get_function_name(function_text_string.clone());
-                        eprintln!("FormulaField.process :: function_name: {}", &function_name);
-                        // let function_name_str = function_name.as_str();
-                        let handler = FunctionsHanler{
-                            function_name: function_name.clone(),
-                            function_text: function_text_string,
-                            data_map: insert_data_map.clone()
-                        };
-                        eprintln!("FormulaField.process :: handler: {:#?}", &handler);
-                        formula = handler.do_functions(formula);
-                    }
-                }
                 // This injects references without achiever functions
                 let formula_wrap = formula_obj.inyect_data_formula(&table, insert_data_map);
+                eprintln!("FormulaField.process :: formula_wrap: {:#?}", &formula_wrap);
                 if formula_wrap.is_some() {
                     formula = formula_wrap.unwrap();
+                    eprintln!("FormulaField.process :: [LIB] formula: {:#?}", &formula);
                     formula = format!("={}", &formula);
                     let formula_ = parse_formula::parse_string_to_formula(
                         &formula, 
                         None::<NoCustomFunction>
                     );
                     let result = calculate::calculate_formula(formula_, None::<NoReference>);
-                    &data.insert(field_id, calculate::result_to_string(result));
+                    let result = calculate::result_to_string(result);
+                    eprintln!("FormulaField.process :: result: {:#?}", &result);
+                    &data.insert(field_id, result);
                     db_data.data = Some(data);
                     return Ok(db_data);
                 }
@@ -1142,6 +1151,7 @@ impl StringValueField for FormulaField {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Formula {
     formula: String,
     regex: String,

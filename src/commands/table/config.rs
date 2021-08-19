@@ -17,6 +17,7 @@ use crate::storage::*;
 use crate::storage::table::{DbData};
 use crate::planet::constants::*;
 use crate::planet::make_bool_str;
+use crate::functions::validate_formula;
 
 use super::fetch_yaml_config;
 
@@ -385,9 +386,11 @@ impl ConfigStorageField for FieldConfig {
         map.insert(String::from("api_version"), field_config.api_version.unwrap_or_default());
         map.insert(String::from("indexed"), indexed.to_string());
         map.insert(String::from("many"), many.to_string());
+        // formula and functions
         let formula = field_config.formula;
         if formula.is_some() {
             let formula = formula.unwrap();
+            let formula_validation = validate_formula(&formula);
             map.insert(String::from("formula"), formula);
         }
         // Here we encode as string the options as string using yaml encoding
