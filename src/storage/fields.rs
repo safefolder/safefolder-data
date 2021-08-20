@@ -14,7 +14,7 @@ use crate::planet::constants::ID;
 use crate::planet::{PlanetError};
 use crate::storage::table::{DbData, DbTable};
 use crate::commands::table::config::FieldConfig;
-use crate::storage::constants::{FIELD_SMALL_TEXT, FIELD_LONG_TEXT};
+use crate::storage::constants::*;
 use crate::functions::{check_achiever_function, get_function_name, FunctionsHanler};
 
 /*
@@ -208,10 +208,8 @@ impl DbDumpString for SmallTextField {
         let field_name = field_config.name.unwrap();
         let mut yaml_string = yaml_string.clone();
         let field = &field_name.blue();
-        let value = format!("{}{}{}", 
-            String::from("\"").truecolor(255, 165, 0), 
+        let value = format!("{}", 
             value.truecolor(255, 165, 0), 
-            String::from("\"").truecolor(255, 165, 0)
         );
         yaml_string.push_str(format!("  {field}: {value}\n", field=field, value=value).as_str());
         return yaml_string;
@@ -336,10 +334,8 @@ impl DbDumpString for LongTextField {
         let field_name = field_config.name.unwrap();
         let mut yaml_string = yaml_string.clone();
         let field = &field_name.blue();
-        let value = format!("{}{}{}", 
-            String::from("\"").truecolor(255, 165, 0), 
+        let value = format!("{}", 
             value.truecolor(255, 165, 0), 
-            String::from("\"").truecolor(255, 165, 0)
         );
         yaml_string.push_str(format!("  {field}: {value}\n", field=field, value=value).as_str());
         return yaml_string;
@@ -1024,14 +1020,31 @@ impl FormulaField {
 impl DbDumpString for FormulaField {
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
         let field_config = self.field_config.clone();
+        let mut value = value.clone();
+        eprintln!("FormulaField.get_yaml_out :: field_config: {:#?}", field_config.clone());
+        eprintln!("FormulaField.get_yaml_out :: value: {:?}", &value);
         let field_name = field_config.name.unwrap();
         let mut yaml_string = yaml_string.clone();
         let field = &field_name.blue();
-        let value = format!("{}{}{}", 
-            String::from("\"").truecolor(255, 165, 0), 
-            value.truecolor(255, 165, 0), 
-            String::from("\"").truecolor(255, 165, 0)
-        );
+        let formula_format = field_config.formula_format.unwrap();
+        eprintln!("FormulaField.get_yaml_out :: formula_format: {:?}", &formula_format);
+        if &formula_format == FORMULA_FORMAT_TEXT {
+            value = format!("{}", 
+                value.truecolor(255, 165, 0), 
+            );
+            eprintln!("FormulaField.get_yaml_out :: Text : value: {}", &value);
+        } else if &formula_format == FORMULA_FORMAT_NUMBER {
+            eprintln!("FormulaField.get_yaml_out :: Number : value: {}", &value);
+            value = value.replace("\"", "");
+            value = format!("{}", value.truecolor(255, 255, 200));
+            
+        } else if &formula_format == FORMULA_FORMAT_CHECK {
+            value = value.replace("\"", "");
+            value = format!("{}", 
+                value.blue(), 
+            );
+        }
+        eprintln!("FormulaField.get_yaml_out :: value: {}", &value);
         yaml_string.push_str(format!("  {field}: {value}\n", field=field, value=value).as_str());
         return yaml_string;
     }

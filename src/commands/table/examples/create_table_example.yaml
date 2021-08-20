@@ -31,6 +31,8 @@ fields:
   - name: Counter Multiply
     field_type: Formula
     formula: "{Counter} * 2"
+    formula_format: Number
   - name: Concat
     field_type: Formula
     formula: CONCAT("this-is-some-slug", " ", {My Field})
+    formula_format: Text

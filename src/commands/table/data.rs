@@ -310,18 +310,14 @@ impl<'gb> Command<String> for GetFromTable<'gb> {
                 let mut yaml_out_str = String::from("---\n");
                 // id
                 let id_yaml_value = self.config.data.clone().unwrap().id.unwrap().blue();
-                let id_yaml = format!("{}{}{}", 
-                    String::from("\"").truecolor(255, 165, 0), 
+                let id_yaml = format!("{}", 
                     id_yaml_value.truecolor(255, 165, 0), 
-                    String::from("\"").truecolor(255, 165, 0)
                 );
                 yaml_out_str.push_str(format!("{field}: {value}\n", field=String::from(ID).blue(), value=&id_yaml).as_str());
                 // name
                 let name_yaml_value = &db_data.name.unwrap().clone();
-                let name_yaml = format!("{}{}{}", 
-                    String::from("\"").truecolor(255, 165, 0), 
+                let name_yaml = format!("{}", 
                     name_yaml_value.truecolor(255, 165, 0), 
-                    String::from("\"").truecolor(255, 165, 0)
                 );
                 yaml_out_str.push_str(format!("{field}: {value}\n", field=String::from(NAME).blue(), value=&name_yaml).as_str());
                 yaml_out_str.push_str(format!("{}\n", 

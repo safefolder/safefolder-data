@@ -5,9 +5,11 @@ use std::collections::HashMap;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use regex::Regex;
+use tr::tr;
 
 use crate::functions::constants::*;
 use crate::functions::text::*;
+use crate::planet::PlanetError;
 
 // achiever planet functions
 pub const FORMULA_FUNCTIONS: [&str; 49] = [
@@ -112,7 +114,7 @@ impl FunctionsHanler{
     }
 }
 
-pub fn validate_formula(formula: &String) -> bool {
+pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
     let mut check = true;
     let mut achiever_functions: Vec<String> = Vec::new();
     for function_name_item in FORMULA_FUNCTIONS {
@@ -145,8 +147,14 @@ pub fn validate_formula(formula: &String) -> bool {
     }
     if number_fails > 0 {
         check = false;
+        return Err(
+            PlanetError::new(
+                500, 
+                Some(tr!("Could not validate formula")),
+            )
+        );
     }
-    return check;
+    return Ok(check);
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

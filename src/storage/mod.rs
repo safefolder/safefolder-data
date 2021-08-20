@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use validator::{ValidationErrors};
 use crate::commands::table::config::FieldConfig;
 use crate::storage::table::DbData;
+use crate::planet::PlanetError;
 
 pub trait ConfigStorageField {
     fn defaults(
@@ -20,7 +21,7 @@ pub trait ConfigStorageField {
     fn generate_id() -> Option<String> {
         return generate_id();
     }
-    fn map_object_db(&self) -> HashMap<String, String>;
+    fn map_object_db(&self) -> Result<HashMap<String, String>, PlanetError>;
     fn map_collections_db(&self) -> HashMap<String, Vec<HashMap<String, String>>>;
     fn parse_from_db(db_data: &DbData) -> Vec<FieldConfig>;
     fn map_objects_db(&self) -> HashMap<String, Vec<HashMap<String, String>>>;

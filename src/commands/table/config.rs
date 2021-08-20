@@ -10,7 +10,7 @@ use tr::tr;
 
 use crate::commands::table::constants::{FIELD_IDS, NAME_CAMEL, SELECT_OPTIONS, VALUE};
 use crate::planet::validation::{CommandImportConfig, PlanetValidationError};
-use crate::planet::{PlanetContext};
+use crate::planet::{PlanetContext, PlanetError};
 
 use crate::storage::constants::{FIELD_VERSION, FIELD_API_VERSION};
 use crate::storage::*;
@@ -148,6 +148,7 @@ pub struct FieldConfig {
     pub many: Option<bool>,
     pub options: Option<Vec<String>>,
     pub formula: Option<String>,
+    pub formula_format: Option<String>,
 }
 
 impl ConfigStorageField for FieldConfig {
@@ -166,6 +167,7 @@ impl ConfigStorageField for FieldConfig {
             options: None,
             many: None,
             formula: None,
+            formula_format: None,
         };
         if options.is_some() {
             object.options = Some(options.unwrap());
@@ -211,6 +213,7 @@ impl ConfigStorageField for FieldConfig {
                         many: Some(many),
                         options: None,
                         formula: None,
+                        formula_format: None,
                     };
                     return Some(field_config);
                 }
@@ -256,10 +259,14 @@ impl ConfigStorageField for FieldConfig {
                 }
                 // Process formula
                 let formula = field_config_map.get("formula");
+                let formula_format = field_config_map.get("formula_format");
                 let mut formula_wrap: Option<String> = None;
+                let mut formula_format_wrap: Option<String> = None;
                 if formula.is_some() {
                     let formula = formula.unwrap().clone();
                     formula_wrap = Some(formula);
+                    let formula_format = formula_format.unwrap().clone();
+                    formula_format_wrap = Some(formula_format);
                 }
                 let field_config: FieldConfig = FieldConfig{
                     id: Some(field_id.clone()),
@@ -273,6 +280,7 @@ impl ConfigStorageField for FieldConfig {
                     many: Some(many),
                     options: options_wrap,
                     formula: formula_wrap,
+                    formula_format: formula_format_wrap,
                 };
                 &map_fields_by_id.insert(field_id, field_config.clone());
                 &map_fields_by_name.insert(field_name.clone(), field_config.clone());
@@ -336,41 +344,11 @@ impl ConfigStorageField for FieldConfig {
             }
         }
 
-        // if data_collections.is_some() {
-        //     let data_collections = data_collections.unwrap();
-        //     let db_fields = data_collections.get(FIELDS).unwrap();
-        //     for db_field in db_fields {
-        //         let required = make_bool_str(db_field.get("required").unwrap().clone());
-        //         let indexed = make_bool_str(db_field.get("indexed").unwrap().clone());
-        //         let many = make_bool_str(db_field.get("many").unwrap().clone());
-        //         // select_data is (id,option)::(id,option)::(id,option)
-        //         let select_data_str = db_field.get("select_data").unwrap().clone();
-        //         let select_data: Option<Vec<(String, String)>> = None;
-        //         let mut select_data_list: Vec<(String, String)> = Vec::new();
-        //         if select_data_str != String::from("") {
-        //             let select_data_items = select_data_str.split("::");
-        //         }
-        //         let field: FieldConfig = FieldConfig{
-        //             id: Some(db_field.get("id").unwrap().clone()),
-        //             name: Some(db_field.get("name").unwrap().clone()),
-        //             field_type: Some(db_field.get("field_type").unwrap().clone()),
-        //             default: Some(db_field.get("default").unwrap().clone()),
-        //             version: Some(db_field.get("version").unwrap().clone()),
-        //             required: Some(required),
-        //             api_version: Some(db_field.get("api_version").unwrap().clone()),
-        //             indexed: Some(indexed),
-        //             many: Some(many),
-        //             select_data: select_data,
-        //         };
-        //     }
-        // }
-        // if data.is_some() {
-
         // }
         // eprintln!("parse_from_db :: !!!!!!!!!!!!!!! fields: {:#?}", &fields);
         return fields
     }
-    fn map_object_db(&self) -> HashMap<String, String> {
+    fn map_object_db(&self) -> Result<HashMap<String, String>, PlanetError> {
         let field_config = self.clone();
         let mut map: HashMap<String, String> = HashMap::new();
         let required = field_config.required.unwrap_or_default();
@@ -390,8 +368,10 @@ impl ConfigStorageField for FieldConfig {
         let formula = field_config.formula;
         if formula.is_some() {
             let formula = formula.unwrap();
-            let formula_validation = validate_formula(&formula);
+            let formula_format = field_config.formula_format.unwrap();
+            validate_formula(&formula)?;
             map.insert(String::from("formula"), formula);
+            map.insert(String::from("formula_format"), formula_format);
         }
         // Here we encode as string the options as string using yaml encoding
         let options = field_config.options;
@@ -403,7 +383,7 @@ impl ConfigStorageField for FieldConfig {
                 panic!("Could not parse options for field \"{}\"", &field_name);
             }
         }
-        return map;
+        return Ok(map);
     }
 
     fn map_collections_db(&self) -> HashMap<String, Vec<HashMap<String, String>>> {

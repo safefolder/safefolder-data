@@ -5,5 +5,9 @@ pub const CHILD_PRIVATE_KEY_STR: &str = "xprv9zcbcQgMpVAa742DEAUFDLW7KxE5xRgqKVg
 pub const CHILD_PUBLIC_KEY_STR: &str = "xpub6Dbx1vDFerisKY6gLC1FaUSqsz4aMtQggibzxPEGcyFRyqevnGpj7MM5iKoduqYcV9QHiLQafLcr9QYZ8M9Sb1XhkZ2xs73skyCTzsQ7Q7M";
 pub const CHILD_PRIVATE_KEY_ARRAY: [u8; 32] = [5, 184, 20, 127, 179, 211, 242, 67, 135, 53, 134, 91, 9, 210, 7, 179, 187, 140, 129, 89, 76, 7, 225, 55, 201, 108, 208, 42, 131, 42, 104, 170];
 
+pub const FORMULA_FORMAT_TEXT: &str = "Text";
+pub const FORMULA_FORMAT_NUMBER: &str = "Number";
+pub const FORMULA_FORMAT_CHECK: &str = "Check";
+
 pub const FIELD_SMALL_TEXT: &str = "Small Text";
 pub const FIELD_LONG_TEXT: &str = "Long Text";
