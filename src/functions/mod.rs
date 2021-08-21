@@ -69,25 +69,6 @@ lazy_static! {
     static ref RE_FORMULA_FUNCTIONS: Regex = Regex::new(r#"([A-Z]+\(.+\))"#).unwrap();
 }
 
-pub fn check_achiever_function(function_text: String) -> bool {
-    let mut check = false;
-    for function_item in FORMULA_FUNCTIONS {
-        let function_name = get_function_name(function_text.clone());
-        if function_item.to_lowercase() == function_name.to_string().to_lowercase() {
-            check = true;
-            break
-        }
-    }
-    return check;
-}
-
-pub fn get_function_name(function_text: String) -> String {
-    let function_name_pieces = function_text.split("(");
-    let function_name_pieces: Vec<&str> = function_name_pieces.collect();
-    let function_name = function_name_pieces[0].to_string();
-    return function_name
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FunctionsHanler {
     pub function_name: String,
@@ -97,16 +78,20 @@ pub struct FunctionsHanler {
 impl FunctionsHanler{
     pub fn do_functions(&self, mut formula: String) -> String {
         let function_name = self.function_name.as_str();
-        // Match all achiever functions here
+        // Match all achiever functions here. Used by insert and update data to process formula columns.
         match function_name {
             FUNCTION_CONCAT => {
                 formula = ConcatenateFunction::do_replace(
                     &self.function_text, self.data_map.clone(), formula);
             },
-            // FUNCTION_FORMAT => {
-            //     formula = FormatFunction::init_do(
-            //         &self.function_text, self.data_map.clone(), formula);
-            // },
+            FUNCTION_FORMAT => {
+                formula = FormatFunction::do_replace(
+                    &self.function_text, self.data_map.clone(), formula);
+            },
+            FUNCTION_JOINLIST => {
+                formula = JoinListFunction::do_replace(
+                    &self.function_text, self.data_map.clone(), formula);
+            },
             _ => {
             }
         }
@@ -141,6 +126,12 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
             FUNCTION_CONCAT => {
                 number_fails = ConcatenateFunction::do_validate(function_text, &number_fails);
             },
+            FUNCTION_FORMAT => {
+                number_fails = FormatFunction::do_validate(function_text, &number_fails);
+            },
+            FUNCTION_JOINLIST => {
+                number_fails = JoinListFunction::do_validate(function_text, &number_fails);
+            },
             _ => {
             }
         }
@@ -155,6 +146,25 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
         );
     }
     return Ok(check);
+}
+
+pub fn check_achiever_function(function_text: String) -> bool {
+    let mut check = false;
+    for function_item in FORMULA_FUNCTIONS {
+        let function_name = get_function_name(function_text.clone());
+        if function_item.to_lowercase() == function_name.to_string().to_lowercase() {
+            check = true;
+            break
+        }
+    }
+    return check;
+}
+
+pub fn get_function_name(function_text: String) -> String {
+    let function_name_pieces = function_text.split("(");
+    let function_name_pieces: Vec<&str> = function_name_pieces.collect();
+    let function_name = function_name_pieces[0].to_string();
+    return function_name
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -36,3 +36,11 @@ fields:
     field_type: Formula
     formula: CONCAT("this-is-some-slug", " ", {My Field})
     formula_format: Text
+  - name: Format
+    field_type: Formula
+    formula: FORMAT("this-is-my-{My Field}")
+    formula_format: Text
+  - name: Join List
+    field_type: Formula
+    formula: JOINLIST({1, 2, 3}, ";")
+    formula_format: Text
