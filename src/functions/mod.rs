@@ -100,7 +100,7 @@ impl FunctionsHanler{
 }
 
 pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
-    let mut check = true;
+    let check = true;
     let mut achiever_functions: Vec<String> = Vec::new();
     for function_name_item in FORMULA_FUNCTIONS {
         achiever_functions.push(function_name_item.to_string());
@@ -137,7 +137,6 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
         }
     }
     if number_fails > 0 {
-        check = false;
         return Err(
             PlanetError::new(
                 500, 
