@@ -48,3 +48,7 @@ fields:
     field_type: Formula
     formula: LEN("This is my string")
     formula_format: Number
+  - name: Lower
+    field_type: Formula
+    formula: LOWER("This Is My String")
+    formula_format: Text

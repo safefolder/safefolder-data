@@ -96,6 +96,10 @@ impl FunctionsHanler{
                 formula = LengthFunction::do_replace(
                     &self.function_text, self.data_map.clone(), formula);
             },
+            FUNCTION_LOWER => {
+                formula = LowerFunction::do_replace(
+                    &self.function_text, self.data_map.clone(), formula);
+            },
             _ => {
             }
         }
@@ -138,6 +142,9 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
             },
             FUNCTION_LENGTH => {
                 number_fails = LengthFunction::do_validate(function_text, &number_fails);
+            },
+            FUNCTION_LOWER => {
+                number_fails = LowerFunction::do_validate(function_text, &number_fails);
             },
             _ => {
             }
