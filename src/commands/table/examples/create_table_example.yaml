@@ -60,3 +60,7 @@ fields:
     field_type: Formula
     formula: REPLACE("This is my place", 0, 4, "That")
     formula_format: Text
+  - name: Date
+    field_type: Formula
+    formula: DATE(2021, 8, 12)
+    formula_format: Date

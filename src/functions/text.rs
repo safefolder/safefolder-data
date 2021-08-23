@@ -54,7 +54,7 @@ impl ConcatenateFunction{
         let check = expr.is_match(&function_text);
         return check
     }
-    pub fn do_validate(function_text: &String, number_fails: &i32) -> i32 {
+    pub fn do_validate(function_text: &String, number_fails: &u32) -> u32 {
         let concat_obj = ConcatenateFunction::defaults(
             &function_text, 
         );
@@ -128,7 +128,7 @@ impl FormatFunction{
         let check = expr.is_match(&function_text);
         return check
     }
-    pub fn do_validate(function_text: &String, number_fails: &i32) -> i32 {
+    pub fn do_validate(function_text: &String, number_fails: &u32) -> u32 {
         let concat_obj = FormatFunction::defaults(
             &function_text, 
         );
@@ -216,7 +216,7 @@ impl JoinListFunction{
         let check = expr.is_match(&function_text);
         return check
     }
-    pub fn do_validate(function_text: &String, number_fails: &i32) -> i32 {
+    pub fn do_validate(function_text: &String, number_fails: &u32) -> u32 {
         let concat_obj = JoinListFunction::defaults(
             &function_text, 
         );
@@ -291,7 +291,7 @@ impl LengthFunction {
         let check = expr.is_match(&function_text);
         return check
     }
-    pub fn do_validate(function_text: &String, number_fails: &i32) -> i32 {
+    pub fn do_validate(function_text: &String, number_fails: &u32) -> u32 {
         let concat_obj = LengthFunction::defaults(
             &function_text, 
         );
@@ -356,7 +356,7 @@ impl LowerFunction {
         let check = expr.is_match(&function_text);
         return check
     }
-    pub fn do_validate(function_text: &String, number_fails: &i32) -> i32 {
+    pub fn do_validate(function_text: &String, number_fails: &u32) -> u32 {
         let concat_obj = LowerFunction::defaults(
             &function_text, 
         );
@@ -421,7 +421,7 @@ impl UpperFunction {
         let check = expr.is_match(&function_text);
         return check
     }
-    pub fn do_validate(function_text: &String, number_fails: &i32) -> i32 {
+    pub fn do_validate(function_text: &String, number_fails: &u32) -> u32 {
         let concat_obj = UpperFunction::defaults(
             &function_text, 
         );
@@ -470,8 +470,8 @@ pub struct ReplaceFunction {
     pub attributes: Vec<String>,
     pub attributes_value_map: Option<HashMap<String, String>>,
     pub old_text: String,
-    pub start_num: i32,
-    pub num_chars: i32,
+    pub start_num: u32,
+    pub num_chars: u32,
     pub new_text: String,
 
 }
@@ -491,8 +491,8 @@ impl ReplaceFunction {
         attributes.push(start_num.clone());
         attributes.push(num_chars.clone());
         attributes.push(new_text.clone());
-        let start_num: i32 = FromStr::from_str(start_num.as_str()).unwrap();
-        let num_chars: i32 = FromStr::from_str(num_chars.as_str()).unwrap();
+        let start_num: u32 = FromStr::from_str(start_num.as_str()).unwrap();
+        let num_chars: u32 = FromStr::from_str(num_chars.as_str()).unwrap();
 
         let obj = Self{
             function_text: function_text.clone(),
@@ -512,7 +512,7 @@ impl ReplaceFunction {
         let check = expr.is_match(&function_text);
         return check
     }
-    pub fn do_validate(function_text: &String, number_fails: &i32) -> i32 {
+    pub fn do_validate(function_text: &String, number_fails: &u32) -> u32 {
         let concat_obj = ReplaceFunction::defaults(
             &function_text, 
         );
@@ -543,14 +543,15 @@ impl ReplaceFunction {
         let old_text_processed = function_attr.replace(data_map.clone()).item_processed.unwrap();
         let mut piece: String = String::from("");
         for (i, item) in old_text_processed.chars().enumerate() {
-            let i = i as i32;
+            let i = i as u32;
             let length = *&piece.len();
-            let length = length as i32;
+            let length = length as u32;
             if &i >= &start_num && length < number_chars {
                 piece.push(item);
             }
         }
         replacement_string = old_text.replace(&piece, new_text);
+        // TODO: attributes_value_map
 
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         formula = format!("\"{}\"", formula);

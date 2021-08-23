@@ -1,5 +1,6 @@
-pub mod text;
 pub mod constants;
+pub mod text;
+pub mod date;
 
 use std::collections::HashMap;
 use lazy_static::lazy_static;
@@ -9,6 +10,7 @@ use tr::tr;
 
 use crate::functions::constants::*;
 use crate::functions::text::*;
+use crate::functions::date::*;
 use crate::planet::PlanetError;
 
 // achiever planet functions
@@ -108,6 +110,10 @@ impl FunctionsHanler{
                 formula = ReplaceFunction::do_replace(
                     &self.function_text, self.data_map.clone(), formula);
             },
+            FUNCTION_DATE => {
+                formula = DateFunction::do_replace(
+                    &self.function_text, formula);
+            },
             _ => {
             }
         }
@@ -134,7 +140,7 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
     }
 
     // Validate all formula_functions (only ones found in formula from all functions in achiever)
-    let mut number_fails = 0;
+    let mut number_fails: u32 = 0;
     for function_name in function_name_map.keys() {
         let function_name = function_name.as_str();
         let function_text = function_name_map.get(function_name).unwrap();
@@ -159,6 +165,9 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
             },
             FUNCTION_REPLACE => {
                 number_fails = ReplaceFunction::do_validate(function_text, &number_fails);
+            },
+            FUNCTION_DATE => {
+                number_fails = DateFunction::do_validate(function_text, &number_fails);
             },
             _ => {
             }
