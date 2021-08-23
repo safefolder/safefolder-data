@@ -52,3 +52,7 @@ fields:
     field_type: Formula
     formula: LOWER("This Is My String")
     formula_format: Text
+  - name: Upper
+    field_type: Formula
+    formula: UPPER("This Is My String")
+    formula_format: Text

@@ -391,3 +391,69 @@ impl LowerFunction {
         return formula
     }
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UpperFunction {
+    pub function_text: String,
+    pub attribute: String,
+}
+impl UpperFunction {
+    pub fn defaults(function_text: &String) -> UpperFunction {
+        // UPPER("my string")
+        // UPPER({My Column})
+
+        let mut obj = Self{
+            function_text: function_text.clone(),
+            attribute: String::from(""),
+        };
+        for capture in RE_SINGLE_ATTR.captures_iter(function_text) {
+            let attribute = capture.get(0).unwrap().as_str().to_string();
+            obj.attribute = attribute;
+        }
+
+        return obj
+    }
+    pub fn validate(&self) -> bool {
+        let expr = RE_SINGLE_ATTR.clone();
+        let function_text = self.function_text.clone();
+        let check = expr.is_match(&function_text);
+        return check
+    }
+    pub fn do_validate(function_text: &String, number_fails: &i32) -> i32 {
+        let concat_obj = UpperFunction::defaults(
+            &function_text, 
+        );
+        let check = concat_obj.validate();
+        let mut number_fails = number_fails.clone();
+        if check == false {
+            number_fails += 1;
+        }
+        return number_fails;
+    }
+    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
+        let data_map = data_map.clone();
+        let function_text = self.function_text.clone();
+        let mut formula = formula.clone();
+
+        let mut replacement_string: String = String::from("");
+        for capture in RE_SINGLE_ATTR.captures_iter(&function_text) {
+            let attribute = capture.get(0).unwrap().as_str().to_string();
+            let function_attr = FunctionAttribute::defaults(&attribute, Some(true));
+            replacement_string = function_attr.replace(data_map.clone()).item_processed.unwrap();
+        };
+        replacement_string = replacement_string.to_uppercase();
+        eprintln!("UpperFunction.replace :: replacement_string: {}", &replacement_string);
+
+        formula = formula.replace(function_text.as_str(), replacement_string.as_str());
+        formula = format!("\"{}\"", formula);
+        return formula;
+    }
+    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
+        let data_map = data_map.clone();
+        let mut concat_obj = UpperFunction::defaults(
+            &function_text, 
+        );
+        formula = concat_obj.replace(formula, data_map.clone());
+        return formula
+    }
+}
