@@ -1,5 +1,6 @@
+use std::str::FromStr;
 use regex::Regex;
-use std::collections::HashMap;
+use std::{collections::HashMap};
 use serde::{Deserialize, Serialize};
 use lazy_static::lazy_static;
 
@@ -22,6 +23,7 @@ lazy_static! {
     static ref RE_JOINLIST_ATTRS: Regex = Regex::new(r#"(?P<array>\{[\w\s\d,"-]+\}),[\s+]{0,}(?P<sep>\\{0,1}"[\W]\\{0,1}")"#).unwrap();
     static ref RE_LEN_ATTR: Regex = Regex::new(r#"("[\w\s-]+")|(\{[\w\s]+\})"#).unwrap();
     static ref RE_SINGLE_ATTR: Regex = Regex::new(r#"("[\w\s-]+")|(\{[\w\s]+\})"#).unwrap();
+    static ref RE_REPLACE: Regex = Regex::new(r#"REPLACE\("(?P<old_text>[\w\s]+)",[\s]+(?P<start_num>\d),[\s]+(?P<num_chars>\d),[\s]+"(?P<new_text>[\w\s]+)"\)"#).unwrap();
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -442,7 +444,6 @@ impl UpperFunction {
             replacement_string = function_attr.replace(data_map.clone()).item_processed.unwrap();
         };
         replacement_string = replacement_string.to_uppercase();
-        eprintln!("UpperFunction.replace :: replacement_string: {}", &replacement_string);
 
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         formula = format!("\"{}\"", formula);
@@ -451,6 +452,113 @@ impl UpperFunction {
     pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
         let data_map = data_map.clone();
         let mut concat_obj = UpperFunction::defaults(
+            &function_text, 
+        );
+        formula = concat_obj.replace(formula, data_map.clone());
+        return formula
+    }
+}
+
+// REPLACE(old_text, start_num, num_chars, new_text)
+// old_text     Required. Text in which you want to replace some characters.
+// start_num    Required. The position of the character in old_text that you want to replace with new_text.
+// num_chars    Required. The number of characters in old_text that you want REPLACE to replace with new_text.
+// new_text     Required. The text that will replace characters in old_text.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ReplaceFunction {
+    pub function_text: String,
+    pub attributes: Vec<String>,
+    pub attributes_value_map: Option<HashMap<String, String>>,
+    pub old_text: String,
+    pub start_num: i32,
+    pub num_chars: i32,
+    pub new_text: String,
+
+}
+impl ReplaceFunction {
+    pub fn defaults(function_text: &String) -> ReplaceFunction {
+        // REPLACE(old_text, start_num, num_chars, new_text)
+        // REPLACE({My Column}, start_num, num_chars, new_text)
+
+        // RE matches: "old_text", "start_num", "num_chars", "new_text"
+        let matches = RE_REPLACE.captures(function_text).unwrap();
+        let old_text = matches.name("old_text").unwrap().as_str().to_string();
+        let start_num= matches.name("start_num").unwrap().as_str().to_string();
+        let num_chars = matches.name("num_chars").unwrap().as_str().to_string();
+        let new_text = matches.name("new_text").unwrap().as_str().to_string();
+        let mut attributes: Vec<String> = Vec::new();
+        attributes.push(old_text.clone());
+        attributes.push(start_num.clone());
+        attributes.push(num_chars.clone());
+        attributes.push(new_text.clone());
+        let start_num: i32 = FromStr::from_str(start_num.as_str()).unwrap();
+        let num_chars: i32 = FromStr::from_str(num_chars.as_str()).unwrap();
+
+        let obj = Self{
+            function_text: function_text.clone(),
+            attributes: attributes,
+            attributes_value_map: None,
+            old_text: old_text,
+            new_text: new_text,
+            start_num: start_num,
+            num_chars: num_chars,
+        };
+        
+        return obj
+    }
+    pub fn validate(&self) -> bool {
+        let expr = RE_REPLACE.clone();
+        let function_text = self.function_text.clone();
+        let check = expr.is_match(&function_text);
+        return check
+    }
+    pub fn do_validate(function_text: &String, number_fails: &i32) -> i32 {
+        let concat_obj = ReplaceFunction::defaults(
+            &function_text, 
+        );
+        let check = concat_obj.validate();
+        let mut number_fails = number_fails.clone();
+        if check == false {
+            number_fails += 1;
+        }
+        return number_fails;
+    }
+    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
+        let data_map = data_map.clone();
+        let function_text = self.function_text.clone();
+        let mut formula = formula.clone();
+        let old_text = self.old_text.clone();
+        let start_num = self.start_num.clone();
+        let number_chars = self.num_chars.clone();
+        let new_text = self.new_text.clone();
+        let new_text = new_text.as_str();
+
+        let replacement_string: String;
+
+        // attribute processed only in case of old_text, since rest are strings, and ints
+        let function_attr = FunctionAttribute::defaults(
+            &old_text, 
+            Some(true)
+        );
+        let old_text_processed = function_attr.replace(data_map.clone()).item_processed.unwrap();
+        let mut piece: String = String::from("");
+        for (i, item) in old_text_processed.chars().enumerate() {
+            let i = i as i32;
+            let length = *&piece.len();
+            let length = length as i32;
+            if &i >= &start_num && length < number_chars {
+                piece.push(item);
+            }
+        }
+        replacement_string = old_text.replace(&piece, new_text);
+
+        formula = formula.replace(function_text.as_str(), replacement_string.as_str());
+        formula = format!("\"{}\"", formula);
+        return formula;
+    }
+    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
+        let data_map = data_map.clone();
+        let mut concat_obj = ReplaceFunction::defaults(
             &function_text, 
         );
         formula = concat_obj.replace(formula, data_map.clone());

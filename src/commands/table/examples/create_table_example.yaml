@@ -56,3 +56,7 @@ fields:
     field_type: Formula
     formula: UPPER("This Is My String")
     formula_format: Text
+  - name: Replace
+    field_type: Formula
+    formula: REPLACE("This is my place", 0, 4, "That")
+    formula_format: Text

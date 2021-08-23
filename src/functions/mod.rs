@@ -104,6 +104,10 @@ impl FunctionsHanler{
                 formula = UpperFunction::do_replace(
                     &self.function_text, self.data_map.clone(), formula);
             },
+            FUNCTION_REPLACE => {
+                formula = ReplaceFunction::do_replace(
+                    &self.function_text, self.data_map.clone(), formula);
+            },
             _ => {
             }
         }
@@ -152,6 +156,9 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
             },
             FUNCTION_UPPER => {
                 number_fails = UpperFunction::do_validate(function_text, &number_fails);
+            },
+            FUNCTION_REPLACE => {
+                number_fails = ReplaceFunction::do_validate(function_text, &number_fails);
             },
             _ => {
             }
