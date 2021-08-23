@@ -20,6 +20,7 @@ lazy_static! {
     static ref RE_CONCAT_ATTRS: Regex = Regex::new(r#"("[\w\s-]+")|(\d+)|(\{[\w\s]+\})"#).unwrap();
     static ref RE_FORMAT_COLUMNS: Regex = Regex::new(r"(\{[\w\s-]+\})").unwrap();
     static ref RE_JOINLIST_ATTRS: Regex = Regex::new(r#"(?P<array>\{[\w\s\d,"-]+\}),[\s+]{0,}(?P<sep>\\{0,1}"[\W]\\{0,1}")"#).unwrap();
+    static ref RE_LEN_ATTR: Regex = Regex::new(r#"("[\w\s-]+")|(\{[\w\s]+\})"#).unwrap();
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -253,6 +254,71 @@ impl JoinListFunction{
     pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
         let data_map = data_map.clone();
         let mut concat_obj = JoinListFunction::defaults(
+            &function_text, 
+        );
+        formula = concat_obj.replace(formula, data_map.clone());
+        return formula
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LengthFunction {
+    pub function_text: String,
+    pub attribute: String,
+}
+impl LengthFunction {
+    pub fn defaults(function_text: &String) -> LengthFunction {
+        // LEN("my string") => 8
+        // LEN({My Column}) => 23
+
+        let mut obj = Self{
+            function_text: function_text.clone(),
+            attribute: String::from(""),
+        };
+        for capture in RE_LEN_ATTR.captures_iter(function_text) {
+            let attribute = capture.get(0).unwrap().as_str().to_string();
+            obj.attribute = attribute;
+        }
+
+        return obj
+    }
+    pub fn validate(&self) -> bool {
+        let expr = RE_LEN_ATTR.clone();
+        let function_text = self.function_text.clone();
+        let check = expr.is_match(&function_text);
+        return check
+    }
+    pub fn do_validate(function_text: &String, number_fails: &i32) -> i32 {
+        let concat_obj = LengthFunction::defaults(
+            &function_text, 
+        );
+        let check = concat_obj.validate();
+        let mut number_fails = number_fails.clone();
+        if check == false {
+            number_fails += 1;
+        }
+        return number_fails;
+    }
+    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
+        let data_map = data_map.clone();
+        let function_text = self.function_text.clone();
+        let mut formula = formula.clone();
+
+        let mut replacement_string: String = String::from("");
+        for capture in RE_LEN_ATTR.captures_iter(&function_text) {
+            let attribute = capture.get(0).unwrap().as_str().to_string();
+            let function_attr = FunctionAttribute::defaults(&attribute, Some(true));
+            replacement_string = function_attr.replace(data_map.clone()).item_processed.unwrap();
+        };
+        // let length = replacement_string.len();
+        replacement_string = replacement_string.len().to_string();
+
+        formula = formula.replace(function_text.as_str(), replacement_string.as_str());
+        return formula;
+    }
+    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
+        let data_map = data_map.clone();
+        let mut concat_obj = LengthFunction::defaults(
             &function_text, 
         );
         formula = concat_obj.replace(formula, data_map.clone());

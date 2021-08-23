@@ -44,3 +44,7 @@ fields:
     field_type: Formula
     formula: JOINLIST({1, 2, 3}, ";")
     formula_format: Text
+  - name: Length
+    field_type: Formula
+    formula: LEN("This is my string")
+    formula_format: Number
