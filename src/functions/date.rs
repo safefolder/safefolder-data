@@ -4,7 +4,7 @@ use std::{collections::HashMap};
 use serde::{Deserialize, Serialize};
 use lazy_static::lazy_static;
 // use chrono::{DateTime, Datelike, FixedOffset, Local, NaiveDate, NaiveDateTime, Timelike, Utc};
-use chrono::{DateTime, Datelike, Timelike, Utc, NaiveDate};
+use chrono::{DateTime, Datelike, Timelike, Utc, NaiveDate, Date};
 
 use crate::functions::FunctionAttribute;
 
@@ -30,6 +30,7 @@ lazy_static! {
     static ref RE_YEAR: Regex = Regex::new(r#"YEAR\((?P<date>"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+\d{2}:\d{2}")|YEAR\((?P<date_ref>\{[\w\s]+\})\)"#).unwrap();
     static ref RE_NOW: Regex = Regex::new(r#"NOW\(\)"#).unwrap();
     static ref RE_TODAY: Regex = Regex::new(r#"TODAY\(\)"#).unwrap();
+    static ref RE_DAYS: Regex = Regex::new(r#"(DAYS\((?P<end_date>"\d{1,2}-[a-zA-Z]{3}-\d{4}"),[\s]+(?P<start_date>"\d{1,2}-[a-zA-Z]{3}-\d{4}"))\)|DAYS\(((?P<end_date_ref>\{[\w\s]+\}),[\s]+(?P<start_date_ref>\{[\w\s]+\}))\)"#).unwrap();
 }
 
 // DATE(year,month,day)
@@ -94,7 +95,7 @@ impl DateFunction {
             ).as_str(), 
             "%Y-%m-%d"
         ).unwrap();
-        let month_short = date_only.format("%b").to_string().to_uppercase();
+        let month_short = date_only.format("%b").to_string();
         let replacement_string: String = format!(
             "{day}-{month_short}-{year}",
             day=day,
@@ -368,7 +369,7 @@ impl TodayFunction {
         let function_text = self.function_text.clone();
         let mut formula = formula.clone();
         let today_date_obj = Utc::today();
-        let month_short = &today_date_obj.format("%b").to_string().to_uppercase();
+        let month_short = &today_date_obj.format("%b").to_string();
         let day = &today_date_obj.day();
         let year = &today_date_obj.year();
         let replacement_string = format!("{day}-{month_short}-{year}", 
@@ -389,6 +390,129 @@ impl TodayFunction {
             &function_text, 
         );
         formula = obj.replace(formula);
+        return formula
+    }
+}
+
+// DAYS(end_date, start_date)
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DaysFunction {
+    pub function_text: String,
+    pub start_date: Option<String>,
+    pub end_date: Option<String>,
+    pub start_date_ref: Option<String>,
+    pub end_date_ref: Option<String>,
+}
+impl DaysFunction {
+    pub fn defaults(function_text: &String) -> DaysFunction {
+        // DAYS("12-SEP-2021", "5-FEB-2021")
+        // DAYS({Column A}, {Column B})
+        let matches = RE_DAYS.captures(&function_text).unwrap();
+        let start_date = matches.name("start_date");
+        let end_date = matches.name("end_date");
+        let start_date_ref = matches.name("start_date_ref");
+        let end_date_ref = matches.name("end_date_ref");
+        let mut start_date_wrap: Option<String> = None;
+        let mut end_date_wrap: Option<String> = None;
+        let mut start_date_ref_wrap: Option<String> = None;
+        let mut end_date_ref_wrap: Option<String> = None;
+        if start_date.is_some() {
+            start_date_wrap = Some(start_date.unwrap().as_str().to_string())
+        }
+        if end_date.is_some() {
+            end_date_wrap = Some(end_date.unwrap().as_str().to_string())
+        }
+        if start_date_ref.is_some() {
+            start_date_ref_wrap = Some(start_date_ref.unwrap().as_str().to_string())
+        }
+        if end_date_ref.is_some() {
+            end_date_ref_wrap = Some(end_date_ref.unwrap().as_str().to_string())
+        }
+        let obj = Self{
+            function_text: function_text.clone(),
+            start_date: start_date_wrap,
+            end_date: end_date_wrap,
+            start_date_ref: start_date_ref_wrap,
+            end_date_ref: end_date_ref_wrap,
+        };
+        return obj
+    }
+    pub fn validate(&self) -> bool {
+        let expr: Regex = RE_DAYS.clone();
+        let function_text = self.function_text.clone();
+        let check = expr.is_match(&function_text);
+        return check
+    }
+    pub fn do_validate(function_text: &String, number_fails: &u32) -> u32 {
+        let obj = DaysFunction::defaults(
+            &function_text
+        );
+        let check = obj.validate();
+        let mut number_fails = number_fails.clone();
+        if check == false {
+            number_fails += 1;
+        }
+        return number_fails;
+    }
+    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
+        let data_map = data_map.clone();
+        let function_text = self.function_text.clone();
+        let mut formula = formula.clone();
+        let start_date = self.start_date.clone();
+        let end_date = self.end_date.clone();
+        let start_date_ref = self.start_date_ref.clone();
+        let end_date_ref = self.end_date_ref.clone();
+        let number_days: i64;
+        if start_date.is_some() == true {
+            let start_date = start_date.unwrap();
+            let end_date = end_date.unwrap();
+            let start_date = start_date.replace("\"", "");
+            let end_date = end_date.replace("\"", "");
+            let start_date_obj = NaiveDate::parse_from_str(
+                start_date.as_str(), 
+                "%d-%b-%Y"
+            ).unwrap();
+            let end_date_obj = NaiveDate::parse_from_str(
+                end_date.as_str(), 
+                "%d-%b-%Y"
+            ).unwrap();
+            let duration = end_date_obj.signed_duration_since(start_date_obj);
+            number_days = duration.num_days();
+        } else {
+            let start_date_ref = start_date_ref.unwrap();
+            let end_date_ref = end_date_ref.unwrap();
+            let function_attr = FunctionAttribute::defaults(&start_date_ref, 
+                Some(true));
+            let start_date_ref_processed = function_attr.replace(data_map.clone()).item_processed.unwrap();
+            let function_attr = FunctionAttribute::defaults(&end_date_ref, 
+                Some(true));
+            let end_date_ref_processed = function_attr.replace(data_map.clone()).item_processed.unwrap();
+            let start_date_obj = NaiveDate::parse_from_str(
+                start_date_ref_processed.as_str(), 
+                "%d-%b-%Y"
+            ).unwrap();
+            let end_date_obj = NaiveDate::parse_from_str(
+                end_date_ref_processed.as_str(), 
+                "%d-%b-%Y"
+            ).unwrap();
+            let duration = end_date_obj.signed_duration_since(start_date_obj);
+            number_days = duration.num_days();
+        }
+
+        let replacement_string = number_days.to_string();
+        formula = formula.replace(function_text.as_str(), replacement_string.as_str());
+        return formula;
+    }
+    pub fn do_replace(
+        function_text: &String, 
+        data_map: HashMap<String, String>,
+        mut formula: String
+    ) -> String {
+        let data_map = data_map.clone();
+        let mut obj = DaysFunction::defaults(
+            &function_text, 
+        );
+        formula = obj.replace(formula, data_map.clone());
         return formula
     }
 }

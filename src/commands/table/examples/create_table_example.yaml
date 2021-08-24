@@ -76,3 +76,7 @@ fields:
     field_type: Formula
     formula: TODAY()
     formula_format: Date
+  - name: Days
+    field_type: Formula
+    formula: DAYS("05-Sep-2021", "21-Aug-2021")
+    formula_format: Number

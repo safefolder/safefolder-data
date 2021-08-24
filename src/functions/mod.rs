@@ -155,6 +155,10 @@ impl FunctionsHanler{
                 formula = TodayFunction::do_replace(
                     &self.function_text, formula);
             },
+            FUNCTION_DAYS => {
+                formula = DaysFunction::do_replace(
+                    &self.function_text, self.data_map.clone(), formula);
+            },
             _ => {
             }
         }
@@ -239,6 +243,9 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
             },
             FUNCTION_TODAY => {
                 number_fails = TodayFunction::do_validate(function_text, &number_fails);
+            },
+            FUNCTION_DAYS => {
+                number_fails = DaysFunction::do_validate(function_text, &number_fails);
             },
             _ => {
             }
