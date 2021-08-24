@@ -4,7 +4,7 @@ use std::{collections::HashMap};
 use serde::{Deserialize, Serialize};
 use lazy_static::lazy_static;
 // use chrono::{DateTime, Datelike, FixedOffset, Local, NaiveDate, NaiveDateTime, Timelike, Utc};
-use chrono::{DateTime, Datelike, Timelike};
+use chrono::{DateTime, Datelike, Timelike, Utc};
 
 use crate::functions::FunctionAttribute;
 
@@ -28,6 +28,8 @@ lazy_static! {
     static ref RE_WEEKDAY: Regex = Regex::new(r#"WEEKDAY\((?P<date>"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+\d{2}:\d{2}")|WEEKDAY\((?P<date_ref>\{[\w\s]+\})\)"#).unwrap();
     static ref RE_MONTH: Regex = Regex::new(r#"MONTH\((?P<date>"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+\d{2}:\d{2}")|MONTH\((?P<date_ref>\{[\w\s]+\})\)"#).unwrap();
     static ref RE_YEAR: Regex = Regex::new(r#"YEAR\((?P<date>"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+\d{2}:\d{2}")|YEAR\((?P<date_ref>\{[\w\s]+\})\)"#).unwrap();
+    static ref RE_NOW: Regex = Regex::new(r#"NOW\(\)"#).unwrap();
+    static ref RE_TODAY: Regex = Regex::new(r#"TODAY\(\)"#).unwrap();
 }
 
 // DATE(year,month,day)
@@ -115,7 +117,7 @@ pub enum DateParseOption {
     Year,
 }
 
-// DAY(year,month,day)
+// DAY($date_str)
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DateParseFunction {
     pub function_text: String,
@@ -266,6 +268,110 @@ impl DateParseFunction {
             date_parse_option
         );
         formula = concat_obj.replace(formula, data_map.clone());
+        return formula
+    }
+}
+
+// NOW()
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct NowFunction {
+    pub function_text: String,
+}
+impl NowFunction {
+    pub fn defaults(function_text: &String) -> NowFunction {
+        // NOW()
+        let obj = Self{
+            function_text: function_text.clone(),
+        };
+        return obj
+    }
+    pub fn validate(&self) -> bool {
+        let expr: Regex = RE_NOW.clone();
+        let function_text = self.function_text.clone();
+        let check = expr.is_match(&function_text);
+        return check
+    }
+    pub fn do_validate(function_text: &String, number_fails: &u32) -> u32 {
+        let obj = NowFunction::defaults(
+            &function_text
+        );
+        let check = obj.validate();
+        let mut number_fails = number_fails.clone();
+        if check == false {
+            number_fails += 1;
+        }
+        return number_fails;
+    }
+    pub fn replace(&mut self, formula: String) -> String {
+        let function_text = self.function_text.clone();
+        let mut formula = formula.clone();
+        let now_date_obj = Utc::now();
+        let replacement_string = now_date_obj.to_rfc3339();
+
+        formula = formula.replace(function_text.as_str(), replacement_string.as_str());
+        formula = format!("\"{}\"", formula);
+        return formula;
+    }
+    pub fn do_replace(
+        function_text: &String, 
+        mut formula: String
+    ) -> String {
+        let mut obj = NowFunction::defaults(
+            &function_text, 
+        );
+        formula = obj.replace(formula);
+        return formula
+    }
+}
+
+// TODAY()
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TodayFunction {
+    pub function_text: String,
+}
+impl TodayFunction {
+    pub fn defaults(function_text: &String) -> TodayFunction {
+        // NOW()
+        let obj = Self{
+            function_text: function_text.clone(),
+        };
+        return obj
+    }
+    pub fn validate(&self) -> bool {
+        let expr: Regex = RE_TODAY.clone();
+        let function_text = self.function_text.clone();
+        let check = expr.is_match(&function_text);
+        return check
+    }
+    pub fn do_validate(function_text: &String, number_fails: &u32) -> u32 {
+        let obj = TodayFunction::defaults(
+            &function_text
+        );
+        let check = obj.validate();
+        let mut number_fails = number_fails.clone();
+        if check == false {
+            number_fails += 1;
+        }
+        return number_fails;
+    }
+    pub fn replace(&mut self, formula: String) -> String {
+        let function_text = self.function_text.clone();
+        let mut formula = formula.clone();
+        let today_date_obj = Utc::today();
+        let today_date_obj = today_date_obj.and_hms(0, 0, 0);
+        let replacement_string = today_date_obj.to_rfc3339();
+        formula = formula.replace(function_text.as_str(), replacement_string.as_str());
+        formula = format!("\"{}\"", formula);
+        return formula;
+    }
+    pub fn do_replace(
+        function_text: &String, 
+        mut formula: String
+    ) -> String {
+        let mut obj = TodayFunction::defaults(
+            &function_text, 
+        );
+        formula = obj.replace(formula);
         return formula
     }
 }

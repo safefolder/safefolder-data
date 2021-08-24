@@ -68,3 +68,11 @@ fields:
     field_type: Formula
     formula: DAY("2021-08-21T14:32:11+00:00")
     formula_format: Number
+  - name: Now
+    field_type: Formula
+    formula: NOW()
+    formula_format: Date
+  - name: Today
+    field_type: Formula
+    formula: TODAY()
+    formula_format: Date

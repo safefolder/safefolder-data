@@ -147,6 +147,14 @@ impl FunctionsHanler{
                 formula = DateParseFunction::do_replace(
                     &self.function_text, DateParseOption::Year, self.data_map.clone(), formula);
             },
+            FUNCTION_NOW => {
+                formula = NowFunction::do_replace(
+                    &self.function_text, formula);
+            },
+            FUNCTION_TODAY => {
+                formula = TodayFunction::do_replace(
+                    &self.function_text, formula);
+            },
             _ => {
             }
         }
@@ -225,6 +233,12 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
             },
             FUNCTION_YEAR => {
                 number_fails = DateParseFunction::do_validate(function_text, DateParseOption::Year, &number_fails);
+            },
+            FUNCTION_NOW => {
+                number_fails = NowFunction::do_validate(function_text, &number_fails);
+            },
+            FUNCTION_TODAY => {
+                number_fails = TodayFunction::do_validate(function_text, &number_fails);
             },
             _ => {
             }

@@ -1087,7 +1087,7 @@ impl ProcessField for FormulaField {
             let mut formula = formula.unwrap();
             eprintln!("FormulaField.process :: formula initial: {}", &formula);
             // First process the achiever functions, then rest
-            let expr = Regex::new(r"[A-Z]+\(.+\)").unwrap();
+            let expr = Regex::new(r"[A-Z]+\(.+\)|[A-Z]+\(\)").unwrap();
             let formula_str = formula.clone();
             for capture in expr.captures_iter(formula_str.as_str()) {
                 let function_text = capture.get(0).unwrap().as_str();
