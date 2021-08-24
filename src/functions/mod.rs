@@ -14,7 +14,7 @@ use crate::functions::date::*;
 use crate::planet::PlanetError;
 
 // achiever planet functions
-pub const FORMULA_FUNCTIONS: [&str; 49] = [
+pub const FORMULA_FUNCTIONS: [&str; 50] = [
     FUNCTION_CONCAT,
     FUNCTION_FORMAT,
     FUNCTION_JOINLIST,
@@ -32,6 +32,7 @@ pub const FORMULA_FUNCTIONS: [&str; 49] = [
     FUNCTION_MINUTE,
     FUNCTION_TODAY,
     FUNCTION_WEEK,
+    FUNCTION_WEEKDAY,
     FUNCTION_YEAR,
     FUNCTION_IF,
     FUNCTION_MID,
@@ -114,6 +115,38 @@ impl FunctionsHanler{
                 formula = DateFunction::do_replace(
                     &self.function_text, formula);
             },
+            FUNCTION_SECOND => {
+                formula = DateParseFunction::do_replace(
+                    &self.function_text, DateParseOption::Second, self.data_map.clone(), formula);
+            },
+            FUNCTION_MINUTE => {
+                formula = DateParseFunction::do_replace(
+                    &self.function_text, DateParseOption::Minute, self.data_map.clone(), formula);
+            },
+            FUNCTION_HOUR => {
+                formula = DateParseFunction::do_replace(
+                    &self.function_text, DateParseOption::Hour, self.data_map.clone(), formula);
+            },
+            FUNCTION_DAY => {
+                formula = DateParseFunction::do_replace(
+                    &self.function_text, DateParseOption::Day, self.data_map.clone(), formula);
+            },
+            FUNCTION_WEEK => {
+                formula = DateParseFunction::do_replace(
+                    &self.function_text, DateParseOption::Week, self.data_map.clone(), formula);
+            },
+            FUNCTION_WEEKDAY => {
+                formula = DateParseFunction::do_replace(
+                    &self.function_text, DateParseOption::WeekDay, self.data_map.clone(), formula);
+            },
+            FUNCTION_MONTH => {
+                formula = DateParseFunction::do_replace(
+                    &self.function_text, DateParseOption::Month, self.data_map.clone(), formula);
+            },
+            FUNCTION_YEAR => {
+                formula = DateParseFunction::do_replace(
+                    &self.function_text, DateParseOption::Year, self.data_map.clone(), formula);
+            },
             _ => {
             }
         }
@@ -168,6 +201,30 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
             },
             FUNCTION_DATE => {
                 number_fails = DateFunction::do_validate(function_text, &number_fails);
+            },
+            FUNCTION_SECOND => {
+                number_fails = DateParseFunction::do_validate(function_text, DateParseOption::Second, &number_fails);
+            },
+            FUNCTION_MINUTE => {
+                number_fails = DateParseFunction::do_validate(function_text, DateParseOption::Minute, &number_fails);
+            },
+            FUNCTION_HOUR => {
+                number_fails = DateParseFunction::do_validate(function_text, DateParseOption::Hour, &number_fails);
+            },
+            FUNCTION_DAY => {
+                number_fails = DateParseFunction::do_validate(function_text, DateParseOption::Day, &number_fails);
+            },
+            FUNCTION_WEEK => {
+                number_fails = DateParseFunction::do_validate(function_text, DateParseOption::Week, &number_fails);
+            },
+            FUNCTION_WEEKDAY => {
+                number_fails = DateParseFunction::do_validate(function_text, DateParseOption::WeekDay, &number_fails);
+            },
+            FUNCTION_MONTH => {
+                number_fails = DateParseFunction::do_validate(function_text, DateParseOption::Month, &number_fails);
+            },
+            FUNCTION_YEAR => {
+                number_fails = DateParseFunction::do_validate(function_text, DateParseOption::Year, &number_fails);
             },
             _ => {
             }

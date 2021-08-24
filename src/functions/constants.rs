@@ -16,6 +16,7 @@ pub const FUNCTION_SECOND: &str = "SECOND";
 pub const FUNCTION_MINUTE: &str = "MINUTE";
 pub const FUNCTION_TODAY: &str = "TODAY";
 pub const FUNCTION_WEEK: &str = "WEEK";
+pub const FUNCTION_WEEKDAY: &str = "WEEKDAY";
 pub const FUNCTION_YEAR: &str = "YEAR";
 pub const FUNCTION_IF: &str = "IF";
 pub const FUNCTION_MID: &str = "MID";

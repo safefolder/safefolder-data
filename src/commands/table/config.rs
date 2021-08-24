@@ -81,7 +81,7 @@ impl CreateTableConfig {
                         name_field.required = Some(true);
                         name_field.name = Some(String::from(NAME_CAMEL));
                         config_model.name = Some(name_field);
-                        eprintln!("CreateTableConfig.import :: config_model: {:#?}", &config_model);
+                        // eprintln!("CreateTableConfig.import :: config_model: {:#?}", &config_model);
                         // Go through fields and check if any has name "Name", raising an error since
                         // is not allowed, reserved field.
                         for field in fields {

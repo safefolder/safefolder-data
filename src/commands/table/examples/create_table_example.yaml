@@ -64,3 +64,7 @@ fields:
     field_type: Formula
     formula: DATE(2021, 8, 12)
     formula_format: Date
+  - name: Day
+    field_type: Formula
+    formula: DAY("2021-08-21T14:32:11+00:00")
+    formula_format: Number
