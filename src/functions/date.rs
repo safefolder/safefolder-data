@@ -4,7 +4,7 @@ use std::{collections::HashMap};
 use serde::{Deserialize, Serialize};
 use lazy_static::lazy_static;
 // use chrono::{DateTime, Datelike, FixedOffset, Local, NaiveDate, NaiveDateTime, Timelike, Utc};
-use chrono::{DateTime, Datelike, Timelike, Utc};
+use chrono::{DateTime, Datelike, Timelike, Utc, NaiveDate};
 
 use crate::functions::FunctionAttribute;
 
@@ -85,11 +85,21 @@ impl DateFunction {
         let year = self.year;
         let month = self.month;
         let day = self.day;
+        let date_only = NaiveDate::parse_from_str(
+            format!(
+                "{year}-{month}-{day}",
+                year=year,
+                month=month,
+                day=day,
+            ).as_str(), 
+            "%Y-%m-%d"
+        ).unwrap();
+        let month_short = date_only.format("%b").to_string().to_uppercase();
         let replacement_string: String = format!(
-            "{year}-{month}-{day}T00:00:00+00:00",
+            "{day}-{month_short}-{year}",
+            day=day,
+            month_short=month_short,
             year=year,
-            month=month,
-            day=day
         );
 
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
@@ -358,8 +368,15 @@ impl TodayFunction {
         let function_text = self.function_text.clone();
         let mut formula = formula.clone();
         let today_date_obj = Utc::today();
-        let today_date_obj = today_date_obj.and_hms(0, 0, 0);
-        let replacement_string = today_date_obj.to_rfc3339();
+        let month_short = &today_date_obj.format("%b").to_string().to_uppercase();
+        let day = &today_date_obj.day();
+        let year = &today_date_obj.year();
+        let replacement_string = format!("{day}-{month_short}-{year}", 
+            day=day,
+            month_short=month_short,
+            year=year
+        );
+        // 24-AUG-2021
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         formula = format!("\"{}\"", formula);
         return formula;
