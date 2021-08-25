@@ -69,7 +69,7 @@ pub const FORMULA_FUNCTIONS: [&str; 50] = [
 
 lazy_static! {
     // CONCAT("mine", "-", {My Column}, 45) :: Regex to catch the function attributes in an array
-    static ref RE_FORMULA_FUNCTIONS: Regex = Regex::new(r#"([A-Z]+\(.+\))"#).unwrap();
+    static ref RE_FORMULA_FUNCTIONS: Regex = Regex::new(r#"([a-zA-Z]+\(.+\))"#).unwrap();
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -116,16 +116,16 @@ impl FunctionsHanler{
                     &self.function_text, formula);
             },
             FUNCTION_SECOND => {
-                formula = DateParseFunction::do_replace(
-                    &self.function_text, DateParseOption::Second, self.data_map.clone(), formula);
+                formula = DateTimeParseFunction::do_replace(
+                    &self.function_text, DateTimeParseOption::Second, self.data_map.clone(), formula);
             },
             FUNCTION_MINUTE => {
-                formula = DateParseFunction::do_replace(
-                    &self.function_text, DateParseOption::Minute, self.data_map.clone(), formula);
+                formula = DateTimeParseFunction::do_replace(
+                    &self.function_text, DateTimeParseOption::Minute, self.data_map.clone(), formula);
             },
             FUNCTION_HOUR => {
-                formula = DateParseFunction::do_replace(
-                    &self.function_text, DateParseOption::Hour, self.data_map.clone(), formula);
+                formula = DateTimeParseFunction::do_replace(
+                    &self.function_text, DateTimeParseOption::Hour, self.data_map.clone(), formula);
             },
             FUNCTION_DAY => {
                 formula = DateParseFunction::do_replace(
@@ -181,6 +181,14 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
         if achiever_functions.contains(&function_name) == true {
             formula_functions.push(function_text.clone());
             function_name_map.insert(function_name, function_text.clone());    
+        } else {
+            eprintln!("validate_formula :: ** function_name: {} DOES NOT EXIST!!!", &function_name);
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Function \"{}\" does not exist. Check your spelling.", &function_name)),
+                )
+            );
         }
     }
 
@@ -188,6 +196,7 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
     let mut number_fails: u32 = 0;
     for function_name in function_name_map.keys() {
         let function_name = function_name.as_str();
+        eprintln!("validate_formula :: ** function_name: {}", &function_name);
         let function_text = function_name_map.get(function_name).unwrap();
         match function_name {
             FUNCTION_CONCAT => {
@@ -215,13 +224,13 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
                 number_fails = DateFunction::do_validate(function_text, &number_fails);
             },
             FUNCTION_SECOND => {
-                number_fails = DateParseFunction::do_validate(function_text, DateParseOption::Second, &number_fails);
+                number_fails = DateTimeParseFunction::do_validate(function_text, DateTimeParseOption::Second, &number_fails);
             },
             FUNCTION_MINUTE => {
-                number_fails = DateParseFunction::do_validate(function_text, DateParseOption::Minute, &number_fails);
+                number_fails = DateTimeParseFunction::do_validate(function_text, DateTimeParseOption::Minute, &number_fails);
             },
             FUNCTION_HOUR => {
-                number_fails = DateParseFunction::do_validate(function_text, DateParseOption::Hour, &number_fails);
+                number_fails = DateTimeParseFunction::do_validate(function_text, DateTimeParseOption::Hour, &number_fails);
             },
             FUNCTION_DAY => {
                 number_fails = DateParseFunction::do_validate(function_text, DateParseOption::Day, &number_fails);
@@ -248,9 +257,11 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
                 number_fails = DaysFunction::do_validate(function_text, &number_fails);
             },
             _ => {
+                number_fails += 1;
             }
         }
     }
+    eprintln!("validate_formula :: number_fails: {}", &number_fails);
     if number_fails > 0 {
         return Err(
             PlanetError::new(

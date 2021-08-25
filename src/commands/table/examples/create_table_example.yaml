@@ -64,9 +64,29 @@ fields:
     field_type: Formula
     formula: DATE(2021, 8, 12)
     formula_format: Date
-  - name: Day
+  - name: Day 01
     field_type: Formula
     formula: DAY("2021-08-21T14:32:11+00:00")
+    formula_format: Number
+  - name: Day 02
+    field_type: Formula
+    formula: DAY("2021-08-25 06:26:00")
+    formula_format: Number
+  - name: Day 03
+    field_type: Formula
+    formula: DAY("25-AUG-2021 06:26:00")
+    formula_format: Number
+  - name: Day 04
+    field_type: Formula
+    formula: DAY("25-AUG-2021")
+    formula_format: Number
+  - name: Week
+    field_type: Formula
+    formula: WEEK("25-AUG-2021")
+    formula_format: Number
+  - name: Minute
+    field_type: Formula
+    formula: MINUTE("25-AUG-2021 06:26:00")
     formula_format: Number
   - name: Now
     field_type: Formula
