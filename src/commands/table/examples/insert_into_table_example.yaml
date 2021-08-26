@@ -1,10 +1,10 @@
 ---
 command: INSERT INTO TABLE "Super Table"
-name: Pepito Data 01
+name: Pepito Data 03
 data:
   My Field: pepito
   Description: This is some description I want to include
   Is Published: true
   Counter: 34
-  Status: c4j2iggsmpv82iegkhi0
-  Locations: c4j2iggsmpv82iegkhj0,c4j2iggsmpv82iegkhk0
+  Status: c4jo900smpv358pv5n60
+  Locations: c4jo900smpv358pv5n70,c4jo900smpv358pv5n80

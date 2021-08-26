@@ -100,3 +100,11 @@ fields:
     field_type: Formula
     formula: DAYS("05-Sep-2021", "21-Aug-2021")
     formula_format: Number
+  - name: DateAdd Date
+    field_type: Formula
+    formula: DATEADD("26-Aug-2021", 5, "days")
+    formula_format: "Date"
+  - name: DateAdd DateTime
+    field_type: Formula
+    formula: DATEADD("26-Aug-2021 12:45:00", 45, "minutes")
+    formula_format: "Date"

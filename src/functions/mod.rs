@@ -159,6 +159,10 @@ impl FunctionsHanler{
                 formula = DaysFunction::do_replace(
                     &self.function_text, self.data_map.clone(), formula);
             },
+            FUNCTION_DATEADD => {
+                formula = DateAddDiffFunction::do_replace(
+                    &self.function_text, DateDeltaOperation::Add, self.data_map.clone(), formula);
+            },
             _ => {
             }
         }
@@ -182,7 +186,6 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
             formula_functions.push(function_text.clone());
             function_name_map.insert(function_name, function_text.clone());    
         } else {
-            eprintln!("validate_formula :: ** function_name: {} DOES NOT EXIST!!!", &function_name);
             return Err(
                 PlanetError::new(
                     500, 
@@ -234,6 +237,7 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
             },
             FUNCTION_DAY => {
                 number_fails = DateParseFunction::do_validate(function_text, DateParseOption::Day, &number_fails);
+                eprintln!("validate_formula :: DAY : number_fails: {}", &number_fails);
             },
             FUNCTION_WEEK => {
                 number_fails = DateParseFunction::do_validate(function_text, DateParseOption::Week, &number_fails);
@@ -255,6 +259,10 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
             },
             FUNCTION_DAYS => {
                 number_fails = DaysFunction::do_validate(function_text, &number_fails);
+            },
+            FUNCTION_DATEADD => {
+                number_fails = DateAddDiffFunction::do_validate(function_text, 
+                    DateDeltaOperation::Add, &number_fails);
             },
             _ => {
                 number_fails += 1;

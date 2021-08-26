@@ -3,8 +3,7 @@ use regex::{Regex, Captures};
 use std::{collections::HashMap};
 use serde::{Deserialize, Serialize};
 use lazy_static::lazy_static;
-// use chrono::{DateTime, Datelike, FixedOffset, Local, NaiveDate, NaiveDateTime, Timelike, Utc};
-use chrono::{DateTime, Datelike, FixedOffset, NaiveDate, Timelike, Utc, NaiveDateTime};
+use chrono::{DateTime, Datelike, FixedOffset, NaiveDate, Timelike, Utc, NaiveDateTime, Duration, Date};
 use tr::tr;
 
 use crate::{functions::FunctionAttribute, planet::PlanetError};
@@ -32,6 +31,8 @@ lazy_static! {
     static ref RE_NOW: Regex = Regex::new(r#"NOW\(\)"#).unwrap();
     static ref RE_TODAY: Regex = Regex::new(r#"TODAY\(\)"#).unwrap();
     static ref RE_DAYS: Regex = Regex::new(r#"(DAYS\((?P<end_date>"\d{1,2}-[a-zA-Z]{3}-\d{4}"),[\s]+(?P<start_date>"\d{1,2}-[a-zA-Z]{3}-\d{4}"))\)|DAYS\(((?P<end_date_ref>\{[\w\s]+\}),[\s]+(?P<start_date_ref>\{[\w\s]+\}))\)"#).unwrap();
+    static ref RE_DATEADD: Regex = Regex::new(r#"DATEADD\((?P<date>"\d{1,2}-[a-zA-Z]{3}-\d{4}"),[\s]+(?P<number>\d+),[\s]+(?P<units>("days")|("months")|("milliseconds")|("seconds")|("minutes")|("hours")|("weeks")|("quarters")|("years"))\)|DATEADD\((?P<datetime>"\d{1,2}-[a-zA-Z]{3}-\d{4}[\s]{1}\d{1,2}:\d{1,2}:\d{1,2}"),[\s]+(?P<dt_number>\d+),[\s]+(?P<dt_units>("days")|("months")|("milliseconds")|("seconds")|("minutes")|("hours")|("weeks")|("quarters")|("years"))\)|DATEADD\((?P<date_ref>\{[\w\s]+\}),[\s]+(?P<ref_number>\d{1,2}),[\s]+(?P<ref_units>("days")|("months")|("milliseconds")|("seconds")|("minutes")|("hours")|("weeks")|("quarters")|("years"))\)"#).unwrap();
+    static ref RE_DATEDIF: Regex = Regex::new(r#"DATEDIF\((?P<date>"\d{1,2}-[a-zA-Z]{3}-\d{4}"),[\s]+(?P<number>\d+),[\s]+(?P<units>("days")|("months")|("milliseconds")|("seconds")|("minutes")|("hours")|("weeks")|("quarters")|("years"))\)|DATEDIF\((?P<datetime>"\d{1,2}-[a-zA-Z]{3}-\d{4}[\s]{1}\d{1,2}:\d{1,2}:\d{1,2}"),[\s]+(?P<dt_number>\d+),[\s]+(?P<dt_units>("days")|("months")|("milliseconds")|("seconds")|("minutes")|("hours")|("weeks")|("quarters")|("years"))\)|DATEDIF\((?P<date_ref>\{[\w\s]+\}),[\s]+(?P<ref_number>\d{1,2}),[\s]+(?P<ref_units>("days")|("months")|("milliseconds")|("seconds")|("minutes")|("hours")|("weeks")|("quarters")|("years"))\)"#).unwrap();
 }
 
 // DATE(year,month,day)
@@ -206,69 +207,6 @@ impl DateTimeParseFunction {
         };
         return obj
     }
-    pub fn get_date_object_iso(&self, date_string: &String) -> Result<DateTime<FixedOffset>, PlanetError> {
-        let date_string = date_string.clone();
-        let date_string = date_string.replace("\"", "");
-        let mode = self.mode.clone();
-        let mode = mode.as_str();
-        if mode == "iso" {
-            let date_obj_wrap = DateTime::parse_from_rfc3339(&date_string);
-            if date_obj_wrap.is_ok() {
-                return Ok(date_obj_wrap.unwrap())
-            }    
-        }
-        return Err(
-            PlanetError::new(
-                500, 
-                Some(tr!("Could not parse date")),
-            )
-        );
-    }
-    pub fn get_date_object_human_time(&self, date_string: &String) -> Result<NaiveDateTime, PlanetError> {
-        let date_string = date_string.clone();
-        let date_string = date_string.replace("\"", "");
-        let mode = self.mode.clone();
-        let mode = mode.as_str();
-        match mode {
-            "human_time" => {
-                // DAY("2021-08-25 06:26:00")
-                // DAY("25-Aug-2021 06:26:00")
-                // DAY("25-AUG-2021 06:26:00")
-
-                // need map AUG -> Aug
-                // Check str month in order to parse
-                let has_short_month = has_month_short(&date_string);
-                if has_short_month {
-                    let date_string_ = get_standard_date_short_month(&date_string);
-                    // date_string now is "25-Aug-2021 06:26:00"
-                    let date_obj = NaiveDateTime::parse_from_str(
-                        &date_string_, 
-                        "%d-%b-%Y %H:%M:%S"
-                    );
-                    if date_obj.is_ok() {
-                        return Ok(date_obj.unwrap())
-                    }
-                } else {
-                    // DAY("2021-08-25 06:26:00")
-                    // let no_timezone = NaiveDateTime::parse_from_str("2015-09-05 23:56:04", "%Y-%m-%d %H:%M:%S");
-                    let date_obj = NaiveDateTime::parse_from_str(
-                        &date_string, 
-                        "%Y-%m-%d %H:%M:%S"
-                    );
-                    if date_obj.is_ok() {
-                        return Ok(date_obj.unwrap())
-                    }
-                }
-            },
-            _ => {}
-        }
-        return Err(
-            PlanetError::new(
-                500, 
-                Some(tr!("Could not parse date")),
-            )
-        );
-    }
     pub fn validate(&self, date_parse_option: DateTimeParseOption) -> bool {
         let expr: Regex;
         match date_parse_option {
@@ -294,12 +232,12 @@ impl DateTimeParseFunction {
         if date_string.is_some() {
             let date_string = date_string.unwrap();
             if mode == "iso" {
-                let date_object = self.get_date_object_iso(&date_string);
+                let date_object = get_date_object_iso(&date_string);
                 if date_object.is_err() {
                     check = false;
                 }    
             } else if mode == "human_time" {
-                let date_object = self.get_date_object_human_time(&date_string);
+                let date_object = get_date_object_human_time(&date_string);
                 if date_object.is_err() {
                     check = false;
                 }
@@ -340,7 +278,7 @@ impl DateTimeParseFunction {
         date = date.replace("\"", "");
 
         if mode == "iso" {
-            let date_obj_wrap = self.get_date_object_iso(&date);
+            let date_obj_wrap = get_date_object_iso(&date);
             if date_obj_wrap.is_ok() {
                 let date_obj = date_obj_wrap.unwrap();
                 match date_parse_option {
@@ -359,7 +297,7 @@ impl DateTimeParseFunction {
                 }
             }
         } else if mode == "human_time" {
-            let date_obj_wrap = self.get_date_object_human_time(&date);
+            let date_obj_wrap = get_date_object_human_time(&date);
             
             if date_obj_wrap.is_ok() {
                 let date_obj = date_obj_wrap.unwrap();
@@ -487,93 +425,6 @@ impl DateParseFunction {
         };
         return obj
     }
-    pub fn get_date_object_iso(&self, date_string: &String) -> Result<DateTime<FixedOffset>, PlanetError> {
-        let date_string = date_string.clone();
-        let date_string = date_string.replace("\"", "");
-        let mode = self.mode.clone();
-        let mode = mode.as_str();
-        if mode == "iso" {
-            let date_obj_wrap = DateTime::parse_from_rfc3339(&date_string);
-            if date_obj_wrap.is_ok() {
-                return Ok(date_obj_wrap.unwrap())
-            }    
-        }
-        return Err(
-            PlanetError::new(
-                500, 
-                Some(tr!("Could not parse date")),
-            )
-        );
-    }
-    pub fn get_date_object_only_date(&self, date_string: &String) -> Result<NaiveDate, PlanetError> {
-        let date_string = date_string.clone();
-        let date_string = date_string.replace("\"", "");
-        let mode = self.mode.clone();
-        let mode = mode.as_str();
-        if mode == "only_date" {
-            let date_string_ = get_standard_date_short_month(&date_string);
-            let date_obj = NaiveDate::parse_from_str(
-                &date_string_, 
-                "%d-%b-%Y"
-            );
-            if date_obj.is_ok() {
-                return Ok(date_obj.unwrap())
-            } else {
-                eprintln!("{}", date_obj.unwrap_err());
-            }
-        }
-        return Err(
-            PlanetError::new(
-                500, 
-                Some(tr!("Could not parse date")),
-            )
-        );
-    }
-    pub fn get_date_object_human_time(&self, date_string: &String) -> Result<NaiveDateTime, PlanetError> {
-        let date_string = date_string.clone();
-        let date_string = date_string.replace("\"", "");
-        let mode = self.mode.clone();
-        let mode = mode.as_str();
-        match mode {
-            "human_time" => {
-                // DAY("2021-08-25 06:26:00")
-                // DAY("25-Aug-2021 06:26:00")
-                // DAY("25-AUG-2021 06:26:00")
-
-                // need map AUG -> Aug
-                // Check str month in order to parse
-                let has_short_month = has_month_short(&date_string);
-                if has_short_month {
-                    let date_string_ = get_standard_date_short_month(&date_string);
-                    // date_string now is "25-Aug-2021 06:26:00"
-                    let date_obj = NaiveDateTime::parse_from_str(
-                        &date_string_, 
-                        "%d-%b-%Y %H:%M:%S"
-                    );
-                    if date_obj.is_ok() {
-                        return Ok(date_obj.unwrap())
-                    }
-                } else {
-                    // DAY("2021-08-25 06:26:00")
-                    // let no_timezone = NaiveDateTime::parse_from_str("2015-09-05 23:56:04", "%Y-%m-%d %H:%M:%S");
-                    let date_obj = NaiveDateTime::parse_from_str(
-                        &date_string, 
-                        "%Y-%m-%d %H:%M:%S"
-                    );
-                    if date_obj.is_ok() {
-                        return Ok(date_obj.unwrap())
-                    }
-                }
-            },
-            _ => {}
-        }
-        return Err(
-            PlanetError::new(
-                500, 
-                Some(tr!("Could not parse date")),
-            )
-        );
-    }
     pub fn validate(&self, date_parse_option: DateParseOption) -> bool {
         let expr: Regex;
         match date_parse_option {
@@ -595,6 +446,7 @@ impl DateParseFunction {
         }
         let function_text = self.function_text.clone();
         let mut check = expr.is_match(&function_text);
+        eprintln!("DateParseFunction.validate :: basic check: {}", &check);
         if check == false {
             return false;
         }
@@ -604,19 +456,23 @@ impl DateParseFunction {
         let mode = mode.as_str();
         if date_string.is_some() {
             let date_string = date_string.unwrap();
+            eprintln!("DateParseFunction.validate :: date_string: {:#?}", &date_string);
             if mode == "iso" {
-                let date_object = self.get_date_object_iso(&date_string);
+                let date_object = get_date_object_iso(&date_string);
+                eprintln!("DateParseFunction.validate :: iso : date_object: {:#?}", &date_object);
                 if date_object.is_err() {
                     check = false;
                 }    
             } else if mode == "human_time" {
-                let date_object = self.get_date_object_human_time(&date_string);
+                let date_object = get_date_object_human_time(&date_string);
+                eprintln!("DateParseFunction.validate :: human time : date_object: {:#?}", &date_object);
                 if date_object.is_err() {
                     check = false;
                 }
 
             } else {
-                let date_object = self.get_date_object_only_date(&date_string);
+                let date_object = get_date_object_only_date(&date_string);
+                eprintln!("DateParseFunction.validate :: date only : date_object: {:#?}", &date_object);
                 if date_object.is_err() {
                     check = false;
                 }
@@ -657,7 +513,7 @@ impl DateParseFunction {
 
         let mut is_string_output = false;
         if mode == "iso" {
-            let date_obj_wrap = self.get_date_object_iso(&date);
+            let date_obj_wrap = get_date_object_iso(&date);
             if date_obj_wrap.is_ok() {
                 let date_obj = date_obj_wrap.unwrap();
                 match date_parse_option {
@@ -685,7 +541,7 @@ impl DateParseFunction {
                 }
             }
         } else if mode == "human_time" {
-            let date_obj_wrap = self.get_date_object_human_time(&date);
+            let date_obj_wrap = get_date_object_human_time(&date);
             
             if date_obj_wrap.is_ok() {
                 let date_obj = date_obj_wrap.unwrap();
@@ -714,7 +570,7 @@ impl DateParseFunction {
                 }
             }
         } else if mode == "only_date" {
-            let date_obj_wrap = self.get_date_object_only_date(&date);
+            let date_obj_wrap = get_date_object_only_date(&date);
             
             if date_obj_wrap.is_ok() {
                 let date_obj = date_obj_wrap.unwrap();
@@ -1001,6 +857,311 @@ impl DaysFunction {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum DateUnits {
+    Milliseconds,
+    Seconds,
+    Minutes,
+    Hours,
+    Days,
+    Weeks,
+    Months,
+    Quarters,
+    Years,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum DateDeltaOperation {
+    Add,
+    Diff,
+}
+
+// DATEADD(date, number, units)
+// DATEDIF(date, number, units)
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DateAddDiffFunction {
+    pub function_text: String,
+    pub date: Option<String>,
+    pub date_ref: Option<String>,
+    pub number: Option<u32>,
+    pub units: Option<DateUnits>,
+    pub operation: DateDeltaOperation,
+}
+impl DateAddDiffFunction {
+    pub fn defaults(function_text: &String, operation: DateDeltaOperation) -> DateAddDiffFunction {
+        let matches: Captures;
+        match operation {
+            DateDeltaOperation::Add => {
+                matches = RE_DATEADD.captures(&function_text).unwrap();
+            },
+            DateDeltaOperation::Diff => {
+                matches = RE_DATEDIF.captures(&function_text).unwrap();
+            },
+        }
+        // date
+        let attr_date = matches.name("date");
+        let attr_number = matches.name("number");
+        let attr_units = matches.name("units");
+        // date with time
+        let attr_datetime = matches.name("datetime");
+        let attr_dt_number = matches.name("dt_number");
+        let attr_dt_units = matches.name("dt_units");
+        // reference to column with date
+        let attr_date_ref = matches.name("date_ref");
+        let attr_ref_number = matches.name("ref_number");
+        let attr_ref_units = matches.name("ref_units");
+        
+        let mut date_wrap: Option<String> = None;
+        let mut date_ref_wrap: Option<String> = None;
+        let mut number_wrap: Option<u32> = None;
+        let mut units_wrap: Option<DateUnits> = None;
+        let mut units_str_wrap: Option<&str> = None;
+        if attr_date.is_some() && attr_number.is_some() && attr_units.is_some() {
+            date_wrap = Some(attr_date.unwrap().as_str().to_string());
+            number_wrap = Some(FromStr::from_str(attr_number.unwrap().as_str()).unwrap());
+            units_str_wrap = Some(attr_units.unwrap().as_str());
+        } else if attr_datetime.is_some() && attr_dt_number.is_some() && attr_dt_units.is_some() {
+            date_wrap = Some(attr_datetime.unwrap().as_str().to_string());
+            number_wrap = Some(FromStr::from_str(attr_dt_number.unwrap().as_str()).unwrap());
+            units_str_wrap = Some(attr_dt_units.unwrap().as_str());
+        } else if attr_date_ref.is_some() && attr_ref_number.is_some() && attr_ref_units.is_some() {
+            date_ref_wrap = Some(attr_date_ref.unwrap().as_str().to_string());
+            number_wrap = Some(FromStr::from_str(attr_ref_number.unwrap().as_str()).unwrap());
+            units_str_wrap = Some(attr_ref_units.unwrap().as_str());
+        }
+        if units_str_wrap.is_some() {
+            let units_str = units_str_wrap.unwrap();
+            let units_str = units_str.replace("\"", "");
+            let units_str = units_str.as_str();
+            let units = match units_str {
+                "milliseconds" => DateUnits::Milliseconds,
+                "seconds" => DateUnits::Seconds,
+                "minutes" => DateUnits::Minutes,
+                "hours" => DateUnits::Hours,
+                "days" => DateUnits::Days,
+                "weeks" => DateUnits::Weeks,
+                "months" => DateUnits::Months,
+                "quarters" => DateUnits::Quarters,
+                "years" => DateUnits::Years,
+                _ => DateUnits::Days,
+            };
+            units_wrap = Some(units);
+        }
+        let obj = Self{
+            function_text: function_text.clone(),
+            date: date_wrap,
+            date_ref: date_ref_wrap,
+            number: number_wrap,
+            units: units_wrap,
+            operation: operation,
+        };
+        return obj
+    }
+    pub fn validate(&self) -> bool {
+        let operation = self.operation.clone();
+        let expr: Regex;
+        match operation {
+            DateDeltaOperation::Add => {
+                expr = RE_DATEADD.clone();
+            },
+            DateDeltaOperation::Diff => {
+                expr = RE_DATEDIF.clone();
+            },
+        }
+        let function_text = self.function_text.clone();
+        let mut check = expr.is_match(&function_text);
+        if check == false {
+            return check
+        }
+        // parse date, datetime
+        let date = self.date.clone().unwrap();
+        let has_time = *&date.find(" ").is_some();
+        if has_time == true {
+            // We have date and time
+            let date_obj_wrap = get_date_object_human_time(&date);
+            if date_obj_wrap.is_err() {
+                check = false;
+            }
+        } else {
+            let date_obj_wrap = get_date_object_only_date(&date);
+            if date_obj_wrap.is_err() {
+                check = false;
+            }
+        }
+        return check
+    }
+    pub fn do_validate(function_text: &String, operation: DateDeltaOperation, number_fails: &u32) -> u32 {
+        let obj = DateAddDiffFunction::defaults(
+            &function_text, operation
+        );
+        let check = obj.validate();
+        let mut number_fails = number_fails.clone();
+        if check == false {
+            number_fails += 1;
+        }
+        return number_fails;
+    }
+    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
+        let data_map = data_map.clone();
+        let function_text = self.function_text.clone();
+        let mut formula = formula.clone();
+        let operation = self.operation.clone();
+        let date = self.date.clone();
+        let number = self.number.clone().unwrap();
+        let number: i64 = FromStr::from_str(number.to_string().as_str()).unwrap();
+        let units = self.units.clone().unwrap();
+        let replacement_string: String;
+        let new_date: DateTime<FixedOffset>;
+        let date_obj: DateTime<FixedOffset>;
+        let has_time: bool;
+        if date.is_some() {
+            let date = date.unwrap();
+            has_time = *&date.find(" ").is_some();
+            if has_time == true {
+                date_obj = get_date_object_human_time(&date).unwrap();
+            } else {
+                date_obj = get_date_object_only_date(&date).unwrap();
+            }
+        } else {
+            let date_ref = self.date_ref.clone().unwrap();
+            // I need to get from data_map the date string
+            let function_attr = FunctionAttribute::defaults(
+                &date_ref, 
+                Some(true)
+            );
+            let date = function_attr.replace(data_map.clone()).item_processed.unwrap();
+            has_time = *&date.find(" ").is_some();
+            if has_time == true {
+                date_obj = get_date_object_human_time(&date).unwrap();
+            } else {
+                date_obj = get_date_object_only_date(&date).unwrap();
+            }
+        }
+        // I could use operation to get date_obj????
+        match units {
+            DateUnits::Milliseconds => {
+                match operation {
+                    DateDeltaOperation::Add => {
+                        new_date = date_obj + Duration::microseconds(number);
+                    },
+                    DateDeltaOperation::Diff => {
+                        new_date = date_obj - Duration::microseconds(number);
+                    },
+                }
+            },
+            DateUnits::Seconds => {
+                match operation {
+                    DateDeltaOperation::Add => {
+                        new_date = date_obj + Duration::seconds(number);
+                    },
+                    DateDeltaOperation::Diff => {
+                        new_date = date_obj - Duration::seconds(number);
+                    },
+                }
+            },
+            DateUnits::Minutes => {
+                match operation {
+                    DateDeltaOperation::Add => {
+                        new_date = date_obj + Duration::minutes(number);
+                    },
+                    DateDeltaOperation::Diff => {
+                        new_date = date_obj - Duration::minutes(number);
+                    },
+                }
+            },
+            DateUnits::Hours => {
+                match operation {
+                    DateDeltaOperation::Add => {
+                        new_date = date_obj + Duration::hours(number);
+                    },
+                    DateDeltaOperation::Diff => {
+                        new_date = date_obj - Duration::hours(number);
+                    },
+                }
+            },
+            DateUnits::Days => {
+                match operation {
+                    DateDeltaOperation::Add => {
+                        new_date = date_obj + Duration::days(number);
+                    },
+                    DateDeltaOperation::Diff => {
+                        new_date = date_obj - Duration::days(number);
+                    },
+                }
+            },
+            DateUnits::Weeks => {
+                match operation {
+                    DateDeltaOperation::Add => {
+                        new_date = date_obj + Duration::weeks(number);
+                    },
+                    DateDeltaOperation::Diff => {
+                        new_date = date_obj - Duration::weeks(number);
+                    },
+                }
+            },
+            DateUnits::Months => {
+                // Here same day in a month (+/-)
+                match operation {
+                    DateDeltaOperation::Add => {
+                        // I can have date or datetime
+                        let month = date_obj.month() + 1;
+                        new_date = date_obj.with_month(month).unwrap();
+                    },
+                    DateDeltaOperation::Diff => {
+                        let month = date_obj.month() - 1;
+                        new_date = date_obj.with_month(month).unwrap();
+                    },
+                }
+            },
+            DateUnits::Quarters => {
+                // Same day in three months (+/-)
+                match operation {
+                    DateDeltaOperation::Add => {
+                        let month = date_obj.month() + 3;
+                        new_date = date_obj.with_month(month).unwrap();
+                    },
+                    DateDeltaOperation::Diff => {
+                        let month = date_obj.month() - 3;
+                        new_date = date_obj.with_month(month).unwrap();
+                    },
+                }
+            },
+            DateUnits::Years => {
+                match operation {
+                    DateDeltaOperation::Add => {
+                        new_date = date_obj + Duration::days(number*365);
+                    },
+                    DateDeltaOperation::Diff => {
+                        new_date = date_obj - Duration::days(number*365);
+                    },
+                }
+            },
+        }
+        if has_time == true {
+            replacement_string = new_date.to_rfc3339();
+        } else {
+            replacement_string = new_date.format("%d-%b-%Y").to_string();
+        }
+        formula = formula.replace(function_text.as_str(), replacement_string.as_str());
+        formula = format!("\"{}\"", formula);
+        return formula;
+    }
+    pub fn do_replace(
+        function_text: &String, 
+        operation: DateDeltaOperation, 
+        data_map: HashMap<String, String>,
+        mut formula: String
+    ) -> String {
+        let data_map = data_map.clone();
+        let mut obj = DateAddDiffFunction::defaults(
+            &function_text, operation
+        );
+        formula = obj.replace(formula, data_map.clone());
+        return formula
+    }
+}
+
+
 pub fn has_month_short(date_str: &String) -> bool {
     let date_str = date_str.clone().to_lowercase();
     let months: Vec<&str> = [
@@ -1055,4 +1216,80 @@ pub fn get_standard_date_short_month(date_str: &String) -> String {
         }
     }
     return date_str
+}
+
+pub fn get_date_object_human_time(date_string: &String) -> Result<DateTime<FixedOffset>, PlanetError> {
+    let date_string = date_string.clone();
+    let mut date_string = date_string.replace("\"", "");
+    // DAY("2021-08-25 06:26:00")
+    // DAY("25-Aug-2021 06:26:00")
+    // DAY("25-AUG-2021 06:26:00")
+
+    // need map AUG -> Aug
+    // Check str month in order to parse
+    let has_short_month = has_month_short(&date_string);
+    if has_short_month {
+        let mut date_string_ = get_standard_date_short_month(&date_string);
+        date_string_ = format!("{}+0000", &date_string_);
+        // date_string now is "25-Aug-2021 06:26:00"
+        let date_obj = DateTime::parse_from_str(
+            &date_string_, 
+            "%d-%b-%Y %H:%M:%S%z"
+        );
+        if date_obj.is_ok() {
+            return Ok(date_obj.unwrap())
+        }
+    } else {
+        // DAY("2021-08-25 06:26:00")
+        // let no_timezone = NaiveDateTime::parse_from_str("2015-09-05 23:56:04", "%Y-%m-%d %H:%M:%S");
+        date_string = format!("{}+0000", &date_string);
+        let date_obj = DateTime::parse_from_str(
+            &date_string, 
+            "%Y-%m-%d %H:%M:%S%z"
+        );
+        if date_obj.is_ok() {
+            return Ok(date_obj.unwrap())
+        }
+    }
+    return Err(
+        PlanetError::new(
+            500, 
+            Some(tr!("Could not parse date")),
+        )
+    );
+}
+
+pub fn get_date_object_only_date(date_string: &String) -> Result<DateTime<FixedOffset>, PlanetError> {
+    let date_string = date_string.clone();
+    let date_string = date_string.replace("\"", "");
+    let mut date_string_ = get_standard_date_short_month(&date_string);
+    date_string_ = format!("{} 00:00:00+0000", &date_string_);
+    let date_obj = DateTime::parse_from_str(
+        &date_string_, 
+        "%d-%b-%Y %H:%M:%S%z"
+    );
+    if date_obj.is_ok() {
+        return Ok(date_obj.unwrap())
+    }
+    return Err(
+        PlanetError::new(
+            500, 
+            Some(tr!("Could not parse date")),
+        )
+    );
+}
+
+pub fn get_date_object_iso(date_string: &String) -> Result<DateTime<FixedOffset>, PlanetError> {
+    let date_string = date_string.clone();
+    let date_string = date_string.replace("\"", "");
+    let date_obj_wrap = DateTime::parse_from_rfc3339(&date_string);
+    if date_obj_wrap.is_ok() {
+        return Ok(date_obj_wrap.unwrap())
+    }
+    return Err(
+        PlanetError::new(
+            500, 
+            Some(tr!("Could not parse date")),
+        )
+    );
 }
