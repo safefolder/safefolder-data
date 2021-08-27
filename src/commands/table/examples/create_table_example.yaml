@@ -108,3 +108,7 @@ fields:
     field_type: Formula
     formula: DATEADD("26-Aug-2021 12:45:00", 45, "minutes")
     formula_format: "Date"
+  - name: Date format
+    field_type: Formula
+    formula: DATEFMT("21-Aug-2021 13:45:22", "{DD} was the day, {YYYY} the year. I love {Do} of months")
+    formula_format: Text

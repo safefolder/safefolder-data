@@ -5,8 +5,10 @@ use serde::{Deserialize, Serialize};
 use lazy_static::lazy_static;
 use chrono::{DateTime, Datelike, FixedOffset, NaiveDate, Timelike, Utc, Duration};
 use tr::tr;
+use ordinal::Ordinal;
 
 use crate::{functions::FunctionAttribute, planet::PlanetError};
+use crate::functions::constants::*;
 
 // 1. defaults receives the function test, that is FUNC_NAME(attr1, attr2, ...) and returns function instance
 //      attributes embeeded into the object attributes. It does not prepare for replacement or anythin.
@@ -33,6 +35,7 @@ lazy_static! {
     static ref RE_DAYS: Regex = Regex::new(r#"(DAYS\((?P<end_date>"\d{1,2}-[a-zA-Z]{3}-\d{4}"),[\s]+(?P<start_date>"\d{1,2}-[a-zA-Z]{3}-\d{4}"))\)|DAYS\(((?P<end_date_ref>\{[\w\s]+\}),[\s]+(?P<start_date_ref>\{[\w\s]+\}))\)"#).unwrap();
     static ref RE_DATEADD: Regex = Regex::new(r#"DATEADD\((?P<date>"\d{1,2}-[a-zA-Z]{3}-\d{4}"),[\s]+(?P<number>\d+),[\s]+(?P<units>("days")|("months")|("milliseconds")|("seconds")|("minutes")|("hours")|("weeks")|("quarters")|("years"))\)|DATEADD\((?P<datetime>"\d{1,2}-[a-zA-Z]{3}-\d{4}[\s]{1}\d{1,2}:\d{1,2}:\d{1,2}"),[\s]+(?P<dt_number>\d+),[\s]+(?P<dt_units>("days")|("months")|("milliseconds")|("seconds")|("minutes")|("hours")|("weeks")|("quarters")|("years"))\)|DATEADD\((?P<date_ref>\{[\w\s]+\}),[\s]+(?P<ref_number>\d{1,2}),[\s]+(?P<ref_units>("days")|("months")|("milliseconds")|("seconds")|("minutes")|("hours")|("weeks")|("quarters")|("years"))\)"#).unwrap();
     static ref RE_DATEDIF: Regex = Regex::new(r#"DATEDIF\((?P<date>"\d{1,2}-[a-zA-Z]{3}-\d{4}"),[\s]+(?P<number>\d+),[\s]+(?P<units>("days")|("months")|("milliseconds")|("seconds")|("minutes")|("hours")|("weeks")|("quarters")|("years"))\)|DATEDIF\((?P<datetime>"\d{1,2}-[a-zA-Z]{3}-\d{4}[\s]{1}\d{1,2}:\d{1,2}:\d{1,2}"),[\s]+(?P<dt_number>\d+),[\s]+(?P<dt_units>("days")|("months")|("milliseconds")|("seconds")|("minutes")|("hours")|("weeks")|("quarters")|("years"))\)|DATEDIF\((?P<date_ref>\{[\w\s]+\}),[\s]+(?P<ref_number>\d{1,2}),[\s]+(?P<ref_units>("days")|("months")|("milliseconds")|("seconds")|("minutes")|("hours")|("weeks")|("quarters")|("years"))\)"#).unwrap();
+    static ref RE_DATEFMT: Regex = Regex::new(r#"DATEFMT\((?P<date>"\d{1,2}-[a-zA-Z]{3}-\d{4}"),[\s]+(?P<format>"[\{a-zA-Z-/,:_\s\}].+")\)|DATEFMT\((?P<datetime>"\d{1,2}-[a-zA-Z]{3}-\d{4}\s{1}\d{2}:\d{2}:\d{2}"),[\s]+(?P<dt_format>"[\{a-zA-Z-/,:_\s\}].+")\)|DATEFMT\((?P<ref>\{[\w\s]+\}),[\s]+(?P<ref_format>"[\{a-zA-Z-/,:_\s\}].+")\)"#).unwrap();
 }
 
 // DATE(year,month,day)
@@ -71,7 +74,8 @@ impl DateFunction {
         let check = expr.is_match(&function_text);
         return check
     }
-    pub fn do_validate(function_text: &String, number_fails: &u32) -> u32 {
+    pub fn do_validate(function_text: &String, validate_tuple: (u32, Vec<String>)) -> (u32, Vec<String>) {
+        let (number_fails, mut failed_functions) = validate_tuple;
         let concat_obj = DateFunction::defaults(
             &function_text, 
         );
@@ -79,8 +83,9 @@ impl DateFunction {
         let mut number_fails = number_fails.clone();
         if check == false {
             number_fails += 1;
+            failed_functions.push(String::from(FUNCTION_DATE));
         }
-        return number_fails;
+        return (number_fails, failed_functions);
     }
     pub fn replace(&mut self, formula: String) -> String {
         let function_text = self.function_text.clone();
@@ -246,7 +251,12 @@ impl DateTimeParseFunction {
         }
         return check
     }
-    pub fn do_validate(function_text: &String, date_parse_option: DateTimeParseOption, number_fails: &u32) -> u32 {
+    pub fn do_validate(
+        function_text: &String, 
+        date_parse_option: DateTimeParseOption, 
+        validate_tuple: (u32, Vec<String>)
+    ) -> (u32, Vec<String>) {
+        let (number_fails, mut failed_functions) = validate_tuple;
         let obj = DateTimeParseFunction::defaults(
             &function_text, date_parse_option.clone()
         );
@@ -254,8 +264,19 @@ impl DateTimeParseFunction {
         let mut number_fails = number_fails.clone();
         if check == false {
             number_fails += 1;
+            match date_parse_option {
+                DateTimeParseOption::Hour => {
+                    failed_functions.push(String::from(FUNCTION_HOUR));
+                },
+                DateTimeParseOption::Minute => {
+                    failed_functions.push(String::from(FUNCTION_MINUTE));
+                },
+                DateTimeParseOption::Second => {
+                    failed_functions.push(String::from(FUNCTION_SECOND));
+                },
+            }
         }
-        return number_fails;
+        return (number_fails, failed_functions);
     }
     pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
         let function_text = self.function_text.clone();
@@ -480,7 +501,12 @@ impl DateParseFunction {
         }
         return check
     }
-    pub fn do_validate(function_text: &String, date_parse_option: DateParseOption, number_fails: &u32) -> u32 {
+    pub fn do_validate(
+        function_text: &String, 
+        date_parse_option: DateParseOption, 
+        validate_tuple: (u32, Vec<String>)
+    ) -> (u32, Vec<String>) {
+        let (number_fails, mut failed_functions) = validate_tuple;
         let obj = DateParseFunction::defaults(
             &function_text, date_parse_option.clone()
         );
@@ -488,8 +514,25 @@ impl DateParseFunction {
         let mut number_fails = number_fails.clone();
         if check == false {
             number_fails += 1;
+            match date_parse_option {
+                DateParseOption::Day => {
+                    failed_functions.push(String::from(FUNCTION_DAY));
+                },
+                DateParseOption::Week => {
+                    failed_functions.push(String::from(FUNCTION_WEEK));
+                },
+                DateParseOption::WeekDay => {
+                    failed_functions.push(String::from(FUNCTION_WEEKDAY));
+                },
+                DateParseOption::Month => {
+                    failed_functions.push(String::from(FUNCTION_MONTH));
+                },
+                DateParseOption::Year => {
+                    failed_functions.push(String::from(FUNCTION_YEAR));
+                },
+            }
         }
-        return number_fails;
+        return (number_fails, failed_functions);
     }
     pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
         let function_text = self.function_text.clone();
@@ -642,7 +685,8 @@ impl NowFunction {
         let check = expr.is_match(&function_text);
         return check
     }
-    pub fn do_validate(function_text: &String, number_fails: &u32) -> u32 {
+    pub fn do_validate(function_text: &String, validate_tuple: (u32, Vec<String>)) -> (u32, Vec<String>) {
+        let (number_fails, mut failed_functions) = validate_tuple;
         let obj = NowFunction::defaults(
             &function_text
         );
@@ -650,8 +694,9 @@ impl NowFunction {
         let mut number_fails = number_fails.clone();
         if check == false {
             number_fails += 1;
+            failed_functions.push(String::from(FUNCTION_NOW));
         }
-        return number_fails;
+        return (number_fails, failed_functions);
     }
     pub fn replace(&mut self, formula: String) -> String {
         let function_text = self.function_text.clone();
@@ -694,7 +739,8 @@ impl TodayFunction {
         let check = expr.is_match(&function_text);
         return check
     }
-    pub fn do_validate(function_text: &String, number_fails: &u32) -> u32 {
+    pub fn do_validate(function_text: &String, validate_tuple: (u32, Vec<String>)) -> (u32, Vec<String>) {
+        let (number_fails, mut failed_functions) = validate_tuple;
         let obj = TodayFunction::defaults(
             &function_text
         );
@@ -702,8 +748,9 @@ impl TodayFunction {
         let mut number_fails = number_fails.clone();
         if check == false {
             number_fails += 1;
+            failed_functions.push(String::from(FUNCTION_TODAY));
         }
-        return number_fails;
+        return (number_fails, failed_functions);
     }
     pub fn replace(&mut self, formula: String) -> String {
         let function_text = self.function_text.clone();
@@ -783,7 +830,8 @@ impl DaysFunction {
         let check = expr.is_match(&function_text);
         return check
     }
-    pub fn do_validate(function_text: &String, number_fails: &u32) -> u32 {
+    pub fn do_validate(function_text: &String, validate_tuple: (u32, Vec<String>)) -> (u32, Vec<String>) {
+        let (number_fails, mut failed_functions) = validate_tuple;
         let obj = DaysFunction::defaults(
             &function_text
         );
@@ -791,8 +839,9 @@ impl DaysFunction {
         let mut number_fails = number_fails.clone();
         if check == false {
             number_fails += 1;
+            failed_functions.push(String::from(FUNCTION_DAYS));
         }
-        return number_fails;
+        return (number_fails, failed_functions);
     }
     pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
         let data_map = data_map.clone();
@@ -990,7 +1039,13 @@ impl DateAddDiffFunction {
         }
         return check
     }
-    pub fn do_validate(function_text: &String, operation: DateDeltaOperation, number_fails: &u32) -> u32 {
+    pub fn do_validate(
+        function_text: &String, 
+        operation: DateDeltaOperation, 
+        validate_tuple: (u32, Vec<String>)
+    ) -> (u32, Vec<String>) {
+        let (number_fails, mut failed_functions) = validate_tuple;
+        let operation_ = operation.clone();
         let obj = DateAddDiffFunction::defaults(
             &function_text, operation
         );
@@ -998,8 +1053,16 @@ impl DateAddDiffFunction {
         let mut number_fails = number_fails.clone();
         if check == false {
             number_fails += 1;
+            match operation_ {
+                DateDeltaOperation::Add => {
+                    failed_functions.push(String::from(FUNCTION_DATEADD));
+                },
+                DateDeltaOperation::Diff => {
+                    failed_functions.push(String::from(FUNCTION_DATEDIF));
+                },
+            }
         }
-        return number_fails;
+        return (number_fails, failed_functions);
     }
     pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
         let data_map = data_map.clone();
@@ -1155,6 +1218,249 @@ impl DateAddDiffFunction {
         let data_map = data_map.clone();
         let mut obj = DateAddDiffFunction::defaults(
             &function_text, operation
+        );
+        formula = obj.replace(formula, data_map.clone());
+        return formula
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DateFormatFunction {
+    pub function_text: String,
+    pub date: Option<String>,
+    pub datetime: Option<String>,
+    pub date_ref: Option<String>,
+    pub format: Option<String>,
+}
+impl DateFormatFunction {
+    pub fn defaults(function_text: &String) -> DateFormatFunction {
+        let matches= RE_DATEFMT.captures(&function_text).unwrap();
+
+        // date
+        let date = matches.name("date");
+        let datetime = matches.name("datetime");
+        let date_ref = matches.name("ref");
+        // format
+        let fmt = matches.name("format");
+        let dt_fmt = matches.name("dt_format");
+        let ref_fmt = matches.name("ref_format");
+
+        let mut date_wrap: Option<String> = None;
+        let mut datetime_wrap: Option<String> = None;
+        let mut date_ref_wrap: Option<String> = None;
+        let mut format_wrap: Option<String> = None;
+
+        if date.is_some() && fmt.is_some() {
+            date_wrap = Some(date.unwrap().as_str().to_string());
+            format_wrap = Some(fmt.unwrap().as_str().to_string());
+        } else if datetime.is_some() && dt_fmt.is_some() {
+            datetime_wrap = Some(datetime.unwrap().as_str().to_string());
+            format_wrap = Some(dt_fmt.unwrap().as_str().to_string());
+        } else if date_ref.is_some() && ref_fmt.is_some() {
+            date_ref_wrap = Some(date_ref.unwrap().as_str().to_string());
+            format_wrap = Some(ref_fmt.unwrap().as_str().to_string());
+        }
+
+        let obj = Self{
+            function_text: function_text.clone(),
+            date: date_wrap,
+            datetime: datetime_wrap,
+            date_ref: date_ref_wrap,
+            format: format_wrap,
+        };
+        return obj
+    }
+    pub fn get_rust_format(&self, date_obj: DateTime<FixedOffset>) -> String {
+        let mut format = self.format.clone().unwrap();
+        let mut fmt_map: HashMap<&str, &str> = HashMap::new();
+        fmt_map.insert("M", "%_m");
+        fmt_map.insert("Mo", "");
+        fmt_map.insert("MM", "%m");
+        fmt_map.insert("MMM", "%b");
+        fmt_map.insert("MMMM", "%B");
+        fmt_map.insert("D", "%_d");
+        fmt_map.insert("Do", "");
+        fmt_map.insert("DD", "%d");
+        fmt_map.insert("d", "%w");
+        fmt_map.insert("ddd", "%a");
+        fmt_map.insert("dddd", "%A");
+        fmt_map.insert("w", "%_W");
+        fmt_map.insert("ww", "%W");
+        fmt_map.insert("YY", "%y");
+        fmt_map.insert("YYYY", "%Y");
+        fmt_map.insert("H", "%k");
+        fmt_map.insert("HH", "%H");
+        fmt_map.insert("h", "%l");
+        fmt_map.insert("hh", "%I");
+        fmt_map.insert("A", "%P");
+        fmt_map.insert("a", "%p");
+        fmt_map.insert("m", "%_M");
+        fmt_map.insert("mm", "%M");
+        fmt_map.insert("s", "%_S");
+        fmt_map.insert("ss", "%S");
+        fmt_map.insert("S", "%.f");
+        fmt_map.insert("Z", "%:z");
+        fmt_map.insert("ZZ", "%z");
+        fmt_map.insert("X", "%s");
+        fmt_map.insert("x", "%s");
+
+        // additional processing: x, ww, Mo, Do
+        for fmt_key in fmt_map.keys() {
+            let fmt_key = fmt_key.clone();
+            let mut find_key = String::from("{");
+            find_key.push_str(fmt_key);
+            find_key.push_str("}");
+            let has_key = format.find(find_key.as_str());
+            let value = fmt_map.get(fmt_key);
+            if has_key.is_some() && value.is_some() {
+                let value = value.unwrap();
+                if fmt_key == "x" {
+                    // Timestamp in miliseconds
+                    let value_int: u64 = FromStr::from_str(value).unwrap();
+                    let value_str = (value_int*1000).to_string();
+                    let value_str = value_str.as_str();
+                    format = format.replace(find_key.as_str(), value_str);
+                } else if fmt_key == "ww" {
+                    // Week number starts with 01 instead of 00
+                    let mut value_int: u64 = FromStr::from_str(value).unwrap();
+                    value_int += 1;
+                    let value_str = value_int.to_string();
+                    let mut value_str = value_str.as_str();
+                    let value_str_: String = format!("0{}", value_str).clone();
+                    if value_str.len() < 2 {
+                        value_str = value_str_.as_str();
+                    }
+                    format = format.replace(find_key.as_str(), value_str);
+                } else if fmt_key == "Mo" {
+                    // Number of month as 1st, 2nd 13th, 31st, etc...
+                    let number_month = date_obj.month();
+                    let ord_number_month = Ordinal(number_month).to_string();
+                    let ord_number_month = ord_number_month.as_str();
+                    format = format.replace(find_key.as_str(), ord_number_month);
+                } else if fmt_key == "Do" {
+                    // Number of day as 1st, 2nd 13th, 31st, etc...
+                    let number_day = date_obj.day();
+                    let ord_number_day = Ordinal(number_day).to_string();
+                    let ord_number_day = ord_number_day.as_str();
+                    format = format.replace(find_key.as_str(), ord_number_day);
+                } else {
+                    format = format.replace(find_key.as_str(), value);
+                }
+            }
+        }
+        return format;
+    }
+    pub fn validate(&self) -> bool {
+        let expr: Regex = RE_DATEFMT.clone();
+        let function_text = self.function_text.clone();
+        let mut check = expr.is_match(&function_text);
+        let date = self.date.clone();
+        let datetime = self.datetime.clone();
+        let format = self.format.clone();
+        if date.is_none() && datetime.is_none() {
+            check = false;
+        }
+        if format.is_none() {
+            check = false;
+        }
+        if check == false {
+            return check
+        }
+
+        let mut date_obj_wrap: Option<DateTime<FixedOffset>> = None;
+        if date.is_some() && datetime.is_none() {
+            // I have date
+            let date = date.unwrap();
+            let date_obj_wrap_ = get_date_object_only_date(&date);
+            if date_obj_wrap_.is_err() {
+                return false;
+            }
+            date_obj_wrap = Some(date_obj_wrap_.unwrap());
+        } else if datetime.is_some() && date.is_none() {
+            // I have date with time
+            let date = datetime.unwrap();
+            let date_obj_wrap_ = get_date_object_human_time(&date);
+            if date_obj_wrap_.is_err() {
+                return false;
+            }
+            date_obj_wrap = Some(date_obj_wrap_.unwrap());
+        }
+
+        let format = self.get_rust_format(date_obj_wrap.unwrap());
+        let date_obj = date_obj_wrap.unwrap();
+        let date_string = date_obj.format(format.as_str()).to_string();
+        if date_string.len() == 0 {
+            check = false;
+        }
+        return check
+    }
+    pub fn do_validate(
+        function_text: &String, 
+        validate_tuple: (u32, Vec<String>),
+    ) -> (u32, Vec<String>) {
+        let (number_fails, failed_functions) = validate_tuple.clone();
+        let obj = DateFormatFunction::defaults(
+            &function_text
+        );
+        let check = obj.validate();
+        let mut number_fails = number_fails.clone();
+        let mut failed_functions = failed_functions.clone();
+        if check == false {
+            number_fails += 1;
+            failed_functions.push(String::from(FUNCTION_DATEFMT));
+        }
+        return (number_fails, failed_functions);
+    }
+    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
+        let data_map = data_map.clone();
+        let function_text = self.function_text.clone();
+        let date = self.date.clone();
+        let datetime = self.datetime.clone();
+        let date_ref = self.date_ref.clone();
+        let mut formula = formula.clone();
+
+        let date_str: String;
+        let mut date_obj_wrap: Option<DateTime<FixedOffset>> = None;
+        // let has_time: bool = false;
+        if date_ref.is_some() {
+            eprintln!("DateFmt.replace :: data map length: {}", &data_map.len());
+            // let date_ref = date_ref.unwrap();
+            // let function_attr = FunctionAttribute::defaults(
+            //     &date_ref, 
+            //     Some(true)
+            // );
+            // date_str = function_attr.replace(data_map.clone()).item_processed.unwrap();
+            // What I have at database?????? Need to check with table config
+            // Might be only date, or datetime
+            // TODO: Do when we have the date fields
+        } else {
+            if date.is_some() && datetime.is_none() {
+                eprintln!("");
+                date_str = date.unwrap();
+                let date_obj_wrap_ = get_date_object_only_date(&date_str);
+                date_obj_wrap = Some(date_obj_wrap_.unwrap());
+            } else if datetime.is_some() && date.is_none() {
+                date_str = datetime.unwrap();
+                let date_obj_wrap_ = get_date_object_human_time(&date_str);
+                date_obj_wrap = Some(date_obj_wrap_.unwrap());
+            }
+        }
+        let date_obj = date_obj_wrap.unwrap();
+        let format = self.get_rust_format(date_obj);
+        let date_string = date_obj.format(format.as_str()).to_string();
+        let replacement_string: String = date_string;
+
+        formula = formula.replace(function_text.as_str(), replacement_string.as_str());
+        return formula;
+    }
+    pub fn do_replace(
+        function_text: &String, 
+        data_map: HashMap<String, String>,
+        mut formula: String
+    ) -> String {
+        let data_map = data_map.clone();
+        let mut obj = DateFormatFunction::defaults(
+            &function_text
         );
         formula = obj.replace(formula, data_map.clone());
         return formula

@@ -23,6 +23,7 @@ pub const FORMULA_FUNCTIONS: [&str; 50] = [
     FUNCTION_UPPER,
     FUNCTION_REPLACE,
     FUNCTION_DATE,
+    FUNCTION_DATEFMT,
     FUNCTION_DAY,
     FUNCTION_DAYS,
     FUNCTION_HOUR,
@@ -59,8 +60,7 @@ pub const FORMULA_FUNCTIONS: [&str; 50] = [
     FUNCTION_VALUE,
     FUNCTION_CREATED_TIME,
     FUNCTION_DATEADD,
-    FUNCTION_DATETDIF,
-    FUNCTION_DATETIME_FORMAT,
+    FUNCTION_DATEDIF,
     FUNCTION_LAST_MODIFIED_TIME,
     FUNCTION_RECORD_ID,
     FUNCTION_TRUE,
@@ -163,6 +163,10 @@ impl FunctionsHanler{
                 formula = DateAddDiffFunction::do_replace(
                     &self.function_text, DateDeltaOperation::Add, self.data_map.clone(), formula);
             },
+            FUNCTION_DATEFMT => {
+                formula = DateFormatFunction::do_replace(
+                    &self.function_text, self.data_map.clone(), formula);
+            },
             _ => {
             }
         }
@@ -197,84 +201,94 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
 
     // Validate all formula_functions (only ones found in formula from all functions in achiever)
     let mut number_fails: u32 = 0;
+    let mut failed_functions: Vec<String> = Vec::new();
+    let mut validate_tuple = (number_fails, failed_functions);
     for function_name in function_name_map.keys() {
         let function_name = function_name.as_str();
         eprintln!("validate_formula :: ** function_name: {}", &function_name);
         let function_text = function_name_map.get(function_name).unwrap();
         match function_name {
             FUNCTION_CONCAT => {
-                number_fails = ConcatenateFunction::do_validate(function_text, &number_fails);
+                validate_tuple = ConcatenateFunction::do_validate(function_text, validate_tuple);
             },
             FUNCTION_FORMAT => {
-                number_fails = FormatFunction::do_validate(function_text, &number_fails);
+                validate_tuple = FormatFunction::do_validate(function_text, validate_tuple);
             },
             FUNCTION_JOINLIST => {
-                number_fails = JoinListFunction::do_validate(function_text, &number_fails);
+                validate_tuple = JoinListFunction::do_validate(function_text, validate_tuple);
             },
             FUNCTION_LENGTH => {
-                number_fails = LengthFunction::do_validate(function_text, &number_fails);
+                validate_tuple = LengthFunction::do_validate(function_text, validate_tuple);
             },
             FUNCTION_LOWER => {
-                number_fails = LowerFunction::do_validate(function_text, &number_fails);
+                validate_tuple = LowerFunction::do_validate(function_text, validate_tuple);
             },
             FUNCTION_UPPER => {
-                number_fails = UpperFunction::do_validate(function_text, &number_fails);
+                validate_tuple = UpperFunction::do_validate(function_text, validate_tuple);
             },
             FUNCTION_REPLACE => {
-                number_fails = ReplaceFunction::do_validate(function_text, &number_fails);
+                validate_tuple = ReplaceFunction::do_validate(function_text, validate_tuple);
             },
             FUNCTION_DATE => {
-                number_fails = DateFunction::do_validate(function_text, &number_fails);
+                validate_tuple = DateFunction::do_validate(function_text, validate_tuple);
             },
             FUNCTION_SECOND => {
-                number_fails = DateTimeParseFunction::do_validate(function_text, DateTimeParseOption::Second, &number_fails);
+                validate_tuple = DateTimeParseFunction::do_validate(function_text, 
+                    DateTimeParseOption::Second, validate_tuple);
             },
             FUNCTION_MINUTE => {
-                number_fails = DateTimeParseFunction::do_validate(function_text, DateTimeParseOption::Minute, &number_fails);
+                validate_tuple = DateTimeParseFunction::do_validate(function_text, 
+                    DateTimeParseOption::Minute, validate_tuple);
             },
             FUNCTION_HOUR => {
-                number_fails = DateTimeParseFunction::do_validate(function_text, DateTimeParseOption::Hour, &number_fails);
+                validate_tuple = DateTimeParseFunction::do_validate(function_text, 
+                    DateTimeParseOption::Hour, validate_tuple);
             },
             FUNCTION_DAY => {
-                number_fails = DateParseFunction::do_validate(function_text, DateParseOption::Day, &number_fails);
-                eprintln!("validate_formula :: DAY : number_fails: {}", &number_fails);
+                validate_tuple = DateParseFunction::do_validate(function_text, DateParseOption::Day, validate_tuple);
             },
             FUNCTION_WEEK => {
-                number_fails = DateParseFunction::do_validate(function_text, DateParseOption::Week, &number_fails);
+                validate_tuple = DateParseFunction::do_validate(function_text, DateParseOption::Week, validate_tuple);
             },
             FUNCTION_WEEKDAY => {
-                number_fails = DateParseFunction::do_validate(function_text, DateParseOption::WeekDay, &number_fails);
+                validate_tuple = DateParseFunction::do_validate(function_text, DateParseOption::WeekDay, validate_tuple);
             },
             FUNCTION_MONTH => {
-                number_fails = DateParseFunction::do_validate(function_text, DateParseOption::Month, &number_fails);
+                validate_tuple = DateParseFunction::do_validate(function_text, DateParseOption::Month, validate_tuple);
             },
             FUNCTION_YEAR => {
-                number_fails = DateParseFunction::do_validate(function_text, DateParseOption::Year, &number_fails);
+                validate_tuple = DateParseFunction::do_validate(function_text, DateParseOption::Year, validate_tuple);
             },
             FUNCTION_NOW => {
-                number_fails = NowFunction::do_validate(function_text, &number_fails);
+                validate_tuple = NowFunction::do_validate(function_text, validate_tuple);
             },
             FUNCTION_TODAY => {
-                number_fails = TodayFunction::do_validate(function_text, &number_fails);
+                validate_tuple = TodayFunction::do_validate(function_text, validate_tuple);
             },
             FUNCTION_DAYS => {
-                number_fails = DaysFunction::do_validate(function_text, &number_fails);
+                validate_tuple = DaysFunction::do_validate(function_text, validate_tuple);
             },
             FUNCTION_DATEADD => {
-                number_fails = DateAddDiffFunction::do_validate(function_text, 
-                    DateDeltaOperation::Add, &number_fails);
+                validate_tuple = DateAddDiffFunction::do_validate(function_text, 
+                    DateDeltaOperation::Add, validate_tuple);
+            },
+            FUNCTION_DATEFMT => {
+                validate_tuple = DateFormatFunction::do_validate(function_text, validate_tuple);
             },
             _ => {
                 number_fails += 1;
             }
         }
     }
+    number_fails = validate_tuple.0;
+    failed_functions = validate_tuple.1;
     eprintln!("validate_formula :: number_fails: {}", &number_fails);
     if number_fails > 0 {
+        let failed_functions_str = failed_functions.join(", ");
         return Err(
             PlanetError::new(
                 500, 
-                Some(tr!("Could not validate formula")),
+                Some(tr!("Could not validate formula. Failed functions: {}", &failed_functions_str)),
             )
         );
     }
