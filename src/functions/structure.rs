@@ -79,7 +79,7 @@ impl IfFunction {
         let mut number_fails = number_fails.clone();
         if check == false {
             number_fails += 1;
-            failed_functions.push(String::from(FUNCTION_DATE));
+            failed_functions.push(String::from(FUNCTION_IF));
         }
         return (number_fails, failed_functions);
     }
