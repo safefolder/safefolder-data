@@ -132,3 +132,11 @@ fields:
     field_type: Formula
     formula: MID({My Field}, 1, 3)
     formula_format: Text
+  - name: REPT text
+    field_type: Formula
+    formula: REPT("-", 10)
+    formula_format: Text
+  - name: REPT text ref
+    field_type: Formula
+    formula: REPT({My Field}, 3)
+    formula_format: Text

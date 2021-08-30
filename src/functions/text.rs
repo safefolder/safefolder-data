@@ -25,6 +25,7 @@ lazy_static! {
     static ref RE_SINGLE_ATTR: Regex = Regex::new(r#"("[\w\s-]+")|(\{[\w\s]+\})"#).unwrap();
     static ref RE_REPLACE: Regex = Regex::new(r#"REPLACE\("(?P<old_text>[\w\s]+)",[\s]+(?P<start_num>\d),[\s]+(?P<num_chars>\d),[\s]+"(?P<new_text>[\w\s]+)"\)"#).unwrap();
     static ref RE_MID: Regex = Regex::new(r#"MID\(((?P<text>"[\w\s]+")|(?P<text_ref>\{[\w\s]+\}))[\s\n\t]{0,},[\s\n\t]{0,}(?P<start_num>\d+)[\s\n\t]{0,},[\s\n\t]{0,}(?P<num_chars>\d+)\)"#).unwrap();
+    static ref RE_REPT: Regex = Regex::new(r#"REPT\(((?P<text>"[\w\s\W]+")|(?P<text_ref>\{[\w\s]+\}))[\s\n\t]{0,},[\s\n\t]{0,}(?P<number_times>\d+)\)"#).unwrap();
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -702,6 +703,115 @@ impl MidFunction {
     pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
         let data_map = data_map.clone();
         let mut concat_obj = MidFunction::defaults(
+            &function_text, 
+        );
+        formula = concat_obj.replace(formula, data_map.clone());
+        return formula
+    }
+}
+
+// REPT(text, number_times)
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ReptFunction {
+    pub function_text: String,
+    pub text: Option<String>,
+    pub text_ref: Option<String>,
+    pub number_times: Option<u32>,
+}
+impl ReptFunction {
+    pub fn defaults(function_text: &String) -> ReptFunction {
+        // REPT(text, number_times)
+
+        let matches = RE_REPT.captures(function_text).unwrap();
+        let attr_text = matches.name("text");
+        let attr_text_ref = matches.name("text_ref");
+        let attr_number_times = matches.name("number_times");
+
+        let mut text_wrap: Option<String> = None;
+        let mut text_ref_wrap: Option<String> = None;
+        let mut number_times_wrap: Option<u32> = None;
+
+        if attr_text.is_some() && attr_number_times.is_some() {
+            text_wrap = Some(attr_text.unwrap().as_str().to_string());
+            let number_times: u32 = FromStr::from_str(attr_number_times.unwrap().as_str()).unwrap();
+            number_times_wrap = Some(number_times);
+        } else if attr_text_ref.is_some() && attr_number_times.is_some() {
+            text_ref_wrap = Some(attr_text_ref.unwrap().as_str().to_string());
+            let number_times: u32 = FromStr::from_str(attr_number_times.unwrap().as_str()).unwrap();
+            number_times_wrap = Some(number_times);
+        }
+
+        let obj = Self{
+            function_text: function_text.clone(),
+            text: text_wrap,
+            text_ref: text_ref_wrap,
+            number_times: number_times_wrap,
+        };
+        return obj
+    }
+    pub fn validate(&self) -> bool {
+        let expr = RE_REPT.clone();
+        let function_text = self.function_text.clone();
+        let mut check = expr.is_match(&function_text);
+        let number_times = self.number_times.clone();
+        if check == false {
+            return check
+        }
+        if number_times.is_none() {
+            check = false;
+        }
+        return check
+    }
+    pub fn do_validate(
+        function_text: &String, 
+        validate_tuple: (u32, Vec<String>)
+    ) -> (u32, Vec<String>) {
+        let (number_fails, mut failed_functions) = validate_tuple;
+        let concat_obj = ReptFunction::defaults(
+            &function_text, 
+        );
+        let check = concat_obj.validate();
+        let mut number_fails = number_fails.clone();
+        if check == false {
+            number_fails += 1;
+            failed_functions.push(String::from(FUNCTION_REPT));
+        }
+        return (number_fails, failed_functions);
+    }
+    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
+        let data_map = data_map.clone();
+        let function_text = self.function_text.clone();
+        let mut formula = formula.clone();
+        let replacement_string: String;
+
+        let text_wrap = self.text.clone();
+        let text_ref_wrap = self.text_ref.clone();
+        let number_times: u32 = self.number_times.unwrap();
+        let number_times = number_times as usize;
+        let mut text: String;
+        if text_wrap.is_some() {
+            text = text_wrap.unwrap();
+            text = text.replace("\"", "");
+        } else {
+            let text_ref = text_ref_wrap.unwrap();
+            let function_attr = FunctionAttribute::defaults(
+                &text_ref, 
+                Some(true)
+            );
+            text = function_attr.replace(data_map.clone()).item_processed.unwrap();
+            text = text.replace("\"", "");
+        }
+        let text_str = text.as_str();
+        let text_str = text_str.repeat(number_times);
+        replacement_string = text_str;
+
+        formula = formula.replace(function_text.as_str(), replacement_string.as_str());
+        formula = format!("\"{}\"", formula);
+        return formula;
+    }
+    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
+        let data_map = data_map.clone();
+        let mut concat_obj = ReptFunction::defaults(
             &function_text, 
         );
         formula = concat_obj.replace(formula, data_map.clone());
