@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use tr::tr;
-use xlformula_engine::{calculate, parse_formula, NoReference, NoCustomFunction, types};
+use xlformula_engine::{calculate, parse_formula, NoReference, NoCustomFunction};
 use regex::Regex;
 
 use crate::commands::table::constants::{FIELD_IDS, KEY, SELECT_OPTIONS, VALUE};
@@ -1102,7 +1102,8 @@ impl ProcessField for FormulaField {
                     let handler = FunctionsHanler{
                         function_name: function_name.clone(),
                         function_text: function_text_string,
-                        data_map: insert_data_map.clone()
+                        data_map: insert_data_map.clone(),
+                        table: table.clone(),
                     };
                     eprintln!("FormulaField.process :: handler: {:#?}", &handler);
                     formula = handler.do_functions(formula);
@@ -1234,7 +1235,7 @@ impl Formula{
         }
         return None
     }
-    pub fn execute_formula(formula: &String) -> types::Value {
+    pub fn execute_formula(formula: &String) -> String {
         // Built functions
         // AND, OR, NOT, XOR, ABS, SUM, PRODUCT, AVERAGE, RIGHT, LEFT, DAYS, NEGATE
         let formula = format!("={}", formula);
@@ -1247,6 +1248,7 @@ impl Formula{
             None::<NoCustomFunction>
         );
         let result = calculate::calculate_formula(formula_, None::<NoReference>);
+        let result = calculate::result_to_string(result);
         return result
     }
 }

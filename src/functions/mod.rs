@@ -1,6 +1,7 @@
 pub mod constants;
 pub mod text;
 pub mod date;
+pub mod structure;
 
 use std::collections::HashMap;
 use lazy_static::lazy_static;
@@ -11,7 +12,9 @@ use tr::tr;
 use crate::functions::constants::*;
 use crate::functions::text::*;
 use crate::functions::date::*;
+use crate::functions::structure::*;
 use crate::planet::PlanetError;
+use crate::storage::table::DbData;
 
 // achiever planet functions
 pub const FORMULA_FUNCTIONS: [&str; 50] = [
@@ -77,6 +80,7 @@ pub struct FunctionsHanler {
     pub function_name: String,
     pub function_text: String,
     pub data_map: HashMap<String, String>,
+    pub table: DbData,
 }
 impl FunctionsHanler{
     pub fn do_functions(&self, mut formula: String) -> String {
@@ -167,6 +171,10 @@ impl FunctionsHanler{
                 formula = DateFormatFunction::do_replace(
                     &self.function_text, self.data_map.clone(), formula);
             },
+            FUNCTION_IF => {
+                formula = IfFunction::do_replace(
+                    &self.function_text, formula, self.data_map.clone(), &self.table.clone());
+            },            
             _ => {
             }
         }
@@ -274,6 +282,9 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
             },
             FUNCTION_DATEFMT => {
                 validate_tuple = DateFormatFunction::do_validate(function_text, validate_tuple);
+            },
+            FUNCTION_IF => {
+                validate_tuple = IfFunction::do_validate(function_text, validate_tuple);
             },
             _ => {
                 number_fails += 1;
