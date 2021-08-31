@@ -2,6 +2,7 @@ pub mod constants;
 pub mod text;
 pub mod date;
 pub mod structure;
+pub mod number;
 
 use std::collections::HashMap;
 use lazy_static::lazy_static;
@@ -12,6 +13,7 @@ use tr::tr;
 use crate::functions::constants::*;
 use crate::functions::text::*;
 use crate::functions::date::*;
+use crate::functions::number::*;
 use crate::functions::structure::*;
 use crate::planet::PlanetError;
 use crate::storage::table::DbData;
@@ -129,6 +131,10 @@ impl FunctionsHanler{
             },
             FUNCTION_TRIM => {
                 formula = TrimFunction::do_replace(
+                    &self.function_text, self.data_map.clone(), formula);
+            },
+            FUNCTION_CEILING => {
+                formula = CeilingFunction::do_replace(
                     &self.function_text, self.data_map.clone(), formula);
             },
             FUNCTION_DATE => {
@@ -264,6 +270,9 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
             },
             FUNCTION_TRIM => {
                 validate_tuple = TrimFunction::do_validate(function_text, validate_tuple);
+            },
+            FUNCTION_CEILING => {
+                validate_tuple = CeilingFunction::do_validate(function_text, validate_tuple);
             },
             FUNCTION_DATE => {
                 validate_tuple = DateFunction::do_validate(function_text, validate_tuple);

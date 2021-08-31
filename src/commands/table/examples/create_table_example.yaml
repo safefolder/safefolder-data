@@ -156,3 +156,11 @@ fields:
     field_type: Formula
     formula: TRIM({My Field})
     formula_format: Text
+  - name: Ceil Number
+    field_type: Formula
+    formula: CEILING(2.5, 1)
+    formula_format: Number
+  - name: Ceil Number Ref
+    field_type: Formula
+    formula: CEILING({Counter}, 1)
+    formula_format: Number
