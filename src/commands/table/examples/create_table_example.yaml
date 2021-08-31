@@ -140,3 +140,11 @@ fields:
     field_type: Formula
     formula: REPT({My Field}, 3)
     formula_format: Text
+  - name: Subs String
+    field_type: Formula
+    formula: SUBSTITUTE("This is some text", "some", "some good")
+    formula_format: Text
+  - name: Subs Ref
+    field_type: Formula
+    formula: SUBSTITUTE({Description}, "some", "some good")
+    formula_format: Text
