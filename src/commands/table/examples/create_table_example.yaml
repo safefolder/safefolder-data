@@ -148,3 +148,11 @@ fields:
     field_type: Formula
     formula: SUBSTITUTE({Description}, "some", "some good")
     formula_format: Text
+  - name: Trim String
+    field_type: Formula
+    formula: TRIM("This is something great     ")
+    formula_format: Text
+  - name: Trim Ref
+    field_type: Formula
+    formula: TRIM({My Field})
+    formula_format: Text
