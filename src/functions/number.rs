@@ -14,6 +14,7 @@ lazy_static! {
     static ref RE_FLOOR: Regex = Regex::new(r#"FLOOR\(((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|(?P<number_ref>\{[\w\s]+\}))[\s\n\t]{0,},[\s\n\t]{0,}(?P<significance>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)\)"#).unwrap();
     static ref RE_COUNT: Regex = Regex::new(r#"COUNT\((?P<attrs>.+)\)"#).unwrap();
     static ref RE_COUNTA: Regex = Regex::new(r#"COUNTA\((?P<attrs>.+)\)"#).unwrap();
+    static ref RE_COUNTALL: Regex = Regex::new(r#"COUNTALL\((?P<attrs>.+)\)"#).unwrap();
 }
 
 // CEILING(number, significance)
@@ -470,6 +471,90 @@ impl CountAFunction {
             &function_text, 
         );
         formula = concat_obj.replace(formula, data_map.clone());
+        return formula
+    }
+}
+
+// COUNTALL(value1, value2, ...))
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CountAllFunction {
+    pub function_text: String,
+    pub attrs: Option<String>,
+}
+impl CountAllFunction {
+    pub fn defaults(function_text: &String) -> CountAllFunction {
+        // COUNTALL(value1, value2, ...))
+        // We count all, including nulls and empty values
+
+        let matches = RE_COUNTALL.captures(function_text).unwrap();
+        let attrs = matches.name("attrs");
+
+        let mut attrs_wrap: Option<String> = None;
+        if attrs.is_some() {
+            let attrs = attrs.unwrap().as_str().to_string();
+            attrs_wrap = Some(attrs);
+        }
+
+        let obj = Self{
+            function_text: function_text.clone(),
+            attrs: attrs_wrap,
+        };
+
+        return obj
+    }
+    pub fn validate(&self) -> bool {
+        let expr = RE_COUNTALL.clone();
+        let function_text = self.function_text.clone();
+        let mut check = expr.is_match(&function_text);
+        if check == false {
+            return check
+        }
+        let attrs_wrap = self.attrs.clone();
+        if attrs_wrap.is_none() {
+            check = false
+        }
+        return check
+    }
+    pub fn do_validate(
+        function_text: &String, 
+        validate_tuple: (u32, Vec<String>)
+    ) -> (u32, Vec<String>) {
+        let (number_fails, mut failed_functions) = validate_tuple;
+        let concat_obj = CountAllFunction::defaults(
+            &function_text, 
+        );
+        let check = concat_obj.validate();
+        let mut number_fails = number_fails.clone();
+        if check == false {
+            number_fails += 1;
+            failed_functions.push(String::from(FUNCTION_COUNTALL));
+        }
+        return (number_fails, failed_functions);
+    }
+    pub fn replace(&mut self, formula: String) -> String {
+        let function_text = self.function_text.clone();
+        let mut formula = formula.clone();
+        let replacement_string: String;
+
+        let attrs = self.attrs.clone().unwrap();
+        let items: Vec<&str> = attrs.split(",").collect();
+        let mut number_items: Vec<String> = Vec::new();
+        for mut item in items {
+            item = item.trim();
+            number_items.push(item.to_string());
+        }
+        let count = number_items.len();
+
+        replacement_string = count.to_string();
+
+        formula = formula.replace(function_text.as_str(), replacement_string.as_str());
+        return formula;
+    }
+    pub fn do_replace(function_text: &String, mut formula: String) -> String {
+        let mut concat_obj = CountAllFunction::defaults(
+            &function_text, 
+        );
+        formula = concat_obj.replace(formula);
         return formula
     }
 }

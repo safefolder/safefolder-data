@@ -149,6 +149,10 @@ impl FunctionsHanler{
                 formula = CountAFunction::do_replace(
                     &self.function_text, self.data_map.clone(), formula);
             },
+            FUNCTION_COUNTALL => {
+                formula = CountAllFunction::do_replace(
+                    &self.function_text, formula);
+            },
             FUNCTION_DATE => {
                 formula = DateFunction::do_replace(
                     &self.function_text, formula);
@@ -294,6 +298,9 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
             },
             FUNCTION_COUNTA => {
                 validate_tuple = CountAFunction::do_validate(function_text, validate_tuple);
+            },
+            FUNCTION_COUNTALL => {
+                validate_tuple = CountAllFunction::do_validate(function_text, validate_tuple);
             },
             FUNCTION_DATE => {
                 validate_tuple = DateFunction::do_validate(function_text, validate_tuple);
