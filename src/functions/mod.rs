@@ -137,6 +137,14 @@ impl FunctionsHanler{
                 formula = CeilingFunction::do_replace(
                     &self.function_text, self.data_map.clone(), formula);
             },
+            FUNCTION_FLOOR => {
+                formula = FloorFunction::do_replace(
+                    &self.function_text, self.data_map.clone(), formula);
+            },
+            FUNCTION_COUNT => {
+                formula = CountFunction::do_replace(
+                    &self.function_text, self.data_map.clone(), formula);
+            },
             FUNCTION_DATE => {
                 formula = DateFunction::do_replace(
                     &self.function_text, formula);
@@ -273,6 +281,12 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
             },
             FUNCTION_CEILING => {
                 validate_tuple = CeilingFunction::do_validate(function_text, validate_tuple);
+            },
+            FUNCTION_FLOOR => {
+                validate_tuple = FloorFunction::do_validate(function_text, validate_tuple);
+            },
+            FUNCTION_COUNT => {
+                validate_tuple = CountFunction::do_validate(function_text, validate_tuple);
             },
             FUNCTION_DATE => {
                 validate_tuple = DateFunction::do_validate(function_text, validate_tuple);

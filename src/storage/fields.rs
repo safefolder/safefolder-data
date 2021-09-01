@@ -1125,7 +1125,7 @@ impl ProcessField for FormulaField {
                 // eprintln!("FormulaField.process :: formula_wrap: {:#?}", &formula_wrap);
                 if formula_wrap.is_some() {
                     formula = formula_wrap.unwrap();
-                    // eprintln!("FormulaField.process :: [LIB] formula: {:#?}", &formula);
+                    eprintln!("FormulaField.process :: [LIB] formula: {:#?}", &formula);
                     formula = format!("={}", &formula);
                     let formula_ = parse_formula::parse_string_to_formula(
                         &formula, 
@@ -1133,7 +1133,7 @@ impl ProcessField for FormulaField {
                     );
                     let result = calculate::calculate_formula(formula_, None::<NoReference>);
                     let result = calculate::result_to_string(result);
-                    // eprintln!("FormulaField.process :: result: {:#?}", &result);
+                    eprintln!("FormulaField.process :: result: {:#?}", &result);
                     &data.insert(field_id, result);
                     db_data.data = Some(data);
                     return Ok(db_data);
