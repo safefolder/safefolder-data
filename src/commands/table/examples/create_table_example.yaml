@@ -168,3 +168,7 @@ fields:
     field_type: Formula
     formula: COUNT(23, 4.5, "My Thing", 89, "2021-02-23")
     formula_format: Number
+  - name: CountA
+    field_type: Formula
+    formula: COUNTA(23, 4.5, 98, "My Thing", "", null, "2021-02-23")
+    formula_format: Number
