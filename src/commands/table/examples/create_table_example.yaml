@@ -176,3 +176,7 @@ fields:
     field_type: Formula
     formula: COUNTALL(23, 4.5, 98, "My Thing", "", null, "2021-02-23")
     formula_format: Number
+  - name: Even
+    field_type: Formula
+    formula: EVEN(3)
+    formula_format: Number

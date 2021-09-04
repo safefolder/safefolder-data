@@ -153,6 +153,10 @@ impl FunctionsHanler{
                 formula = CountAllFunction::do_replace(
                     &self.function_text, formula);
             },
+            FUNCTION_EVEN => {
+                formula = EvenFunction::do_replace(
+                    &self.function_text, self.data_map.clone(), formula);
+            },            
             FUNCTION_DATE => {
                 formula = DateFunction::do_replace(
                     &self.function_text, formula);
@@ -301,6 +305,9 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
             },
             FUNCTION_COUNTALL => {
                 validate_tuple = CountAllFunction::do_validate(function_text, validate_tuple);
+            },
+            FUNCTION_EVEN => {
+                validate_tuple = EvenFunction::do_validate(function_text, validate_tuple);
             },
             FUNCTION_DATE => {
                 validate_tuple = DateFunction::do_validate(function_text, validate_tuple);
