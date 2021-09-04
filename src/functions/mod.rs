@@ -156,7 +156,11 @@ impl FunctionsHanler{
             FUNCTION_EVEN => {
                 formula = EvenFunction::do_replace(
                     &self.function_text, self.data_map.clone(), formula);
-            },            
+            },
+            FUNCTION_EXP => {
+                formula = ExpFunction::do_replace(
+                    &self.function_text, self.data_map.clone(), formula);
+            },
             FUNCTION_DATE => {
                 formula = DateFunction::do_replace(
                     &self.function_text, formula);
@@ -308,6 +312,9 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
             },
             FUNCTION_EVEN => {
                 validate_tuple = EvenFunction::do_validate(function_text, validate_tuple);
+            },
+            FUNCTION_EXP => {
+                validate_tuple = ExpFunction::do_validate(function_text, validate_tuple);
             },
             FUNCTION_DATE => {
                 validate_tuple = DateFunction::do_validate(function_text, validate_tuple);

@@ -180,3 +180,7 @@ fields:
     field_type: Formula
     formula: EVEN(3)
     formula_format: Number
+  - name: e Number
+    field_type: Formula
+    formula: EXP(1)
+    formula_format: Number
