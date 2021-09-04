@@ -18,7 +18,7 @@ lazy_static! {
     static ref RE_EVEN: Regex = Regex::new(r#"EVEN\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)\)|EVEN\((?P<number_ref>\{[\w\s]+\})\)"#).unwrap();
     static ref RE_EXP: Regex = Regex::new(r#"EXP\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)\)|EXP\((?P<number_ref>\{[\w\s]+\})\)"#).unwrap();
     static ref RE_INT: Regex = Regex::new(r#"INT\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)\)|INT\((?P<number_ref>\{[\w\s]+\})\)"#).unwrap();
-    static ref RE_LOG: Regex = Regex::new(r#"LOG\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},{0,}[\n\s\t]{0,}(?P<base>\d+)\)|LOG\((?P<number_ref>\{[\w\s]+\})\)"#).unwrap();
+    static ref RE_LOG: Regex = Regex::new(r#"LOG\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},{0,}[\n\s\t]{0,}(?P<base>\d+){0,}\)|LOG\((?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},{0,}[\n\s\t]{0,}(?P<base_ref>\d+){0,}\)"#).unwrap();
 }
 
 // CEILING(number, significance)
@@ -871,6 +871,7 @@ pub struct LogFunction {
     pub number: Option<f64>,
     pub number_ref: Option<String>,
     pub base: Option<usize>,
+    pub base_ref: Option<usize>,
 }
 impl LogFunction {
     pub fn defaults(function_text: &String) -> LogFunction {
@@ -883,10 +884,12 @@ impl LogFunction {
         let attr_number = matches.name("number");
         let attr_number_ref = matches.name("number_ref");
         let attr_base = matches.name("base");
+        let attr_base_ref = matches.name("base_ref");
 
         let mut number_wrap: Option<f64> = None;
         let mut number_ref_wrap: Option<String> = None;
         let mut base_wrap: Option<usize> = None;
+        let mut base_ref_wrap: Option<usize> = None;
 
         if attr_number.is_some() {
             let number: f64 = FromStr::from_str(attr_number.unwrap().as_str()).unwrap();
@@ -900,12 +903,18 @@ impl LogFunction {
             let base: usize = FromStr::from_str(base).unwrap();
             base_wrap = Some(base);
         }
+        if attr_base_ref.is_some() {
+            let base = attr_base_ref.unwrap().as_str();
+            let base_ref: usize = FromStr::from_str(base).unwrap();
+            base_ref_wrap = Some(base_ref);
+        }
 
         let obj = Self{
             function_text: function_text.clone(),
             number: number_wrap,
             number_ref: number_ref_wrap,
             base: base_wrap,
+            base_ref: base_ref_wrap,
         };
 
         return obj
@@ -940,6 +949,7 @@ impl LogFunction {
         let number_wrap = self.number.clone();
         let number_ref_wrap = self.number_ref.clone();
         let base_wrap = self.base.clone();
+        let base_ref_wrap = self.base_ref.clone();
         let mut number: f64 = 0.0;
         let mut base: f64 = 10.0;
         if number_wrap.is_some() {
@@ -956,6 +966,10 @@ impl LogFunction {
         }
         if base_wrap.is_some() {
             let base_: usize = base_wrap.unwrap();
+            base = FromStr::from_str(base_.to_string().as_str()).unwrap();
+        }
+        if base_ref_wrap.is_some() {
+            let base_: usize = base_ref_wrap.unwrap();
             base = FromStr::from_str(base_.to_string().as_str()).unwrap();
         }
         number = number.log(base);
