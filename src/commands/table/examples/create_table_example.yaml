@@ -188,3 +188,7 @@ fields:
     field_type: Formula
     formula: INT(8.9)
     formula_format: Number
+  - name: LOG
+    field_type: Formula
+    formula: LOG(8, 2)
+    formula_format: Number
