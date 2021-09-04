@@ -19,6 +19,7 @@ lazy_static! {
     static ref RE_EXP: Regex = Regex::new(r#"EXP\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)\)|EXP\((?P<number_ref>\{[\w\s]+\})\)"#).unwrap();
     static ref RE_INT: Regex = Regex::new(r#"INT\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)\)|INT\((?P<number_ref>\{[\w\s]+\})\)"#).unwrap();
     static ref RE_LOG: Regex = Regex::new(r#"LOG\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},{0,}[\n\s\t]{0,}(?P<base>\d+){0,}\)|LOG\((?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},{0,}[\n\s\t]{0,}(?P<base_ref>\d+){0,}\)"#).unwrap();
+    static ref RE_MOD: Regex = Regex::new(r#"MOD\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<divisor>\d+){0,}\)|MOD\((?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<divisor_ref>\d+){0,}\)"#).unwrap();
 }
 
 // CEILING(number, significance)
@@ -985,6 +986,131 @@ impl LogFunction {
     pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
         let data_map = data_map.clone();
         let mut concat_obj = LogFunction::defaults(
+            &function_text, 
+        );
+        formula = concat_obj.replace(formula, data_map.clone());
+        return formula
+    }
+}
+
+// MOD(number, divisor)
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ModFunction {
+    pub function_text: String,
+    pub number: Option<f64>,
+    pub number_ref: Option<String>,
+    pub divisor: Option<usize>,
+    pub divisor_ref: Option<usize>,
+}
+impl ModFunction {
+    pub fn defaults(function_text: &String) -> ModFunction {
+        // MOD(number, divisor)
+
+        let matches = RE_MOD.captures(function_text).unwrap();
+        let attr_number = matches.name("number");
+        let attr_number_ref = matches.name("number_ref");
+        let attr_divisor = matches.name("divisor");
+        let attr_divisor_ref = matches.name("divisor_ref");
+
+        let mut number_wrap: Option<f64> = None;
+        let mut number_ref_wrap: Option<String> = None;
+        let mut divisor_wrap: Option<usize> = None;
+        let mut divisor_ref_wrap: Option<usize> = None;
+
+        if attr_number.is_some() {
+            let number: f64 = FromStr::from_str(attr_number.unwrap().as_str()).unwrap();
+            number_wrap = Some(number);
+        } else if attr_number_ref.is_some() {
+            let number_ref = attr_number_ref.unwrap().as_str().to_string();
+            number_ref_wrap = Some(number_ref);
+        }
+        if attr_divisor.is_some() {
+            let divisor = attr_divisor.unwrap().as_str();
+            let divisor: usize = FromStr::from_str(divisor).unwrap();
+            divisor_wrap = Some(divisor);
+        }
+        if attr_divisor_ref.is_some() {
+            let divisor = attr_divisor_ref.unwrap().as_str();
+            let divisor_ref: usize = FromStr::from_str(divisor).unwrap();
+            divisor_ref_wrap = Some(divisor_ref);
+        }
+
+        let obj = Self{
+            function_text: function_text.clone(),
+            number: number_wrap,
+            number_ref: number_ref_wrap,
+            divisor: divisor_wrap,
+            divisor_ref: divisor_ref_wrap,
+        };
+
+        return obj
+    }
+    pub fn validate(&self) -> bool {
+        let expr = RE_MOD.clone();
+        let function_text = self.function_text.clone();
+        let check = expr.is_match(&function_text);
+        return check
+    }
+    pub fn do_validate(
+        function_text: &String, 
+        validate_tuple: (u32, Vec<String>)
+    ) -> (u32, Vec<String>) {
+        let (number_fails, mut failed_functions) = validate_tuple;
+        let concat_obj = ModFunction::defaults(
+            &function_text, 
+        );
+        let check = concat_obj.validate();
+        let mut number_fails = number_fails.clone();
+        if check == false {
+            number_fails += 1;
+            failed_functions.push(String::from(FUNCTION_LOG));
+        }
+        return (number_fails, failed_functions);
+    }
+    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
+        let data_map = data_map.clone();
+        let function_text = self.function_text.clone();
+        let mut formula = formula.clone();
+
+        let number_wrap = self.number.clone();
+        let number_ref_wrap = self.number_ref.clone();
+        let divisor_wrap = self.divisor.clone();
+        let divisor_ref_wrap = self.divisor_ref.clone();
+        let mut number: f64 = 0.0;
+        let mut divisor: f64 = 10.0;
+        if number_wrap.is_some() {
+            number = number_wrap.unwrap();
+        } else if number_ref_wrap.is_some() {
+            let number_ref = number_ref_wrap.unwrap();
+            let function_attr = FunctionAttribute::defaults(
+                &number_ref, 
+                Some(true)
+            );
+            let result = function_attr.replace(data_map.clone());
+            let result = result.item_processed.clone();
+            number = FromStr::from_str(result.unwrap().as_str()).unwrap();
+        }
+        if divisor_wrap.is_some() {
+            let divisor_: usize = divisor_wrap.unwrap();
+            divisor = FromStr::from_str(divisor_.to_string().as_str()).unwrap();
+        }
+        if divisor_ref_wrap.is_some() {
+            let divisor_: usize = divisor_ref_wrap.unwrap();
+            divisor = FromStr::from_str(divisor_.to_string().as_str()).unwrap();
+        }
+        number = number%divisor;
+        let number_str = number.to_string();
+        let number_str = number_str.as_str();
+        let number_result: isize = FromStr::from_str(number_str).unwrap();
+
+        let replacement_string = number_result.to_string();
+
+        formula = formula.replace(function_text.as_str(), replacement_string.as_str());
+        return formula;
+    }
+    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
+        let data_map = data_map.clone();
+        let mut concat_obj = ModFunction::defaults(
             &function_text, 
         );
         formula = concat_obj.replace(formula, data_map.clone());

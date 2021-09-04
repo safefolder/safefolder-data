@@ -192,3 +192,7 @@ fields:
     field_type: Formula
     formula: LOG(8, 2)
     formula_format: Number
+  - name: MOD
+    field_type: Formula
+    formula: MOD(3, 2)
+    formula_format: Number
