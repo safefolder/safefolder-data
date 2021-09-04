@@ -184,3 +184,7 @@ fields:
     field_type: Formula
     formula: EXP(1)
     formula_format: Number
+  - name: INT
+    field_type: Formula
+    formula: INT(8.9)
+    formula_format: Number
