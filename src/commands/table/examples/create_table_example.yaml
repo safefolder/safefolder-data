@@ -196,3 +196,7 @@ fields:
     field_type: Formula
     formula: MOD(3, 2)
     formula_format: Number
+  - name: POWER
+    field_type: Formula
+    formula: POWER(98.6, 3.2)
+    formula_format: Number

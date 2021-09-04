@@ -173,6 +173,10 @@ impl FunctionsHanler{
                 formula = ModFunction::do_replace(
                     &self.function_text, self.data_map.clone(), formula);
             },
+            FUNCTION_POWER => {
+                formula = PowerFunction::do_replace(
+                    &self.function_text, self.data_map.clone(), formula);
+            },
             FUNCTION_DATE => {
                 formula = DateFunction::do_replace(
                     &self.function_text, formula);
@@ -336,6 +340,9 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
             },
             FUNCTION_MOD => {
                 validate_tuple = ModFunction::do_validate(function_text, validate_tuple);
+            },
+            FUNCTION_POWER => {
+                validate_tuple = PowerFunction::do_validate(function_text, validate_tuple);
             },            
             FUNCTION_DATE => {
                 validate_tuple = DateFunction::do_validate(function_text, validate_tuple);
