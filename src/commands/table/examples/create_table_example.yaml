@@ -212,3 +212,7 @@ fields:
     field_type: Formula
     formula: ROUNDDOWN(3.2, 0)
     formula_format: Number
+  - name: SQRT
+    field_type: Formula
+    formula: SQRT(16)
+    formula_format: Number

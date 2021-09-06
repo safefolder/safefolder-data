@@ -189,6 +189,10 @@ impl FunctionsHanler{
                 formula = RoundFunction::do_replace(
                     &self.function_text, self.data_map.clone(), formula, RoundOption::Down);
             },
+            FUNCTION_SQRT => {
+                formula = SqrtFunction::do_replace(
+                    &self.function_text, self.data_map.clone(), formula);
+            },
             FUNCTION_DATE => {
                 formula = DateFunction::do_replace(
                     &self.function_text, formula);
@@ -364,7 +368,10 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
             },
             FUNCTION_ROUNDDOWN => {
                 validate_tuple = RoundFunction::do_validate(function_text, validate_tuple, RoundOption::Down);
-            },            
+            },
+            FUNCTION_SQRT => {
+                validate_tuple = SqrtFunction::do_validate(function_text, validate_tuple);
+            },
             FUNCTION_DATE => {
                 validate_tuple = DateFunction::do_validate(function_text, validate_tuple);
             },
