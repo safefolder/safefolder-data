@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use regex::Regex;
+use regex::{Regex, Captures};
 use std::{collections::HashMap};
 use serde::{Deserialize, Serialize};
 use lazy_static::lazy_static;
@@ -21,6 +21,9 @@ lazy_static! {
     static ref RE_LOG: Regex = Regex::new(r#"LOG\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},{0,}[\n\s\t]{0,}(?P<base>\d+){0,}\)|LOG\((?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},{0,}[\n\s\t]{0,}(?P<base_ref>\d+){0,}\)"#).unwrap();
     static ref RE_MOD: Regex = Regex::new(r#"MOD\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<divisor>\d+){0,}\)|MOD\((?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<divisor_ref>\d+){0,}\)"#).unwrap();
     static ref RE_POWER: Regex = Regex::new(r#"POWER\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<power>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+){0,}\)|POWER\((?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<power_ref>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+){0,}\)"#).unwrap();
+    static ref RE_ROUND: Regex = Regex::new(r#"ROUND\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits>\d+){0,}\)|ROUND\((?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits_ref>\d+){0,}\)"#).unwrap();
+    static ref RE_ROUND_UP: Regex = Regex::new(r#"ROUNDUP\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits>\d+){0,}\)|ROUNDUP\((?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits_ref>\d+){0,}\)"#).unwrap();
+    static ref RE_ROUND_DOWN: Regex = Regex::new(r#"ROUNDDOWN\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits>\d+){0,}\)|ROUNDDOWN\((?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits_ref>\d+){0,}\)"#).unwrap();
 }
 
 // CEILING(number, significance)
@@ -1238,6 +1241,189 @@ impl PowerFunction {
         let data_map = data_map.clone();
         let mut concat_obj = PowerFunction::defaults(
             &function_text, 
+        );
+        formula = concat_obj.replace(formula, data_map.clone());
+        return formula
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum RoundOption {
+    Basic,
+    Up,
+    Down,
+}
+
+// ROUND(number, digits)
+// ROUNDUP(number, digits)
+// ROUNDDOWN(number, digits)
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RoundFunction {
+    pub function_text: String,
+    pub number: Option<f64>,
+    pub number_ref: Option<String>,
+    pub digits: Option<i8>,
+    pub digits_ref: Option<i8>,
+    pub option: RoundOption,
+}
+impl RoundFunction {
+    pub fn defaults(function_text: &String, option: RoundOption) -> RoundFunction {
+        // ROUND(number, digits)
+        // ROUNDUP(number, digits)
+        // ROUNDDOWN(number, digits)
+
+        let matches: Captures;
+        match option {
+            RoundOption::Basic => {
+                matches = RE_ROUND.captures(function_text).unwrap();
+            },
+            RoundOption::Up => {
+                matches = RE_ROUND_UP.captures(function_text).unwrap();
+            },
+            RoundOption::Down => {
+                matches = RE_ROUND_DOWN.captures(function_text).unwrap();
+            },
+        }
+        let attr_number = matches.name("number");
+        let attr_number_ref = matches.name("number_ref");
+        let attr_digits = matches.name("digits");
+        let attr_digits_ref = matches.name("digits_ref");
+
+        let mut number_wrap: Option<f64> = None;
+        let mut number_ref_wrap: Option<String> = None;
+        let mut digits_wrap: Option<i8> = None;
+        let mut digits_ref_wrap: Option<i8> = None;
+
+        if attr_number.is_some() {
+            let number: f64 = FromStr::from_str(attr_number.unwrap().as_str()).unwrap();
+            number_wrap = Some(number);
+        } else if attr_number_ref.is_some() {
+            let number_ref = attr_number_ref.unwrap().as_str().to_string();
+            number_ref_wrap = Some(number_ref);
+        }
+        if attr_digits.is_some() {
+            let digits = attr_digits.unwrap().as_str();
+            let digits: i8 = FromStr::from_str(digits).unwrap();
+            digits_wrap = Some(digits);
+        }
+        if attr_digits_ref.is_some() {
+            let digits = attr_digits_ref.unwrap().as_str();
+            let digits_ref: i8 = FromStr::from_str(digits).unwrap();
+            digits_ref_wrap = Some(digits_ref);
+        }
+
+        let obj = Self{
+            function_text: function_text.clone(),
+            number: number_wrap,
+            number_ref: number_ref_wrap,
+            digits: digits_wrap,
+            digits_ref: digits_ref_wrap,
+            option: option,
+        };
+
+        return obj
+    }
+    pub fn validate(&self) -> bool {
+        let expr: Regex;
+        match self.option {
+            RoundOption::Basic => {
+                expr = RE_ROUND.clone();
+            },
+            RoundOption::Up => {
+                expr = RE_ROUND_UP.clone();
+            },
+            RoundOption::Down => {
+                expr = RE_ROUND_DOWN.clone();
+            },
+        }
+        let function_text = self.function_text.clone();
+        let check = expr.is_match(&function_text);
+        return check
+    }
+    pub fn do_validate(
+        function_text: &String, 
+        validate_tuple: (u32, Vec<String>),
+        option: RoundOption
+    ) -> (u32, Vec<String>) {
+        let (number_fails, mut failed_functions) = validate_tuple;
+        let concat_obj = RoundFunction::defaults(
+            &function_text, option.clone()
+        );
+        let check = concat_obj.validate();
+        let mut number_fails = number_fails.clone();
+        if check == false {
+            number_fails += 1;
+            match option {
+                RoundOption::Basic => {
+                    failed_functions.push(String::from(FUNCTION_ROUND));
+                },
+                RoundOption::Up => {
+                    failed_functions.push(String::from(FUNCTION_ROUNDUP));
+                },
+                RoundOption::Down => {
+                    failed_functions.push(String::from(FUNCTION_ROUNDDOWN));
+                },
+            }
+            
+        }
+        return (number_fails, failed_functions);
+    }
+    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
+        let data_map = data_map.clone();
+        let function_text = self.function_text.clone();
+        let mut formula = formula.clone();
+        let option = self.option.clone();
+
+        let number_wrap = self.number.clone();
+        let number_ref_wrap = self.number_ref.clone();
+        let digits_wrap = self.digits.clone();
+        let digits_ref_wrap = self.digits_ref.clone();
+        let mut number: f64 = 0.0;
+        let mut digits: i8 = 2;
+        if number_wrap.is_some() {
+            number = number_wrap.unwrap();
+        } else if number_ref_wrap.is_some() {
+            let number_ref = number_ref_wrap.unwrap();
+            let function_attr = FunctionAttribute::defaults(
+                &number_ref, 
+                Some(true)
+            );
+            let result = function_attr.replace(data_map.clone());
+            let result = result.item_processed.clone();
+            number = FromStr::from_str(result.unwrap().as_str()).unwrap();
+        }
+        if digits_wrap.is_some() {
+            let digits_: i8 = digits_wrap.unwrap();
+            digits = FromStr::from_str(digits_.to_string().as_str()).unwrap();
+        }
+        if digits_ref_wrap.is_some() {
+            let digits_: i8 = digits_ref_wrap.unwrap();
+            digits = FromStr::from_str(digits_.to_string().as_str()).unwrap();
+        }
+        match option {
+            RoundOption::Basic => {
+                number = round::half_away_from_zero(number, digits);
+            },
+            RoundOption::Up => {
+                number = round::ceil(number, digits);
+            },
+            RoundOption::Down => {
+                number = round::floor(number, digits);
+            },
+        }
+        let number_str = number.to_string();
+        let number_str = number_str.as_str();
+        let number_result: f64 = FromStr::from_str(number_str).unwrap();
+
+        let replacement_string = number_result.to_string();
+
+        formula = formula.replace(function_text.as_str(), replacement_string.as_str());
+        return formula;
+    }
+    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String, option: RoundOption) -> String {
+        let data_map = data_map.clone();
+        let mut concat_obj = RoundFunction::defaults(
+            &function_text, option
         );
         formula = concat_obj.replace(formula, data_map.clone());
         return formula

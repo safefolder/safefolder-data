@@ -177,6 +177,18 @@ impl FunctionsHanler{
                 formula = PowerFunction::do_replace(
                     &self.function_text, self.data_map.clone(), formula);
             },
+            FUNCTION_ROUND => {
+                formula = RoundFunction::do_replace(
+                    &self.function_text, self.data_map.clone(), formula, RoundOption::Basic);
+            },
+            FUNCTION_ROUNDUP => {
+                formula = RoundFunction::do_replace(
+                    &self.function_text, self.data_map.clone(), formula, RoundOption::Up);
+            },
+            FUNCTION_ROUNDDOWN => {
+                formula = RoundFunction::do_replace(
+                    &self.function_text, self.data_map.clone(), formula, RoundOption::Down);
+            },
             FUNCTION_DATE => {
                 formula = DateFunction::do_replace(
                     &self.function_text, formula);
@@ -343,6 +355,15 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
             },
             FUNCTION_POWER => {
                 validate_tuple = PowerFunction::do_validate(function_text, validate_tuple);
+            },
+            FUNCTION_ROUND => {
+                validate_tuple = RoundFunction::do_validate(function_text, validate_tuple, RoundOption::Basic);
+            },
+            FUNCTION_ROUNDUP => {
+                validate_tuple = RoundFunction::do_validate(function_text, validate_tuple, RoundOption::Up);
+            },
+            FUNCTION_ROUNDDOWN => {
+                validate_tuple = RoundFunction::do_validate(function_text, validate_tuple, RoundOption::Down);
             },            
             FUNCTION_DATE => {
                 validate_tuple = DateFunction::do_validate(function_text, validate_tuple);

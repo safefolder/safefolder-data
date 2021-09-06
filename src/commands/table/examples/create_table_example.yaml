@@ -200,3 +200,15 @@ fields:
     field_type: Formula
     formula: POWER(98.6, 3.2)
     formula_format: Number
+  - name: ROUND
+    field_type: Formula
+    formula: ROUND(2.15, 1)
+    formula_format: Number
+  - name: ROUNDUP
+    field_type: Formula
+    formula: ROUNDUP(3.2, 0)
+    formula_format: Number
+  - name: ROUNDDOWN
+    field_type: Formula
+    formula: ROUNDDOWN(3.2, 0)
+    formula_format: Number
