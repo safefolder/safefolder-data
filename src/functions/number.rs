@@ -26,6 +26,7 @@ lazy_static! {
     static ref RE_ROUND_DOWN: Regex = Regex::new(r#"ROUNDDOWN\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits>\d+){0,}\)|ROUNDDOWN\((?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits_ref>\d+){0,}\)"#).unwrap();
     static ref RE_SQRT: Regex = Regex::new(r#"SQRT\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)\)|SQRT\((?P<number_ref>\{[\w\s]+\})\)"#).unwrap();
     static ref RE_VALUE: Regex = Regex::new(r#"VALUE\((?P<text>"[\w\d,.{0,}\$€{0,}]+")\)|VALUE\((?P<text_ref>\{[\w\s]+\})\)"#).unwrap();
+    static ref RE_BOOLEAN: Regex = Regex::new(r#"TRUE\(\)|FALSE\(\)"#).unwrap();
 }
 
 // CEILING(number, significance)
@@ -1644,6 +1645,92 @@ impl ValueFunction {
             &function_text
         );
         formula = concat_obj.replace(formula, data_map.clone());
+        return formula
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum BooleanOption {
+    True,
+    False,
+}
+
+// TRUE() or FALSE()
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct BooleanFunction {
+    pub function_text: String,
+    pub option: BooleanOption,
+}
+impl BooleanFunction {
+    pub fn defaults(function_text: &String, option: BooleanOption) -> BooleanFunction {
+        // TRUE() or FALSE()
+
+        let obj = Self{
+            function_text: function_text.clone(),
+            option: option,
+        };
+
+        eprintln!("BooleanFunction.defaults :: obj: {:#?}", &obj);
+
+        return obj
+    }
+    pub fn validate(&self) -> bool {
+        let expr = RE_BOOLEAN.clone();
+        let function_text = self.function_text.clone();
+        let check = expr.is_match(&function_text);
+        return check
+    }
+    pub fn do_validate(
+        function_text: &String, 
+        validate_tuple: (u32, Vec<String>),
+        option: BooleanOption
+    ) -> (u32, Vec<String>) {
+        let (number_fails, mut failed_functions) = validate_tuple;
+        let concat_obj = BooleanFunction::defaults(
+            &function_text, option.clone()
+        );
+        let check = concat_obj.validate();
+        let mut number_fails = number_fails.clone();
+        if check == false {
+            number_fails += 1;
+            match option {
+                BooleanOption::False => {
+                    failed_functions.push(String::from(FUNCTION_FALSE));
+                },
+                BooleanOption::True => {
+                    failed_functions.push(String::from(FUNCTION_TRUE));
+                },
+            }
+        }
+        return (number_fails, failed_functions);
+    }
+    pub fn replace(&mut self, formula: String) -> String {
+        let function_text = self.function_text.clone();
+        let mut formula = formula.clone();
+        let option = self.option.clone();
+        let number: u8;
+        match option {
+            BooleanOption::False => {
+                number = 0;
+            },
+            BooleanOption::True => {
+                number = 1;
+            },
+        }
+        let replacement_string = number.to_string();
+
+        formula = formula.replace(function_text.as_str(), replacement_string.as_str());
+        return formula;
+    }
+    pub fn do_replace(
+        function_text: &String, 
+        mut formula: String,
+        option: BooleanOption
+    ) -> String {
+        let mut concat_obj = BooleanFunction::defaults(
+            &function_text, option
+        );
+        formula = concat_obj.replace(formula);
         return formula
     }
 }

@@ -228,3 +228,11 @@ fields:
     field_type: Formula
     formula: VALUE("345,98€")
     formula_format: Number
+  - name: TRUE()
+    field_type: Formula
+    formula: TRUE()
+    formula_format: Number
+  - name: FALSE()
+    field_type: Formula
+    formula: FALSE()
+    formula_format: Number
