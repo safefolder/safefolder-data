@@ -25,6 +25,7 @@ lazy_static! {
     static ref RE_ROUND_UP: Regex = Regex::new(r#"ROUNDUP\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits>\d+){0,}\)|ROUNDUP\((?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits_ref>\d+){0,}\)"#).unwrap();
     static ref RE_ROUND_DOWN: Regex = Regex::new(r#"ROUNDDOWN\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits>\d+){0,}\)|ROUNDDOWN\((?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits_ref>\d+){0,}\)"#).unwrap();
     static ref RE_SQRT: Regex = Regex::new(r#"SQRT\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)\)|SQRT\((?P<number_ref>\{[\w\s]+\})\)"#).unwrap();
+    static ref RE_VALUE: Regex = Regex::new(r#"VALUE\((?P<text>"[\w\d,.{0,}\$€{0,}]+")\)|VALUE\((?P<text_ref>\{[\w\s]+\})\)"#).unwrap();
 }
 
 // CEILING(number, significance)
@@ -1520,6 +1521,126 @@ impl SqrtFunction {
     pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
         let data_map = data_map.clone();
         let mut concat_obj = SqrtFunction::defaults(
+            &function_text
+        );
+        formula = concat_obj.replace(formula, data_map.clone());
+        return formula
+    }
+}
+
+// VALUE(text)
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ValueFunction {
+    pub function_text: String,
+    pub text: Option<String>,
+    pub text_ref: Option<String>,
+}
+impl ValueFunction {
+    pub fn defaults(function_text: &String) -> ValueFunction {
+        // VALUE(text)
+
+        let matches = RE_VALUE.captures(function_text).unwrap();
+        let attr_text = matches.name("text");
+        let attr_text_ref = matches.name("text_ref");
+
+        let mut text_wrap: Option<String> = None;
+        let mut text_ref_wrap: Option<String> = None;
+
+        if attr_text.is_some() {
+            let text = attr_text.unwrap().as_str().to_string();
+            text_wrap = Some(text);
+        } else if attr_text_ref.is_some() {
+            let text_ref = attr_text_ref.unwrap().as_str().to_string();
+            text_ref_wrap = Some(text_ref);
+        }
+
+        let obj = Self{
+            function_text: function_text.clone(),
+            text: text_wrap,
+            text_ref: text_ref_wrap,
+        };
+
+        return obj
+    }
+    pub fn validate(&self) -> bool {
+        let expr = RE_VALUE.clone();
+        let function_text = self.function_text.clone();
+        let check = expr.is_match(&function_text);
+        return check
+    }
+    pub fn do_validate(
+        function_text: &String, 
+        validate_tuple: (u32, Vec<String>)
+    ) -> (u32, Vec<String>) {
+        let (number_fails, mut failed_functions) = validate_tuple;
+        let concat_obj = ValueFunction::defaults(
+            &function_text
+        );
+        let check = concat_obj.validate();
+        let mut number_fails = number_fails.clone();
+        if check == false {
+            number_fails += 1;
+            failed_functions.push(String::from(FUNCTION_VALUE));            
+        }
+        return (number_fails, failed_functions);
+    }
+    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
+        let data_map = data_map.clone();
+        let function_text = self.function_text.clone();
+        let mut formula = formula.clone();
+
+        let text_wrap = self.text.clone();
+        let text_ref_wrap = self.text_ref.clone();
+        let mut text: String = String::from("");
+        if text_wrap.is_some() {
+            text = text_wrap.unwrap();
+        } else if text_ref_wrap.is_some() {
+            let text_ref = text_ref_wrap.unwrap();
+            let function_attr = FunctionAttribute::defaults(
+                &text_ref, 
+                Some(true)
+            );
+            let result = function_attr.replace(data_map.clone());
+            let result = result.item_processed.clone();
+            text = result.unwrap().as_str().to_string();
+        }
+        let number: f64;
+        text = text.replace("$", "").replace("€", "");
+        text = text.replace("\"", "");
+        let has_multiple_punc = text.find(",").is_some() && text.find(".").is_some();
+        if has_multiple_punc {
+            // , could be thousand sep or decimals
+            // . could be thousand or decimals
+            let index_dot = text.find(".").unwrap();
+            let index_comma = text.find(",").unwrap();
+            if index_comma > index_dot {
+                // 1.200,98
+                text = text.replace(".", "");
+                text = text.replace(",", ".");
+                // 1200.98
+            } else {
+                // 1,200.98
+                text = text.replace(",", "");
+                // 1200.98
+            }
+        } else {
+            let index_comma = text.find(",");
+            if index_comma.is_some() {
+                // 920,98
+                text = text.replace(",", ".");
+                // 920.98
+            }
+        }
+        number = FromStr::from_str(text.as_str()).unwrap();
+
+        let replacement_string = number.to_string();
+
+        formula = formula.replace(function_text.as_str(), replacement_string.as_str());
+        return formula;
+    }
+    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
+        let data_map = data_map.clone();
+        let mut concat_obj = ValueFunction::defaults(
             &function_text
         );
         formula = concat_obj.replace(formula, data_map.clone());

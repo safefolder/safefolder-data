@@ -216,3 +216,15 @@ fields:
     field_type: Formula
     formula: SQRT(16)
     formula_format: Number
+  - name: VALUE th
+    field_type: Formula
+    formula: VALUE("$1,345.98")
+    formula_format: Number
+  - name: VALUE
+    field_type: Formula
+    formula: VALUE("$345.98")
+    formula_format: Number
+  - name: VALUE Euros
+    field_type: Formula
+    formula: VALUE("345,98€")
+    formula_format: Number

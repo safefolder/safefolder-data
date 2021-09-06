@@ -193,6 +193,10 @@ impl FunctionsHanler{
                 formula = SqrtFunction::do_replace(
                     &self.function_text, self.data_map.clone(), formula);
             },
+            FUNCTION_VALUE => {
+                formula = ValueFunction::do_replace(
+                    &self.function_text, self.data_map.clone(), formula);
+            },
             FUNCTION_DATE => {
                 formula = DateFunction::do_replace(
                     &self.function_text, formula);
@@ -371,6 +375,9 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
             },
             FUNCTION_SQRT => {
                 validate_tuple = SqrtFunction::do_validate(function_text, validate_tuple);
+            },
+            FUNCTION_VALUE => {
+                validate_tuple = ValueFunction::do_validate(function_text, validate_tuple);
             },
             FUNCTION_DATE => {
                 validate_tuple = DateFunction::do_validate(function_text, validate_tuple);

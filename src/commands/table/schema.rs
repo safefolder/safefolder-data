@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use tr::tr;
 use colored::*;
 use regex::Regex;
+use validator::Contains;
 
 use crate::commands::table::config::{CreateTableConfig};
 use crate::commands::table::{Command};
@@ -60,6 +61,7 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                 // name field
                 let name_field_config = config.name.unwrap();
                 fields.insert(0, name_field_config);
+                let mut field_name_map: HashMap<String, bool> = HashMap::new();
                 for field in fields.iter() {
                     // field simple attributes
                     let field_attrs = field.clone();
@@ -67,6 +69,17 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                     field_id_map.insert(String::from(ID), field_attrs.id.unwrap());
                     &field_ids.push(field_id_map);
                     let field_name = field_attrs.name.unwrap_or_default().clone();
+                    let field_name_str = &field_name.as_str();
+                    if field_name_map.has_element(field_name_str) == false {
+                        field_name_map.insert(field_name.clone(), true);
+                    } else {
+                        return Err(
+                            PlanetError::new(
+                                500, 
+                                Some(tr!("There is already a field with name \"{}\"", &field_name)),
+                            )
+                        );                        
+                    }
                     let map = &field.map_object_db()?;
                     data_objects.insert(String::from(field_name.clone()), map.clone());
                     // field complex attributes like select_data
