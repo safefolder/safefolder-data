@@ -236,3 +236,11 @@ fields:
     field_type: Formula
     formula: FALSE()
     formula_format: Number
+  - name: MIN
+    field_type: Formula
+    formula: MIN(-4, 1.9, 2.34)
+    formula_format: Number
+  - name: MAX
+    field_type: Formula
+    formula: MAX(-4, 1.9, 2.34)
+    formula_format: Number

@@ -3,6 +3,7 @@ pub mod text;
 pub mod date;
 pub mod structure;
 pub mod number;
+pub mod collections;
 
 use std::collections::HashMap;
 use lazy_static::lazy_static;
@@ -14,6 +15,7 @@ use crate::functions::constants::*;
 use crate::functions::text::*;
 use crate::functions::date::*;
 use crate::functions::number::*;
+use crate::functions::collections::*;
 use crate::functions::structure::*;
 use crate::planet::PlanetError;
 use crate::storage::table::DbData;
@@ -264,7 +266,15 @@ impl FunctionsHanler{
             FUNCTION_IF => {
                 formula = IfFunction::do_replace(
                     &self.function_text, formula, self.data_map.clone(), &self.table.clone());
-            },            
+            },
+            FUNCTION_MIN => {
+                formula = StatsFunction::do_replace(
+                    &self.function_text, self.data_map.clone(), formula, StatOption::Min);
+            },
+            FUNCTION_MAX => {
+                formula = StatsFunction::do_replace(
+                    &self.function_text, self.data_map.clone(), formula, StatOption::Max);
+            },
             _ => {
             }
         }
@@ -441,6 +451,12 @@ pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
             },
             FUNCTION_IF => {
                 validate_tuple = IfFunction::do_validate(function_text, validate_tuple);
+            },
+            FUNCTION_MIN => {
+                validate_tuple = StatsFunction::do_validate(function_text, validate_tuple, StatOption::Min);
+            },
+            FUNCTION_MAX => {
+                validate_tuple = StatsFunction::do_validate(function_text, validate_tuple, StatOption::Max);
             },
             _ => {
                 number_fails += 1;
