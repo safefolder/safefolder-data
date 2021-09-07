@@ -9,6 +9,7 @@ use ordinal::Ordinal;
 
 use crate::{functions::FunctionAttribute, planet::PlanetError};
 use crate::functions::constants::*;
+use crate::functions::Function;
 
 // 1. defaults receives the function test, that is FUNC_NAME(attr1, attr2, ...) and returns function instance
 //      attributes embeeded into the object attributes. It does not prepare for replacement or anythin.
@@ -45,9 +46,10 @@ pub struct DateFunction {
     pub year: i32,
     pub month: u32,
     pub day: u32,
+    pub data_map: Option<HashMap<String, String>>,
 }
 impl DateFunction {
-    pub fn defaults(function_text: &String) -> DateFunction {
+    pub fn defaults(function_text: &String, data_map: Option<HashMap<String, String>>) -> DateFunction {
         // DATE(year,month,day)
         // DATE(2021, 8, 28)
 
@@ -64,20 +66,15 @@ impl DateFunction {
             year: year,
             month: month,
             day: day,
+            data_map: data_map,
         };
         
         return obj
     }
-    pub fn validate(&self) -> bool {
-        let expr = RE_DATE.clone();
-        let function_text = self.function_text.clone();
-        let check = expr.is_match(&function_text);
-        return check
-    }
     pub fn do_validate(function_text: &String, validate_tuple: (u32, Vec<String>)) -> (u32, Vec<String>) {
         let (number_fails, mut failed_functions) = validate_tuple;
         let concat_obj = DateFunction::defaults(
-            &function_text, 
+            &function_text, None
         );
         let check = concat_obj.validate();
         let mut number_fails = number_fails.clone();
@@ -87,7 +84,22 @@ impl DateFunction {
         }
         return (number_fails, failed_functions);
     }
-    pub fn replace(&mut self, formula: String) -> String {
+    pub fn do_replace(function_text: &String, mut formula: String) -> String {
+        let mut concat_obj = DateFunction::defaults(
+            &function_text, None
+        );
+        formula = concat_obj.replace(formula);
+        return formula
+    }
+}
+impl Function for DateFunction {
+    fn validate(&self) -> bool {
+        let expr = RE_DATE.clone();
+        let function_text = self.function_text.clone();
+        let check = expr.is_match(&function_text);
+        return check
+    }
+    fn replace(&mut self, formula: String) -> String {
         let function_text = self.function_text.clone();
         let mut formula = formula.clone();
         let year = self.year;
@@ -113,13 +125,6 @@ impl DateFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         formula = format!("\"{}\"", formula);
         return formula;
-    }
-    pub fn do_replace(function_text: &String, mut formula: String) -> String {
-        let mut concat_obj = DateFunction::defaults(
-            &function_text, 
-        );
-        formula = concat_obj.replace(formula);
-        return formula
     }
 }
 
@@ -150,9 +155,10 @@ pub struct DateTimeParseFunction {
     pub is_iso: bool,
     pub is_human_time: bool,
     pub only_date: bool,
+    pub data_map: Option<HashMap<String, String>>,
 }
 impl DateTimeParseFunction {
-    pub fn defaults(function_text: &String, date_parse_option: DateTimeParseOption) -> DateTimeParseFunction {
+    pub fn defaults(function_text: &String, date_parse_option: DateTimeParseOption, data_map: Option<HashMap<String, String>>) -> DateTimeParseFunction {
         // Applies to MINUTE, HOUR, SECOND
 
         let matches: Captures;
@@ -208,11 +214,57 @@ impl DateTimeParseFunction {
             mode: mode.to_string(),
             is_iso: is_iso,
             is_human_time: is_human_time,
-            only_date: only_date
+            only_date: only_date,
+            data_map: data_map,
         };
         return obj
     }
-    pub fn validate(&self, date_parse_option: DateTimeParseOption) -> bool {
+    pub fn do_validate(
+        function_text: &String, 
+        date_parse_option: DateTimeParseOption, 
+        validate_tuple: (u32, Vec<String>)
+    ) -> (u32, Vec<String>) {
+        let (number_fails, mut failed_functions) = validate_tuple;
+        let obj = DateTimeParseFunction::defaults(
+            &function_text, date_parse_option.clone(), None
+        );
+        let check = obj.validate();
+        let mut number_fails = number_fails.clone();
+        if check == false {
+            number_fails += 1;
+            match date_parse_option {
+                DateTimeParseOption::Hour => {
+                    failed_functions.push(String::from(FUNCTION_HOUR));
+                },
+                DateTimeParseOption::Minute => {
+                    failed_functions.push(String::from(FUNCTION_MINUTE));
+                },
+                DateTimeParseOption::Second => {
+                    failed_functions.push(String::from(FUNCTION_SECOND));
+                },
+            }
+        }
+        return (number_fails, failed_functions);
+    }
+    pub fn do_replace(
+        function_text: &String, 
+        date_parse_option: DateTimeParseOption, 
+        data_map: HashMap<String, String>, 
+        mut formula: String
+    ) -> String {
+        let data_map = data_map.clone();
+        let mut concat_obj = DateTimeParseFunction::defaults(
+            &function_text, 
+            date_parse_option,
+            Some(data_map)
+        );
+        formula = concat_obj.replace(formula);
+        return formula
+    }
+}
+impl Function for DateTimeParseFunction {
+    fn validate(&self) -> bool {
+        let date_parse_option = self.parse_option.clone();
         let expr: Regex;
         match date_parse_option {
             DateTimeParseOption::Hour => {
@@ -251,34 +303,8 @@ impl DateTimeParseFunction {
         }
         return check
     }
-    pub fn do_validate(
-        function_text: &String, 
-        date_parse_option: DateTimeParseOption, 
-        validate_tuple: (u32, Vec<String>)
-    ) -> (u32, Vec<String>) {
-        let (number_fails, mut failed_functions) = validate_tuple;
-        let obj = DateTimeParseFunction::defaults(
-            &function_text, date_parse_option.clone()
-        );
-        let check = obj.validate(date_parse_option.clone());
-        let mut number_fails = number_fails.clone();
-        if check == false {
-            number_fails += 1;
-            match date_parse_option {
-                DateTimeParseOption::Hour => {
-                    failed_functions.push(String::from(FUNCTION_HOUR));
-                },
-                DateTimeParseOption::Minute => {
-                    failed_functions.push(String::from(FUNCTION_MINUTE));
-                },
-                DateTimeParseOption::Second => {
-                    failed_functions.push(String::from(FUNCTION_SECOND));
-                },
-            }
-        }
-        return (number_fails, failed_functions);
-    }
-    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
+    fn replace(&mut self, formula: String) -> String {
+        let data_map = self.data_map.clone().unwrap();
         let function_text = self.function_text.clone();
         let mut formula = formula.clone();
         let mut replacement_string = String::from("");
@@ -342,20 +368,6 @@ impl DateTimeParseFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         return formula;
     }
-    pub fn do_replace(
-        function_text: &String, 
-        date_parse_option: DateTimeParseOption, 
-        data_map: HashMap<String, String>, 
-        mut formula: String
-    ) -> String {
-        let data_map = data_map.clone();
-        let mut concat_obj = DateTimeParseFunction::defaults(
-            &function_text, 
-            date_parse_option
-        );
-        formula = concat_obj.replace(formula, data_map.clone());
-        return formula
-    }
 }
 
 
@@ -370,9 +382,10 @@ pub struct DateParseFunction {
     pub is_iso: bool,
     pub is_human_time: bool,
     pub only_date: bool,
+    pub data_map: Option<HashMap<String, String>>,
 }
 impl DateParseFunction {
-    pub fn defaults(function_text: &String, date_parse_option: DateParseOption) -> DateParseFunction {
+    pub fn defaults(function_text: &String, date_parse_option: DateParseOption, data_map: Option<HashMap<String, String>>) -> DateParseFunction {
         // DAY("2021-08-25T06:26:00+00:00")
         // DAY({Column Date}) : This is any of the ones here.
         // DAY("2021-08-25 06:26:00")
@@ -442,11 +455,63 @@ impl DateParseFunction {
             mode: mode.to_string(),
             is_iso: is_iso,
             is_human_time: is_human_time,
-            only_date: only_date
+            only_date: only_date,
+            data_map: data_map,
         };
         return obj
     }
-    pub fn validate(&self, date_parse_option: DateParseOption) -> bool {
+    pub fn do_validate(
+        function_text: &String, 
+        date_parse_option: DateParseOption, 
+        validate_tuple: (u32, Vec<String>)
+    ) -> (u32, Vec<String>) {
+        let (number_fails, mut failed_functions) = validate_tuple;
+        let obj = DateParseFunction::defaults(
+            &function_text, date_parse_option.clone(), None
+        );
+        let check = obj.validate();
+        let mut number_fails = number_fails.clone();
+        if check == false {
+            number_fails += 1;
+            match date_parse_option {
+                DateParseOption::Day => {
+                    failed_functions.push(String::from(FUNCTION_DAY));
+                },
+                DateParseOption::Week => {
+                    failed_functions.push(String::from(FUNCTION_WEEK));
+                },
+                DateParseOption::WeekDay => {
+                    failed_functions.push(String::from(FUNCTION_WEEKDAY));
+                },
+                DateParseOption::Month => {
+                    failed_functions.push(String::from(FUNCTION_MONTH));
+                },
+                DateParseOption::Year => {
+                    failed_functions.push(String::from(FUNCTION_YEAR));
+                },
+            }
+        }
+        return (number_fails, failed_functions);
+    }
+    pub fn do_replace(
+        function_text: &String, 
+        date_parse_option: DateParseOption, 
+        data_map: HashMap<String, String>, 
+        mut formula: String
+    ) -> String {
+        let data_map = data_map.clone();
+        let mut concat_obj = DateParseFunction::defaults(
+            &function_text, 
+            date_parse_option,
+            Some(data_map)
+        );
+        formula = concat_obj.replace(formula);
+        return formula
+    }
+}
+impl Function for DateParseFunction {
+    fn validate(&self) -> bool {
+        let date_parse_option = self.parse_option.clone();
         let expr: Regex;
         match date_parse_option {
             DateParseOption::Day => {
@@ -501,40 +566,8 @@ impl DateParseFunction {
         }
         return check
     }
-    pub fn do_validate(
-        function_text: &String, 
-        date_parse_option: DateParseOption, 
-        validate_tuple: (u32, Vec<String>)
-    ) -> (u32, Vec<String>) {
-        let (number_fails, mut failed_functions) = validate_tuple;
-        let obj = DateParseFunction::defaults(
-            &function_text, date_parse_option.clone()
-        );
-        let check = obj.validate(date_parse_option.clone());
-        let mut number_fails = number_fails.clone();
-        if check == false {
-            number_fails += 1;
-            match date_parse_option {
-                DateParseOption::Day => {
-                    failed_functions.push(String::from(FUNCTION_DAY));
-                },
-                DateParseOption::Week => {
-                    failed_functions.push(String::from(FUNCTION_WEEK));
-                },
-                DateParseOption::WeekDay => {
-                    failed_functions.push(String::from(FUNCTION_WEEKDAY));
-                },
-                DateParseOption::Month => {
-                    failed_functions.push(String::from(FUNCTION_MONTH));
-                },
-                DateParseOption::Year => {
-                    failed_functions.push(String::from(FUNCTION_YEAR));
-                },
-            }
-        }
-        return (number_fails, failed_functions);
-    }
-    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
+    fn replace(&mut self, formula: String) -> String {
+        let data_map = self.data_map.clone().unwrap();
         let function_text = self.function_text.clone();
         let mut formula = formula.clone();
         let mut replacement_string = String::from("");
@@ -650,45 +683,27 @@ impl DateParseFunction {
         }
         return formula;
     }
-    pub fn do_replace(
-        function_text: &String, 
-        date_parse_option: DateParseOption, 
-        data_map: HashMap<String, String>, 
-        mut formula: String
-    ) -> String {
-        let data_map = data_map.clone();
-        let mut concat_obj = DateParseFunction::defaults(
-            &function_text, 
-            date_parse_option
-        );
-        formula = concat_obj.replace(formula, data_map.clone());
-        return formula
-    }
 }
 
 // NOW()
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NowFunction {
     pub function_text: String,
+    pub data_map: Option<HashMap<String, String>>,
 }
 impl NowFunction {
-    pub fn defaults(function_text: &String) -> NowFunction {
+    pub fn defaults(function_text: &String, data_map: Option<HashMap<String, String>>) -> NowFunction {
         // NOW()
         let obj = Self{
             function_text: function_text.clone(),
+            data_map: data_map,
         };
         return obj
-    }
-    pub fn validate(&self) -> bool {
-        let expr: Regex = RE_NOW.clone();
-        let function_text = self.function_text.clone();
-        let check = expr.is_match(&function_text);
-        return check
     }
     pub fn do_validate(function_text: &String, validate_tuple: (u32, Vec<String>)) -> (u32, Vec<String>) {
         let (number_fails, mut failed_functions) = validate_tuple;
         let obj = NowFunction::defaults(
-            &function_text
+            &function_text, None
         );
         let check = obj.validate();
         let mut number_fails = number_fails.clone();
@@ -698,7 +713,25 @@ impl NowFunction {
         }
         return (number_fails, failed_functions);
     }
-    pub fn replace(&mut self, formula: String) -> String {
+    pub fn do_replace(
+        function_text: &String, 
+        mut formula: String
+    ) -> String {
+        let mut obj = NowFunction::defaults(
+            &function_text, None
+        );
+        formula = obj.replace(formula);
+        return formula
+    }
+}
+impl Function for NowFunction {
+    fn validate(&self) -> bool {
+        let expr: Regex = RE_NOW.clone();
+        let function_text = self.function_text.clone();
+        let check = expr.is_match(&function_text);
+        return check
+    }
+    fn replace(&mut self, formula: String) -> String {
         let function_text = self.function_text.clone();
         let mut formula = formula.clone();
         let now_date_obj = Utc::now();
@@ -708,41 +741,27 @@ impl NowFunction {
         formula = format!("\"{}\"", formula);
         return formula;
     }
-    pub fn do_replace(
-        function_text: &String, 
-        mut formula: String
-    ) -> String {
-        let mut obj = NowFunction::defaults(
-            &function_text, 
-        );
-        formula = obj.replace(formula);
-        return formula
-    }
 }
 
 // TODAY()
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TodayFunction {
     pub function_text: String,
+    pub data_map: Option<HashMap<String, String>>,
 }
 impl TodayFunction {
-    pub fn defaults(function_text: &String) -> TodayFunction {
+    pub fn defaults(function_text: &String, data_map: Option<HashMap<String, String>>) -> TodayFunction {
         // NOW()
         let obj = Self{
             function_text: function_text.clone(),
+            data_map: data_map,
         };
         return obj
-    }
-    pub fn validate(&self) -> bool {
-        let expr: Regex = RE_TODAY.clone();
-        let function_text = self.function_text.clone();
-        let check = expr.is_match(&function_text);
-        return check
     }
     pub fn do_validate(function_text: &String, validate_tuple: (u32, Vec<String>)) -> (u32, Vec<String>) {
         let (number_fails, mut failed_functions) = validate_tuple;
         let obj = TodayFunction::defaults(
-            &function_text
+            &function_text, None
         );
         let check = obj.validate();
         let mut number_fails = number_fails.clone();
@@ -752,7 +771,25 @@ impl TodayFunction {
         }
         return (number_fails, failed_functions);
     }
-    pub fn replace(&mut self, formula: String) -> String {
+    pub fn do_replace(
+        function_text: &String, 
+        mut formula: String
+    ) -> String {
+        let mut obj = TodayFunction::defaults(
+            &function_text, None
+        );
+        formula = obj.replace(formula);
+        return formula
+    }
+}
+impl Function for TodayFunction {
+    fn validate(&self) -> bool {
+        let expr: Regex = RE_TODAY.clone();
+        let function_text = self.function_text.clone();
+        let check = expr.is_match(&function_text);
+        return check
+    }
+    fn replace(&mut self, formula: String) -> String {
         let function_text = self.function_text.clone();
         let mut formula = formula.clone();
         let today_date_obj = Utc::today();
@@ -769,16 +806,6 @@ impl TodayFunction {
         formula = format!("\"{}\"", formula);
         return formula;
     }
-    pub fn do_replace(
-        function_text: &String, 
-        mut formula: String
-    ) -> String {
-        let mut obj = TodayFunction::defaults(
-            &function_text, 
-        );
-        formula = obj.replace(formula);
-        return formula
-    }
 }
 
 // DAYS(end_date, start_date)
@@ -789,9 +816,10 @@ pub struct DaysFunction {
     pub end_date: Option<String>,
     pub start_date_ref: Option<String>,
     pub end_date_ref: Option<String>,
+    pub data_map: Option<HashMap<String, String>>,
 }
 impl DaysFunction {
-    pub fn defaults(function_text: &String) -> DaysFunction {
+    pub fn defaults(function_text: &String, data_map: Option<HashMap<String, String>>) -> DaysFunction {
         // DAYS("12-SEP-2021", "5-FEB-2021")
         // DAYS({Column A}, {Column B})
         let matches = RE_DAYS.captures(&function_text).unwrap();
@@ -821,19 +849,14 @@ impl DaysFunction {
             end_date: end_date_wrap,
             start_date_ref: start_date_ref_wrap,
             end_date_ref: end_date_ref_wrap,
+            data_map: data_map,
         };
         return obj
-    }
-    pub fn validate(&self) -> bool {
-        let expr: Regex = RE_DAYS.clone();
-        let function_text = self.function_text.clone();
-        let check = expr.is_match(&function_text);
-        return check
     }
     pub fn do_validate(function_text: &String, validate_tuple: (u32, Vec<String>)) -> (u32, Vec<String>) {
         let (number_fails, mut failed_functions) = validate_tuple;
         let obj = DaysFunction::defaults(
-            &function_text
+            &function_text, None
         );
         let check = obj.validate();
         let mut number_fails = number_fails.clone();
@@ -843,8 +866,28 @@ impl DaysFunction {
         }
         return (number_fails, failed_functions);
     }
-    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
+    pub fn do_replace(
+        function_text: &String, 
+        data_map: HashMap<String, String>,
+        mut formula: String
+    ) -> String {
         let data_map = data_map.clone();
+        let mut obj = DaysFunction::defaults(
+            &function_text,Some(data_map)
+        );
+        formula = obj.replace(formula);
+        return formula
+    }
+}
+impl Function for DaysFunction { 
+    fn validate(&self) -> bool {
+        let expr: Regex = RE_DAYS.clone();
+        let function_text = self.function_text.clone();
+        let check = expr.is_match(&function_text);
+        return check
+    }
+    fn replace(&mut self, formula: String) -> String {
+        let data_map = self.data_map.clone().unwrap();
         let function_text = self.function_text.clone();
         let mut formula = formula.clone();
         let start_date = self.start_date.clone();
@@ -892,18 +935,6 @@ impl DaysFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         return formula;
     }
-    pub fn do_replace(
-        function_text: &String, 
-        data_map: HashMap<String, String>,
-        mut formula: String
-    ) -> String {
-        let data_map = data_map.clone();
-        let mut obj = DaysFunction::defaults(
-            &function_text, 
-        );
-        formula = obj.replace(formula, data_map.clone());
-        return formula
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -935,9 +966,10 @@ pub struct DateAddDiffFunction {
     pub number: Option<u32>,
     pub units: Option<DateUnits>,
     pub operation: DateDeltaOperation,
+    pub data_map: Option<HashMap<String, String>>,
 }
 impl DateAddDiffFunction {
-    pub fn defaults(function_text: &String, operation: DateDeltaOperation) -> DateAddDiffFunction {
+    pub fn defaults(function_text: &String, operation: DateDeltaOperation, data_map: Option<HashMap<String, String>>) -> DateAddDiffFunction {
         let matches: Captures;
         match operation {
             DateDeltaOperation::Add => {
@@ -1003,10 +1035,51 @@ impl DateAddDiffFunction {
             number: number_wrap,
             units: units_wrap,
             operation: operation,
+            data_map: data_map,
         };
         return obj
     }
-    pub fn validate(&self) -> bool {
+    pub fn do_validate(
+        function_text: &String, 
+        operation: DateDeltaOperation, 
+        validate_tuple: (u32, Vec<String>)
+    ) -> (u32, Vec<String>) {
+        let (number_fails, mut failed_functions) = validate_tuple;
+        let operation_ = operation.clone();
+        let obj = DateAddDiffFunction::defaults(
+            &function_text, operation, None
+        );
+        let check = obj.validate();
+        let mut number_fails = number_fails.clone();
+        if check == false {
+            number_fails += 1;
+            match operation_ {
+                DateDeltaOperation::Add => {
+                    failed_functions.push(String::from(FUNCTION_DATEADD));
+                },
+                DateDeltaOperation::Diff => {
+                    failed_functions.push(String::from(FUNCTION_DATEDIF));
+                },
+            }
+        }
+        return (number_fails, failed_functions);
+    }
+    pub fn do_replace(
+        function_text: &String, 
+        operation: DateDeltaOperation, 
+        data_map: HashMap<String, String>,
+        mut formula: String
+    ) -> String {
+        let data_map = data_map.clone();
+        let mut obj = DateAddDiffFunction::defaults(
+            &function_text, operation,Some(data_map)
+        );
+        formula = obj.replace(formula);
+        return formula
+    }
+}
+impl Function for DateAddDiffFunction {
+    fn validate(&self) -> bool {
         let operation = self.operation.clone();
         let expr: Regex;
         match operation {
@@ -1039,33 +1112,8 @@ impl DateAddDiffFunction {
         }
         return check
     }
-    pub fn do_validate(
-        function_text: &String, 
-        operation: DateDeltaOperation, 
-        validate_tuple: (u32, Vec<String>)
-    ) -> (u32, Vec<String>) {
-        let (number_fails, mut failed_functions) = validate_tuple;
-        let operation_ = operation.clone();
-        let obj = DateAddDiffFunction::defaults(
-            &function_text, operation
-        );
-        let check = obj.validate();
-        let mut number_fails = number_fails.clone();
-        if check == false {
-            number_fails += 1;
-            match operation_ {
-                DateDeltaOperation::Add => {
-                    failed_functions.push(String::from(FUNCTION_DATEADD));
-                },
-                DateDeltaOperation::Diff => {
-                    failed_functions.push(String::from(FUNCTION_DATEDIF));
-                },
-            }
-        }
-        return (number_fails, failed_functions);
-    }
-    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
-        let data_map = data_map.clone();
+    fn replace(&mut self, formula: String) -> String {
+        let data_map = self.data_map.clone().unwrap();
         let function_text = self.function_text.clone();
         let mut formula = formula.clone();
         let operation = self.operation.clone();
@@ -1209,19 +1257,6 @@ impl DateAddDiffFunction {
         formula = format!("\"{}\"", formula);
         return formula;
     }
-    pub fn do_replace(
-        function_text: &String, 
-        operation: DateDeltaOperation, 
-        data_map: HashMap<String, String>,
-        mut formula: String
-    ) -> String {
-        let data_map = data_map.clone();
-        let mut obj = DateAddDiffFunction::defaults(
-            &function_text, operation
-        );
-        formula = obj.replace(formula, data_map.clone());
-        return formula
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -1231,9 +1266,10 @@ pub struct DateFormatFunction {
     pub datetime: Option<String>,
     pub date_ref: Option<String>,
     pub format: Option<String>,
+    pub data_map: Option<HashMap<String, String>>,
 }
 impl DateFormatFunction {
-    pub fn defaults(function_text: &String) -> DateFormatFunction {
+    pub fn defaults(function_text: &String, data_map: Option<HashMap<String, String>>) -> DateFormatFunction {
         let matches= RE_DATEFMT.captures(&function_text).unwrap();
 
         // date
@@ -1267,10 +1303,40 @@ impl DateFormatFunction {
             datetime: datetime_wrap,
             date_ref: date_ref_wrap,
             format: format_wrap,
+            data_map: data_map,
         };
         return obj
     }
-    pub fn get_rust_format(&self, date_obj: DateTime<FixedOffset>) -> String {
+    pub fn do_validate(
+        function_text: &String, 
+        validate_tuple: (u32, Vec<String>),
+    ) -> (u32, Vec<String>) {
+        let (number_fails, failed_functions) = validate_tuple.clone();
+        let obj = DateFormatFunction::defaults(
+            &function_text, None
+        );
+        let check = obj.validate();
+        let mut number_fails = number_fails.clone();
+        let mut failed_functions = failed_functions.clone();
+        if check == false {
+            number_fails += 1;
+            failed_functions.push(String::from(FUNCTION_DATEFMT));
+        }
+        return (number_fails, failed_functions);
+    }
+    pub fn do_replace(
+        function_text: &String, 
+        data_map: HashMap<String, String>,
+        mut formula: String
+    ) -> String {
+        let data_map = data_map.clone();
+        let mut obj = DateFormatFunction::defaults(
+            &function_text,Some(data_map)
+        );
+        formula = obj.replace(formula);
+        return formula
+    }
+    fn get_rust_format(&self, date_obj: DateTime<FixedOffset>) -> String {
         let mut format = self.format.clone().unwrap();
         let mut fmt_map: HashMap<&str, &str> = HashMap::new();
         fmt_map.insert("M", "%_m");
@@ -1350,7 +1416,9 @@ impl DateFormatFunction {
         }
         return format;
     }
-    pub fn validate(&self) -> bool {
+}
+impl Function for DateFormatFunction {
+    fn validate(&self) -> bool {
         let expr: Regex = RE_DATEFMT.clone();
         let function_text = self.function_text.clone();
         let mut check = expr.is_match(&function_text);
@@ -1394,25 +1462,8 @@ impl DateFormatFunction {
         }
         return check
     }
-    pub fn do_validate(
-        function_text: &String, 
-        validate_tuple: (u32, Vec<String>),
-    ) -> (u32, Vec<String>) {
-        let (number_fails, failed_functions) = validate_tuple.clone();
-        let obj = DateFormatFunction::defaults(
-            &function_text
-        );
-        let check = obj.validate();
-        let mut number_fails = number_fails.clone();
-        let mut failed_functions = failed_functions.clone();
-        if check == false {
-            number_fails += 1;
-            failed_functions.push(String::from(FUNCTION_DATEFMT));
-        }
-        return (number_fails, failed_functions);
-    }
-    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
-        let data_map = data_map.clone();
+    fn replace(&mut self, formula: String) -> String {
+        let data_map = self.data_map.clone().unwrap();
         let function_text = self.function_text.clone();
         let date = self.date.clone();
         let datetime = self.datetime.clone();
@@ -1453,20 +1504,7 @@ impl DateFormatFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         return formula;
     }
-    pub fn do_replace(
-        function_text: &String, 
-        data_map: HashMap<String, String>,
-        mut formula: String
-    ) -> String {
-        let data_map = data_map.clone();
-        let mut obj = DateFormatFunction::defaults(
-            &function_text
-        );
-        formula = obj.replace(formula, data_map.clone());
-        return formula
-    }
 }
-
 
 pub fn has_month_short(date_str: &String) -> bool {
     let date_str = date_str.clone().to_lowercase();

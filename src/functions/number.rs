@@ -7,6 +7,7 @@ use math::round;
 
 use crate::functions::FunctionAttribute;
 use crate::functions::constants::*;
+use crate::functions::Function;
 
 
 lazy_static! {
@@ -36,9 +37,10 @@ pub struct CeilingFunction {
     pub number: Option<f64>,
     pub number_ref: Option<String>,
     pub significance: Option<i8>,
+    pub data_map: Option<HashMap<String, String>>,
 }
 impl CeilingFunction {
-    pub fn defaults(function_text: &String) -> CeilingFunction {
+    pub fn defaults(function_text: &String, data_map: Option<HashMap<String, String>>) -> CeilingFunction {
         // CEILING(number, significance)
 
         let matches = RE_CEILING.captures(function_text).unwrap();
@@ -68,11 +70,38 @@ impl CeilingFunction {
             number: number_wrap,
             number_ref: number_ref_wrap,
             significance: significance_wrap,
+            data_map: data_map,
         };
 
         return obj
     }
-    pub fn validate(&self) -> bool {
+    pub fn do_validate(
+        function_text: &String, 
+        validate_tuple: (u32, Vec<String>)
+    ) -> (u32, Vec<String>) {
+        let (number_fails, mut failed_functions) = validate_tuple;
+        let concat_obj = CeilingFunction::defaults(
+            &function_text, None
+        );
+        let check = concat_obj.validate();
+        let mut number_fails = number_fails.clone();
+        if check == false {
+            number_fails += 1;
+            failed_functions.push(String::from(FUNCTION_CEILING));
+        }
+        return (number_fails, failed_functions);
+    }
+    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
+        let data_map = data_map.clone();
+        let mut concat_obj = CeilingFunction::defaults(
+            &function_text,Some(data_map)
+        );
+        formula = concat_obj.replace(formula);
+        return formula
+    }
+}
+impl Function for CeilingFunction {
+    fn validate(&self) -> bool {
         let expr = RE_CEILING.clone();
         let function_text = self.function_text.clone();
         let mut check = expr.is_match(&function_text);
@@ -90,24 +119,8 @@ impl CeilingFunction {
         }
         return check
     }
-    pub fn do_validate(
-        function_text: &String, 
-        validate_tuple: (u32, Vec<String>)
-    ) -> (u32, Vec<String>) {
-        let (number_fails, mut failed_functions) = validate_tuple;
-        let concat_obj = CeilingFunction::defaults(
-            &function_text, 
-        );
-        let check = concat_obj.validate();
-        let mut number_fails = number_fails.clone();
-        if check == false {
-            number_fails += 1;
-            failed_functions.push(String::from(FUNCTION_CEILING));
-        }
-        return (number_fails, failed_functions);
-    }
-    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
-        let data_map = data_map.clone();
+    fn replace(&mut self, formula: String) -> String {
+        let data_map = self.data_map.clone().unwrap();
         let function_text = self.function_text.clone();
         let mut formula = formula.clone();
         let replacement_string: String;
@@ -136,14 +149,6 @@ impl CeilingFunction {
         formula = format!("\"{}\"", formula);
         return formula;
     }
-    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
-        let data_map = data_map.clone();
-        let mut concat_obj = CeilingFunction::defaults(
-            &function_text, 
-        );
-        formula = concat_obj.replace(formula, data_map.clone());
-        return formula
-    }
 }
 
 // FLOOR(number, significance)
@@ -153,9 +158,10 @@ pub struct FloorFunction {
     pub number: Option<f64>,
     pub number_ref: Option<String>,
     pub significance: Option<i8>,
+    pub data_map: Option<HashMap<String, String>>,
 }
 impl FloorFunction {
-    pub fn defaults(function_text: &String) -> FloorFunction {
+    pub fn defaults(function_text: &String, data_map: Option<HashMap<String, String>>) -> FloorFunction {
         // FLOOR(number, significance)
 
         let matches = RE_FLOOR.captures(function_text).unwrap();
@@ -185,11 +191,38 @@ impl FloorFunction {
             number: number_wrap,
             number_ref: number_ref_wrap,
             significance: significance_wrap,
+            data_map: data_map,
         };
 
         return obj
     }
-    pub fn validate(&self) -> bool {
+    pub fn do_validate(
+        function_text: &String, 
+        validate_tuple: (u32, Vec<String>)
+    ) -> (u32, Vec<String>) {
+        let (number_fails, mut failed_functions) = validate_tuple;
+        let concat_obj = FloorFunction::defaults(
+            &function_text, None
+        );
+        let check = concat_obj.validate();
+        let mut number_fails = number_fails.clone();
+        if check == false {
+            number_fails += 1;
+            failed_functions.push(String::from(FUNCTION_FLOOR));
+        }
+        return (number_fails, failed_functions);
+    }
+    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
+        let data_map = data_map.clone();
+        let mut concat_obj = FloorFunction::defaults(
+            &function_text,Some(data_map)
+        );
+        formula = concat_obj.replace(formula);
+        return formula
+    }
+}
+impl Function for FloorFunction {
+    fn validate(&self) -> bool {
         let expr = RE_FLOOR.clone();
         let function_text = self.function_text.clone();
         let mut check = expr.is_match(&function_text);
@@ -207,24 +240,8 @@ impl FloorFunction {
         }
         return check
     }
-    pub fn do_validate(
-        function_text: &String, 
-        validate_tuple: (u32, Vec<String>)
-    ) -> (u32, Vec<String>) {
-        let (number_fails, mut failed_functions) = validate_tuple;
-        let concat_obj = FloorFunction::defaults(
-            &function_text, 
-        );
-        let check = concat_obj.validate();
-        let mut number_fails = number_fails.clone();
-        if check == false {
-            number_fails += 1;
-            failed_functions.push(String::from(FUNCTION_FLOOR));
-        }
-        return (number_fails, failed_functions);
-    }
-    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
-        let data_map = data_map.clone();
+    fn replace(&mut self, formula: String) -> String {
+        let data_map = self.data_map.clone().unwrap();
         let function_text = self.function_text.clone();
         let mut formula = formula.clone();
         let replacement_string: String;
@@ -253,14 +270,6 @@ impl FloorFunction {
         formula = format!("\"{}\"", formula);
         return formula;
     }
-    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
-        let data_map = data_map.clone();
-        let mut concat_obj = FloorFunction::defaults(
-            &function_text, 
-        );
-        formula = concat_obj.replace(formula, data_map.clone());
-        return formula
-    }
 }
 
 // COUNT(value1, value2, ...))
@@ -268,9 +277,10 @@ impl FloorFunction {
 pub struct CountFunction {
     pub function_text: String,
     pub attrs: Option<String>,
+    pub data_map: Option<HashMap<String, String>>,
 }
 impl CountFunction {
-    pub fn defaults(function_text: &String) -> CountFunction {
+    pub fn defaults(function_text: &String, data_map: Option<HashMap<String, String>>) -> CountFunction {
         // COUNT(value1, value2, ...))
 
         let matches = RE_COUNT.captures(function_text).unwrap();
@@ -285,11 +295,38 @@ impl CountFunction {
         let obj = Self{
             function_text: function_text.clone(),
             attrs: attrs_wrap,
+            data_map: data_map,
         };
 
         return obj
     }
-    pub fn validate(&self) -> bool {
+    pub fn do_validate(
+        function_text: &String, 
+        validate_tuple: (u32, Vec<String>)
+    ) -> (u32, Vec<String>) {
+        let (number_fails, mut failed_functions) = validate_tuple;
+        let concat_obj = CountFunction::defaults(
+            &function_text, None
+        );
+        let check = concat_obj.validate();
+        let mut number_fails = number_fails.clone();
+        if check == false {
+            number_fails += 1;
+            failed_functions.push(String::from(FUNCTION_COUNT));
+        }
+        return (number_fails, failed_functions);
+    }
+    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
+        let data_map = data_map.clone();
+        let mut concat_obj = CountFunction::defaults(
+            &function_text,Some(data_map)
+        );
+        formula = concat_obj.replace(formula);
+        return formula
+    }
+}
+impl Function for CountFunction {
+    fn validate(&self) -> bool {
         let expr = RE_COUNT.clone();
         let function_text = self.function_text.clone();
         let mut check = expr.is_match(&function_text);
@@ -302,24 +339,8 @@ impl CountFunction {
         }
         return check
     }
-    pub fn do_validate(
-        function_text: &String, 
-        validate_tuple: (u32, Vec<String>)
-    ) -> (u32, Vec<String>) {
-        let (number_fails, mut failed_functions) = validate_tuple;
-        let concat_obj = CountFunction::defaults(
-            &function_text, 
-        );
-        let check = concat_obj.validate();
-        let mut number_fails = number_fails.clone();
-        if check == false {
-            number_fails += 1;
-            failed_functions.push(String::from(FUNCTION_COUNT));
-        }
-        return (number_fails, failed_functions);
-    }
-    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
-        let data_map = data_map.clone();
+    fn replace(&mut self, formula: String) -> String {
+        let data_map = self.data_map.clone().unwrap();
         let function_text = self.function_text.clone();
         let mut formula = formula.clone();
         let replacement_string: String;
@@ -358,14 +379,6 @@ impl CountFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         return formula;
     }
-    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
-        let data_map = data_map.clone();
-        let mut concat_obj = CountFunction::defaults(
-            &function_text, 
-        );
-        formula = concat_obj.replace(formula, data_map.clone());
-        return formula
-    }
 }
 
 // COUNTA(value1, value2, ...))
@@ -373,9 +386,10 @@ impl CountFunction {
 pub struct CountAFunction {
     pub function_text: String,
     pub attrs: Option<String>,
+    pub data_map: Option<HashMap<String, String>>,
 }
 impl CountAFunction {
-    pub fn defaults(function_text: &String) -> CountAFunction {
+    pub fn defaults(function_text: &String, data_map: Option<HashMap<String, String>>) -> CountAFunction {
         // COUNTA(value1, value2, ...))
         // We take as empty null and ""
 
@@ -391,11 +405,38 @@ impl CountAFunction {
         let obj = Self{
             function_text: function_text.clone(),
             attrs: attrs_wrap,
+            data_map: data_map,
         };
 
         return obj
     }
-    pub fn validate(&self) -> bool {
+    pub fn do_validate(
+        function_text: &String, 
+        validate_tuple: (u32, Vec<String>)
+    ) -> (u32, Vec<String>) {
+        let (number_fails, mut failed_functions) = validate_tuple;
+        let concat_obj = CountAFunction::defaults(
+            &function_text, None
+        );
+        let check = concat_obj.validate();
+        let mut number_fails = number_fails.clone();
+        if check == false {
+            number_fails += 1;
+            failed_functions.push(String::from(FUNCTION_COUNTA));
+        }
+        return (number_fails, failed_functions);
+    }
+    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
+        let data_map = data_map.clone();
+        let mut concat_obj = CountAFunction::defaults(
+            &function_text,Some(data_map)
+        );
+        formula = concat_obj.replace(formula);
+        return formula
+    }
+}
+impl Function for CountAFunction {
+    fn validate(&self) -> bool {
         let expr = RE_COUNTA.clone();
         let function_text = self.function_text.clone();
         let mut check = expr.is_match(&function_text);
@@ -408,24 +449,8 @@ impl CountAFunction {
         }
         return check
     }
-    pub fn do_validate(
-        function_text: &String, 
-        validate_tuple: (u32, Vec<String>)
-    ) -> (u32, Vec<String>) {
-        let (number_fails, mut failed_functions) = validate_tuple;
-        let concat_obj = CountAFunction::defaults(
-            &function_text, 
-        );
-        let check = concat_obj.validate();
-        let mut number_fails = number_fails.clone();
-        if check == false {
-            number_fails += 1;
-            failed_functions.push(String::from(FUNCTION_COUNTA));
-        }
-        return (number_fails, failed_functions);
-    }
-    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
-        let data_map = data_map.clone();
+    fn replace(&mut self, formula: String) -> String {
+        let data_map = self.data_map.clone().unwrap();
         let function_text = self.function_text.clone();
         let mut formula = formula.clone();
         let replacement_string: String;
@@ -477,14 +502,6 @@ impl CountAFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         return formula;
     }
-    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
-        let data_map = data_map.clone();
-        let mut concat_obj = CountAFunction::defaults(
-            &function_text, 
-        );
-        formula = concat_obj.replace(formula, data_map.clone());
-        return formula
-    }
 }
 
 // COUNTALL(value1, value2, ...))
@@ -492,9 +509,10 @@ impl CountAFunction {
 pub struct CountAllFunction {
     pub function_text: String,
     pub attrs: Option<String>,
+    pub data_map: Option<HashMap<String, String>>,
 }
 impl CountAllFunction {
-    pub fn defaults(function_text: &String) -> CountAllFunction {
+    pub fn defaults(function_text: &String, data_map: Option<HashMap<String, String>>) -> CountAllFunction {
         // COUNTALL(value1, value2, ...))
         // We count all, including nulls and empty values
 
@@ -510,11 +528,37 @@ impl CountAllFunction {
         let obj = Self{
             function_text: function_text.clone(),
             attrs: attrs_wrap,
+            data_map: data_map,
         };
 
         return obj
     }
-    pub fn validate(&self) -> bool {
+    pub fn do_validate(
+        function_text: &String, 
+        validate_tuple: (u32, Vec<String>)
+    ) -> (u32, Vec<String>) {
+        let (number_fails, mut failed_functions) = validate_tuple;
+        let concat_obj = CountAllFunction::defaults(
+            &function_text, None
+        );
+        let check = concat_obj.validate();
+        let mut number_fails = number_fails.clone();
+        if check == false {
+            number_fails += 1;
+            failed_functions.push(String::from(FUNCTION_COUNTALL));
+        }
+        return (number_fails, failed_functions);
+    }
+    pub fn do_replace(function_text: &String, mut formula: String) -> String {
+        let mut concat_obj = CountAllFunction::defaults(
+            &function_text, None
+        );
+        formula = concat_obj.replace(formula);
+        return formula
+    }
+}
+impl Function for CountAllFunction {
+    fn validate(&self) -> bool {
         let expr = RE_COUNTALL.clone();
         let function_text = self.function_text.clone();
         let mut check = expr.is_match(&function_text);
@@ -527,23 +571,7 @@ impl CountAllFunction {
         }
         return check
     }
-    pub fn do_validate(
-        function_text: &String, 
-        validate_tuple: (u32, Vec<String>)
-    ) -> (u32, Vec<String>) {
-        let (number_fails, mut failed_functions) = validate_tuple;
-        let concat_obj = CountAllFunction::defaults(
-            &function_text, 
-        );
-        let check = concat_obj.validate();
-        let mut number_fails = number_fails.clone();
-        if check == false {
-            number_fails += 1;
-            failed_functions.push(String::from(FUNCTION_COUNTALL));
-        }
-        return (number_fails, failed_functions);
-    }
-    pub fn replace(&mut self, formula: String) -> String {
+    fn replace(&mut self, formula: String) -> String {
         let function_text = self.function_text.clone();
         let mut formula = formula.clone();
         let replacement_string: String;
@@ -562,13 +590,6 @@ impl CountAllFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         return formula;
     }
-    pub fn do_replace(function_text: &String, mut formula: String) -> String {
-        let mut concat_obj = CountAllFunction::defaults(
-            &function_text, 
-        );
-        formula = concat_obj.replace(formula);
-        return formula
-    }
 }
 
 // EVEN(number)
@@ -577,9 +598,10 @@ pub struct EvenFunction {
     pub function_text: String,
     pub number: Option<f64>,
     pub number_ref: Option<String>,
+    pub data_map: Option<HashMap<String, String>>,
 }
 impl EvenFunction {
-    pub fn defaults(function_text: &String) -> EvenFunction {
+    pub fn defaults(function_text: &String, data_map: Option<HashMap<String, String>>) -> EvenFunction {
         // EVEN(number)
         // EVEN(1.5) => 2
         // EVEN(3) => 4
@@ -606,15 +628,10 @@ impl EvenFunction {
             function_text: function_text.clone(),
             number: number_wrap,
             number_ref: number_ref_wrap,
+            data_map: data_map,
         };
 
         return obj
-    }
-    pub fn validate(&self) -> bool {
-        let expr = RE_EVEN.clone();
-        let function_text = self.function_text.clone();
-        let check = expr.is_match(&function_text);
-        return check
     }
     pub fn do_validate(
         function_text: &String, 
@@ -622,7 +639,7 @@ impl EvenFunction {
     ) -> (u32, Vec<String>) {
         let (number_fails, mut failed_functions) = validate_tuple;
         let concat_obj = EvenFunction::defaults(
-            &function_text, 
+            &function_text, None
         );
         let check = concat_obj.validate();
         let mut number_fails = number_fails.clone();
@@ -632,8 +649,24 @@ impl EvenFunction {
         }
         return (number_fails, failed_functions);
     }
-    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
+    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
         let data_map = data_map.clone();
+        let mut concat_obj = EvenFunction::defaults(
+            &function_text,Some(data_map)
+        );
+        formula = concat_obj.replace(formula);
+        return formula
+    }
+}
+impl Function for EvenFunction {
+    fn validate(&self) -> bool {
+        let expr = RE_EVEN.clone();
+        let function_text = self.function_text.clone();
+        let check = expr.is_match(&function_text);
+        return check
+    }
+    fn replace(&mut self, formula: String) -> String {
+        let data_map = self.data_map.clone().unwrap();
         let function_text = self.function_text.clone();
         let mut formula = formula.clone();
 
@@ -668,14 +701,6 @@ impl EvenFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         return formula;
     }
-    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
-        let data_map = data_map.clone();
-        let mut concat_obj = EvenFunction::defaults(
-            &function_text, 
-        );
-        formula = concat_obj.replace(formula, data_map.clone());
-        return formula
-    }
 }
 
 // EXP(number)
@@ -684,9 +709,10 @@ pub struct ExpFunction {
     pub function_text: String,
     pub number: Option<f64>,
     pub number_ref: Option<String>,
+    pub data_map: Option<HashMap<String, String>>,
 }
 impl ExpFunction {
-    pub fn defaults(function_text: &String) -> ExpFunction {
+    pub fn defaults(function_text: &String, data_map: Option<HashMap<String, String>>) -> ExpFunction {
         // EXP(number)
         // EXP(1) => 2.71828183
 
@@ -709,15 +735,10 @@ impl ExpFunction {
             function_text: function_text.clone(),
             number: number_wrap,
             number_ref: number_ref_wrap,
+            data_map: data_map,
         };
 
         return obj
-    }
-    pub fn validate(&self) -> bool {
-        let expr = RE_EXP.clone();
-        let function_text = self.function_text.clone();
-        let check = expr.is_match(&function_text);
-        return check
     }
     pub fn do_validate(
         function_text: &String, 
@@ -725,7 +746,7 @@ impl ExpFunction {
     ) -> (u32, Vec<String>) {
         let (number_fails, mut failed_functions) = validate_tuple;
         let concat_obj = ExpFunction::defaults(
-            &function_text, 
+            &function_text, None
         );
         let check = concat_obj.validate();
         let mut number_fails = number_fails.clone();
@@ -735,8 +756,24 @@ impl ExpFunction {
         }
         return (number_fails, failed_functions);
     }
-    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
+    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
         let data_map = data_map.clone();
+        let mut concat_obj = ExpFunction::defaults(
+            &function_text,Some(data_map)
+        );
+        formula = concat_obj.replace(formula);
+        return formula
+    }
+}
+impl Function for ExpFunction {
+    fn validate(&self) -> bool {
+        let expr = RE_EXP.clone();
+        let function_text = self.function_text.clone();
+        let check = expr.is_match(&function_text);
+        return check
+    }
+    fn replace(&mut self, formula: String) -> String {
+        let data_map = self.data_map.clone().unwrap();
         let function_text = self.function_text.clone();
         let mut formula = formula.clone();
 
@@ -764,14 +801,6 @@ impl ExpFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         return formula;
     }
-    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
-        let data_map = data_map.clone();
-        let mut concat_obj = ExpFunction::defaults(
-            &function_text, 
-        );
-        formula = concat_obj.replace(formula, data_map.clone());
-        return formula
-    }
 }
 
 // INT(number)
@@ -780,9 +809,10 @@ pub struct IntFunction {
     pub function_text: String,
     pub number: Option<f64>,
     pub number_ref: Option<String>,
+    pub data_map: Option<HashMap<String, String>>,
 }
 impl IntFunction {
-    pub fn defaults(function_text: &String) -> IntFunction {
+    pub fn defaults(function_text: &String, data_map: Option<HashMap<String, String>>) -> IntFunction {
         // INT(number)
         // INT(8.9) => 8
 
@@ -805,15 +835,10 @@ impl IntFunction {
             function_text: function_text.clone(),
             number: number_wrap,
             number_ref: number_ref_wrap,
+            data_map: data_map,
         };
 
         return obj
-    }
-    pub fn validate(&self) -> bool {
-        let expr = RE_INT.clone();
-        let function_text = self.function_text.clone();
-        let check = expr.is_match(&function_text);
-        return check
     }
     pub fn do_validate(
         function_text: &String, 
@@ -821,7 +846,7 @@ impl IntFunction {
     ) -> (u32, Vec<String>) {
         let (number_fails, mut failed_functions) = validate_tuple;
         let concat_obj = IntFunction::defaults(
-            &function_text, 
+            &function_text, None
         );
         let check = concat_obj.validate();
         let mut number_fails = number_fails.clone();
@@ -831,8 +856,24 @@ impl IntFunction {
         }
         return (number_fails, failed_functions);
     }
-    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
+    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
         let data_map = data_map.clone();
+        let mut concat_obj = IntFunction::defaults(
+            &function_text,Some(data_map)
+        );
+        formula = concat_obj.replace(formula);
+        return formula
+    }
+}
+impl Function for IntFunction {
+    fn validate(&self) -> bool {
+        let expr = RE_INT.clone();
+        let function_text = self.function_text.clone();
+        let check = expr.is_match(&function_text);
+        return check
+    }
+    fn replace(&mut self, formula: String) -> String {
+        let data_map = self.data_map.clone().unwrap();
         let function_text = self.function_text.clone();
         let mut formula = formula.clone();
 
@@ -861,14 +902,6 @@ impl IntFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         return formula;
     }
-    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
-        let data_map = data_map.clone();
-        let mut concat_obj = IntFunction::defaults(
-            &function_text, 
-        );
-        formula = concat_obj.replace(formula, data_map.clone());
-        return formula
-    }
 }
 
 // LOG(number)
@@ -880,9 +913,10 @@ pub struct LogFunction {
     pub number_ref: Option<String>,
     pub base: Option<usize>,
     pub base_ref: Option<usize>,
+    pub data_map: Option<HashMap<String, String>>,
 }
 impl LogFunction {
-    pub fn defaults(function_text: &String) -> LogFunction {
+    pub fn defaults(function_text: &String, data_map: Option<HashMap<String, String>>) -> LogFunction {
         // LOG(number)
         // LOG(number, [base])
         // LOG(10) = 1
@@ -923,15 +957,10 @@ impl LogFunction {
             number_ref: number_ref_wrap,
             base: base_wrap,
             base_ref: base_ref_wrap,
+            data_map: data_map,
         };
 
         return obj
-    }
-    pub fn validate(&self) -> bool {
-        let expr = RE_LOG.clone();
-        let function_text = self.function_text.clone();
-        let check = expr.is_match(&function_text);
-        return check
     }
     pub fn do_validate(
         function_text: &String, 
@@ -939,7 +968,7 @@ impl LogFunction {
     ) -> (u32, Vec<String>) {
         let (number_fails, mut failed_functions) = validate_tuple;
         let concat_obj = LogFunction::defaults(
-            &function_text, 
+            &function_text, None
         );
         let check = concat_obj.validate();
         let mut number_fails = number_fails.clone();
@@ -949,8 +978,24 @@ impl LogFunction {
         }
         return (number_fails, failed_functions);
     }
-    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
+    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
         let data_map = data_map.clone();
+        let mut concat_obj = LogFunction::defaults(
+            &function_text,Some(data_map)
+        );
+        formula = concat_obj.replace(formula);
+        return formula
+    }
+}
+impl Function for LogFunction {
+    fn validate(&self) -> bool {
+        let expr = RE_LOG.clone();
+        let function_text = self.function_text.clone();
+        let check = expr.is_match(&function_text);
+        return check
+    }
+    fn replace(&mut self, formula: String) -> String {
+        let data_map = self.data_map.clone().unwrap();
         let function_text = self.function_text.clone();
         let mut formula = formula.clone();
 
@@ -990,14 +1035,6 @@ impl LogFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         return formula;
     }
-    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
-        let data_map = data_map.clone();
-        let mut concat_obj = LogFunction::defaults(
-            &function_text, 
-        );
-        formula = concat_obj.replace(formula, data_map.clone());
-        return formula
-    }
 }
 
 // MOD(number, divisor)
@@ -1008,9 +1045,10 @@ pub struct ModFunction {
     pub number_ref: Option<String>,
     pub divisor: Option<usize>,
     pub divisor_ref: Option<usize>,
+    pub data_map: Option<HashMap<String, String>>,
 }
 impl ModFunction {
-    pub fn defaults(function_text: &String) -> ModFunction {
+    pub fn defaults(function_text: &String, data_map: Option<HashMap<String, String>>) -> ModFunction {
         // MOD(number, divisor)
 
         let matches = RE_MOD.captures(function_text).unwrap();
@@ -1048,15 +1086,10 @@ impl ModFunction {
             number_ref: number_ref_wrap,
             divisor: divisor_wrap,
             divisor_ref: divisor_ref_wrap,
+            data_map: data_map,
         };
 
         return obj
-    }
-    pub fn validate(&self) -> bool {
-        let expr = RE_MOD.clone();
-        let function_text = self.function_text.clone();
-        let check = expr.is_match(&function_text);
-        return check
     }
     pub fn do_validate(
         function_text: &String, 
@@ -1064,7 +1097,7 @@ impl ModFunction {
     ) -> (u32, Vec<String>) {
         let (number_fails, mut failed_functions) = validate_tuple;
         let concat_obj = ModFunction::defaults(
-            &function_text, 
+            &function_text, None
         );
         let check = concat_obj.validate();
         let mut number_fails = number_fails.clone();
@@ -1074,8 +1107,24 @@ impl ModFunction {
         }
         return (number_fails, failed_functions);
     }
-    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
+    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
         let data_map = data_map.clone();
+        let mut concat_obj = ModFunction::defaults(
+            &function_text,Some(data_map)
+        );
+        formula = concat_obj.replace(formula);
+        return formula
+    }
+}
+impl Function for ModFunction {
+    fn validate(&self) -> bool {
+        let expr = RE_MOD.clone();
+        let function_text = self.function_text.clone();
+        let check = expr.is_match(&function_text);
+        return check
+    }
+    fn replace(&mut self, formula: String) -> String {
+        let data_map = self.data_map.clone().unwrap();
         let function_text = self.function_text.clone();
         let mut formula = formula.clone();
 
@@ -1115,14 +1164,6 @@ impl ModFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         return formula;
     }
-    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
-        let data_map = data_map.clone();
-        let mut concat_obj = ModFunction::defaults(
-            &function_text, 
-        );
-        formula = concat_obj.replace(formula, data_map.clone());
-        return formula
-    }
 }
 
 // POWER(number, power)
@@ -1133,9 +1174,10 @@ pub struct PowerFunction {
     pub number_ref: Option<String>,
     pub power: Option<f64>,
     pub power_ref: Option<f64>,
+    pub data_map: Option<HashMap<String, String>>,
 }
 impl PowerFunction {
-    pub fn defaults(function_text: &String) -> PowerFunction {
+    pub fn defaults(function_text: &String, data_map: Option<HashMap<String, String>>) -> PowerFunction {
         // POWER(number, power)
 
         let matches = RE_POWER.captures(function_text).unwrap();
@@ -1173,15 +1215,10 @@ impl PowerFunction {
             number_ref: number_ref_wrap,
             power: power_wrap,
             power_ref: power_ref_wrap,
+            data_map: data_map,
         };
 
         return obj
-    }
-    pub fn validate(&self) -> bool {
-        let expr = RE_POWER.clone();
-        let function_text = self.function_text.clone();
-        let check = expr.is_match(&function_text);
-        return check
     }
     pub fn do_validate(
         function_text: &String, 
@@ -1189,7 +1226,7 @@ impl PowerFunction {
     ) -> (u32, Vec<String>) {
         let (number_fails, mut failed_functions) = validate_tuple;
         let concat_obj = PowerFunction::defaults(
-            &function_text, 
+            &function_text, None
         );
         let check = concat_obj.validate();
         let mut number_fails = number_fails.clone();
@@ -1199,8 +1236,24 @@ impl PowerFunction {
         }
         return (number_fails, failed_functions);
     }
-    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
+    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
         let data_map = data_map.clone();
+        let mut concat_obj = PowerFunction::defaults(
+            &function_text,Some(data_map)
+        );
+        formula = concat_obj.replace(formula);
+        return formula
+    }
+}
+impl Function for PowerFunction {
+    fn validate(&self) -> bool {
+        let expr = RE_POWER.clone();
+        let function_text = self.function_text.clone();
+        let check = expr.is_match(&function_text);
+        return check
+    }
+    fn replace(&mut self, formula: String) -> String {
+        let data_map = self.data_map.clone().unwrap();
         let function_text = self.function_text.clone();
         let mut formula = formula.clone();
 
@@ -1240,14 +1293,6 @@ impl PowerFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         return formula;
     }
-    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
-        let data_map = data_map.clone();
-        let mut concat_obj = PowerFunction::defaults(
-            &function_text, 
-        );
-        formula = concat_obj.replace(formula, data_map.clone());
-        return formula
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -1268,9 +1313,10 @@ pub struct RoundFunction {
     pub digits: Option<i8>,
     pub digits_ref: Option<i8>,
     pub option: RoundOption,
+    pub data_map: Option<HashMap<String, String>>,
 }
 impl RoundFunction {
-    pub fn defaults(function_text: &String, option: RoundOption) -> RoundFunction {
+    pub fn defaults(function_text: &String, option: RoundOption, data_map: Option<HashMap<String, String>>) -> RoundFunction {
         // ROUND(number, digits)
         // ROUNDUP(number, digits)
         // ROUNDDOWN(number, digits)
@@ -1322,26 +1368,10 @@ impl RoundFunction {
             digits: digits_wrap,
             digits_ref: digits_ref_wrap,
             option: option,
+            data_map: data_map,
         };
 
         return obj
-    }
-    pub fn validate(&self) -> bool {
-        let expr: Regex;
-        match self.option {
-            RoundOption::Basic => {
-                expr = RE_ROUND.clone();
-            },
-            RoundOption::Up => {
-                expr = RE_ROUND_UP.clone();
-            },
-            RoundOption::Down => {
-                expr = RE_ROUND_DOWN.clone();
-            },
-        }
-        let function_text = self.function_text.clone();
-        let check = expr.is_match(&function_text);
-        return check
     }
     pub fn do_validate(
         function_text: &String, 
@@ -1350,7 +1380,7 @@ impl RoundFunction {
     ) -> (u32, Vec<String>) {
         let (number_fails, mut failed_functions) = validate_tuple;
         let concat_obj = RoundFunction::defaults(
-            &function_text, option.clone()
+            &function_text, option.clone(), None
         );
         let check = concat_obj.validate();
         let mut number_fails = number_fails.clone();
@@ -1371,8 +1401,35 @@ impl RoundFunction {
         }
         return (number_fails, failed_functions);
     }
-    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
+    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String, option: RoundOption) -> String {
         let data_map = data_map.clone();
+        let mut concat_obj = RoundFunction::defaults(
+            &function_text, option,Some(data_map)
+        );
+        formula = concat_obj.replace(formula);
+        return formula
+    }
+}
+impl Function for RoundFunction {
+    fn validate(&self) -> bool {
+        let expr: Regex;
+        match self.option {
+            RoundOption::Basic => {
+                expr = RE_ROUND.clone();
+            },
+            RoundOption::Up => {
+                expr = RE_ROUND_UP.clone();
+            },
+            RoundOption::Down => {
+                expr = RE_ROUND_DOWN.clone();
+            },
+        }
+        let function_text = self.function_text.clone();
+        let check = expr.is_match(&function_text);
+        return check
+    }
+    fn replace(&mut self, formula: String) -> String {
+        let data_map = self.data_map.clone().unwrap();
         let function_text = self.function_text.clone();
         let mut formula = formula.clone();
         let option = self.option.clone();
@@ -1423,14 +1480,6 @@ impl RoundFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         return formula;
     }
-    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String, option: RoundOption) -> String {
-        let data_map = data_map.clone();
-        let mut concat_obj = RoundFunction::defaults(
-            &function_text, option
-        );
-        formula = concat_obj.replace(formula, data_map.clone());
-        return formula
-    }
 }
 
 // SQRT(number)
@@ -1439,9 +1488,10 @@ pub struct SqrtFunction {
     pub function_text: String,
     pub number: Option<f64>,
     pub number_ref: Option<String>,
+    pub data_map: Option<HashMap<String, String>>,
 }
 impl SqrtFunction {
-    pub fn defaults(function_text: &String) -> SqrtFunction {
+    pub fn defaults(function_text: &String, data_map: Option<HashMap<String, String>>) -> SqrtFunction {
         // SQRT(number)
 
         let matches = RE_SQRT.captures(function_text).unwrap();
@@ -1463,15 +1513,10 @@ impl SqrtFunction {
             function_text: function_text.clone(),
             number: number_wrap,
             number_ref: number_ref_wrap,
+            data_map: data_map,
         };
 
         return obj
-    }
-    pub fn validate(&self) -> bool {
-        let expr = RE_SQRT.clone();
-        let function_text = self.function_text.clone();
-        let check = expr.is_match(&function_text);
-        return check
     }
     pub fn do_validate(
         function_text: &String, 
@@ -1479,7 +1524,7 @@ impl SqrtFunction {
     ) -> (u32, Vec<String>) {
         let (number_fails, mut failed_functions) = validate_tuple;
         let concat_obj = SqrtFunction::defaults(
-            &function_text
+            &function_text, None
         );
         let check = concat_obj.validate();
         let mut number_fails = number_fails.clone();
@@ -1489,8 +1534,24 @@ impl SqrtFunction {
         }
         return (number_fails, failed_functions);
     }
-    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
+    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
         let data_map = data_map.clone();
+        let mut concat_obj = SqrtFunction::defaults(
+            &function_text,Some(data_map)
+        );
+        formula = concat_obj.replace(formula);
+        return formula
+    }
+}
+impl Function for SqrtFunction {
+    fn validate(&self) -> bool {
+        let expr = RE_SQRT.clone();
+        let function_text = self.function_text.clone();
+        let check = expr.is_match(&function_text);
+        return check
+    }
+    fn replace(&mut self, formula: String) -> String {
+        let data_map = self.data_map.clone().unwrap();
         let function_text = self.function_text.clone();
         let mut formula = formula.clone();
 
@@ -1519,14 +1580,6 @@ impl SqrtFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         return formula;
     }
-    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
-        let data_map = data_map.clone();
-        let mut concat_obj = SqrtFunction::defaults(
-            &function_text
-        );
-        formula = concat_obj.replace(formula, data_map.clone());
-        return formula
-    }
 }
 
 // VALUE(text)
@@ -1535,9 +1588,10 @@ pub struct ValueFunction {
     pub function_text: String,
     pub text: Option<String>,
     pub text_ref: Option<String>,
+    pub data_map: Option<HashMap<String, String>>,
 }
 impl ValueFunction {
-    pub fn defaults(function_text: &String) -> ValueFunction {
+    pub fn defaults(function_text: &String, data_map: Option<HashMap<String, String>>) -> ValueFunction {
         // VALUE(text)
 
         let matches = RE_VALUE.captures(function_text).unwrap();
@@ -1559,15 +1613,10 @@ impl ValueFunction {
             function_text: function_text.clone(),
             text: text_wrap,
             text_ref: text_ref_wrap,
+            data_map: data_map,
         };
 
         return obj
-    }
-    pub fn validate(&self) -> bool {
-        let expr = RE_VALUE.clone();
-        let function_text = self.function_text.clone();
-        let check = expr.is_match(&function_text);
-        return check
     }
     pub fn do_validate(
         function_text: &String, 
@@ -1575,7 +1624,7 @@ impl ValueFunction {
     ) -> (u32, Vec<String>) {
         let (number_fails, mut failed_functions) = validate_tuple;
         let concat_obj = ValueFunction::defaults(
-            &function_text
+            &function_text, None
         );
         let check = concat_obj.validate();
         let mut number_fails = number_fails.clone();
@@ -1585,8 +1634,24 @@ impl ValueFunction {
         }
         return (number_fails, failed_functions);
     }
-    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
+    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
         let data_map = data_map.clone();
+        let mut concat_obj = ValueFunction::defaults(
+            &function_text,Some(data_map)
+        );
+        formula = concat_obj.replace(formula);
+        return formula
+    }
+}
+impl Function for ValueFunction {
+    fn validate(&self) -> bool {
+        let expr = RE_VALUE.clone();
+        let function_text = self.function_text.clone();
+        let check = expr.is_match(&function_text);
+        return check
+    }
+    fn replace(&mut self, formula: String) -> String {
+        let data_map = self.data_map.clone().unwrap();
         let function_text = self.function_text.clone();
         let mut formula = formula.clone();
 
@@ -1639,14 +1704,6 @@ impl ValueFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         return formula;
     }
-    pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
-        let data_map = data_map.clone();
-        let mut concat_obj = ValueFunction::defaults(
-            &function_text
-        );
-        formula = concat_obj.replace(formula, data_map.clone());
-        return formula
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -1660,25 +1717,19 @@ pub enum BooleanOption {
 pub struct BooleanFunction {
     pub function_text: String,
     pub option: BooleanOption,
+    pub data_map: Option<HashMap<String, String>>,
 }
 impl BooleanFunction {
-    pub fn defaults(function_text: &String, option: BooleanOption) -> BooleanFunction {
+    pub fn defaults(function_text: &String, option: BooleanOption, data_map: Option<HashMap<String, String>>) -> BooleanFunction {
         // TRUE() or FALSE()
 
         let obj = Self{
             function_text: function_text.clone(),
             option: option,
+            data_map: data_map,
         };
 
-        eprintln!("BooleanFunction.defaults :: obj: {:#?}", &obj);
-
         return obj
-    }
-    pub fn validate(&self) -> bool {
-        let expr = RE_BOOLEAN.clone();
-        let function_text = self.function_text.clone();
-        let check = expr.is_match(&function_text);
-        return check
     }
     pub fn do_validate(
         function_text: &String, 
@@ -1687,7 +1738,7 @@ impl BooleanFunction {
     ) -> (u32, Vec<String>) {
         let (number_fails, mut failed_functions) = validate_tuple;
         let concat_obj = BooleanFunction::defaults(
-            &function_text, option.clone()
+            &function_text, option.clone(), None
         );
         let check = concat_obj.validate();
         let mut number_fails = number_fails.clone();
@@ -1704,7 +1755,26 @@ impl BooleanFunction {
         }
         return (number_fails, failed_functions);
     }
-    pub fn replace(&mut self, formula: String) -> String {
+    pub fn do_replace(
+        function_text: &String, 
+        mut formula: String,
+        option: BooleanOption
+    ) -> String {
+        let mut concat_obj = BooleanFunction::defaults(
+            &function_text, option, None
+        );
+        formula = concat_obj.replace(formula);
+        return formula
+    }
+}
+impl Function for BooleanFunction {
+    fn validate(&self) -> bool {
+        let expr = RE_BOOLEAN.clone();
+        let function_text = self.function_text.clone();
+        let check = expr.is_match(&function_text);
+        return check
+    }
+    fn replace(&mut self, formula: String) -> String {
         let function_text = self.function_text.clone();
         let mut formula = formula.clone();
         let option = self.option.clone();
@@ -1721,16 +1791,5 @@ impl BooleanFunction {
 
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         return formula;
-    }
-    pub fn do_replace(
-        function_text: &String, 
-        mut formula: String,
-        option: BooleanOption
-    ) -> String {
-        let mut concat_obj = BooleanFunction::defaults(
-            &function_text, option
-        );
-        formula = concat_obj.replace(formula);
-        return formula
     }
 }

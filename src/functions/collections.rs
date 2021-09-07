@@ -6,6 +6,7 @@ use lazy_static::lazy_static;
 
 use crate::functions::FunctionAttribute;
 use crate::functions::constants::*;
+use crate::functions::Function;
 
 
 lazy_static! {
@@ -27,9 +28,10 @@ pub struct StatsFunction {
     pub sequence: Option<String>,
     pub sequence_ref: Option<String>,
     pub option: StatOption,
+    pub data_map: Option<HashMap<String, String>>,
 }
 impl StatsFunction {
-    pub fn defaults(function_text: &String, option: StatOption) -> StatsFunction {
+    pub fn defaults(function_text: &String, option: StatOption, data_map: Option<HashMap<String, String>>) -> StatsFunction {
         // MIN(1,2,3,4)
         // MIN({My Column}) (Having Set, or other collection of numbers)
         // MIN(-4, 1.9, 2.34)
@@ -65,24 +67,10 @@ impl StatsFunction {
             sequence: sequence_wrap,
             sequence_ref: sequence_ref_wrap,
             option: option,
+            data_map: data_map,
         };
 
         return obj
-    }
-    pub fn validate(&self) -> bool {
-        let expr: Regex;
-        let option = self.option.clone();
-        match option {
-            StatOption::Min => {
-                expr = RE_MIN.clone();
-            },
-            StatOption::Max => {
-                expr = RE_MAX.clone();
-            },
-        }
-        let function_text = self.function_text.clone();
-        let check = expr.is_match(&function_text);
-        return check
     }
     pub fn do_validate(
         function_text: &String, 
@@ -91,7 +79,7 @@ impl StatsFunction {
     ) -> (u32, Vec<String>) {
         let (number_fails, mut failed_functions) = validate_tuple;
         let concat_obj = StatsFunction::defaults(
-            &function_text, option.clone()
+            &function_text, option.clone(), None
         );
         let check = concat_obj.validate();
         let mut number_fails = number_fails.clone();
@@ -109,8 +97,38 @@ impl StatsFunction {
         }
         return (number_fails, failed_functions);
     }
-    pub fn replace(&mut self, formula: String, data_map: HashMap<String, String>) -> String {
+    pub fn do_replace(
+        function_text: &String, 
+        data_map: HashMap<String, String>, 
+        mut formula: String,
+        option: StatOption
+    ) -> String {
         let data_map = data_map.clone();
+        let mut concat_obj = StatsFunction::defaults(
+            &function_text, option, Some(data_map)
+        );
+        formula = concat_obj.replace(formula);
+        return formula
+    }
+}
+impl Function for StatsFunction {
+    fn validate(&self) -> bool {
+        let expr: Regex;
+        let option = self.option.clone();
+        match option {
+            StatOption::Min => {
+                expr = RE_MIN.clone();
+            },
+            StatOption::Max => {
+                expr = RE_MAX.clone();
+            },
+        }
+        let function_text = self.function_text.clone();
+        let check = expr.is_match(&function_text);
+        return check
+    }
+    fn replace(&mut self, formula: String) -> String {
+        let data_map = self.data_map.clone().unwrap();
         let function_text = self.function_text.clone();
         let mut formula = formula.clone();
         let replacement_string: String;
@@ -170,17 +188,5 @@ impl StatsFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         return formula;
     }
-    pub fn do_replace(
-        function_text: &String, 
-        data_map: HashMap<String, String>, 
-        mut formula: String,
-        option: StatOption
-    ) -> String {
-        let data_map = data_map.clone();
-        let mut concat_obj = StatsFunction::defaults(
-            &function_text, option
-        );
-        formula = concat_obj.replace(formula, data_map.clone());
-        return formula
-    }
+
 }

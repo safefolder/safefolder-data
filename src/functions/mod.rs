@@ -74,6 +74,11 @@ pub const FORMULA_FUNCTIONS: [&str; 50] = [
     FUNCTION_FALSE,
 ];
 
+pub trait Function {
+    fn validate(&self) -> bool;
+    fn replace(&mut self, formula: String) -> String;
+}
+
 lazy_static! {
     // CONCAT("mine", "-", {My Column}, 45) :: Regex to catch the function attributes in an array
     static ref RE_FORMULA_FUNCTIONS: Regex = Regex::new(r#"([a-zA-Z]+\(.+\))"#).unwrap();

@@ -6,6 +6,7 @@ use std::{collections::HashMap};
 use crate::functions::constants::*;
 use crate::storage::fields::Formula;
 use crate::storage::table::DbData;
+use crate::functions::Function;
 
 lazy_static! {
     static ref RE_IF: Regex = Regex::new(r#"IF\([\n\s\t]{0,}(?P<condition>\{[\w\s]+\}[\s]{0,}(=|<|>|<=|>=)[\s]{0,}((\d+)|("[\w\s]+"))),[\s\n\t]{0,}(?P<expr_true>(\d+)|("[\w\s]+")),[\s\n\t]{0,}(?P<expr_false>(\d+)|("[\w\s]+"))[\s\n\t]{0,}\)|IF\([\s\n\t]{0,}(?P<log_condition>(AND\(.+\)|OR\(.+\)|NOT\(.+\)|XOR\(.+\))),[\s\n\t]{0,}(?P<log_expr_true>(\d+)|("[\w\s]+")),[\s\n\t]{0,}(?P<log_expr_false>(\d+)|("[\w\s]+"))[\s\n\t]{0,}\)"#).unwrap();
@@ -19,9 +20,11 @@ pub struct IfFunction {
     pub condition: Option<String>,
     pub expr_true: Option<String>,
     pub expr_false: Option<String>,
+    pub data_map: Option<HashMap<String, String>>,
+    pub table: Option<DbData>,
 }
 impl IfFunction {
-    pub fn defaults(function_text: &String) -> IfFunction {
+    pub fn defaults(function_text: &String, data_map: Option<HashMap<String, String>>, table: Option<DbData>) -> IfFunction {
         // IF({My Column} = 3, "Mine", "Yours")
         // IF({My Column} > 3, "Mine", "Yours")
         // IF({My Column}>3, "Mine", "Yours")
@@ -57,15 +60,11 @@ impl IfFunction {
             condition: condition_wrap,
             expr_true: expr_true_wrap,
             expr_false: expr_false_wrap,
+            data_map: data_map,
+            table: table,
         };
         
         return obj
-    }
-    pub fn validate(&self) -> bool {
-        let expr = RE_IF.clone();
-        let function_text = self.function_text.clone();
-        let check = expr.is_match(&function_text);
-        return check
     }
     pub fn do_validate(
         function_text: &String, 
@@ -73,7 +72,7 @@ impl IfFunction {
     ) -> (u32, Vec<String>) {
         let (number_fails, mut failed_functions) = validate_tuple;
         let concat_obj = IfFunction::defaults(
-            &function_text
+            &function_text, None, None
         );
         let check = concat_obj.validate();
         let mut number_fails = number_fails.clone();
@@ -83,11 +82,34 @@ impl IfFunction {
         }
         return (number_fails, failed_functions);
     }
-    pub fn replace(&mut self, formula: String, insert_data_map: HashMap<String, String>, table: &DbData) -> String {
-        let insert_data_map = insert_data_map.clone();
+    pub fn do_replace(
+        function_text: &String, 
+        mut formula: String,
+        insert_data_map: HashMap<String, String>,
+        table: &DbData,
+    ) -> String {
+        let table = table.clone();
+        let mut concat_obj = IfFunction::defaults(
+            &function_text, Some(insert_data_map), Some(table)
+        );
+        formula = concat_obj.replace(formula);
+        return formula
+    }
+}
+impl Function for IfFunction {
+    fn validate(&self) -> bool {
+        let expr = RE_IF.clone();
+        let function_text = self.function_text.clone();
+        let check = expr.is_match(&function_text);
+        return check
+    }
+    fn replace(&mut self, formula: String) -> String {
+        // let insert_data_map = insert_data_map.clone();
+        let insert_data_map = self.data_map.clone().unwrap();
         let function_text = self.function_text.clone();
         let mut formula = formula.clone();
-        let table = table.clone();
+        // let table = table.clone();
+        let table = self.table.clone().unwrap();
 
         let expr_true_wrap = self.expr_true.clone();
         let expr_false_wrap = self.expr_false.clone();
@@ -115,17 +137,5 @@ impl IfFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         formula = format!("\"{}\"", formula);
         return formula;
-    }
-    pub fn do_replace(
-        function_text: &String, 
-        mut formula: String,
-        insert_data_map: HashMap<String, String>,
-        table: &DbData,
-    ) -> String {
-        let mut concat_obj = IfFunction::defaults(
-            &function_text
-        );
-        formula = concat_obj.replace(formula, insert_data_map, &table);
-        return formula
     }
 }
