@@ -116,33 +116,36 @@ impl Function for IfFunction {
         let expr_true = expr_true_wrap.unwrap();
         let expr_false = expr_false_wrap.unwrap();
 
-        let formula_obj = Formula::defaults(&formula);
-        let formula_wrap = formula_obj.inyect_data_formula(&table, insert_data_map);
+        let formula_obj = Formula::defaults(
+            Some(insert_data_map),
+            Some(table.clone()),
+        );
+        let formula_wrap = formula_obj.inyect_data_formula(&formula);
         let formula_if = formula_wrap.unwrap();
         let replacement_string: String;
 
         let matches = RE_IF_REPLACED.captures(&formula_if);
         let matches = matches.unwrap();
         let processed_condition = matches.name("condition").unwrap().as_str().to_string();
-        let mut formula_obj = Formula::defaults(&processed_condition);
-        let result = formula_obj.execute(
-            self.data_map.clone(), 
-            self.table.clone()
-        ).unwrap();
+        let formula_obj = Formula::defaults(
+            self.data_map.clone(),
+            self.table.clone(),
+        );
+        let result = formula_obj.execute(&processed_condition).unwrap();
 
         if result == "TRUE" {
-            let mut formula_obj = Formula::defaults(&expr_true);
-            let result = formula_obj.execute(
+            let formula_obj = Formula::defaults(
                 self.data_map.clone(), 
                 self.table.clone()
-            ).unwrap();
+            );
+            let result = formula_obj.execute(&expr_true).unwrap();
             replacement_string = result;
         } else {
-            let mut formula_obj = Formula::defaults(&expr_false);
-            let result = formula_obj.execute(
+            let formula_obj = Formula::defaults(
                 self.data_map.clone(), 
                 self.table.clone()
-            ).unwrap();
+            );
+            let result = formula_obj.execute(&expr_false).unwrap();
             replacement_string = result;
         }
 

@@ -103,11 +103,11 @@ fields:
   - name: DateAdd Date
     field_type: Formula
     formula: DATEADD("26-Aug-2021", 5, "days")
-    formula_format: "Date"
+    formula_format: Date
   - name: DateAdd DateTime
     field_type: Formula
     formula: DATEADD("26-Aug-2021 12:45:00", 45, "minutes")
-    formula_format: "Date"
+    formula_format: Date
   - name: Date format
     field_type: Formula
     formula: DATEFMT("21-Aug-2021 13:45:22", "{DD} was the day, {YYYY} the year. I love {Do} of months")
@@ -231,11 +231,11 @@ fields:
   - name: TRUE()
     field_type: Formula
     formula: TRUE()
-    formula_format: Number
+    formula_format: Check
   - name: FALSE()
     field_type: Formula
     formula: FALSE()
-    formula_format: Number
+    formula_format: Check
   - name: MIN
     field_type: Formula
     formula: MIN(-4, 1.9, 2.34)

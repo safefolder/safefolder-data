@@ -8,6 +8,13 @@ pub const CHILD_PRIVATE_KEY_ARRAY: [u8; 32] = [5, 184, 20, 127, 179, 211, 242, 6
 pub const FORMULA_FORMAT_TEXT: &str = "Text";
 pub const FORMULA_FORMAT_NUMBER: &str = "Number";
 pub const FORMULA_FORMAT_CHECK: &str = "Check";
+pub const FORMULA_FORMAT_DATE: &str = "Date";
+
+// value.truecolor(197, 147, 122),
 
 pub const FIELD_SMALL_TEXT: &str = "Small Text";
 pub const FIELD_LONG_TEXT: &str = "Long Text";
+
+pub const YAML_COLOR_ORANGE: [u8; 3] = [197, 147, 122];
+pub const YAML_COLOR_BLUE: [u8; 3] = [100, 153, 208];
+pub const YAML_COLOR_YELLOW: [u8; 3] = [175, 193, 161];

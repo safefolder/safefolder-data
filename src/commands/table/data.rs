@@ -19,7 +19,7 @@ use crate::commands::table::constants::{FIELD_IDS, TABLE_NAME};
 use crate::commands::table::{Command};
 use crate::commands::{CommandRunner};
 use crate::planet::constants::{ID, NAME};
-use crate::storage::constants::FIELD_SMALL_TEXT;
+use crate::storage::constants::*;
 use crate::storage::table::{DbTable, DbRow, Row, Schema, DbData, GetItemOption};
 use crate::storage::table::*;
 use crate::storage::ConfigStorageField;
@@ -80,11 +80,11 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                 );
                 let table = table.unwrap();
                 let table_name = &table.clone().name.unwrap();
-                eprintln!("InsertIntoTable.run :: table: {:#?}", &table);
+                // eprintln!("InsertIntoTable.run :: table: {:#?}", &table);
 
                 // I need a way to get list of instance FieldConfig (fields)
                 let config_fields = FieldConfig::parse_from_db(&table);
-                eprintln!("InsertIntoTable.run :: config_fields: {:#?}", &config_fields);
+                // eprintln!("InsertIntoTable.run :: config_fields: {:#?}", &config_fields);
                 
                 let insert_data_map: HashMap<String, String> = self.config.data.clone().unwrap();
                 
@@ -92,7 +92,7 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                 // eprintln!("InsertIntoTable.run :: insert_data__collections_map: {:#?}", &insert_data_collections_map);
                 // TODO: Change for the item name
                 // We will use this when we have the Name field, which is required in all tables
-                eprintln!("InsertIntoTable.run :: routing_wrap: {:#?}", &routing_wrap);
+                // eprintln!("InsertIntoTable.run :: routing_wrap: {:#?}", &routing_wrap);
 
                 // Keep in mind on name attribute for DbData
                 // 1. Can be small text or any other field, so we need to do validation and generation of data...
@@ -116,9 +116,9 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                 }
                 let name = insert_name.unwrap();
                 // Check name does not exist
-                eprintln!("InsertIntoTable.run :: name: {}", &name);
+                // eprintln!("InsertIntoTable.run :: name: {}", &name);
                 let name_exists = self.check_name_exists(&table_name, &name, &db_row);
-                eprintln!("InsertIntoTable.run :: name_exists: {}", &name_exists);
+                // eprintln!("InsertIntoTable.run :: name_exists: {}", &name_exists);
                 if name_exists {
                     return Err(
                         PlanetError::new(
@@ -144,7 +144,7 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                     let field_config = field.clone();
                     let field_type = field.field_type.unwrap_or_default();
                     let field_type = field_type.as_str();
-                    eprintln!("InsertIntoTable.run :: field_type: {}", &field_type);
+                    // eprintln!("InsertIntoTable.run :: field_type: {}", &field_type);
                     match field_type {
                         "Small Text" => {
                             db_data = SmallTextField::init_do(&field_config, insert_data_map.clone(), db_data)?
@@ -309,19 +309,31 @@ impl<'gb> Command<String> for GetFromTable<'gb> {
                 let data = db_data.data;
                 let mut yaml_out_str = String::from("---\n");
                 // id
-                let id_yaml_value = self.config.data.clone().unwrap().id.unwrap().blue();
-                let id_yaml = format!("{}", 
-                    id_yaml_value.truecolor(255, 165, 0), 
+                let id_yaml_value = self.config.data.clone().unwrap().id.unwrap().truecolor(
+                    YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
                 );
-                yaml_out_str.push_str(format!("{field}: {value}\n", field=String::from(ID).blue(), value=&id_yaml).as_str());
+                let id_yaml = format!("{}", 
+                    id_yaml_value.truecolor(YAML_COLOR_ORANGE[0], YAML_COLOR_ORANGE[1], YAML_COLOR_ORANGE[2]), 
+                );
+                yaml_out_str.push_str(format!("{field}: {value}\n", 
+                    field=String::from(ID).truecolor(
+                        YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
+                    ), 
+                    value=&id_yaml
+                ).as_str());
                 // name
                 let name_yaml_value = &db_data.name.unwrap().clone();
                 let name_yaml = format!("{}", 
-                    name_yaml_value.truecolor(255, 165, 0), 
+                    name_yaml_value.truecolor(YAML_COLOR_ORANGE[0], YAML_COLOR_ORANGE[1], YAML_COLOR_ORANGE[2]), 
                 );
-                yaml_out_str.push_str(format!("{field}: {value}\n", field=String::from(NAME).blue(), value=&name_yaml).as_str());
+                yaml_out_str.push_str(format!("{field}: {value}\n", 
+                    field=String::from(NAME).truecolor(
+                        YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
+                    ), 
+                    value=&name_yaml
+                ).as_str());
                 yaml_out_str.push_str(format!("{}\n", 
-                    String::from("data:").blue(),
+                    String::from("data:").truecolor(YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]),
                 ).as_str());
                 if data.is_some() {
                     // field_id -> string value

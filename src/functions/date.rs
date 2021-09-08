@@ -532,7 +532,7 @@ impl Function for DateParseFunction {
         }
         let function_text = self.function_text.clone();
         let mut check = expr.is_match(&function_text);
-        eprintln!("DateParseFunction.validate :: basic check: {}", &check);
+        // eprintln!("DateParseFunction.validate :: basic check: {}", &check);
         if check == false {
             return false;
         }
@@ -542,23 +542,23 @@ impl Function for DateParseFunction {
         let mode = mode.as_str();
         if date_string.is_some() {
             let date_string = date_string.unwrap();
-            eprintln!("DateParseFunction.validate :: date_string: {:#?}", &date_string);
+            // eprintln!("DateParseFunction.validate :: date_string: {:#?}", &date_string);
             if mode == "iso" {
                 let date_object = get_date_object_iso(&date_string);
-                eprintln!("DateParseFunction.validate :: iso : date_object: {:#?}", &date_object);
+                // eprintln!("DateParseFunction.validate :: iso : date_object: {:#?}", &date_object);
                 if date_object.is_err() {
                     check = false;
                 }    
             } else if mode == "human_time" {
                 let date_object = get_date_object_human_time(&date_string);
-                eprintln!("DateParseFunction.validate :: human time : date_object: {:#?}", &date_object);
+                // eprintln!("DateParseFunction.validate :: human time : date_object: {:#?}", &date_object);
                 if date_object.is_err() {
                     check = false;
                 }
 
             } else {
                 let date_object = get_date_object_only_date(&date_string);
-                eprintln!("DateParseFunction.validate :: date only : date_object: {:#?}", &date_object);
+                // eprintln!("DateParseFunction.validate :: date only : date_object: {:#?}", &date_object);
                 if date_object.is_err() {
                     check = false;
                 }
@@ -650,7 +650,7 @@ impl Function for DateParseFunction {
             
             if date_obj_wrap.is_ok() {
                 let date_obj = date_obj_wrap.unwrap();
-                eprintln!("DateParseFunction.replace :: date_obj: {:?}", &date_obj);
+                // eprintln!("DateParseFunction.replace :: date_obj: {:?}", &date_obj);
                 match date_parse_option {
                     DateParseOption::Day => {
                         let day = date_obj.day();
@@ -1463,7 +1463,6 @@ impl Function for DateFormatFunction {
         return check
     }
     fn replace(&mut self, formula: String) -> String {
-        let data_map = self.data_map.clone().unwrap();
         let function_text = self.function_text.clone();
         let date = self.date.clone();
         let datetime = self.datetime.clone();
@@ -1474,7 +1473,7 @@ impl Function for DateFormatFunction {
         let mut date_obj_wrap: Option<DateTime<FixedOffset>> = None;
         // let has_time: bool = false;
         if date_ref.is_some() {
-            eprintln!("DateFmt.replace :: data map length: {}", &data_map.len());
+            // eprintln!("DateFmt.replace :: data map length: {}", &data_map.len());
             // let date_ref = date_ref.unwrap();
             // let function_attr = FunctionAttribute::defaults(
             //     &date_ref, 
@@ -1486,7 +1485,7 @@ impl Function for DateFormatFunction {
             // TODO: Do when we have the date fields
         } else {
             if date.is_some() && datetime.is_none() {
-                eprintln!("");
+                // eprintln!("");
                 date_str = date.unwrap();
                 let date_obj_wrap_ = get_date_object_only_date(&date_str);
                 date_obj_wrap = Some(date_obj_wrap_.unwrap());

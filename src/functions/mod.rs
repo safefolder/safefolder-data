@@ -568,22 +568,28 @@ impl FunctionAttribute {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Formula {
-    formula: String,
+    item_data: Option<HashMap<String, String>>, 
+    table: Option<DbData>,
 }
 impl Formula{
-    pub fn defaults(formula: &String) -> Formula {
+    pub fn defaults(
+        item_data: Option<HashMap<String, String>>, 
+        table: Option<DbData>
+    ) -> Formula {
         let obj = Self{
-            formula: formula.clone(),
+            item_data: item_data,
+            table: table,
         };
 
-        eprintln!("Formula.defaults :: obj: {:#?}", &obj);
+        // eprintln!("Formula.defaults :: obj: {:#?}", &obj);
 
         return obj
     }
-    pub fn validate_data(&self, data_map: HashMap<String, String>) -> Result<bool, PlanetError> {
+    pub fn validate_data(&self, formula: &String) -> Result<bool, PlanetError> {
         let expr = RE_FORMULA_VALID.clone();
         let mut check = true;
-        for capture in expr.captures_iter(self.formula.as_str()) {
+        let data_map = self.item_data.clone().unwrap();
+        for capture in expr.captures_iter(formula.as_str()) {
             let field_ref = capture.get(0).unwrap().as_str();
             let field_ref = field_ref.replace("{", "").replace("}", "");
             let field_ref_value = data_map.get(&field_ref);
@@ -594,57 +600,66 @@ impl Formula{
         }
         return Ok(check)
     }
-    pub fn inyect_data_formula(&self, table: &DbData, data_map: HashMap<String, String>) -> Option<String> {
-        // This replaces the column data with its value and return the formula to be processed
-        let field_type_map = DbTable::get_field_type_map(table);
-        if field_type_map.is_ok() {
-            let field_type_map = field_type_map.unwrap();
-            let expr = RE_FORMULA_VALID.clone();
-            let mut formula = self.formula.clone();
-            for capture in expr.captures_iter(self.formula.as_str()) {
-                let field_ref = capture.get(0).unwrap().as_str();
-                let field_ref = field_ref.replace("{", "").replace("}", "");
-                let field_ref_value = data_map.get(&field_ref);
-                if field_ref_value.is_some() {
-                    let field_ref_value = field_ref_value.unwrap();
-                    // Check is we have string field_type or not string one
-                    let field_type = field_type_map.get(&field_ref.to_string());
-                    if field_type.is_some() {
-                        let field_type = field_type.unwrap().clone();
-                        let replace_string: String;
-                        match field_type.as_str() {
-                            FIELD_SMALL_TEXT => {
-                                replace_string = format!("\"{}\"", &field_ref_value);
-                            },
-                            FIELD_LONG_TEXT => {
-                                replace_string = format!("\"{}\"", &field_ref_value);
-                            },
-                            _ => {
-                                replace_string = field_ref_value.clone();
+    pub fn inyect_data_formula(&self, formula: &String) -> Option<String> {
+        let table_wrap = self.table.clone();
+        let data_map_wrap = self.item_data.clone();
+        let mut formula = formula.clone();
+        let formula_str = formula.clone();
+        let formula_str = formula_str.as_str();
+        if table_wrap.is_some() && data_map_wrap.is_some() {
+            let table = table_wrap.unwrap();
+            let data_map = data_map_wrap.unwrap();
+            // This replaces the column data with its value and return the formula to be processed
+            let field_type_map = DbTable::get_field_type_map(&table);
+            if field_type_map.is_ok() {
+                let field_type_map = field_type_map.unwrap();
+                let expr = RE_FORMULA_VALID.clone();
+                // let mut formula = formula.clone();
+                for capture in expr.captures_iter(formula_str) {
+                    let field_ref = capture.get(0).unwrap().as_str();
+                    let field_ref = field_ref.replace("{", "").replace("}", "");
+                    let field_ref_value = data_map.get(&field_ref);
+                    if field_ref_value.is_some() {
+                        let field_ref_value = field_ref_value.unwrap();
+                        // Check is we have string field_type or not string one
+                        let field_type = field_type_map.get(&field_ref.to_string());
+                        if field_type.is_some() {
+                            let field_type = field_type.unwrap().clone();
+                            let replace_string: String;
+                            match field_type.as_str() {
+                                FIELD_SMALL_TEXT => {
+                                    replace_string = format!("\"{}\"", &field_ref_value);
+                                },
+                                FIELD_LONG_TEXT => {
+                                    replace_string = format!("\"{}\"", &field_ref_value);
+                                },
+                                _ => {
+                                    replace_string = field_ref_value.clone();
+                                }
                             }
+                            let field_to_replace = format!("{}{}{}", 
+                                String::from("{"),
+                                &field_ref,
+                                String::from("}"),
+                            );
+                            formula = formula.replace(&field_to_replace, &replace_string);
                         }
-                        let field_to_replace = format!("{}{}{}", 
-                            String::from("{"),
-                            &field_ref,
-                            String::from("}"),
-                        );
-                        formula = formula.replace(&field_to_replace, &replace_string);
                     }
                 }
+                return Some(formula);
             }
-            return Some(formula);
+            return None;
+        } else {
+            return None;
         }
-        return None
     }
-    pub fn execute(
-        &mut self,
-        data_map: Option<HashMap<String, String>>, 
-        table: Option<DbData>,
-    ) -> Result<String, PlanetError> {
+    pub fn execute(self, formula: &String) -> Result<String, PlanetError> {
         // eprintln!("Formula.execute :: formula initial: {}", &formula);
         // First process the achiever functions, then rest
         let expr = RE_ACHIEVER_FUNCTIONS.clone();
-        let mut formula = self.formula.clone();
+        let mut formula = formula.clone();
+        let data_map = self.item_data.clone();
+        let table = self.table.clone();
         for capture in expr.captures_iter(formula.clone().as_str()) {
             let function_text = capture.get(0).unwrap().as_str();
             let function_text_string = function_text.to_string();
@@ -665,17 +680,16 @@ impl Formula{
                 // eprintln!("Formula.execute :: formula: {:#?}", &formula);
             }
         }
-        let formula_obj = Formula::defaults(&formula);
         // eprintln!("Formula.execute :: formula_obj: {:#?}", formula_obj);
         // This injects references without achiever functions
         if data_map.is_some() && table.is_some() {
-            let table = table.unwrap();
-            let data_map = data_map.unwrap();
-            let formula_wrap = formula_obj.inyect_data_formula(&table, data_map);
+            // let table = table.unwrap();
+            // let data_map = data_map.unwrap();
+            let formula_wrap = self.inyect_data_formula(&formula);
             // eprintln!("Formula.execute :: formula_wrap: {:#?}", &formula_wrap);
             if formula_wrap.is_some() {
                 formula = formula_wrap.unwrap();
-                eprintln!("Formula.execute :: [LIB] formula: {:#?}", &formula);
+                // eprintln!("Formula.execute :: [LIB] formula: {:#?}", &formula);
                 formula = format!("={}", &formula);
                 let formula_ = parse_formula::parse_string_to_formula(
                     &formula, 
@@ -683,7 +697,7 @@ impl Formula{
                 );
                 let result = calculate::calculate_formula(formula_, None::<NoReference>);
                 let result = calculate::result_to_string(result);
-                eprintln!("Formula.execute :: result: {:#?}", &result);
+                // eprintln!("Formula.execute :: [LIB] result: {:#?}", &result);
                 return Ok(result);
             } else {
                 return Err(
@@ -695,7 +709,7 @@ impl Formula{
                 );
             }
         } else {
-            eprintln!("Formula.execute :: no references since no data received");
+            // eprintln!("Formula.execute :: no references since no data received");
             // I have no data and table information, skip references, simply execute formula I have
             let formula_ = parse_formula::parse_string_to_formula(
                 &formula, 
@@ -703,7 +717,7 @@ impl Formula{
             );
             let result = calculate::calculate_formula(formula_, None::<NoReference>);
             let result = calculate::result_to_string(result);
-            eprintln!("Formula.execute :: result: {:#?}", &result);
+            // eprintln!("Formula.execute :: result: {:#?}", &result);
             return Ok(result);
         }        
     }

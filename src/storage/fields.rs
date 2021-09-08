@@ -205,9 +205,11 @@ impl DbDumpString for SmallTextField {
         let field_config = self.field_config.clone();
         let field_name = field_config.name.unwrap();
         let mut yaml_string = yaml_string.clone();
-        let field = &field_name.blue();
+        let field = &field_name.truecolor(
+            YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
+        );
         let value = format!("{}", 
-            value.truecolor(255, 165, 0), 
+            value.truecolor(YAML_COLOR_ORANGE[0], YAML_COLOR_ORANGE[1], YAML_COLOR_ORANGE[2]), 
         );
         yaml_string.push_str(format!("  {field}: {value}\n", field=field, value=value).as_str());
         return yaml_string;
@@ -331,9 +333,11 @@ impl DbDumpString for LongTextField {
         let field_config = self.field_config.clone();
         let field_name = field_config.name.unwrap();
         let mut yaml_string = yaml_string.clone();
-        let field = &field_name.blue();
+        let field = &field_name.truecolor(
+            YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
+        );
         let value = format!("{}", 
-            value.truecolor(255, 165, 0), 
+            value.truecolor(YAML_COLOR_ORANGE[0], YAML_COLOR_ORANGE[1], YAML_COLOR_ORANGE[2]), 
         );
         yaml_string.push_str(format!("  {field}: {value}\n", field=field, value=value).as_str());
         return yaml_string;
@@ -450,8 +454,15 @@ impl DbDumpBool for CheckBoxField {
         let field_config = self.field_config.clone();
         let field_name = field_config.name.unwrap();
         let mut yaml_string = yaml_string.clone();
-        let field = &field_name.blue();
-        let value = format!("{}", value.to_string().blue());
+        let field = &field_name.truecolor(
+            YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
+        );
+        let value = format!("{}", value.to_string().truecolor(
+            YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
+        ));
+        let value = format!("{}", value.to_string().truecolor(
+            YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
+        ));
         yaml_string.push_str(format!("  {field}: {value}\n", field=field, value=value).as_str());
         return yaml_string;
     }
@@ -462,7 +473,7 @@ impl ValidateField for CheckBoxField {
         let field_config = self.field_config.clone();
         let required = field_config.required.unwrap();
         let name = field_config.name.unwrap();
-        eprintln!("CheckBoxField.is_valid :: value: {:?}", &value);
+        // eprintln!("CheckBoxField.is_valid :: value: {:?}", &value);
         if value.is_none() && required == true {
             return Err(
                 PlanetError::new(
@@ -475,7 +486,7 @@ impl ValidateField for CheckBoxField {
             );
         } else {
             let value_str = value.unwrap().as_str();
-            eprintln!("CheckBoxField.is_valid :: value_str: {:?}", &value_str);
+            // eprintln!("CheckBoxField.is_valid :: value_str: {:?}", &value_str);
             if value_str == "true" || value_str == "false" {
                 return Ok(true);
             } else {
@@ -581,8 +592,12 @@ impl DbDumpNumber for NumberField {
         let field_config = self.field_config.clone();
         let field_name = field_config.name.unwrap();
         let mut yaml_string = yaml_string.clone();
-        let field = &field_name.blue();
-        let value = format!("{}", value.to_string().truecolor(255, 255, 200));
+        let field = &field_name.truecolor(
+            YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
+        );
+        let value = format!("{}", value.to_string().truecolor(
+            YAML_COLOR_YELLOW[0], YAML_COLOR_YELLOW[1], YAML_COLOR_YELLOW[2]
+        ));
         yaml_string.push_str(format!("  {field}: {value}\n", field=field, value=value).as_str());
         return yaml_string;
     }
@@ -761,28 +776,28 @@ impl DbDumpSingleSelect for SelectField {
         let field_name = field_config.name.unwrap();
         let many = field_config.many.unwrap();
         let mut yaml_string = yaml_string.clone();
-        let field = &field_name.blue();
+        let field = &field_name.truecolor(
+            YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
+        );
         let select_id = value;
         // let options_name_map = &self.options_name_map.clone().unwrap();
         let options_id_map = &self.options_id_map.clone().unwrap();
         if many == false {
             let select_name = options_id_map.get(select_id).unwrap();
-            let select_id = format!("{}{}{}", 
-                String::from("\"").truecolor(255, 165, 0), 
-                value.truecolor(255, 165, 0), 
-                String::from("\"").truecolor(255, 165, 0)
+            let select_id = format!("{}", 
+                value.truecolor(YAML_COLOR_ORANGE[0], YAML_COLOR_ORANGE[1], YAML_COLOR_ORANGE[2]), 
             );
-            let select_name = format!("{}{}{}", 
-                String::from("\"").truecolor(255, 165, 0), 
-                select_name.truecolor(255, 165, 0), 
-                String::from("\"").truecolor(255, 165, 0)
+            let select_name = format!("{}", 
+                select_name.truecolor(YAML_COLOR_ORANGE[0], YAML_COLOR_ORANGE[1], YAML_COLOR_ORANGE[2]), 
             );
-            yaml_string.push_str(format!("  {field}:\n  {id}: {select_id}\n  {value}: {select_name}\n", 
+            yaml_string.push_str(format!("  {field}:\n    {id}: {select_id}\n    {value}: {select_name}\n", 
                 field=&field, 
                 select_id=select_id,
                 select_name=select_name,
-                id=String::from(ID).blue(),
-                value=String::from(VALUE).blue(),
+                id=String::from(ID).truecolor(YAML_COLOR_ORANGE[0], YAML_COLOR_ORANGE[1], YAML_COLOR_ORANGE[2]),
+                value=String::from(VALUE).truecolor(
+                    YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
+                ),
             ).as_str());
         } else {
             // Check we have fields
@@ -793,21 +808,21 @@ impl DbDumpSingleSelect for SelectField {
                 ).as_str());
                 for select_id in select_ids {
                     let select_name = options_id_map.get(select_id).unwrap();
-                    let select_id = format!("{}{}{}", 
-                        String::from("\"").truecolor(255, 165, 0), 
-                        select_id.truecolor(255, 165, 0), 
-                        String::from("\"").truecolor(255, 165, 0)
+                    let select_id = format!("{}", 
+                        select_id.truecolor(YAML_COLOR_ORANGE[0], YAML_COLOR_ORANGE[1], YAML_COLOR_ORANGE[2]), 
                     );
-                    let select_name = format!("{}{}{}", 
-                        String::from("\"").truecolor(255, 165, 0), 
-                        select_name.truecolor(255, 165, 0), 
-                        String::from("\"").truecolor(255, 165, 0)
+                    let select_name = format!("{}", 
+                        select_name.truecolor(YAML_COLOR_ORANGE[0], YAML_COLOR_ORANGE[1], YAML_COLOR_ORANGE[2]), 
                     );
                     yaml_string.push_str(format!("    - {id}: {select_id}\n    {value}: {select_name}\n", 
                         select_id=select_id,
                         select_name=select_name,
-                        id=String::from(ID).blue(),
-                        value=String::from(VALUE).blue(),
+                        id=String::from(ID).truecolor(
+                            YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
+                        ),
+                        value=String::from(VALUE).truecolor(
+                            YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
+                        ),
                     ).as_str());
                 }
             }
@@ -1019,30 +1034,43 @@ impl DbDumpString for FormulaField {
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
         let field_config = self.field_config.clone();
         let mut value = value.clone();
-        eprintln!("FormulaField.get_yaml_out :: field_config: {:#?}", field_config.clone());
-        eprintln!("FormulaField.get_yaml_out :: value: {:?}", &value);
+        // eprintln!("FormulaField.get_yaml_out :: field_config: {:#?}", field_config.clone());
+        // eprintln!("FormulaField.get_yaml_out :: value: {:?}", &value);
         let field_name = field_config.name.unwrap();
         let mut yaml_string = yaml_string.clone();
-        let field = &field_name.blue();
+        let field = &field_name.truecolor(
+            YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
+        );
         let formula_format = field_config.formula_format.unwrap();
-        eprintln!("FormulaField.get_yaml_out :: formula_format: {:?}", &formula_format);
+        // eprintln!("FormulaField.get_yaml_out :: formula_format: {:?}", &formula_format);
         if &formula_format == FORMULA_FORMAT_TEXT {
             value = format!("{}", 
-                value.truecolor(255, 165, 0), 
+                value.truecolor(YAML_COLOR_ORANGE[0], YAML_COLOR_ORANGE[1], YAML_COLOR_ORANGE[2]), 
             );
-            eprintln!("FormulaField.get_yaml_out :: Text : value: {}", &value);
+            // eprintln!("FormulaField.get_yaml_out :: Text : value: {}", &value);
         } else if &formula_format == FORMULA_FORMAT_NUMBER {
-            eprintln!("FormulaField.get_yaml_out :: Number : value: {}", &value);
+            // eprintln!("FormulaField.get_yaml_out :: Number : value: {}", &value);
             value = value.replace("\"", "");
-            value = format!("{}", value.truecolor(255, 255, 200));
+            value = format!("{}", value.truecolor(
+                YAML_COLOR_YELLOW[0], YAML_COLOR_YELLOW[1], YAML_COLOR_YELLOW[2]
+            ));
             
         } else if &formula_format == FORMULA_FORMAT_CHECK {
             value = value.replace("\"", "");
+            if value == String::from("1") {
+                value = String::from("true");
+            } else if value == String::from("0") {
+                value = String::from("false");
+            }
             value = format!("{}", 
-                value.blue(), 
+                value.truecolor(YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]), 
+            );
+        } else if &formula_format == FORMULA_FORMAT_DATE {
+            value = format!("{}", 
+                value.truecolor(YAML_COLOR_ORANGE[0], YAML_COLOR_ORANGE[1], YAML_COLOR_ORANGE[2]), 
             );
         }
-        eprintln!("FormulaField.get_yaml_out :: value: {}", &value);
+        // eprintln!("FormulaField.get_yaml_out :: value: {}", &value);
         yaml_string.push_str(format!("  {field}: {value}\n", field=field, value=value).as_str());
         return yaml_string;
     }
@@ -1064,8 +1092,8 @@ impl ValidateFormulaField for FormulaField {
                 )
             );
         } else {
-            let data_map = self.data_map.clone();
-            let is_valid = formula_obj.validate_data(data_map)?;
+            // let data_map = self.data_map.clone();
+            let is_valid = formula_obj.validate_data(value.unwrap())?;
             return Ok(is_valid)
         }
     }
@@ -1083,19 +1111,16 @@ impl ProcessField for FormulaField {
         let formula = self.field_config.formula.clone();
         if formula.is_some() {
             let mut formula = formula.unwrap();
-            eprintln!("FormulaField.process :: formula: {}", &formula);
-            let mut formula_obj = Formula::defaults(&formula);
-            let is_valid = self.is_valid(Some(&formula), &formula_obj)?;
-            eprintln!("FormulaField.process :: is_valid: {}", &is_valid);
+            let formula_obj = Formula::defaults(
+                Some(insert_data_map), 
+                Some(table),
+            );
+            self.is_valid(Some(&formula), &formula_obj)?;
             let mut data: HashMap<String, String> = HashMap::new();
             if db_data.data.is_some() {
                 data = db_data.data.clone().unwrap();
             }    
-            formula = formula_obj.execute(
-                Some(insert_data_map), 
-                Some(table),
-            )?;
-            eprintln!("FormulaField.process :: processed formula: {}", &formula);
+            formula = formula_obj.execute(&formula)?;
             &data.insert(field_id, formula);
             db_data.data = Some(data);
             return Ok(db_data);
