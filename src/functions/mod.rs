@@ -10,7 +10,9 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use regex::Regex;
 use tr::tr;
+use xlformula_engine::{calculate, parse_formula, NoReference, NoCustomFunction};
 
+use crate::storage::table::{DbData, DbTable};
 use crate::functions::constants::*;
 use crate::functions::text::*;
 use crate::functions::date::*;
@@ -18,7 +20,12 @@ use crate::functions::number::*;
 use crate::functions::collections::*;
 use crate::functions::structure::*;
 use crate::planet::PlanetError;
-use crate::storage::table::DbData;
+use crate::storage::constants::*;
+
+lazy_static! {
+    static ref RE_ACHIEVER_FUNCTIONS: Regex = Regex::new(r#"[A-Z]+\(.+\)|[A-Z]+\(\)"#).unwrap();
+    static ref RE_FORMULA_VALID: Regex = Regex::new(r#"(?im:\{[\w\s]+\})"#).unwrap();
+}
 
 // achiever planet functions
 pub const FORMULA_FUNCTIONS: [&str; 50] = [
@@ -88,73 +95,81 @@ lazy_static! {
 pub struct FunctionsHanler {
     pub function_name: String,
     pub function_text: String,
-    pub data_map: HashMap<String, String>,
-    pub table: DbData,
+    pub data_map: Option<HashMap<String, String>>,
+    pub table: Option<DbData>,
 }
 impl FunctionsHanler{
     pub fn do_functions(&self, mut formula: String) -> String {
         let function_name = self.function_name.as_str();
         // Match all achiever functions here. Used by insert and update data to process formula columns.
+        let data_map: HashMap<String, String>;
+        let data_map_wrap = self.data_map.clone();
+        let table_wrap = self.table.clone();
+        if data_map_wrap.is_none() {
+            data_map = HashMap::new();
+        } else {
+            data_map = data_map_wrap.unwrap();
+        }
         match function_name {
             FUNCTION_CONCAT => {
                 formula = ConcatenateFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula);
+                    &self.function_text, data_map.clone(), formula);
             },
             FUNCTION_FORMAT => {
                 formula = FormatFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula);
+                    &self.function_text, data_map.clone(), formula);
             },
             FUNCTION_JOINLIST => {
                 formula = JoinListFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula);
+                    &self.function_text, data_map.clone(), formula);
             },
             FUNCTION_LENGTH => {
                 formula = LengthFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula);
+                    &self.function_text, data_map.clone(), formula);
             },
             FUNCTION_LOWER => {
                 formula = LowerFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula);
+                    &self.function_text, data_map.clone(), formula);
             },
             FUNCTION_UPPER => {
                 formula = UpperFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula);
+                    &self.function_text, data_map.clone(), formula);
             },
             FUNCTION_REPLACE => {
                 formula = ReplaceFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula);
+                    &self.function_text, data_map.clone(), formula);
             },
             FUNCTION_MID => {
                 formula = MidFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula);
+                    &self.function_text, data_map.clone(), formula);
             },
             FUNCTION_REPT => {
                 formula = ReptFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula);
+                    &self.function_text, data_map.clone(), formula);
             },
             FUNCTION_SUBSTITUTE => {
                 formula = SubstituteFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula);
+                    &self.function_text, data_map.clone(), formula);
             },
             FUNCTION_TRIM => {
                 formula = TrimFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula);
+                    &self.function_text, data_map.clone(), formula);
             },
             FUNCTION_CEILING => {
                 formula = CeilingFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula);
+                    &self.function_text, data_map.clone(), formula);
             },
             FUNCTION_FLOOR => {
                 formula = FloorFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula);
+                    &self.function_text, data_map.clone(), formula);
             },
             FUNCTION_COUNT => {
                 formula = CountFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula);
+                    &self.function_text, data_map.clone(), formula);
             },
             FUNCTION_COUNTA => {
                 formula = CountAFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula);
+                    &self.function_text, data_map.clone(), formula);
             },
             FUNCTION_COUNTALL => {
                 formula = CountAllFunction::do_replace(
@@ -162,47 +177,47 @@ impl FunctionsHanler{
             },
             FUNCTION_EVEN => {
                 formula = EvenFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula);
+                    &self.function_text, data_map.clone(), formula);
             },
             FUNCTION_EXP => {
                 formula = ExpFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula);
+                    &self.function_text, data_map.clone(), formula);
             },
             FUNCTION_INT => {
                 formula = IntFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula);
+                    &self.function_text, data_map.clone(), formula);
             },
             FUNCTION_LOG => {
                 formula = LogFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula);
+                    &self.function_text, data_map.clone(), formula);
             },
             FUNCTION_MOD => {
                 formula = ModFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula);
+                    &self.function_text, data_map.clone(), formula);
             },
             FUNCTION_POWER => {
                 formula = PowerFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula);
+                    &self.function_text, data_map.clone(), formula);
             },
             FUNCTION_ROUND => {
                 formula = RoundFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula, RoundOption::Basic);
+                    &self.function_text, data_map.clone(), formula, RoundOption::Basic);
             },
             FUNCTION_ROUNDUP => {
                 formula = RoundFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula, RoundOption::Up);
+                    &self.function_text, data_map.clone(), formula, RoundOption::Up);
             },
             FUNCTION_ROUNDDOWN => {
                 formula = RoundFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula, RoundOption::Down);
+                    &self.function_text, data_map.clone(), formula, RoundOption::Down);
             },
             FUNCTION_SQRT => {
                 formula = SqrtFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula);
+                    &self.function_text, data_map.clone(), formula);
             },
             FUNCTION_VALUE => {
                 formula = ValueFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula);
+                    &self.function_text, data_map.clone(), formula);
             },
             FUNCTION_TRUE => {
                 formula = BooleanFunction::do_replace(
@@ -218,35 +233,35 @@ impl FunctionsHanler{
             },
             FUNCTION_SECOND => {
                 formula = DateTimeParseFunction::do_replace(
-                    &self.function_text, DateTimeParseOption::Second, self.data_map.clone(), formula);
+                    &self.function_text, DateTimeParseOption::Second, data_map.clone(), formula);
             },
             FUNCTION_MINUTE => {
                 formula = DateTimeParseFunction::do_replace(
-                    &self.function_text, DateTimeParseOption::Minute, self.data_map.clone(), formula);
+                    &self.function_text, DateTimeParseOption::Minute, data_map.clone(), formula);
             },
             FUNCTION_HOUR => {
                 formula = DateTimeParseFunction::do_replace(
-                    &self.function_text, DateTimeParseOption::Hour, self.data_map.clone(), formula);
+                    &self.function_text, DateTimeParseOption::Hour, data_map.clone(), formula);
             },
             FUNCTION_DAY => {
                 formula = DateParseFunction::do_replace(
-                    &self.function_text, DateParseOption::Day, self.data_map.clone(), formula);
+                    &self.function_text, DateParseOption::Day, data_map.clone(), formula);
             },
             FUNCTION_WEEK => {
                 formula = DateParseFunction::do_replace(
-                    &self.function_text, DateParseOption::Week, self.data_map.clone(), formula);
+                    &self.function_text, DateParseOption::Week, data_map.clone(), formula);
             },
             FUNCTION_WEEKDAY => {
                 formula = DateParseFunction::do_replace(
-                    &self.function_text, DateParseOption::WeekDay, self.data_map.clone(), formula);
+                    &self.function_text, DateParseOption::WeekDay, data_map.clone(), formula);
             },
             FUNCTION_MONTH => {
                 formula = DateParseFunction::do_replace(
-                    &self.function_text, DateParseOption::Month, self.data_map.clone(), formula);
+                    &self.function_text, DateParseOption::Month, data_map.clone(), formula);
             },
             FUNCTION_YEAR => {
                 formula = DateParseFunction::do_replace(
-                    &self.function_text, DateParseOption::Year, self.data_map.clone(), formula);
+                    &self.function_text, DateParseOption::Year, data_map.clone(), formula);
             },
             FUNCTION_NOW => {
                 formula = NowFunction::do_replace(
@@ -258,27 +273,30 @@ impl FunctionsHanler{
             },
             FUNCTION_DAYS => {
                 formula = DaysFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula);
+                    &self.function_text, data_map.clone(), formula);
             },
             FUNCTION_DATEADD => {
                 formula = DateAddDiffFunction::do_replace(
-                    &self.function_text, DateDeltaOperation::Add, self.data_map.clone(), formula);
+                    &self.function_text, DateDeltaOperation::Add, data_map.clone(), formula);
             },
             FUNCTION_DATEFMT => {
                 formula = DateFormatFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula);
+                    &self.function_text, data_map.clone(), formula);
             },
             FUNCTION_IF => {
-                formula = IfFunction::do_replace(
-                    &self.function_text, formula, self.data_map.clone(), &self.table.clone());
+                if table_wrap.is_some() {
+                    let table = table_wrap.unwrap().clone();
+                    formula = IfFunction::do_replace(
+                        &self.function_text, formula, data_map.clone(), &table);
+                }
             },
             FUNCTION_MIN => {
                 formula = StatsFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula, StatOption::Min);
+                    &self.function_text, data_map.clone(), formula, StatOption::Min);
             },
             FUNCTION_MAX => {
                 formula = StatsFunction::do_replace(
-                    &self.function_text, self.data_map.clone(), formula, StatOption::Max);
+                    &self.function_text, data_map.clone(), formula, StatOption::Max);
             },
             _ => {
             }
@@ -544,5 +562,149 @@ impl FunctionAttribute {
             obj.item_processed = Some(item_string);
         }
         return obj;
+    }
+}
+
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Formula {
+    formula: String,
+}
+impl Formula{
+    pub fn defaults(formula: &String) -> Formula {
+        let obj = Self{
+            formula: formula.clone(),
+        };
+
+        eprintln!("Formula.defaults :: obj: {:#?}", &obj);
+
+        return obj
+    }
+    pub fn validate_data(&self, data_map: HashMap<String, String>) -> Result<bool, PlanetError> {
+        let expr = RE_FORMULA_VALID.clone();
+        let mut check = true;
+        for capture in expr.captures_iter(self.formula.as_str()) {
+            let field_ref = capture.get(0).unwrap().as_str();
+            let field_ref = field_ref.replace("{", "").replace("}", "");
+            let field_ref_value = data_map.get(&field_ref);
+            if field_ref_value.is_none() {
+                check = false;
+                break;
+            }
+        }
+        return Ok(check)
+    }
+    pub fn inyect_data_formula(&self, table: &DbData, data_map: HashMap<String, String>) -> Option<String> {
+        // This replaces the column data with its value and return the formula to be processed
+        let field_type_map = DbTable::get_field_type_map(table);
+        if field_type_map.is_ok() {
+            let field_type_map = field_type_map.unwrap();
+            let expr = RE_FORMULA_VALID.clone();
+            let mut formula = self.formula.clone();
+            for capture in expr.captures_iter(self.formula.as_str()) {
+                let field_ref = capture.get(0).unwrap().as_str();
+                let field_ref = field_ref.replace("{", "").replace("}", "");
+                let field_ref_value = data_map.get(&field_ref);
+                if field_ref_value.is_some() {
+                    let field_ref_value = field_ref_value.unwrap();
+                    // Check is we have string field_type or not string one
+                    let field_type = field_type_map.get(&field_ref.to_string());
+                    if field_type.is_some() {
+                        let field_type = field_type.unwrap().clone();
+                        let replace_string: String;
+                        match field_type.as_str() {
+                            FIELD_SMALL_TEXT => {
+                                replace_string = format!("\"{}\"", &field_ref_value);
+                            },
+                            FIELD_LONG_TEXT => {
+                                replace_string = format!("\"{}\"", &field_ref_value);
+                            },
+                            _ => {
+                                replace_string = field_ref_value.clone();
+                            }
+                        }
+                        let field_to_replace = format!("{}{}{}", 
+                            String::from("{"),
+                            &field_ref,
+                            String::from("}"),
+                        );
+                        formula = formula.replace(&field_to_replace, &replace_string);
+                    }
+                }
+            }
+            return Some(formula);
+        }
+        return None
+    }
+    pub fn execute(
+        &mut self,
+        data_map: Option<HashMap<String, String>>, 
+        table: Option<DbData>,
+    ) -> Result<String, PlanetError> {
+        // eprintln!("Formula.execute :: formula initial: {}", &formula);
+        // First process the achiever functions, then rest
+        let expr = RE_ACHIEVER_FUNCTIONS.clone();
+        let mut formula = self.formula.clone();
+        for capture in expr.captures_iter(formula.clone().as_str()) {
+            let function_text = capture.get(0).unwrap().as_str();
+            let function_text_string = function_text.to_string();
+            // Check function is achiever one, then process achiever function
+            let check_achiever = check_achiever_function(function_text_string.clone());
+            // eprintln!("Formula.execute :: check_achiever: {}", &check_achiever);
+            if check_achiever == true {
+                let function_name = get_function_name(function_text_string.clone());
+                // eprintln!("Formula.execute :: function_name: {}", &function_name);
+                let handler = FunctionsHanler{
+                    function_name: function_name.clone(),
+                    function_text: function_text_string,
+                    data_map: data_map.clone(),
+                    table: table.clone(),
+                };
+                // eprintln!("Formula.execute :: handler: {:#?}", &handler);
+                formula = handler.do_functions(formula);
+                // eprintln!("Formula.execute :: formula: {:#?}", &formula);
+            }
+        }
+        let formula_obj = Formula::defaults(&formula);
+        // eprintln!("Formula.execute :: formula_obj: {:#?}", formula_obj);
+        // This injects references without achiever functions
+        if data_map.is_some() && table.is_some() {
+            let table = table.unwrap();
+            let data_map = data_map.unwrap();
+            let formula_wrap = formula_obj.inyect_data_formula(&table, data_map);
+            // eprintln!("Formula.execute :: formula_wrap: {:#?}", &formula_wrap);
+            if formula_wrap.is_some() {
+                formula = formula_wrap.unwrap();
+                eprintln!("Formula.execute :: [LIB] formula: {:#?}", &formula);
+                formula = format!("={}", &formula);
+                let formula_ = parse_formula::parse_string_to_formula(
+                    &formula, 
+                    None::<NoCustomFunction>
+                );
+                let result = calculate::calculate_formula(formula_, None::<NoReference>);
+                let result = calculate::result_to_string(result);
+                eprintln!("Formula.execute :: result: {:#?}", &result);
+                return Ok(result);
+            } else {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Formula could not execute due to bad format in the references like {My Reference} or
+                        data problem on the target data associated with the reference.")),
+                    )
+                );
+            }
+        } else {
+            eprintln!("Formula.execute :: no references since no data received");
+            // I have no data and table information, skip references, simply execute formula I have
+            let formula_ = parse_formula::parse_string_to_formula(
+                &formula, 
+                None::<NoCustomFunction>
+            );
+            let result = calculate::calculate_formula(formula_, None::<NoReference>);
+            let result = calculate::result_to_string(result);
+            eprintln!("Formula.execute :: result: {:#?}", &result);
+            return Ok(result);
+        }        
     }
 }

@@ -4,7 +4,7 @@ use regex::{Regex};
 use std::{collections::HashMap};
 
 use crate::functions::constants::*;
-use crate::storage::fields::Formula;
+use crate::functions::Formula;
 use crate::storage::table::DbData;
 use crate::functions::Function;
 
@@ -124,13 +124,25 @@ impl Function for IfFunction {
         let matches = RE_IF_REPLACED.captures(&formula_if);
         let matches = matches.unwrap();
         let processed_condition = matches.name("condition").unwrap().as_str().to_string();
-        let result = Formula::execute_formula(&processed_condition);
+        let mut formula_obj = Formula::defaults(&processed_condition);
+        let result = formula_obj.execute(
+            self.data_map.clone(), 
+            self.table.clone()
+        ).unwrap();
 
         if result == "TRUE" {
-            let result = Formula::execute_formula(&expr_true);
+            let mut formula_obj = Formula::defaults(&expr_true);
+            let result = formula_obj.execute(
+                self.data_map.clone(), 
+                self.table.clone()
+            ).unwrap();
             replacement_string = result;
         } else {
-            let result = Formula::execute_formula(&expr_false);
+            let mut formula_obj = Formula::defaults(&expr_false);
+            let result = formula_obj.execute(
+                self.data_map.clone(), 
+                self.table.clone()
+            ).unwrap();
             replacement_string = result;
         }
 

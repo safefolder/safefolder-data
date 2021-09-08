@@ -6,16 +6,14 @@ use std::collections::HashMap;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use tr::tr;
-use xlformula_engine::{calculate, parse_formula, NoReference, NoCustomFunction};
-use regex::Regex;
 
 use crate::commands::table::constants::{FIELD_IDS, KEY, SELECT_OPTIONS, VALUE};
 use crate::planet::constants::ID;
 use crate::planet::{PlanetError};
-use crate::storage::table::{DbData, DbTable};
+use crate::storage::table::{DbData};
 use crate::commands::table::config::FieldConfig;
 use crate::storage::constants::*;
-use crate::functions::{check_achiever_function, get_function_name, FunctionsHanler};
+use crate::functions::Formula;
 
 /*
 These are the core fields implemented so we can tackle the security and permissions system
@@ -1085,65 +1083,29 @@ impl ProcessField for FormulaField {
         let formula = self.field_config.formula.clone();
         if formula.is_some() {
             let mut formula = formula.unwrap();
-            // eprintln!("FormulaField.process :: formula initial: {}", &formula);
-            // First process the achiever functions, then rest
-            let expr = Regex::new(r"[A-Z]+\(.+\)|[A-Z]+\(\)").unwrap();
-            let formula_str = formula.clone();
-            for capture in expr.captures_iter(formula_str.as_str()) {
-                let function_text = capture.get(0).unwrap().as_str();
-                let function_text_string = function_text.to_string();
-                // Check function is achiever one, then process achiever function
-                let check_achiever = check_achiever_function(function_text_string.clone());
-                // eprintln!("FormulaField.process :: check_achiever: {}", &check_achiever);
-                if check_achiever == true {
-                    let function_name = get_function_name(function_text_string.clone());
-                    // eprintln!("FormulaField.process :: function_name: {}", &function_name);
-                    // let function_name_str = function_name.as_str();
-                    let handler = FunctionsHanler{
-                        function_name: function_name.clone(),
-                        function_text: function_text_string,
-                        data_map: insert_data_map.clone(),
-                        table: table.clone(),
-                    };
-                    // eprintln!("FormulaField.process :: handler: {:#?}", &handler);
-                    formula = handler.do_functions(formula);
-                    // eprintln!("FormulaField.process :: formula: {:#?}", &formula);
-                    // FormulaField.process :: formula: "this-is-some-slug pepito"
-                }
-            }
-            let formula_obj = Formula::defaults(&formula);
-            // eprintln!("FormulaField.process :: formula_obj: {:#?}", formula_obj);
+            eprintln!("FormulaField.process :: formula: {}", &formula);
+            let mut formula_obj = Formula::defaults(&formula);
+            let is_valid = self.is_valid(Some(&formula), &formula_obj)?;
+            eprintln!("FormulaField.process :: is_valid: {}", &is_valid);
             let mut data: HashMap<String, String> = HashMap::new();
             if db_data.data.is_some() {
                 data = db_data.data.clone().unwrap();
-            }
-            let is_valid = self.is_valid(Some(&formula), &formula_obj)?;
-            // eprintln!("FormulaField.process :: is_valid: {}", &is_valid);
-            if is_valid == true {
-                // This injects references without achiever functions
-                let formula_wrap = formula_obj.inyect_data_formula(&table, insert_data_map);
-                // eprintln!("FormulaField.process :: formula_wrap: {:#?}", &formula_wrap);
-                if formula_wrap.is_some() {
-                    formula = formula_wrap.unwrap();
-                    eprintln!("FormulaField.process :: [LIB] formula: {:#?}", &formula);
-                    formula = format!("={}", &formula);
-                    let formula_ = parse_formula::parse_string_to_formula(
-                        &formula, 
-                        None::<NoCustomFunction>
-                    );
-                    let result = calculate::calculate_formula(formula_, None::<NoReference>);
-                    let result = calculate::result_to_string(result);
-                    eprintln!("FormulaField.process :: result: {:#?}", &result);
-                    &data.insert(field_id, result);
-                    db_data.data = Some(data);
-                    return Ok(db_data);
-                }
-            } else {
-                return Ok(db_data);
-            }
+            }    
+            formula = formula_obj.execute(
+                Some(insert_data_map), 
+                Some(table),
+            )?;
+            eprintln!("FormulaField.process :: processed formula: {}", &formula);
+            &data.insert(field_id, formula);
+            db_data.data = Some(data);
             return Ok(db_data);
         } else {
-            return Ok(db_data);
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Formula not found on formula field")),
+                )
+            );
         }
     }
 }
@@ -1162,93 +1124,5 @@ impl StringValueField for FormulaField {
             return Some(value);
         }
         return None
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Formula {
-    formula: String,
-    regex: String,
-}
-impl Formula{
-    pub fn defaults(formula: &String) -> Formula {
-        let regex: &str = r"(?im:\{[\w\s]+\})";
-        let obj = Self{
-            formula: formula.clone(),
-            regex: regex.to_string(),
-        };        
-        return obj
-    }
-    pub fn validate_data(&self, data_map: HashMap<String, String>) -> Result<bool, PlanetError> {
-        let expr = Regex::new(self.regex.as_str()).unwrap();
-        let mut check = true;
-        for capture in expr.captures_iter(self.formula.as_str()) {
-            let field_ref = capture.get(0).unwrap().as_str();
-            let field_ref = field_ref.replace("{", "").replace("}", "");
-            let field_ref_value = data_map.get(&field_ref);
-            if field_ref_value.is_none() {
-                check = false;
-                break;
-            }
-        }
-        return Ok(check)
-    }
-    pub fn inyect_data_formula(&self, table: &DbData, data_map: HashMap<String, String>) -> Option<String> {
-        // This replaces the column data with its value and return the formula to be processed
-        let field_type_map = DbTable::get_field_type_map(table);
-        if field_type_map.is_ok() {
-            let field_type_map = field_type_map.unwrap();
-            let expr = Regex::new(self.regex.as_str()).unwrap();
-            let mut formula = self.formula.clone();
-            for capture in expr.captures_iter(self.formula.as_str()) {
-                let field_ref = capture.get(0).unwrap().as_str();
-                let field_ref = field_ref.replace("{", "").replace("}", "");
-                let field_ref_value = data_map.get(&field_ref);
-                if field_ref_value.is_some() {
-                    let field_ref_value = field_ref_value.unwrap();
-                    // Check is we have string field_type or not string one
-                    let field_type = field_type_map.get(&field_ref.to_string());
-                    if field_type.is_some() {
-                        let field_type = field_type.unwrap().clone();
-                        let replace_string: String;
-                        match field_type.as_str() {
-                            FIELD_SMALL_TEXT => {
-                                replace_string = format!("\"{}\"", &field_ref_value);
-                            },
-                            FIELD_LONG_TEXT => {
-                                replace_string = format!("\"{}\"", &field_ref_value);
-                            },
-                            _ => {
-                                replace_string = field_ref_value.clone();
-                            }
-                        }
-                        let field_to_replace = format!("{}{}{}", 
-                            String::from("{"),
-                            &field_ref,
-                            String::from("}"),
-                        );
-                        formula = formula.replace(&field_to_replace, &replace_string);
-                    }
-                }
-            }
-            return Some(formula);
-        }
-        return None
-    }
-    pub fn execute_formula(formula: &String) -> String {
-        // Built functions
-        // AND, OR, NOT, XOR, ABS, SUM, PRODUCT, AVERAGE, RIGHT, LEFT, DAYS, NEGATE
-        let formula = format!("={}", formula);
-        // How to do when I have custom functions????
-        // Check (...) with regex to execute with or without functions checking function name is on
-        // map or list of our functions, since we also have base functions.
-        // One problem is the library only does custom functions with numbers in params, so cannot be strings
-        let formula_ = parse_formula::parse_string_to_formula(
-            &formula, 
-            None::<NoCustomFunction>
-        );
-        let result = calculate::calculate_formula(formula_, None::<NoReference>);
-        let result = calculate::result_to_string(result);
-        return result
     }
 }
