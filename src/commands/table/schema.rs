@@ -118,7 +118,10 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                     routing_wrap,
                     None,
                 )?;
-                eprintln!("CreateTable.run :: db_data: {:#?}", &db_data);
+                // Onl output TEMP the choices data to include in insert
+                let mut mine = db_data.clone().data_collections.unwrap();
+                mine.remove("field_ids");
+                eprintln!("CreateTable.run :: db_data: {:#?}", mine);
 
                 let db_table: DbTable = result.unwrap();
 

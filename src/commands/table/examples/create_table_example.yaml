@@ -244,3 +244,7 @@ fields:
     field_type: Formula
     formula: MAX(-4, 1.9, 2.34)
     formula_format: Number
+  - name: FORMULA 01
+    field_type: Formula
+    formula: 23 + MIN(-4, 1.9, 2.34) + SQRT(16)
+    formula_format: Number
