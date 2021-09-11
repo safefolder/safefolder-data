@@ -6,7 +6,6 @@ pub mod number;
 pub mod collections;
 
 use std::collections::HashMap;
-use colored::Colorize;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use regex::Regex;
@@ -572,13 +571,14 @@ impl Formula{
         expr: Regex, 
         formula_string: String, 
         mut function_text_list: Vec<String>,
-        replaced_text: &str,
+        replaced_text: Option<&str>,
         mode: FormulaProcessMode,
     ) -> Result<(String, Vec<String>, bool, bool), PlanetError> {
         let data_map = self.item_data.clone();
         let table = self.table.clone();
         let mut achiever_functions: Vec<String> = Vec::new();
         let formula_str = formula_string.as_str();
+        let replaced_text = replaced_text.unwrap_or_default();
         for function_name_item in FORMULA_FUNCTIONS {
             achiever_functions.push(function_name_item.to_string());
         }
@@ -587,20 +587,16 @@ impl Formula{
         let mut not_achiever_counter = 0;
         for capture in expr.captures_iter(formula_str) {
             let function_text = capture.get(0).unwrap().as_str();
-            eprintln!("Formula.process_formula_str :: function_text: {}", &function_text);
             let function_text_string = function_text.to_string();
             let check_achiever = check_achiever_function(function_text_string.clone());
-            eprintln!("Formula.process_formula_str :: check_achiever: {}", &check_achiever);
             if check_achiever == true {
                 let function_name = get_function_name(function_text_string.clone());
-                eprintln!("Formula.process_formula_str :: function_name: {}", &function_name);
                 if achiever_functions.contains(&function_name) == true {
-                    eprintln!("Formula.process_formula_str :: I add.. : {} => {}", &function_name, &function_text);
                     
                     match mode {
                         FormulaProcessMode::Validate => {
                             function_text_list.push(function_text_string);
-                            formula_new_string = formula_new_string.replace(function_text, replaced_text);        
+                            formula_new_string = formula_new_string.replace(function_text, replaced_text);
                         },
                         FormulaProcessMode::Execute => {
                             let handler = FunctionsHanler{
@@ -610,7 +606,6 @@ impl Formula{
                                 table: table.clone(),
                             };
                             formula_new_string = handler.do_functions(formula_new_string.clone());
-                            eprintln!("Formula.process_formula_str :: I executed... : formula: {}", &formula_new_string);
                         },
                     }
                 } else {
@@ -623,7 +618,6 @@ impl Formula{
                 }
             } else {
                 not_achiever_counter += 1;
-                eprintln!("Formula.process_formula_str :: not achieve func: {}", &function_text);
             }
         }
         let has_matches = expr.clone().captures(formula_new_string.as_str()).is_some();
@@ -674,7 +668,7 @@ impl Formula{
                 expr.clone(), 
                 formula_string.clone(), 
                 function_text_list.clone(), 
-                replaced_text,
+                Some(replaced_text),
                 FormulaProcessMode::Validate,
             )?;
             formula_string = tuple.0;
@@ -781,45 +775,27 @@ impl Formula{
         // First process the achiever functions, then rest
         let expr = RE_ACHIEVER_FUNCTIONS_PARTS.clone();
         let formula_str = formula.as_str();
-        let mut formula = formula.clone();
+        let mut formula_string = formula.clone();
         let data_map = self.item_data.clone();
         let table = self.table.clone();
-        let has_matches = expr.captures(&formula_str);
+        let mut has_matches = expr.captures(&formula_str).is_some();
         let mut sequence: u8 = 1;
         let max_counter = 20;
-        while has_matches.is_some() {
-            eprintln!("Formula.execute :: [inside] has_matches: {}", has_matches.is_some());
-            let mut only_not_achive_functions = false;
-            let mut not_achiever_counter = 0;
-            for capture in expr.captures_iter(formula_str) {
-                // AND, OR, NOT, XOR function names would be skipped, since handled by Lib
-                let function_text = capture.get(0).unwrap().as_str();
-                eprintln!("Formula.execute :: REGEX text item: {}", &function_text);
-                let function_text_string = function_text.to_string();
-                let check_achiever = check_achiever_function(function_text_string.clone());
-                eprintln!("Formula.execute :: check_achiever: {}", &check_achiever);
-                if check_achiever == true {
-                    let function_name = get_function_name(function_text_string.clone());
-                    eprintln!("Formula.execute :: function_name: {}", &function_name);
-                    let handler = FunctionsHanler{
-                        function_name: function_name.clone(),
-                        function_text: function_text_string,
-                        data_map: data_map.clone(),
-                        table: table.clone(),
-                    };
-                    formula = handler.do_functions(formula.clone());
-                } else {
-                    eprintln!("Formula.execute :: not achieve func: {}", &function_text);
-                    not_achiever_counter += 1;
-                }
-            }
-            // formula_str = formula.as_str().clone();
-            if not_achiever_counter == 1 {
-                only_not_achive_functions = true;
-            }
-            let has_matches = expr.captures(&formula.as_str());
-            eprintln!("Formula.execute :: [seq.{sequence}] formula:{formula} has_matches: {matches}", 
-                sequence=&sequence, formula=&formula, matches=&has_matches.is_some());
+        let mut only_not_achive_functions;
+        let mut function_text_list: Vec<String> = Vec::new();
+        while has_matches == true {
+            let tuple = self.process_formula_str(
+                expr.clone(), 
+                formula_string.clone(), 
+                function_text_list.clone(), 
+                None,
+                FormulaProcessMode::Execute,
+            )?;
+            formula_string = tuple.0;
+            function_text_list = tuple.1;
+            has_matches = tuple.2;
+            only_not_achive_functions = tuple.3;
+
             sequence += 1;
             if only_not_achive_functions == true {
                 break
@@ -827,46 +803,36 @@ impl Formula{
             if sequence > max_counter {
                 break
             }
-            if has_matches.is_none() {
+            if has_matches == false {
                 break
             }
         }
-        let formula_str_ = formula.as_str();
+        let formula_str_ = formula_string.as_str();
         // Check function again, for case of IF with non achieve functions inside like AND, OR, etc...
         let expr = RE_ACHIEVER_FUNCTIONS.clone();
-        let has_matches = expr.captures(&formula_str_);
-        if has_matches.is_some() {
-            // IF formula with AND, OR, NOT, etc... global functions from Lib used
-            for capture in expr.captures_iter(formula_str) {
-                let function_text = capture.get(0).unwrap().as_str();
-                let function_text_string = function_text.to_string();
-                let check_achiever = check_achiever_function(function_text_string.clone());
-                if check_achiever == true {
-                    let function_name = get_function_name(function_text_string.clone());
-                    let handler = FunctionsHanler{
-                        function_name: function_name.clone(),
-                        function_text: function_text_string,
-                        data_map: data_map.clone(),
-                        table: table.clone(),
-                    };
-                    formula = handler.do_functions(formula.clone());
-                }
-            }
+        let has_matches = expr.captures(&formula_str_).is_some();
+        if has_matches == true {
+            let tuple = self.process_formula_str(
+                expr.clone(), 
+                formula_string.clone(), 
+                function_text_list.clone(), 
+                None,
+                FormulaProcessMode::Execute,
+            )?;
+            formula_string = tuple.0;
         }
         // This injects references without achiever functions
         if data_map.is_some() && table.is_some() {
-            let formula_wrap = self.inyect_data_formula(&formula);
+            let formula_wrap = self.inyect_data_formula(&formula_string);
             if formula_wrap.is_some() {
-                formula = formula_wrap.unwrap();
-                eprintln!("Formula.execute :: [LIB] formula: {:#?}", &formula);
-                formula = format!("={}", &formula);
+                formula_string = formula_wrap.unwrap();
+                formula_string = format!("={}", &formula_string);
                 let formula_ = parse_formula::parse_string_to_formula(
-                    &formula, 
+                    &formula_string, 
                     None::<NoCustomFunction>
                 );
                 let result = calculate::calculate_formula(formula_, None::<NoReference>);
                 let result = calculate::result_to_string(result);
-                eprintln!("Formula.execute :: [LIB] result: **{}**", &result.blue());
                 return Ok(result);
             } else {
                 return Err(
@@ -878,7 +844,6 @@ impl Formula{
                 );
             }
         } else {
-            // eprintln!("Formula.execute :: no references since no data received");
             // I have no data and table information, skip references, simply execute formula I have
             let formula_ = parse_formula::parse_string_to_formula(
                 &formula, 
@@ -886,7 +851,6 @@ impl Formula{
             );
             let result = calculate::calculate_formula(formula_, None::<NoReference>);
             let result = calculate::result_to_string(result);
-            // eprintln!("Formula.execute :: result: {:#?}", &result);
             return Ok(result);
         }        
     }
