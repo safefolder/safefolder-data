@@ -369,7 +369,7 @@ impl ConfigStorageField for FieldConfig {
         if formula.is_some() {
             let formula = formula.unwrap();
             let formula_format = field_config.formula_format.unwrap();
-            validate_formula(&formula)?;
+            validate_formula(&formula, &formula_format)?;
             map.insert(String::from("formula"), formula);
             map.insert(String::from("formula_format"), formula_format);
         }

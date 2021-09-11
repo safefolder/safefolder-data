@@ -24,6 +24,7 @@ use crate::planet::PlanetError;
 use crate::storage::constants::*;
 
 lazy_static! {
+    static ref RE_FORMULA_FUNCTIONS: Regex = Regex::new(r#"([a-zA-Z]+\(.+\))"#).unwrap();
     static ref RE_ACHIEVER_FUNCTIONS: Regex = Regex::new(r#"(?P<func>[A-Z]+\(.+\))|(?P<func_empty>[A-Z]+\(\))"#).unwrap();
     static ref RE_ACHIEVER_FUNCTIONS_PARTS : Regex = Regex::new(r#"(?P<func>[A-Z]+\([\w\s\d"\-\+:,\{\}.€\$=;]+\))|(?P<func_empty>[A-Z]+\(\))"#).unwrap();
     static ref RE_FORMULA_VALID: Regex = Regex::new(r#"(?im:\{[\w\s]+\})"#).unwrap();
@@ -87,11 +88,6 @@ pub const FORMULA_FUNCTIONS: [&str; 50] = [
 pub trait Function {
     fn validate(&self) -> bool;
     fn replace(&mut self, formula: String) -> String;
-}
-
-lazy_static! {
-    // CONCAT("mine", "-", {My Column}, 45) :: Regex to catch the function attributes in an array
-    static ref RE_FORMULA_FUNCTIONS: Regex = Regex::new(r#"([a-zA-Z]+\(.+\))"#).unwrap();
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -308,38 +304,18 @@ impl FunctionsHanler{
     }
 }
 
-pub fn validate_formula(formula: &String) -> Result<bool, PlanetError> {
+pub fn validate_formula(formula: &String, formula_format: &String) -> Result<bool, PlanetError> {
     let check = true;
-    let mut achiever_functions: Vec<String> = Vec::new();
-    for function_name_item in FORMULA_FUNCTIONS {
-        achiever_functions.push(function_name_item.to_string());
-    }
-    // Get all function texts in the formula, like ["CONCAT(...)", "ABS(23)", ...]
-    let mut formula_functions: Vec<String> = Vec::new();
-    let mut function_name_map: HashMap<String, String> = HashMap::new();
-    for capture in RE_FORMULA_FUNCTIONS.captures_iter(formula) {
-        let function_text = capture.get(0).unwrap().as_str().to_string();
-        let function_name = get_function_name(function_text.clone());
-        if achiever_functions.contains(&function_name) == true {
-            formula_functions.push(function_text.clone());
-            function_name_map.insert(function_name, function_text.clone());    
-        } else {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!("Function \"{}\" does not exist. Check your spelling.", &function_name)),
-                )
-            );
-        }
-    }
+    let formula_obj = Formula::defaults(None, None);
+    let function_text_list = formula_obj.validate(&formula, &formula_format)?;
 
     // Validate all formula_functions (only ones found in formula from all functions in achiever)
     let mut number_fails: u32 = 0;
     let mut failed_functions: Vec<String> = Vec::new();
     let mut validate_tuple = (number_fails, failed_functions);
-    for function_name in function_name_map.keys() {
-        let function_name = function_name.as_str();
-        let function_text = function_name_map.get(function_name).unwrap();
+    for function_text in &function_text_list {
+        let parts: Vec<&str> = function_text.split("(").collect();
+        let function_name = parts[0];
         match function_name {
             FUNCTION_CONCAT => {
                 validate_tuple = ConcatenateFunction::do_validate(function_text, validate_tuple);
@@ -566,6 +542,11 @@ impl FunctionAttribute {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum FormulaProcessMode {
+    Validate,
+    Execute
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Formula {
@@ -585,6 +566,148 @@ impl Formula{
         // eprintln!("Formula.defaults :: obj: {:#?}", &obj);
 
         return obj
+    }
+    fn process_formula_str(
+        &self, 
+        expr: Regex, 
+        formula_string: String, 
+        mut function_text_list: Vec<String>,
+        replaced_text: &str,
+        mode: FormulaProcessMode,
+    ) -> Result<(String, Vec<String>, bool, bool), PlanetError> {
+        let data_map = self.item_data.clone();
+        let table = self.table.clone();
+        let mut achiever_functions: Vec<String> = Vec::new();
+        let formula_str = formula_string.as_str();
+        for function_name_item in FORMULA_FUNCTIONS {
+            achiever_functions.push(function_name_item.to_string());
+        }
+        let mut formula_new_string = formula_str.clone().to_string();
+        let mut only_not_achive_functions = false;
+        let mut not_achiever_counter = 0;
+        for capture in expr.captures_iter(formula_str) {
+            let function_text = capture.get(0).unwrap().as_str();
+            eprintln!("Formula.process_formula_str :: function_text: {}", &function_text);
+            let function_text_string = function_text.to_string();
+            let check_achiever = check_achiever_function(function_text_string.clone());
+            eprintln!("Formula.process_formula_str :: check_achiever: {}", &check_achiever);
+            if check_achiever == true {
+                let function_name = get_function_name(function_text_string.clone());
+                eprintln!("Formula.process_formula_str :: function_name: {}", &function_name);
+                if achiever_functions.contains(&function_name) == true {
+                    eprintln!("Formula.process_formula_str :: I add.. : {} => {}", &function_name, &function_text);
+                    
+                    match mode {
+                        FormulaProcessMode::Validate => {
+                            function_text_list.push(function_text_string);
+                            formula_new_string = formula_new_string.replace(function_text, replaced_text);        
+                        },
+                        FormulaProcessMode::Execute => {
+                            let handler = FunctionsHanler{
+                                function_name: function_name.clone(),
+                                function_text: function_text_string,
+                                data_map: data_map.clone(),
+                                table: table.clone(),
+                            };
+                            formula_new_string = handler.do_functions(formula_new_string.clone());
+                            eprintln!("Formula.process_formula_str :: I executed... : formula: {}", &formula_new_string);
+                        },
+                    }
+                } else {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!("Function \"{}\" does not exist. Check your spelling.", &function_name)),
+                        )
+                    );
+                }
+            } else {
+                not_achiever_counter += 1;
+                eprintln!("Formula.process_formula_str :: not achieve func: {}", &function_text);
+            }
+        }
+        let has_matches = expr.clone().captures(formula_new_string.as_str()).is_some();
+        if not_achiever_counter == 1 {
+            only_not_achive_functions = true;
+        }
+        return Ok(
+            (
+                formula_new_string,
+                function_text_list,
+                has_matches,
+                only_not_achive_functions,
+            )
+        )
+    }
+    pub fn validate(&self, formula: &String, formula_format: &String) -> Result<Vec<String>, PlanetError> {
+        let expr = RE_ACHIEVER_FUNCTIONS_PARTS.clone();
+        let formula = formula.clone();
+        let formula_str = formula.as_str();
+        let mut has_matches = expr.captures(formula_str).is_some();
+        let mut sequence: u8 = 1;
+        let max_counter = 20;
+        let mut achiever_functions: Vec<String> = Vec::new();
+        for function_name_item in FORMULA_FUNCTIONS {
+            achiever_functions.push(function_name_item.to_string());
+        }
+        let mut function_text_list: Vec<String> = Vec::new();
+        let formula_format_str = formula_format.as_str();
+        let replaced_text: &str;
+        match formula_format_str {
+            FORMULA_FORMAT_TEXT => {
+                replaced_text = "\"\"";
+            },
+            FORMULA_FORMAT_NUMBER => {
+                replaced_text = "1"
+            },
+            FORMULA_FORMAT_DATE => {
+                replaced_text = "01-Jan-2021"
+            },
+            _ => {
+                replaced_text = "\"\"";
+            },
+        }
+        let mut formula_string: String = formula_str.to_string();
+        let mut only_not_achive_functions: bool;
+        while has_matches == true {
+            let tuple = self.process_formula_str(
+                expr.clone(), 
+                formula_string.clone(), 
+                function_text_list.clone(), 
+                replaced_text,
+                FormulaProcessMode::Validate,
+            )?;
+            formula_string = tuple.0;
+            function_text_list = tuple.1;
+            has_matches = tuple.2;
+            only_not_achive_functions = tuple.3;
+            sequence += 1;
+            if only_not_achive_functions == true {
+                break
+            }
+            if sequence > max_counter {
+                break
+            }
+            if has_matches == false {
+                break
+            }
+        }
+        let formula_str_ = formula_string.as_str();
+        // Check function again, for case of IF with non achieve functions inside like AND, OR, etc...
+        let expr = RE_ACHIEVER_FUNCTIONS.clone();
+        let has_matches = expr.captures(&formula_str_);
+        if has_matches.is_some() {
+            // IF formula with AND, OR, NOT, etc... global functions from Lib used
+            for capture in expr.captures_iter(formula_str) {
+                let function_text = capture.get(0).unwrap().as_str();
+                let function_text_string = function_text.to_string();
+                let check_achiever = check_achiever_function(function_text_string.clone());
+                if check_achiever == true {
+                    function_text_list.push(function_text_string);
+                }
+            }
+        }
+        return Ok(function_text_list)
     }
     pub fn validate_data(&self, formula: &String) -> Result<bool, PlanetError> {
         let expr = RE_FORMULA_VALID.clone();
