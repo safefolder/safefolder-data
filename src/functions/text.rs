@@ -24,11 +24,11 @@ lazy_static! {
     static ref RE_JOINLIST_ATTRS: Regex = Regex::new(r#"(?P<array>\{[\w\s\d,"-]+\}),[\s+]{0,}(?P<sep>\\{0,1}"[\W]\\{0,1}")"#).unwrap();
     static ref RE_LEN_ATTR: Regex = Regex::new(r#"("[\w\s-]+")|(\{[\w\s]+\})"#).unwrap();
     static ref RE_SINGLE_ATTR: Regex = Regex::new(r#"("[\w\s-]+")|(\{[\w\s]+\})"#).unwrap();
-    static ref RE_REPLACE: Regex = Regex::new(r#"REPLACE\("(?P<old_text>[\w\s]+)",[\s]+(?P<start_num>\d),[\s]+(?P<num_chars>\d),[\s]+"(?P<new_text>[\w\s]+)"\)"#).unwrap();
-    static ref RE_MID: Regex = Regex::new(r#"MID\(((?P<text>"[\w\s]+")|(?P<text_ref>\{[\w\s]+\}))[\s\n\t]{0,},[\s\n\t]{0,}(?P<start_num>\d+)[\s\n\t]{0,},[\s\n\t]{0,}(?P<num_chars>\d+)\)"#).unwrap();
-    static ref RE_REPT: Regex = Regex::new(r#"REPT\(((?P<text>"[\w\s\W]+")|(?P<text_ref>\{[\w\s]+\}))[\s\n\t]{0,},[\s\n\t]{0,}(?P<number_times>\d+)\)"#).unwrap();
-    static ref RE_SUBSTITUTE: Regex = Regex::new(r#"SUBSTITUTE\(((?P<text>("[\w\s]+"))|(?P<text_ref>(\{[\w\s]+\})))[\s\n\t]{0,},[\s\n\t]{0,}(?P<old_text>"[\w\s]+")[\s\n\t]{0,},[\s\n\t]{0,}(?P<new_text>"[\w\s]+")\)"#).unwrap();
-    static ref RE_TRIM: Regex = Regex::new(r#"TRIM\(((?P<text>"[\w\s]+")|(?P<text_ref>\{[\w\s]+\}))\)"#).unwrap();
+    static ref RE_REPLACE: Regex = Regex::new(r#"REPLACE\([\n\s\t]{0,}"(?P<old_text>[\w\s]+)"[\n\s\t]{0,},[\n\s\t]{0,}(?P<start_num>\d)[\n\s\t]{0,},[\n\s\t]{0,}(?P<num_chars>\d)[\n\s\t]{0,},[\n\s\t]{0,}"(?P<new_text>[\w\s]+)"[\s\n\t]{0,}\)"#).unwrap();
+    static ref RE_MID: Regex = Regex::new(r#"MID\([\s\n\t]{0,}((?P<text>"[\w\s]+")|(?P<text_ref>\{[\w\s]+\}))[\s\n\t]{0,},[\s\n\t]{0,}(?P<start_num>\d+)[\s\n\t]{0,},[\s\n\t]{0,}(?P<num_chars>\d+)[\s\n\t]{0,}\)"#).unwrap();
+    static ref RE_REPT: Regex = Regex::new(r#"REPT\([\s\n\t]{0,}((?P<text>"[\w\s\W]+")|(?P<text_ref>\{[\w\s]+\}))[\s\n\t]{0,},[\s\n\t]{0,}(?P<number_times>\d+)[\s\t\n]{0,}\)"#).unwrap();
+    static ref RE_SUBSTITUTE: Regex = Regex::new(r#"SUBSTITUTE\([\s\n\t]{0,}((?P<text>("[\w\s]+"))|(?P<text_ref>(\{[\w\s]+\})))[\s\n\t]{0,},[\s\n\t]{0,}(?P<old_text>"[\w\s]+")[\s\n\t]{0,},[\s\n\t]{0,}(?P<new_text>"[\w\s]+")[\s\t\n]{0,}\)"#).unwrap();
+    static ref RE_TRIM: Regex = Regex::new(r#"TRIM\([\s\n\t]{0,}((?P<text>"[\w\s]+")|(?P<text_ref>\{[\w\s]+\}))[\s\n\t]{0,}\)"#).unwrap();
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
