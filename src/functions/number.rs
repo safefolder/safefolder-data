@@ -11,22 +11,22 @@ use crate::functions::Function;
 
 
 lazy_static! {
-    static ref RE_CEILING: Regex = Regex::new(r#"CEILING\(((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|(?P<number_ref>\{[\w\s]+\}))[\s\n\t]{0,},[\s\n\t]{0,}(?P<significance>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)\)"#).unwrap();
-    static ref RE_FLOOR: Regex = Regex::new(r#"FLOOR\(((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|(?P<number_ref>\{[\w\s]+\}))[\s\n\t]{0,},[\s\n\t]{0,}(?P<significance>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)\)"#).unwrap();
-    static ref RE_COUNT: Regex = Regex::new(r#"COUNT\((?P<attrs>.+)\)"#).unwrap();
-    static ref RE_COUNTA: Regex = Regex::new(r#"COUNTA\((?P<attrs>.+)\)"#).unwrap();
-    static ref RE_COUNTALL: Regex = Regex::new(r#"COUNTALL\((?P<attrs>.+)\)"#).unwrap();
-    static ref RE_EVEN: Regex = Regex::new(r#"EVEN\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)\)|EVEN\((?P<number_ref>\{[\w\s]+\})\)"#).unwrap();
-    static ref RE_EXP: Regex = Regex::new(r#"EXP\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)\)|EXP\((?P<number_ref>\{[\w\s]+\})\)"#).unwrap();
-    static ref RE_INT: Regex = Regex::new(r#"INT\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)\)|INT\((?P<number_ref>\{[\w\s]+\})\)"#).unwrap();
-    static ref RE_LOG: Regex = Regex::new(r#"LOG\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},{0,}[\n\s\t]{0,}(?P<base>\d+){0,}\)|LOG\((?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},{0,}[\n\s\t]{0,}(?P<base_ref>\d+){0,}\)"#).unwrap();
-    static ref RE_MOD: Regex = Regex::new(r#"MOD\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<divisor>\d+){0,}\)|MOD\((?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<divisor_ref>\d+){0,}\)"#).unwrap();
-    static ref RE_POWER: Regex = Regex::new(r#"POWER\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<power>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+){0,}\)|POWER\((?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<power_ref>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+){0,}\)"#).unwrap();
-    static ref RE_ROUND: Regex = Regex::new(r#"ROUND\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits>\d+){0,}\)|ROUND\((?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits_ref>\d+){0,}\)"#).unwrap();
-    static ref RE_ROUND_UP: Regex = Regex::new(r#"ROUNDUP\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits>\d+){0,}\)|ROUNDUP\((?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits_ref>\d+){0,}\)"#).unwrap();
-    static ref RE_ROUND_DOWN: Regex = Regex::new(r#"ROUNDDOWN\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits>\d+){0,}\)|ROUNDDOWN\((?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits_ref>\d+){0,}\)"#).unwrap();
-    static ref RE_SQRT: Regex = Regex::new(r#"SQRT\((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)\)|SQRT\((?P<number_ref>\{[\w\s]+\})\)"#).unwrap();
-    static ref RE_VALUE: Regex = Regex::new(r#"VALUE\((?P<text>"[\w\d,.{0,}\$€{0,}]+")\)|VALUE\((?P<text_ref>\{[\w\s]+\})\)"#).unwrap();
+    static ref RE_CEILING: Regex = Regex::new(r#"CEILING\([\s\n\t]{0,}((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|(?P<number_ref>\{[\w\s]+\}))[\s\n\t]{0,},[\s\n\t]{0,}(?P<significance>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\s\n\t]{0,}\)"#).unwrap();
+    static ref RE_FLOOR: Regex = Regex::new(r#"FLOOR\([\s\n\t]{0,}((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|(?P<number_ref>\{[\w\s]+\}))[\s\n\t]{0,},[\s\n\t]{0,}(?P<significance>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\s\n\t]{0,}\)"#).unwrap();
+    static ref RE_COUNT: Regex = Regex::new(r#"COUNT\([\s\n\t]{0,}(?P<attrs>[\w\W\s\n\t]{0,})[\s\n\t]{0,}\)"#).unwrap();
+    static ref RE_COUNTA: Regex = Regex::new(r#"COUNTA\([\s\n\t]{0,}(?P<attrs>[\w\W\s\n\t]{0,})[\s\n\t]{0,}\)"#).unwrap();
+    static ref RE_COUNTALL: Regex = Regex::new(r#"COUNTALL\([\s\n\t]{0,}(?P<attrs>[\w\W\s\n\t]{0,})[\s\n\t]{0,}\)"#).unwrap();
+    static ref RE_EVEN: Regex = Regex::new(r#"EVEN\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\s\n\t]{0,}\)|EVEN\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\s\n\t]{0,}\)"#).unwrap();
+    static ref RE_EXP: Regex = Regex::new(r#"EXP\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\s\n\t]{0,}\)|EXP\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\s\n\t]{0,}\)"#).unwrap();
+    static ref RE_INT: Regex = Regex::new(r#"INT\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\s\n\t]{0,}\)|INT\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\s\n\t]{0,}\)"#).unwrap();
+    static ref RE_LOG: Regex = Regex::new(r#"LOG\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},{0,}[\n\s\t]{0,}(?P<base>\d+){0,}[\s\n\t]{0,}\)|LOG\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},{0,}[\n\s\t]{0,}(?P<base_ref>\d+){0,}[\s\n\t]{0,}\)"#).unwrap();
+    static ref RE_MOD: Regex = Regex::new(r#"MOD\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<divisor>\d+){0,}[\s\n\t]{0,}\)|MOD\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<divisor_ref>\d+){0,}[\s\n\t]{0,}\)"#).unwrap();
+    static ref RE_POWER: Regex = Regex::new(r#"POWER\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<power>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+){0,}[\s\n\t]{0,}\)|POWER\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<power_ref>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+){0,}[\s\n\t]{0,}\)"#).unwrap();
+    static ref RE_ROUND: Regex = Regex::new(r#"ROUND\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits>\d+){0,}[\s\n\t]{0,}\)|ROUND\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits_ref>\d+){0,}[\s\n\t]{0,}\)"#).unwrap();
+    static ref RE_ROUND_UP: Regex = Regex::new(r#"ROUNDUP\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits>\d+){0,}[\s\n\t]{0,}\)|ROUNDUP\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits_ref>\d+){0,}[\s\n\t]{0,}\)"#).unwrap();
+    static ref RE_ROUND_DOWN: Regex = Regex::new(r#"ROUNDDOWN\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits>\d+){0,}[\s\n\t]{0,}\)|ROUNDDOWN\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits_ref>\d+){0,}[\s\n\t]{0,}\)"#).unwrap();
+    static ref RE_SQRT: Regex = Regex::new(r#"SQRT\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\s\n\t]{0,}\)|SQRT\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\s\n\t]{0,}\)"#).unwrap();
+    static ref RE_VALUE: Regex = Regex::new(r#"VALUE\([\s\n\t]{0,}(?P<text>"[\w\d,.{0,}\$€{0,}]+")[\s\n\t]{0,}\)|VALUE\([\s\n\t]{0,}(?P<text_ref>\{[\w\s]+\})[\s\n\t]{0,}\)"#).unwrap();
     static ref RE_BOOLEAN: Regex = Regex::new(r#"TRUE\(\)|FALSE\(\)"#).unwrap();
 }
 

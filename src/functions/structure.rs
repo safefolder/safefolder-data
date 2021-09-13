@@ -9,8 +9,8 @@ use crate::storage::table::DbData;
 use crate::functions::Function;
 
 lazy_static! {
-    static ref RE_IF: Regex = Regex::new(r#"IF\([\n\s\t]{0,}(?P<condition>\{[\w\s]+\}[\s]{0,}(=|<|>|<=|>=)[\s]{0,}((\d+)|("[\w\s]+"))),[\s\n\t]{0,}(?P<expr_true>(\d+)|("[\w\s]+")),[\s\n\t]{0,}(?P<expr_false>(\d+)|("[\w\s]+"))[\s\n\t]{0,}\)|IF\([\s\n\t]{0,}(?P<log_condition>(AND\(.+\)|OR\(.+\)|NOT\(.+\)|XOR\(.+\))),[\s\n\t]{0,}(?P<log_expr_true>(\d+)|("[\w\s]+")),[\s\n\t]{0,}(?P<log_expr_false>(\d+)|("[\w\s]+"))[\s\n\t]{0,}\)"#).unwrap();
-    static ref RE_IF_REPLACED: Regex = Regex::new(r#"IF\((?P<condition>([a-zA-Z0-9_<>=\s]+)|(AND\(.+\))|(OR\(.+\))|(NOT\(.+\))|(XOR\(.+\)))[\s\n\t]{0,},[\s\n\t]{0,}(?P<expr_true>("[\w\s]+")|(\d+))[\s\n\t]{0,},[\s\n\t]{0,}(?P<expr_false>("[\w\s]+")|(\d+))\)"#).unwrap();
+    static ref RE_IF: Regex = Regex::new(r#"IF\([\n\s\t]{0,}(?P<condition>\{[\w\s]+\}[\s]{0,}(=|<|>|<=|>=)[\s]{0,}((\d+)|("[\w\s]+"))),[\s\n\t]{0,}(?P<expr_true>(\d+)|("[\w\s]+")),[\s\n\t]{0,}(?P<expr_false>(\d+)|("[\w\s]+"))[\s\n\t]{0,}\)|IF\([\s\n\t]{0,}(?P<log_condition>(AND\([\s\n\t]{0,}[\w\W\s\n\t]{1,}[\s\n\t]{0,}\)|OR\([\s\n\t]{0,}[\w\W\s\n\t]{1,}[\s\n\t]{0,}\)|NOT\([\s\n\t]{0,}[\w\W\s\n\t]{1,}[\s\n\t]{0,}\)|XOR\([\s\n\t]{0,}[\w\W\s\n\t]{1,}[\s\n\t]{0,}\))),[\s\n\t]{0,}(?P<log_expr_true>(\d+)|("[\w\s]+")),[\s\n\t]{0,}(?P<log_expr_false>(\d+)|("[\w\s]+"))[\s\n\t]{0,}\)"#).unwrap();
+    static ref RE_IF_REPLACED: Regex = Regex::new(r#"IF\([\s\n\t]{0,}(?P<condition>([a-zA-Z0-9_<>=\s]+)|(AND\([\w\W\s\n\t]{1,}\))|(OR\([\w\W\s\n\t]{1,}\))|(NOT\([\w\W\s\n\t]{1,}\))|(XOR\([\w\W\s\n\t]{1,}\)))[\s\n\t]{0,},[\s\n\t]{0,}(?P<expr_true>("[\w\s]+")|(\d+))[\s\n\t]{0,},[\s\n\t]{0,}(?P<expr_false>("[\w\s]+")|(\d+))[\s\n\t]{0,}\)"#).unwrap();
 }
 
 // IF({Sales} > 50, "Win", "Loose")
