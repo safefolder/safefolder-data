@@ -14,7 +14,14 @@ pub const FORMULA_FORMAT_DATE: &str = "Date";
 
 pub const FIELD_SMALL_TEXT: &str = "Small Text";
 pub const FIELD_LONG_TEXT: &str = "Long Text";
+pub const FIELD_SELECT: &str = "Select";
+pub const FIELD_CHECKBOX: &str = "Checkbox";
+pub const FIELD_FORMULA: &str = "Formula";
+pub const FIELD_NUMBER: &str = "Number";
 
 pub const YAML_COLOR_ORANGE: [u8; 3] = [197, 147, 122];
 pub const YAML_COLOR_BLUE: [u8; 3] = [100, 153, 208];
 pub const YAML_COLOR_YELLOW: [u8; 3] = [175, 193, 161];
+
+pub const SELECT_DEFAULT_PAGE: u32 = 1;
+pub const SELECT_DEFAULT_NUMBER_ITEMS: u32 = 20;

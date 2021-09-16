@@ -1,8 +1,8 @@
 ---
 command: INSERT INTO TABLE "Super Table"
-name: Pepito Data 41
+name: Pepito Data 42
 data:
-  My Field: pepito     
+  My Field: pepito
   Description: This is some description I want to include
   Is Published: true
   Counter: 34

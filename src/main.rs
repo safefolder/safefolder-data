@@ -205,6 +205,7 @@ fn run_command(runner: CommandRunner) -> Result<String, String> {
             "CREATE TABLE" => commands::table::schema::CreateTable::runner(&runner, &path_yaml),
             "INSERT INTO TABLE" => commands::table::data::InsertIntoTable::runner(&runner, &path_yaml),
             "GET FROM TABLE" => commands::table::data::GetFromTable::runner(&runner, &path_yaml),
+            "SELECT FROM TABLE" => commands::table::data::SelectFromTable::runner(&runner, &path_yaml),
             _ => println!("default")
         }
         Ok("Command executed".to_string())

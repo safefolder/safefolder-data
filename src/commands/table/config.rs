@@ -12,7 +12,7 @@ use crate::commands::table::constants::{FIELD_IDS, NAME_CAMEL, SELECT_OPTIONS, V
 use crate::planet::validation::{CommandImportConfig, PlanetValidationError};
 use crate::planet::{PlanetContext, PlanetError};
 
-use crate::storage::constants::{FIELD_VERSION, FIELD_API_VERSION};
+use crate::storage::constants::*;
 use crate::storage::*;
 use crate::storage::table::{DbData};
 use crate::planet::constants::*;
@@ -36,6 +36,7 @@ lazy_static! {
     static ref RE_COMMAND_CREATE_TABLE: Regex = Regex::new(r#"(CREATE TABLE) "([a-zA-Z0-9_ ]+)""#).unwrap();
     static ref RE_COMMAND_INSERT_INTO_TABLE: Regex = Regex::new(r#"(INSERT INTO TABLE) "([a-zA-Z0-9_ ]+)""#).unwrap();
     static ref RE_COMMAND_GET_FROM_TABLE: Regex = Regex::new(r#"(GET FROM TABLE) "([a-zA-Z0-9_ ]+)"#).unwrap();
+    static ref RE_COMMAND_SELECT_FROM_TABLE: Regex = Regex::new(r#"(SELECT FROM TABLE) "([a-zA-Z0-9_ ]+)"#).unwrap();
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
@@ -582,4 +583,72 @@ impl GetFromTableConfig {
         }
     }
 
+}
+
+#[derive(Debug, Serialize, Deserialize, Validate, Clone)]
+pub struct SelectFromTableConfig {
+    #[validate(required, regex="RE_COMMAND_SELECT_FROM_TABLE")]
+    pub command: Option<String>,
+    #[validate(required)]
+    pub r#where: Option<String>,
+    #[serde(default="SelectFromTableConfig::page_default")]
+    pub page: Option<String>,
+    #[serde(default="SelectFromTableConfig::number_items_default")]
+    pub number_items: Option<String>,
+    pub fields: Option<Vec<String>>,
+}
+
+impl SelectFromTableConfig {
+
+    pub fn defaults(r#where: Option<String>, page: Option<String>, number_items: Option<String>) -> Self {
+        let config: SelectFromTableConfig = Self{
+            command: Some(String::from("SELECT FROM TABLE")),
+            r#where: r#where,
+            page: page,
+            number_items: number_items,
+            fields: None,
+        };
+        return config
+    }
+    pub fn page_default() -> Option<String> {
+        return Some(SELECT_DEFAULT_PAGE.to_string());
+    }
+    pub fn number_items_default() -> Option<String> {
+        return Some(SELECT_DEFAULT_NUMBER_ITEMS.to_string());
+    }
+    pub fn import(
+        &self, 
+        planet_context: &PlanetContext, 
+        yaml_path: &String
+    ) -> Result<SelectFromTableConfig, Vec<PlanetValidationError>> {
+        let yaml_str: String = fetch_yaml_config(&yaml_path);
+        // Deseralize the config entity
+        let response: Result<SelectFromTableConfig, serde_yaml::Error> = serde_yaml::from_str(&yaml_str);
+        let import_config: CommandImportConfig = CommandImportConfig{
+            command: String::from(""),
+            planet_context: planet_context,
+        };
+        match response {
+            Ok(_) => {
+                let config_model: SelectFromTableConfig = response.unwrap();
+                let validate: Result<(), ValidationErrors> = config_model.validate();
+                match validate {
+                    Ok(_) => {
+                        return Ok(config_model)
+                    },
+                    Err(errors) => {
+                        let command = &config_model.command.unwrap();
+                        let planet_errors: Vec<PlanetValidationError> = import_config.parse_validator(
+                            command, errors);
+                        return Err(planet_errors);
+                    }
+                }
+            },
+            Err(error) => {
+                let mut planet_errors: Vec<PlanetValidationError> = Vec::new();
+                planet_errors.push(import_config.parse_serde(&error));
+                return Err(planet_errors);
+            }
+        }
+    }
 }

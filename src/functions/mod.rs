@@ -5,6 +5,7 @@ pub mod structure;
 pub mod number;
 pub mod collections;
 
+use std::time::Instant;
 use std::collections::HashMap;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -28,6 +29,7 @@ lazy_static! {
     static ref RE_ACHIEVER_FUNCTIONS_PARTS : Regex = Regex::new(r#"(?P<func>[A-Z]+\([\w\s\d"\-\+:,\{\}.€\$=;]+\))|(?P<func_empty>[A-Z]+\(\))"#).unwrap();
     static ref RE_FORMULA_VALID: Regex = Regex::new(r#"(?im:\{[\w\s]+\})"#).unwrap();
     static ref RE_EMBED_FUNC: Regex = Regex::new(r#"\((?P<func_embed>[A-Z]+)"#).unwrap();
+    static ref RE_STRING_MATCH: Regex = Regex::new(r#"(?P<string_match>"[\w\s]+"[\s\n\t]{0,}[=><][\s\n\t]{0,}"[\w\s]+")"#).unwrap();
 }
 
 // achiever planet functions
@@ -108,6 +110,7 @@ impl FunctionsHanler{
         } else {
             data_map = data_map_wrap.unwrap();
         }
+        eprintln!("FunctionsHandler.do_functions :: data_map: {:#?}", &data_map);
         match function_name {
             FUNCTION_CONCAT => {
                 formula = ConcatenateFunction::do_replace(
@@ -568,7 +571,7 @@ impl Formula{
     }
     fn process_formula_str(
         &self, 
-        expr: Regex, 
+        expr: &Regex, 
         formula_string: String, 
         mut function_text_list: Vec<String>,
         replaced_text: Option<&str>,
@@ -585,7 +588,10 @@ impl Formula{
         let mut formula_new_string = formula_str.clone().to_string();
         let mut only_not_achive_functions = false;
         let mut not_achiever_counter = 0;
-        for capture in expr.captures_iter(formula_str) {
+        // let t_1 = Instant::now();
+        let capture_list = expr.captures_iter(formula_str);
+        // eprintln!("Formula.process_formula_str :: capture_list : {} ms", &t_1.elapsed().as_millis());
+        for capture in capture_list {
             let function_text = capture.get(0).unwrap().as_str();
             let function_text_string = function_text.to_string();
             let check_achiever = check_achiever_function(function_text_string.clone());
@@ -634,7 +640,7 @@ impl Formula{
         )
     }
     pub fn validate(&self, formula: &String, formula_format: &String) -> Result<Vec<String>, PlanetError> {
-        let expr = RE_ACHIEVER_FUNCTIONS_PARTS.clone();
+        let expr = &RE_ACHIEVER_FUNCTIONS_PARTS;
         let formula = formula.clone();
         let formula_str = formula.as_str();
         let mut has_matches = expr.captures(formula_str).is_some();
@@ -665,7 +671,7 @@ impl Formula{
         let mut only_not_achive_functions: bool;
         while has_matches == true {
             let tuple = self.process_formula_str(
-                expr.clone(), 
+                expr, 
                 formula_string.clone(), 
                 function_text_list.clone(), 
                 Some(replaced_text),
@@ -718,6 +724,37 @@ impl Formula{
         }
         return Ok(check)
     }
+    fn process_string_matches(&self, formula: &String) -> String {
+        // let t_1 = Instant::now();
+        let formula = formula.clone();
+        let formula_str = formula.as_str();
+        let expr = &RE_STRING_MATCH;
+        let mut formula_new = formula.clone();
+        // let t_capture_list = Instant::now();
+        let list_captures = expr.captures_iter(formula_str);
+        // eprintln!("Formula.process_string_matches :: perf : capture_list: {} ms", &t_capture_list.elapsed().as_millis());
+        // eprintln!("Formula.process_string_matches :: perf : header: {} ms", &t_1.elapsed().as_millis());
+        for capture in list_captures {
+            // let t_item_1 = Instant::now();
+            let item = capture.get(0).unwrap().as_str();
+            // let equal_greater = item.find("=>");
+            // let smaller_equal = item.find("<=");
+            let equal = item.find("=");
+            if equal.is_some() {
+                let fields: Vec<&str> = item.split("=").collect();
+                let name = fields[0].trim();
+                let value = fields[1].trim();
+                if name != value {
+                    formula_new = formula_new.replace(item, "1=2");
+                } else {
+                    formula_new = formula_new.replace(item, "1=1");
+                }
+            }
+            // eprintln!("Formula.process_string_matches :: perf : item {}: {} ms", &item, &t_item_1.elapsed().as_millis());
+        }
+        // eprintln!("Formula.process_string_matches :: perf : total: {} ms", &t_1.elapsed().as_millis());
+        return formula_new
+    }
     pub fn inyect_data_formula(&self, formula: &String) -> Option<String> {
         let table_wrap = self.table.clone();
         let data_map_wrap = self.item_data.clone();
@@ -743,13 +780,22 @@ impl Formula{
                         let field_type = field_type_map.get(&field_ref.to_string());
                         if field_type.is_some() {
                             let field_type = field_type.unwrap().clone();
+                            // eprintln!("Formula.inyect_data_formula :: field_type: {}", &field_type);
                             let replace_string: String;
+                            // field formula????
+                            // TODO: Add fields as you implement them
                             match field_type.as_str() {
                                 FIELD_SMALL_TEXT => {
                                     replace_string = format!("\"{}\"", &field_ref_value);
                                 },
                                 FIELD_LONG_TEXT => {
                                     replace_string = format!("\"{}\"", &field_ref_value);
+                                },
+                                FIELD_SELECT => {
+                                    replace_string = format!("\"{}\"", &field_ref_value);
+                                },
+                                FIELD_NUMBER => {
+                                    replace_string = format!("{}", &field_ref_value);
                                 },
                                 _ => {
                                     replace_string = field_ref_value.clone();
@@ -773,7 +819,8 @@ impl Formula{
     }
     pub fn execute(self, formula: &String) -> Result<String, PlanetError> {
         // First process the achiever functions, then rest
-        let expr = RE_ACHIEVER_FUNCTIONS_PARTS.clone();
+        let t_1 = Instant::now();
+        let expr = &RE_ACHIEVER_FUNCTIONS_PARTS;
         let formula_str = formula.as_str();
         let mut formula_string = formula.clone();
         let data_map = self.item_data.clone();
@@ -783,9 +830,12 @@ impl Formula{
         let max_counter = 20;
         let mut only_not_achive_functions;
         let mut function_text_list: Vec<String> = Vec::new();
+        // eprintln!("Formula.execute :: achiever functions?: {}", &has_matches);
+        eprintln!("Formula.execute :: perf : header: {} µs", &t_1.elapsed().as_micros());
+        let t_process_formula_1 = Instant::now();
         while has_matches == true {
             let tuple = self.process_formula_str(
-                expr.clone(), 
+                expr, 
                 formula_string.clone(), 
                 function_text_list.clone(), 
                 None,
@@ -807,13 +857,16 @@ impl Formula{
                 break
             }
         }
+        eprintln!("Formula.execute :: perf : process formula: {} µs", &t_process_formula_1.elapsed().as_micros());
+        let t_process_formula_2 = Instant::now();
         let formula_str_ = formula_string.as_str();
         // Check function again, for case of IF with non achieve functions inside like AND, OR, etc...
-        let expr = RE_ACHIEVER_FUNCTIONS.clone();
+        let expr = &RE_ACHIEVER_FUNCTIONS;
         let has_matches = expr.captures(&formula_str_).is_some();
+        // eprintln!("Formula.execute :: [2] achiever functions?: {}", &has_matches);
         if has_matches == true {
             let tuple = self.process_formula_str(
-                expr.clone(), 
+                expr, 
                 formula_string.clone(), 
                 function_text_list.clone(), 
                 None,
@@ -821,18 +874,31 @@ impl Formula{
             )?;
             formula_string = tuple.0;
         }
+        eprintln!("Formula.execute :: perf : process formula (2): {} µs", &t_process_formula_2.elapsed().as_micros());
         // This injects references without achiever functions
         if data_map.is_some() && table.is_some() {
+            let t_inyect_1 = Instant::now();
+            // eprintln!("Formula.execute :: formula before inyect: *{}*", &formula_string);
             let formula_wrap = self.inyect_data_formula(&formula_string);
+            // eprintln!("Formula.execute :: formula after inyect: *{:?}*", &formula_wrap);
+            eprintln!("Formula.execute :: perf : inyect formula: {} µs", &t_inyect_1.elapsed().as_micros());
             if formula_wrap.is_some() {
                 formula_string = formula_wrap.unwrap();
+                let t_string_1 = Instant::now();
+                formula_string = self.process_string_matches(&formula_string);
+                eprintln!("Formula.execute :: perf : string matches: {} µs", &t_string_1.elapsed().as_micros());
+                // eprintln!("Formula.execute :: formula_new: {}", &formula_string);
                 formula_string = format!("={}", &formula_string);
+                let t_exec_1 = Instant::now();
                 let formula_ = parse_formula::parse_string_to_formula(
                     &formula_string, 
                     None::<NoCustomFunction>
                 );
+                // eprintln!("Formula.execute :: formula_: {:?}", &formula_);
                 let result = calculate::calculate_formula(formula_, None::<NoReference>);
+                // eprintln!("Formula.execute :: calcuated formula_: {:?}", &result);
                 let result = calculate::result_to_string(result);
+                eprintln!("Formula.execute :: perf : exec: {} µs", &t_exec_1.elapsed().as_micros());
                 return Ok(result);
             } else {
                 return Err(

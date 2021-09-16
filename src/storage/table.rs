@@ -2,6 +2,7 @@ extern crate sled;
 extern crate slug;
 
 use std::str::FromStr;
+use std::time::Instant;
 use std::collections::HashMap;
 use colored::Colorize;
 use validator::{Validate, ValidationErrors};
@@ -17,8 +18,9 @@ use crate::planet::constants::*;
 use crate::storage::{generate_id};
 use crate::planet::{PlanetError, PlanetContext, Context};
 use crate::commands::table::config::DbTableConfig;
-use crate::storage::constants::CHILD_PRIVATE_KEY_ARRAY;
+use crate::storage::constants::*;
 use crate::storage::fields::*;
+use crate::functions::Formula;
 
 pub trait Schema<'gb> {
     fn defaults(planet_context: &'gb PlanetContext<'gb>, context: &'gb Context<'gb>) -> Result<DbTable<'gb>, PlanetError>;
@@ -36,6 +38,18 @@ pub trait Row<'gb> {
     ) -> Result<DbRow<'gb>, PlanetError>;
     fn insert(&self, table_name: &String, db_data: &DbData) -> Result<DbData, PlanetError>;
     fn get(&self, table_name: &String, by: GetItemOption, fields: Option<Vec<String>>) -> Result<DbData, PlanetError>;
+    fn select(&self, 
+        table_name: &String, 
+        r#where: Option<String>, 
+        page: Option<usize>,
+        number_items: Option<usize>,
+        fields: Option<Vec<String>>,
+    ) -> Result<SelectResult, PlanetError>;
+    fn count(&self, 
+        table_name: &String, 
+        r#where: Option<String>, 
+    ) -> Result<SelectResult, PlanetError>;
+    fn total_count(&self) -> Result<SelectResult, PlanetError>;
 }
 
 // lifetimes: gb (global, for contexts), db, bs
@@ -369,6 +383,24 @@ impl<'gb> DbTable<'gb> {
         }
         Ok(field_type_map)
     }
+    pub fn get_item_data_by_field_names(
+        item_data_id: Option<HashMap<String, String>>,
+        field_id_map: HashMap<String, String>
+    ) -> HashMap<String, String> {
+        let mut item_data: HashMap<String, String> = HashMap::new();
+        if item_data_id.is_some() {
+            let item_data_id = item_data_id.unwrap();
+            for field_id in item_data_id.keys() {
+                let has_name = field_id_map.get(field_id);                    
+                if has_name.is_some() {
+                    let field_name = has_name.unwrap().clone();
+                    let field_value = item_data_id.get(field_id).unwrap().clone();
+                    item_data.insert(field_name, field_value);
+                }
+            }    
+        }
+        return item_data
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -452,11 +484,9 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
     }
 
     fn insert(&self, table_name: &String, db_data: &DbData) -> Result<DbData, PlanetError> {
-        // eprintln!("insert :: row_data: {:#?}", db_data);
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let encrypted_data = db_data.encrypt(&shared_key).unwrap();
         let encoded: Vec<u8> = encrypted_data.serialize();
-        // eprintln!("insert :: data size: {}", encoded.len());
         let id = db_data.id.clone().unwrap();
         let id_db = xid::Id::from_str(id.as_str()).unwrap();
         let id_db = id_db.as_bytes();
@@ -464,8 +494,6 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
         match response {
             Ok(_) => {
                 // Get item
-                eprintln!("DbRow.insert :: id: {:?}", &id);
-                eprintln!("DbRow.insert :: Will get item...");
                 let item_ = self.get(&table_name, GetItemOption::ById(id), None);
                 match item_ {
                     Ok(_) => {
@@ -484,7 +512,12 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
     }
 
     // We can get items by id (not changing string), and name (we search for slugified name)
-    fn get(&self, table_name: &String, by: GetItemOption, fields: Option<Vec<String>>) -> Result<DbData, PlanetError> {
+    fn get(
+        &self, 
+        table_name: &String, 
+        by: GetItemOption, 
+        fields: Option<Vec<String>>
+    ) -> Result<DbData, PlanetError> {
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let item_db: Vec<u8>;
         match by {
@@ -567,12 +600,171 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
                             404, 
                             Some(tr!("Item does not exist"))
                         )
-                    );    
+                    );
                 }
                 return Ok(wrap_db_data.unwrap())
             }
         }
     }
+    fn count(&self, 
+        table_name: &String, 
+        r#where: Option<String>, 
+    ) -> Result<SelectResult, PlanetError> {
+        let mut result = self.select(
+            table_name,
+            r#where,
+            Some(1),
+            Some(1),
+            None
+        )?;
+        result.data = Vec::new();
+        result.data_count = 0;
+        return Ok(result)
+    }
+    fn total_count(&self) -> Result<SelectResult, PlanetError> {
+        let t_1 = Instant::now();
+        let iter = self.db.iter();
+        let mut count = 1;
+        for _result in iter {
+            count += 1;
+        }
+        let select_result = SelectResult{
+            total: count - 1,
+            time: t_1.elapsed().as_millis() as usize,
+            page: 0,
+            data: Vec::new(),
+            data_count: 0,
+        };
+        return Ok(select_result);
+    }
+    fn select(&self, 
+        table_name: &String, 
+        r#where: Option<String>, 
+        page: Option<usize>,
+        number_items_page: Option<usize>,
+        fields: Option<Vec<String>>,
+    ) -> Result<SelectResult, PlanetError> {
+        let t_1 = Instant::now();
+        let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
+        let iter = self.db.iter();
+        // let ctx_account_id = self.context.account_id.unwrap_or_default();
+        // let ctx_space_id = self.context.space_id.unwrap_or_default();
+        let db_table = self.db_table.clone();
+        let table = db_table.get_by_name(table_name)?.unwrap();
+        let fields_wrap = fields.clone();
+        let has_fields = fields_wrap.is_some();
+        let mut fields: Vec<String> = Vec::new();
+        if fields_wrap.is_some() {
+            fields = fields_wrap.unwrap();
+        }
+        
+        let t_total_1 = Instant::now();
+        let result_total_count = self.total_count()?;
+        let total = result_total_count.total;
+        eprintln!("DbRow.select :: get total: {}", &t_total_1.elapsed().as_micros());
+        
+        let mut items: Vec<DbData> = Vec::new();
+        let page = page.unwrap();
+        let number_items_page = number_items_page.unwrap();
+        let where_formula = r#where.clone();
+        let where_formula = where_formula.unwrap_or_default();
+        let where_formula_str = where_formula.as_str();
+        let mut count = 1;
+        let field_id_map= DbTable::get_field_id_map(
+            &self.db_table,
+            table_name
+        )?;
+        // Think way to return total
+        let mut select_result = SelectResult{
+            total: total,
+            time: 0,
+            page: page,
+            data: Vec::new(),
+            data_count: 0,
+        };
+        let t_header = &t_1.elapsed().as_micros();
+        eprintln!("DbRow.select :: t_header: {}", &t_header);
+        for result in iter {
+            let t_item_1 = Instant::now();
+            let tuple = result.unwrap();
+            let item_db = tuple.1.to_vec();
+            let item_ = EncryptedMessage::deserialize(item_db).unwrap();
+            let item_ = DbData::decrypt_owned(
+                &item_, 
+                &shared_key);
+            eprintln!("DbRow.select :: [{}] encrypt & deser: {} ", &count, &t_item_1.elapsed().as_micros());
+            let t_item_2 = Instant::now();
+            let item = item_.unwrap().clone();
+            let routing_response = item.clone().routing;
+            if routing_response.is_some() {
+                let routing = routing_response.unwrap();
+                let account_id = routing.get(ACCOUNT_ID).unwrap().as_str();
+                let space_id = routing.get(SPACE_ID).unwrap().as_str();
+                if account_id == "" && space_id == "" {
+                    continue
+                }
+            }
+
+            // Execute where as a formula if where is not empty
+            let mut formula_matches: bool = true;
+            let item_data_id = item.clone().data;
+            let item_data = DbTable::get_item_data_by_field_names(
+                item_data_id.clone(), field_id_map.clone()
+            );
+            eprintln!("DbRow.select :: [{}] Get field names for item: {}", &count, &t_item_2.elapsed().as_micros());
+            let t_item_3 = Instant::now();
+            if where_formula_str != "" {
+                // TODO: When I have Link, and Link (many) fields implemented, I would need to apply
+                //    formula filter to objects and collections of objects
+                let formula_obj = Formula::defaults(
+                    Some(item_data), 
+                    Some(table.clone()),
+                );
+                let mut formula = where_formula_str.to_string();
+                formula = formula_obj.execute(&formula)?;
+                if formula == String::from("TRUE") {
+                    formula_matches = true;
+                } else {
+                    formula_matches = false;
+                }
+            }
+            eprintln!("DbRow.select :: [{}] formula exec: {}", &count, &t_item_3.elapsed().as_micros());
+
+            let count_float: f64 = FromStr::from_str(count.to_string().as_str()).unwrap();
+            let number_items_page_float: f64 = FromStr::from_str(
+                number_items_page.to_string().as_str()).unwrap();
+            let page_target = (count_float / number_items_page_float).round() + 1.0;
+            let page_target = page_target as usize;
+            if page_target == page && formula_matches {
+                if &has_fields == &true {
+                    let item_new = self.filter_fields(&table_name, &fields, &item)?;
+                    items.push(item_new);
+                } else {
+                    items.push(item);
+                }
+            } else {
+                continue
+            }
+            // let number_items_page_ = number_items_page as usize;
+            count += 1;
+            let t_item = t_item_1.elapsed().as_micros();
+            eprintln!("DbRow.select :: item [{}] : {}", &count, &t_item);
+        }
+        select_result.data = items;
+        select_result.data_count = select_result.data.len();
+        select_result.time = t_1.elapsed().as_millis() as usize;
+        eprintln!("DbRow.select :: total db time: {}", &t_1.elapsed().as_micros());
+        return Ok(select_result);
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SelectResult {
+    total: usize,
+    time: usize,
+    page: usize,
+    data_count: usize,
+    data: Vec<DbData>,
 }
 
 impl<'gb> DbRow<'gb> {

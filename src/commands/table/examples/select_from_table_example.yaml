@@ -1,0 +1,8 @@
+---
+command: SELECT FROM TABLE "Super Table"
+where: "
+  AND(
+    {My Field} = \"pepito\", 
+    {Status}= \"c4vhm0gsmpv7omu4aqg0\"
+  )
+"
