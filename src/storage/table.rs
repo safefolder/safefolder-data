@@ -48,8 +48,8 @@ pub trait Row<'gb> {
     fn count(&self, 
         table_name: &String, 
         r#where: Option<String>, 
-    ) -> Result<SelectResult, PlanetError>;
-    fn total_count(&self) -> Result<SelectResult, PlanetError>;
+    ) -> Result<SelectCountResult, PlanetError>;
+    fn total_count(&self) -> Result<SelectCountResult, PlanetError>;
 }
 
 // lifetimes: gb (global, for contexts), db, bs
@@ -609,33 +609,34 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
     fn count(&self, 
         table_name: &String, 
         r#where: Option<String>, 
-    ) -> Result<SelectResult, PlanetError> {
-        let mut result = self.select(
+    ) -> Result<SelectCountResult, PlanetError> {
+        let select_result = self.select(
             table_name,
             r#where,
             Some(1),
             Some(1),
             None
         )?;
-        result.data = Vec::new();
-        result.data_count = 0;
+        let result = SelectCountResult{
+            time: select_result.time,
+            total: select_result.total,
+            data_count: select_result.data_count,
+        };
         return Ok(result)
     }
-    fn total_count(&self) -> Result<SelectResult, PlanetError> {
+    fn total_count(&self) -> Result<SelectCountResult, PlanetError> {
         let t_1 = Instant::now();
         let iter = self.db.iter();
         let mut count = 1;
         for _result in iter {
             count += 1;
         }
-        let select_result = SelectResult{
-            total: count - 1,
+        let result = SelectCountResult{
             time: t_1.elapsed().as_millis() as usize,
-            page: 0,
-            data: Vec::new(),
-            data_count: 0,
+            total: count - 1,
+            data_count: count - 1,
         };
-        return Ok(select_result);
+        return Ok(result);
     }
     fn select(&self, 
         table_name: &String, 
@@ -765,6 +766,13 @@ pub struct SelectResult {
     page: usize,
     data_count: usize,
     data: Vec<DbData>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SelectCountResult {
+    total: usize,
+    time: usize,
+    data_count: usize,
 }
 
 impl<'gb> DbRow<'gb> {
