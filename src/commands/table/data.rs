@@ -3,6 +3,7 @@ extern crate colored;
 extern crate slug;
 
 use std::collections::HashMap;
+use std::time::Instant;
 
 use tr::tr;
 use colored::*;
@@ -177,6 +178,7 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
     }
 
     fn runner(runner: &CommandRunner, path_yaml: &String) -> () {
+        let t_1 = Instant::now();
         let config_ = InsertIntoTableConfig::defaults(None);
         let config: Result<InsertIntoTableConfig, Vec<PlanetValidationError>> = config_.import(
             runner.planet_context,
@@ -200,6 +202,7 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                     Ok(_) => {
                         println!();
                         println!("{}", String::from("[OK]").green());
+                        eprint!("Time: {} ms", &t_1.elapsed().as_millis());
                     },
                     Err(error) => {
                         let count = 1;

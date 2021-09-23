@@ -25,3 +25,6 @@ pub const YAML_COLOR_YELLOW: [u8; 3] = [175, 193, 161];
 
 pub const SELECT_DEFAULT_PAGE: u32 = 1;
 pub const SELECT_DEFAULT_NUMBER_ITEMS: u32 = 20;
+
+pub const INDEX_PROFILE_IDX: &str = "idx";
+pub const INDEX_PROFILE_RAW: &str = "raw";

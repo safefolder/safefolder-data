@@ -4,9 +4,10 @@ use std::{collections::HashMap};
 use serde::{Deserialize, Serialize};
 use lazy_static::lazy_static;
 
-use crate::functions::FunctionAttribute;
+use crate::planet::PlanetError;
+
+use crate::functions::*;
 use crate::functions::constants::*;
-use crate::functions::Function;
 
 // 1. defaults receives the function test, that is FUNC_NAME(attr1, attr2, ...) and returns function instance
 //      attributes embeeded into the object attributes. It does not prepare for replacement or anythin.
@@ -31,6 +32,167 @@ lazy_static! {
     static ref RE_TRIM: Regex = Regex::new(r#"TRIM\([\s\n\t]{0,}((?P<text>"[\w\s]+")|(?P<text_ref>\{[\w\s]+\}))[\s\n\t]{0,}\)"#).unwrap();
 }
 
+// This goes towards so far formulas and queries
+// {My Field} = 67
+// AND, OR, NOT, XOR
+// Phase 1) is above. Phase 2) integrate all functions I have, which can be used.
+// Phase 3) is to have full text search functions, like MATCH, functions that deal with languages, stop words, 
+//       snowball analyzer, etc...
+// AND({My Field}="pepito", {Status}="c4vhm0gsmpv7omu4aqg0")
+// AND(
+//    OR({This Field}=78, {Other Field}="hola"),
+//    {This Way}=TRIM(" other ")
+// )
+
+// Cond.1: Functions can have simple values, or calls to other functions.
+// Cond.2: Formulas can use other formulas in ( ... formula ...)
+
+
+// Don't use library for calculations, I need something n my own based on the formula compilation
+// Check that would also apply for:
+// 3 + 4 + ROUNDDOWN(3.4)
+// Calculations and formulas can come in parenthesis like (3 + 4 + ROUNDDOWN(3.4)) inside a query, which needs
+//    to be compiled as another formula.
+
+// Check what is faste in comnpare, String or &str
+
+// data_map and other data should be outside the function itself, so I need struct
+
+pub fn concat(
+    data_map: &HashMap<String, String>, 
+    attributes: Vec<FunctionAttributeItem>
+) -> Result<String, PlanetError> {
+    let mut attributes_processed: Vec<String> = Vec::new();
+    for attribute_item in attributes {
+        let is_reference = attribute_item.is_reference;
+        let reference_value_wrap = attribute_item.reference_value;
+        let value = attribute_item.value.unwrap();
+        let mut attribute: String;
+        if is_reference == true {
+            // I can have reference and need to get data from the data_map_names, or reference already comes
+            // with value.
+            if reference_value_wrap.is_some() {
+                let reference_value = reference_value_wrap.unwrap();
+                attribute = reference_value;
+            } else {
+                attribute = value;
+            }
+            let function_attr = FunctionAttributeNew::defaults(
+                &attribute, Some(true)
+            );
+            attribute = function_attr.replace(data_map).item_processed.unwrap();
+        } else {
+            attribute = value;
+        }
+        attributes_processed.push(attribute);
+    }
+    let result = attributes_processed.join("");
+    return Ok(result)
+}
+
+pub fn check_string_equal(name: &String, value: &String) -> Result<bool, PlanetError> {
+    let check: bool;
+    if name.to_lowercase() == value.to_lowercase() {
+        check = true
+    } else {
+        check = false
+    }
+    return Ok(check)
+}
+
+pub fn check_str_equal(name: &str, value: &str) -> Result<bool, PlanetError> {
+    let check: bool;
+    if name.to_lowercase() == value.to_lowercase() {
+        check = true
+    } else {
+        check = false
+    }
+    return Ok(check)
+}
+
+
+
+
+// pub struct TextFunction {
+//     pub data_map_names: HashMap<String, String>,
+// }
+// impl TextFunction {
+//     pub fn defaults(data_map_names: HashMap<String, String>) -> TextFunction {
+//         let obj = Self{
+//             data_map_names: data_map_names,
+//         };
+//         return obj
+//     }
+//     pub fn concat(&self, attributes: Vec<FunctionAttributeItem>) -> Result<String, PlanetError> {
+//         // CONCAT(arg1, arg2, ...)
+//         // CONCAT("Hola, ", "como estas")
+
+//         // Full Text will also be done in SQL format with some Search functions like MATCH and others
+
+//         // 1. Formula Field: It would have and send data_map_names (My Column -> Value)
+//         // 2. SQL. In this case I have an execution plan outside the function that hits the db, the indices,
+//         //    etc... and would inyect into attributes the values itself with reference and value.
+    
+//         // These function will be able to be inyected in the SQL sent to SQL command SELECT FROM TABLE
+//         // SELECT * FROM "Table Name" WHERE "My Column" = CONCAT("Hola, ", "como estas")
+    
+//         // I need to go through raw index, and search for "Hola, como estas"
+//         // I can also use references, like CONCAT("Hola, ", {Name})
+//         // In this case, I would go to "My Column" index, not searching for any value, just the column, then get 
+//         // "Name" from doc
+    
+//         // Attribute structure
+//         // I need to know if it is a reference or not, so I process reference.
+    
+//         // This function returns the result, like
+//         // "Hola, como estas"
+    
+//         // ->
+//         // attributes: Vec<String>
+    
+//         // Attributes could be like
+//         // ["{My Column}", "-", "other"]
+    
+//         // Would replace {My Column} by the column value
+    
+//         // I need inject data, which save into attributes
+    
+//         // replace needs REGEX for attributes in the function text.
+//         // Uses FunctionAttribute to process the column references
+//         // Replaces function text in formula with replaced attributes. Returns formula received with those
+//         // substitutions
+
+//         let data_map_names = self.data_map_names.clone();
+        
+//         let mut attributes_processed: Vec<String> = Vec::new();
+//         for attribute_item in attributes {
+//             let is_reference = attribute_item.is_reference;
+//             let reference_value_wrap = attribute_item.reference_value;
+//             let value = attribute_item.value;
+//             let mut attribute: String;
+//             if is_reference == true {
+//                 // I can have reference and need to get data from the data_map_names, or reference already comes
+//                 // with value.
+//                 if reference_value_wrap.is_some() {
+//                     let reference_value = reference_value_wrap.unwrap();
+//                     attribute = reference_value;
+//                 } else {
+//                     attribute = value;
+//                 }
+//                 let function_attr = FunctionAttribute::defaults(
+//                     &attribute, Some(true)
+//                 );
+//                 attribute = function_attr.replace(data_map_names.clone()).item_processed.unwrap();
+//             } else {
+//                 attribute = value;
+//             }
+//             attributes_processed.push(attribute);
+//         }
+//         let result = attributes_processed.join("");
+//         return Ok(result)
+//     }
+// }
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ConcatenateFunction {
     pub function_text: String,
@@ -41,6 +203,9 @@ pub struct ConcatenateFunction {
 
 impl ConcatenateFunction{
     // CONCAT(arg1, arg2, ...)
+
+    // I need a structure so replace and do_replace have evrything they need.
+
     pub fn defaults(function_text: &String, data_map: Option<HashMap<String, String>>) -> ConcatenateFunction {
         let mut attributes: Vec<String> = Vec::new();
         for capture in RE_CONCAT_ATTRS.captures_iter(function_text) {
@@ -73,6 +238,7 @@ impl ConcatenateFunction{
     }
     pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
         let data_map = data_map.clone();
+        // I can't have this, since constructor executes REGEX, and I need this fast
         let mut concat_obj = ConcatenateFunction::defaults(
             &function_text,Some(data_map)
         );
@@ -120,6 +286,96 @@ impl Function for ConcatenateFunction {
         return formula
     }
 }
+
+// #[derive(Debug, Serialize, Deserialize, Clone)]
+// pub struct ConcatenateFunction {
+//     pub function_text: String,
+//     pub attributes: Vec<String>,
+//     pub attributes_value_map: Option<HashMap<String, String>>,
+//     pub data_map: Option<HashMap<String, String>>,
+// }
+
+// impl ConcatenateFunction{
+//     // CONCAT(arg1, arg2, ...)
+//     pub fn defaults(function_text: &String, data_map: Option<HashMap<String, String>>) -> ConcatenateFunction {
+//         let mut attributes: Vec<String> = Vec::new();
+//         for capture in RE_CONCAT_ATTRS.captures_iter(function_text) {
+//             let attribute = capture.get(0).unwrap().as_str().to_string();
+//             attributes.push(attribute);
+//         }
+//         let obj = Self{
+//             function_text: function_text.clone(),
+//             attributes: attributes,
+//             attributes_value_map: None,
+//             data_map: data_map,
+//         };
+//         return obj
+//     }
+//     pub fn do_validate(
+//         function_text: &String, 
+//         validate_tuple: (u32, Vec<String>)
+//     ) -> (u32, Vec<String>) {
+//         let concat_obj = ConcatenateFunction::defaults(
+//             &function_text, None
+//         );
+//         let (number_fails, mut failed_functions) = validate_tuple;
+//         let check = concat_obj.validate();
+//         let mut number_fails = number_fails.clone();
+//         if check == false {
+//             number_fails += 1;
+//             failed_functions.push(String::from(FUNCTION_CONCAT));
+//         }
+//         return (number_fails, failed_functions);
+//     }
+//     pub fn do_replace(function_text: &String, data_map: HashMap<String, String>, mut formula: String) -> String {
+//         let data_map = data_map.clone();
+//         let mut concat_obj = ConcatenateFunction::defaults(
+//             &function_text,Some(data_map)
+//         );
+//         formula = concat_obj.replace(formula);
+//         return formula
+//     }
+// }
+// impl Function for ConcatenateFunction {
+//     fn validate(&self) -> bool {
+//         let expr = RE_CONCAT_ATTRS.clone();
+//         let function_text = self.function_text.clone();
+//         let check = expr.is_match(&function_text);
+//         return check
+//     }
+//     fn replace(&mut self, formula: String) -> String {
+//         let data_map = self.data_map.clone().unwrap();
+//         let mut attributes_processed: Vec<String> = Vec::new();
+//         let function_text = self.function_text.clone();
+//         for capture in RE_CONCAT_ATTRS.captures_iter(&function_text) {
+//             let attribute = capture.get(0).unwrap().as_str().to_string();
+//             let function_attr = FunctionAttribute::defaults(&attribute, Some(true));
+//             let attribute_processed = function_attr.replace(data_map.clone()).item_processed.unwrap();
+//             attributes_processed.push(attribute_processed);
+//         };
+//         let attributes_process_ = attributes_processed.clone();
+//         let mut formula = formula.clone();
+//         let value = attributes_processed.join("");
+//         let value = value.as_str();
+//         formula = formula.replace(self.function_text.as_str(), value);
+//         // Update attribute_value_map
+//         let mut map: HashMap<String, String> = HashMap::new();
+//         let attributes = self.attributes.clone();
+//         for (i, attribute) in attributes.iter().enumerate() {
+//             let attribute = attribute.clone();
+//             let attribute_processed = &attributes_process_[i];
+//             map.insert(attribute, attribute_processed.clone());
+//         }
+//         self.attributes_value_map = Some(map);
+//         // formula LIB needs to parse and process this, so we need quotes, so handles like a string
+//         formula = format!("{}{}{}", 
+//             String::from("\""),
+//             formula,
+//             String::from("\""),
+//         );
+//         return formula
+//     }
+// }
 
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

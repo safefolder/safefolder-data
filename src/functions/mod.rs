@@ -30,6 +30,7 @@ lazy_static! {
     static ref RE_FORMULA_VALID: Regex = Regex::new(r#"(?im:\{[\w\s]+\})"#).unwrap();
     static ref RE_EMBED_FUNC: Regex = Regex::new(r#"\((?P<func_embed>[A-Z]+)"#).unwrap();
     static ref RE_STRING_MATCH: Regex = Regex::new(r#"(?P<string_match>"[\w\s]+"[\s\n\t]{0,}[=><][\s\n\t]{0,}"[\w\s]+")"#).unwrap();
+    static ref RE_FORMULA_QUERY: Regex = Regex::new(r#"(?P<assign>\{[\s\w]+\}[\s\t]{0,}(?P<log_op>=|>|<|>=|<=)[\s\t]{0,}.+)|(?P<op>AND|OR|NOT|XOR)\((?P<attrs>.+)\)"#).unwrap();
 }
 
 // achiever planet functions
@@ -545,6 +546,51 @@ impl FunctionAttribute {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FunctionAttributeNew{
+    pub item: String,
+    pub remove_quotes: Option<bool>,
+    pub item_processed: Option<String>,    
+}
+impl FunctionAttributeNew {
+    pub fn defaults(attribute: &String, remove_quotes: Option<bool>) -> FunctionAttributeNew {
+        let mut remove_quotes_value: bool = false;
+        if remove_quotes.is_some() {
+            remove_quotes_value = true;
+        }
+        let obj = Self{
+            item: attribute.clone(),
+            remove_quotes: Some(remove_quotes_value),
+            item_processed: None,
+        };
+        return obj
+    }
+    pub fn replace(&self, data_map: &HashMap<String, String>) -> Self {
+        let mut item = self.item.clone();
+        let remove_quotes = self.remove_quotes.unwrap();
+        if remove_quotes == true {
+            item = item.replace("\"", "");
+        }
+        let item_string: String;
+        let item_find = item.find("{");
+        let mut obj = self.clone();
+        if item_find.is_some() && item_find.unwrap() == 0 {
+            // I have a column, need to get data from data_map
+            item = item.replace("{", "").replace("}", "");
+            let item_value = data_map.get(&item);
+            if item_value.is_some() {
+                let item_value = item_value.unwrap().clone();
+                item_string = item_value;
+                obj.item_processed = Some(item_string);
+            }
+        } else {
+            item_string = item.to_string();
+            obj.item_processed = Some(item_string);
+        }
+        return obj;
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum FormulaProcessMode {
     Validate,
     Execute
@@ -920,4 +966,445 @@ impl Formula{
             return Ok(result);
         }        
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum AttributeType {
+    Text,
+    Number,
+    Bool,
+    Date,
+}
+
+// {Field} = "pepito"
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AttributeAssign(
+    pub String, 
+    pub FormulaOperator, 
+    pub String
+);
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FormulaQueryCompiled {
+    pub function: Option<CompiledFunction>,
+    pub assignment: Option<FunctionAttributeItem>,
+}
+impl FormulaQueryCompiled {
+    pub fn defaults(function: Option<CompiledFunction>, assignment: Option<FunctionAttributeItem>) -> Self {
+        let obj = Self{
+            function: function,
+            assignment: assignment,
+        };
+        return obj
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CompiledFunction {
+    pub name: String,
+    pub attributes: Option<Vec<FunctionAttributeItem>>,
+}
+impl CompiledFunction {
+    pub fn defaults(name: &String) -> Self {
+        let name = name.clone();
+        let obj = Self{
+            name: name,
+            attributes: None,
+        };
+        return obj;
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum FormulaOperator {
+    Eq,
+    Greater,
+    Smaller,
+    GreaterOrEqual,
+    SmallerOrEqual,
+}
+
+// attributes:
+// {Column}
+// "value" or value
+// (3 + 4)
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FunctionAttributeItem {
+    pub is_reference: bool,
+    pub reference_value: Option<String>,
+    pub assignment: Option<AttributeAssign>,
+    pub name: String,
+    pub value: Option<String>,
+    pub attr_type: AttributeType,
+    pub function: Option<CompiledFunction>,
+}
+impl FunctionAttributeItem {
+    pub fn defaults(name: &String, attr_type: AttributeType) -> Self {
+        let name = name.clone();
+        let attr_type = attr_type.clone();
+        let obj = Self{
+            is_reference: false,
+            reference_value: None,
+            assignment: None,
+            name: name,
+            value: None,
+            attr_type: attr_type,
+            function: None,
+        };
+        return obj
+    }
+}
+
+pub fn execute_formula_query(
+    formula: &FormulaQueryCompiled, 
+    data_map: &HashMap<String, String>
+) -> Result<bool, PlanetError> {
+    let mut check: bool = true;
+    // eprint!("execute_formula :: formula: {:#?}", formula);
+    let function = formula.function.clone();
+    if function.is_some() {
+        let function = function.unwrap();
+            let result = execute_function(&function, data_map)?;
+            if result.check.unwrap() == false {
+                check = false;
+            }
+    }
+    // Deal with everything but functions on the query formula
+    return Ok(check)
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FunctionResult {
+    pub text: Option<String>,
+    pub date: Option<String>,
+    pub check: Option<bool>,
+    pub number: Option<usize>,
+}
+
+pub fn execute_function(
+    function: &CompiledFunction, 
+    data_map: &HashMap<String, String>
+) -> Result<FunctionResult, PlanetError> {
+    // Here we match which function and we call function directly. We get result as a value and return
+    let function_name = function.name.clone();
+    let function_name = function_name.as_str();
+    let attributes = function.attributes.clone();
+    let attributes = attributes.unwrap();
+    // eprintln!("execute_function :: function_name: {} attributes: {:#?}", function_name, &attributes);
+    let mut function_result = FunctionResult{
+        text: None,
+        date: None,
+        check: None,
+        number: None,
+    };
+    // Here I map all the functions, ones used by formula queries and ones as formula field
+    match function_name {
+        "AND" => {
+            function_result.check = Some(and(data_map, &attributes)?);
+        },
+        _ => {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Function \"{}\" not supported", &function_name)),
+                )
+            );
+        }
+    }
+    return Ok(function_result)
+}
+
+
+pub fn compile_formula_query(
+    formula: &String, 
+    db_table: &DbTable,
+    table_name: &String,
+    table: &DbData,
+) -> Result<FormulaQueryCompiled, PlanetError> {
+    // eprintln!("compile_formula_query...");
+    let db_table = db_table.clone();
+    let expr = &RE_FORMULA_QUERY;
+    let formula_str = formula.as_str();
+    let formula_str = formula_str.replace("\n", "");
+    let expr_map = expr.captures(&formula_str);
+    let mut formula_compiled = FormulaQueryCompiled::defaults(
+        None, None
+    );
+    // let mut formula_function: CompiledFunction;
+    let field_name_map= DbTable::get_field_name_map(
+        &db_table,
+        table_name
+    )?;
+    let field_type_map = DbTable::get_field_type_map(table)?;
+    // "Status": "Select",
+    // My Field": "Small Text",
+    // If I could field name => field id, then could get id for the field names
+    // eprintln!("compile_formula_query :: field_name_map: {:#?}", &field_name_map);
+    // eprintln!("compile_formula_query :: field_type_map: {:#?}", &field_type_map);
+
+    if expr_map.is_some() {
+        let expr_map = expr_map.unwrap();
+        let has_assign = *&expr_map.name("assign").is_some();
+        // eprintln!("compile_formula_query :: has_assign: {}", &has_assign);
+        if has_assign {
+            let assign = *&expr_map.name("assign").unwrap().as_str();
+            let assign = assign.to_string();
+            // capture log_op which is =, <, >, etc...
+            // I need to process these possible cases:
+            // {My Column} = "pepito"
+            // {My Column} = 98.89
+            // {My Column} = TRIM(" pepito ")
+            // {My Column} > 98
+            let (items, attribute_operator) = parse_assign_operator(
+                &assign, &formula
+            )?;
+            let (reference_name, items_new) = get_assignment_reference(
+                &items, 
+                field_name_map
+            )?;
+            let field_type = field_type_map.get(&reference_name);
+            let mut attribute_type: AttributeType = AttributeType::Text;
+            if field_type.is_some() {
+                let field_type = field_type.unwrap();
+                attribute_type = get_attribute_type(field_type);
+            }
+            let mut function_attribute = FunctionAttributeItem::defaults(
+                &reference_name, 
+                attribute_type
+            );
+            function_attribute.is_reference = true;
+            function_attribute.assignment = Some(
+                AttributeAssign(
+                    items_new[0].clone(), 
+                    attribute_operator, 
+                    items_new[1].clone()
+                )
+            );
+            formula_compiled.assignment = Some(function_attribute);
+        } else {
+            let op = *&expr_map.name("op").unwrap().as_str();
+            // attrs: {My Field}   =   "pepito"  , {Status}  =   "c4vhm0gsmpv7omu4aqg0"  ,   {Mine}  =    98.3
+            let attributes_str = *&expr_map.name("attrs").unwrap().as_str();
+            let op_string = String::from(op);
+            // eprintln!("compile_formula_query :: op: {} attributes: {}", &op_string, &attributes_str);
+            let mut main_function: CompiledFunction = CompiledFunction::defaults(&op_string);
+            let mut main_function_attrs: Vec<FunctionAttributeItem> = Vec::new();
+            let attributes_source: Vec<&str> = attributes_str.split(",").collect();
+            // let mut item_replaced: String;
+            for attr_source in attributes_source {
+                //|  {Status}  =   "c4vhm0gsmpv7omu4aqg0"  |
+                // Operators can be "=", "<", ">", ">=", "<="
+                
+                // eprintln!("compile_formula_query :: attr_source: *{}*", attr_source);
+                let (items, attribute_operator) = parse_assign_operator(
+                    attr_source, &formula
+                )?;
+
+                // let log_op = fetch_logical_op(attr_source);
+                // let items: Vec<&str>;
+                // let attribute_operator: FormulaOperator;
+                // match log_op {
+                //     "=" => {
+                //         items = attr_source.split(log_op).collect();
+                //         attribute_operator = FormulaOperator::Eq;
+                //     },
+                //     "=>" => {
+                //         items = attr_source.split(log_op).collect();
+                //         attribute_operator = FormulaOperator::GreaterOrEqual;
+                //     },
+                //     "<=" => {
+                //         items = attr_source.split(log_op).collect();
+                //         attribute_operator = FormulaOperator::SmallerOrEqual;
+                //     },
+                //     ">" => {
+                //         items = attr_source.split(log_op).collect();
+                //         attribute_operator = FormulaOperator::Greater;
+                //     },
+                //     "<" => {
+                //         items = attr_source.split(log_op).collect();
+                //         attribute_operator = FormulaOperator::Smaller;
+                //     },
+                //     _ => {
+                //         return Err(
+                //             PlanetError::new(
+                //                 500, 
+                //                 Some(tr!("Could not validate formula. Formula: {}", &formula)),
+                //             )
+                //         );
+                //     }
+                // }
+                let (reference_name, items_new) = get_assignment_reference(
+                    &items, 
+                    field_name_map.clone()
+                )?;
+                // let mut items_new: Vec<String> = Vec::new();
+                // let mut reference_name: String = String::from("");
+                // for (count, item) in items.iter().enumerate() {
+                //     // |  {Status}  |
+                //     // eprintln!("compile_formula_query :: item: *{}*", item);
+                //     let mut item_ = *item;
+                //     item_ = item_.trim();
+                //     // eprintln!("compile_formula_query :: item_: *{}*", item_);
+                //     if count == 0 {
+                //         // {Column A} => $column_id
+                //         let mut item_string = item_.to_string();
+                //         item_string = item_string.replace("{", "}").replace("}", "");
+                //         reference_name = item_string.clone();
+                //         let column_id = &field_name_map.get(&item_string).unwrap();
+                //         let column_id = column_id.clone();
+                //         // eprintln!("compile_formula_query :: column_id: {}", column_id);
+                //         item_ = column_id;
+                //     }
+                //     item_replaced = item_.replace("\"", "");
+                //     items_new.push(item_replaced);
+                // }
+                // ["$id", "my value"]
+                // eprintln!("compile_formula_query :: reference_name: {}", &reference_name);
+                // eprintln!("compile_formula_query :: items_new: {:?}", &items_new);
+                let field_type = field_type_map.get(&reference_name);
+                let mut attribute_type: AttributeType = AttributeType::Text;
+                if field_type.is_some() {
+                    let field_type = field_type.unwrap();
+                    // eprintln!("compile_formula_query :: field_type: {}", &field_type);
+                    attribute_type = get_attribute_type(field_type);
+                    // eprintln!("compile_formula_query :: attribute_type: {:?}", &attribute_type);
+                }
+                let mut function_attribute = FunctionAttributeItem::defaults(
+                    &reference_name, 
+                    attribute_type
+                );
+                function_attribute.is_reference = true;
+                function_attribute.assignment = Some(
+                    AttributeAssign(
+                        items_new[0].clone(), 
+                        attribute_operator, 
+                        items_new[1].clone()
+                    )
+                );
+                // eprintln!("compile_formula_query :: function_attribute: {:#?}", &function_attribute);
+                main_function_attrs.push(function_attribute);
+            }
+            main_function.attributes = Some(main_function_attrs);
+            // formula_function = main_function;
+            formula_compiled.function = Some(main_function);
+        }
+        // eprintln!("compile_formula_query :: formula_compiled: {:#?}", &formula_compiled);
+        return Ok(formula_compiled)
+    } else {
+        return Err(
+            PlanetError::new(
+                500, 
+                Some(tr!("Could not validate formula. Formula: {}", &formula)),
+            )
+        );
+    }
+}
+
+pub fn fetch_logical_op(attribute: &str) -> &str {
+    let mut log_op: &str = "";
+    let has_equal = attribute.find("=").is_some();
+    let has_greater = attribute.find(">").is_some();
+    let has_smaller = attribute.find("<").is_some();
+    let has_equal_or_greater = attribute.find("=>").is_some();
+    let has_smaller_or_equal = attribute.find("<=").is_some();
+    if has_equal == true {
+        log_op = "=";
+    } else {
+        if has_greater == true && has_equal_or_greater == false {
+            log_op = ">";
+        } else if has_greater == true && has_equal_or_greater == true {
+            log_op = "=>";
+        } else if has_smaller == true && has_smaller_or_equal == false {
+            log_op = "<";
+        } else if has_smaller == true && has_smaller_or_equal == true {
+            log_op = "<=";
+        }
+    }
+    return log_op
+}
+
+pub fn get_attribute_type(field_type: &String) -> AttributeType {
+    let field_type = field_type.clone();
+    let field_type = field_type.as_str();
+    return match field_type {
+        "Small Text" => AttributeType::Text,
+        "select" => AttributeType::Text,
+        _ => AttributeType::Text,
+    }
+}
+
+pub fn get_assignment_reference(
+    items: &Vec<String>, 
+    field_name_map: HashMap<String, String>
+) -> Result<(String, Vec<String>), PlanetError> {
+    let mut reference_name: String = String::from("");
+    let mut items_new: Vec<String> = Vec::new();
+    let mut item_replaced: String;
+    for (count, item) in items.iter().enumerate() {
+        let mut item = item.clone();
+        // |  {Status}  |
+        eprintln!("compile_formula_query :: item: *{}*", item);
+        // let mut item_ = *item;
+        let item_ = item.trim();
+        item = item_.to_string();
+        eprintln!("compile_formula_query :: item: *{}*", item);
+        if count == 0 {
+            // {Column A} => $column_id
+            // let mut item_string = item_.to_string();
+            item = item.replace("{", "}").replace("}", "");
+            reference_name = item.clone();
+            let column_id = &field_name_map.get(&item).unwrap();
+            let column_id = column_id.clone();
+            // eprintln!("compile_formula_query :: column_id: {}", column_id);
+            item = column_id.clone();
+        }
+        item_replaced = item.replace("\"", "");
+        items_new.push(item_replaced);
+    }
+    return Ok((reference_name, items_new));
+}
+
+pub fn parse_assign_operator(
+    attr_source: &str, 
+    formula: &String
+) -> Result<(Vec<String>, FormulaOperator), PlanetError> {
+    let log_op = fetch_logical_op(attr_source);
+    let items: Vec<&str>;
+    let attribute_operator: FormulaOperator;
+    match log_op {
+        "=" => {
+            items = attr_source.split(log_op).collect();
+            attribute_operator = FormulaOperator::Eq;
+        },
+        "=>" => {
+            items = attr_source.split(log_op).collect();
+            attribute_operator = FormulaOperator::GreaterOrEqual;
+        },
+        "<=" => {
+            items = attr_source.split(log_op).collect();
+            attribute_operator = FormulaOperator::SmallerOrEqual;
+        },
+        ">" => {
+            items = attr_source.split(log_op).collect();
+            attribute_operator = FormulaOperator::Greater;
+        },
+        "<" => {
+            items = attr_source.split(log_op).collect();
+            attribute_operator = FormulaOperator::Smaller;
+        },
+        _ => {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Could not validate formula. Formula: {}", &formula)),
+                )
+            );
+        }
+    }
+    let mut items_string: Vec<String> = Vec::new();
+    for item_str in items {
+        let item_string: String = item_str.to_string();
+        items_string.push(item_string);
+    }    
+    return Ok((items_string, attribute_operator))
 }

@@ -20,7 +20,7 @@ use crate::planet::{PlanetError, PlanetContext, Context};
 use crate::commands::table::config::DbTableConfig;
 use crate::storage::constants::*;
 use crate::storage::fields::*;
-use crate::functions::Formula;
+use crate::functions::*;
 
 pub trait Schema<'gb> {
     fn defaults(planet_context: &'gb PlanetContext<'gb>, context: &'gb Context<'gb>) -> Result<DbTable<'gb>, PlanetError>;
@@ -364,6 +364,21 @@ impl<'gb> DbTable<'gb> {
         }
         Ok(field_id_map)
     }
+    pub fn get_field_name_map(
+        db_table: &DbTable,
+        table_name: &String
+    ) -> Result<HashMap<String, String>, PlanetError> {
+        let table = db_table.get_by_name(table_name).unwrap().unwrap();
+        let db_fields = table.data_objects.unwrap();
+        let mut field_id_map: HashMap<String, String> = HashMap::new();
+        for db_field in db_fields.keys() {
+            let field_config = db_fields.get(db_field).unwrap();
+            let field_id = field_config.get(ID).unwrap().clone();
+            let field_name = db_field.clone();
+            field_id_map.insert(field_name, field_id);
+        }
+        Ok(field_id_map)
+    }
     // Get field_name -> field_type map
     pub fn get_field_type_map(
         table: &DbData,
@@ -437,6 +452,8 @@ pub struct DbRow<'gb> {
     pub planet_context: &'gb PlanetContext<'gb>,
     pub db_table: &'gb DbTable<'gb>,
     db: sled::Db,
+    raw_index: sled::Tree,
+    idx_index: sled::Tree,
 }
 
 impl<'gb> Row<'gb> for DbRow<'gb> {
@@ -465,13 +482,27 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
         match result {
             Ok(_) => {
                 let db = result.unwrap();
-                let db_row: DbRow = DbRow{
-                    context: context,
-                    planet_context: planet_context,
-                    db: db,
-                    db_table: db_table,
-                };
-                Ok(db_row)
+                let raw_index = db.open_tree(INDEX_PROFILE_RAW);
+                let idx_index = db.open_tree(INDEX_PROFILE_IDX);
+                if raw_index.is_ok() && idx_index.is_ok() {
+                    let raw_index = raw_index.unwrap();
+                    let idx_index = idx_index.unwrap();
+                    let db_row: DbRow = DbRow{
+                        context: context,
+                        planet_context: planet_context,
+                        db: db,
+                        db_table: db_table,
+                        raw_index: raw_index,
+                        idx_index: idx_index,
+                    };
+                    Ok(db_row)
+                } else {
+                    let planet_error = PlanetError::new(
+                        500, 
+                        Some(tr!("Could not open index trees")),
+                    );
+                    Err(planet_error)
+                }
             },
             Err(_) => {
                 let planet_error = PlanetError::new(
@@ -490,6 +521,8 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
         let id = db_data.id.clone().unwrap();
         let id_db = xid::Id::from_str(id.as_str()).unwrap();
         let id_db = id_db.as_bytes();
+        // TODO: The call already provides the data inserted, check response so I don't need self.get since
+        //       I already have the data.
         let response = &self.db.insert(id_db, encoded);
         match response {
             Ok(_) => {
@@ -626,15 +659,11 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
     }
     fn total_count(&self) -> Result<SelectCountResult, PlanetError> {
         let t_1 = Instant::now();
-        let iter = self.db.iter();
-        let mut count = 1;
-        for _result in iter {
-            count += 1;
-        }
+        let total = self.db.len();
         let result = SelectCountResult{
             time: t_1.elapsed().as_millis() as usize,
-            total: count - 1,
-            data_count: count - 1,
+            total: total,
+            data_count: total,
         };
         return Ok(result);
     }
@@ -652,6 +681,7 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
         // let ctx_space_id = self.context.space_id.unwrap_or_default();
         let db_table = self.db_table.clone();
         let table = db_table.get_by_name(table_name)?.unwrap();
+        // eprintln!("DbRow.select :: table: {:#?}", &table);
         let fields_wrap = fields.clone();
         let has_fields = fields_wrap.is_some();
         let mut fields: Vec<String> = Vec::new();
@@ -662,19 +692,19 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
         let t_total_1 = Instant::now();
         let result_total_count = self.total_count()?;
         let total = result_total_count.total;
-        eprintln!("DbRow.select :: get total: {}", &t_total_1.elapsed().as_micros());
+        eprintln!("DbRow.select :: get total: {} µs", &t_total_1.elapsed().as_micros());
         
         let mut items: Vec<DbData> = Vec::new();
         let page = page.unwrap();
         let number_items_page = number_items_page.unwrap();
         let where_formula = r#where.clone();
         let where_formula = where_formula.unwrap_or_default();
-        let where_formula_str = where_formula.as_str();
+        // let where_formula_str = where_formula.as_str();
         let mut count = 1;
-        let field_id_map= DbTable::get_field_id_map(
-            &self.db_table,
-            table_name
-        )?;
+        // let field_id_map= DbTable::get_field_id_map(
+        //     &self.db_table,
+        //     table_name
+        // )?;
         // Think way to return total
         let mut select_result = SelectResult{
             total: total,
@@ -684,7 +714,18 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
             data_count: 0,
         };
         let t_header = &t_1.elapsed().as_micros();
-        eprintln!("DbRow.select :: t_header: {}", &t_header);
+        eprintln!("DbRow.select :: t_header: {} µs", &t_header);
+
+        let t_f_1 = Instant::now();
+        let formula_query = compile_formula_query(
+            &where_formula, 
+            &db_table, 
+            table_name, 
+            &table
+        )?;
+        let t_f_2 = &t_f_1.elapsed().as_micros();
+        eprintln!("select :: Time compile formula: {} µs", &t_f_2);
+
         for result in iter {
             let t_item_1 = Instant::now();
             let tuple = result.unwrap();
@@ -693,8 +734,8 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
             let item_ = DbData::decrypt_owned(
                 &item_, 
                 &shared_key);
-            eprintln!("DbRow.select :: [{}] encrypt & deser: {} ", &count, &t_item_1.elapsed().as_micros());
-            let t_item_2 = Instant::now();
+            eprintln!("DbRow.select :: [{}] encrypt & deser: {} µs", &count, &t_item_1.elapsed().as_micros());
+            // let t_item_2 = Instant::now();
             let item = item_.unwrap().clone();
             let routing_response = item.clone().routing;
             if routing_response.is_some() {
@@ -707,29 +748,39 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
             }
 
             // Execute where as a formula if where is not empty
-            let mut formula_matches: bool = true;
-            let item_data_id = item.clone().data;
-            let item_data = DbTable::get_item_data_by_field_names(
-                item_data_id.clone(), field_id_map.clone()
-            );
-            eprintln!("DbRow.select :: [{}] Get field names for item: {}", &count, &t_item_2.elapsed().as_micros());
+            // let mut formula_matches: bool = true;
+            // let item_data_id = item.clone().data;
+            // let item_data = DbTable::get_item_data_by_field_names(
+            //     item_data_id.clone(), field_id_map.clone()
+            // );
+            // eprintln!("DbRow.select :: [{}] Get field names for item: {}", &count, &t_item_2.elapsed().as_micros());
+            // let t_item_3 = Instant::now();
+            // if where_formula_str != "" {
+            //     // TODO: When I have Link, and Link (many) fields implemented, I would need to apply
+            //     //    formula filter to objects and collections of objects
+            //     let formula_obj = Formula::defaults(
+            //         Some(item_data), 
+            //         Some(table.clone()),
+            //     );
+            //     let mut formula = where_formula_str.to_string();
+            //     formula = formula_obj.execute(&formula)?;
+            //     if formula == String::from("TRUE") {
+            //         formula_matches = true;
+            //     } else {
+            //         formula_matches = false;
+            //     }
+            // }
+            // eprintln!("DbRow.select :: [{}] formula exec: {}", &count, &t_item_3.elapsed().as_micros());
+
+            // Debug compile formula
+            // let mine = compile_formula_query(&where_formula, &db_table, table_name);
+
+            let formula_matches: bool;
             let t_item_3 = Instant::now();
-            if where_formula_str != "" {
-                // TODO: When I have Link, and Link (many) fields implemented, I would need to apply
-                //    formula filter to objects and collections of objects
-                let formula_obj = Formula::defaults(
-                    Some(item_data), 
-                    Some(table.clone()),
-                );
-                let mut formula = where_formula_str.to_string();
-                formula = formula_obj.execute(&formula)?;
-                if formula == String::from("TRUE") {
-                    formula_matches = true;
-                } else {
-                    formula_matches = false;
-                }
-            }
-            eprintln!("DbRow.select :: [{}] formula exec: {}", &count, &t_item_3.elapsed().as_micros());
+            let data_map = item.clone().data.unwrap();
+            formula_matches = execute_formula_query(&formula_query, &data_map)?;
+            eprintln!("select :: formula_matches: {}", &formula_matches);
+            eprintln!("DbRow.select :: [{}] formula exec: {} µs", &count, &t_item_3.elapsed().as_micros());
 
             let count_float: f64 = FromStr::from_str(count.to_string().as_str()).unwrap();
             let number_items_page_float: f64 = FromStr::from_str(
@@ -749,12 +800,12 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
             // let number_items_page_ = number_items_page as usize;
             count += 1;
             let t_item = t_item_1.elapsed().as_micros();
-            eprintln!("DbRow.select :: item [{}] : {}", &count, &t_item);
+            eprintln!("DbRow.select :: item [{}] : {} µs", &count-1, &t_item);
         }
         select_result.data = items;
         select_result.data_count = select_result.data.len();
         select_result.time = t_1.elapsed().as_millis() as usize;
-        eprintln!("DbRow.select :: total db time: {}", &t_1.elapsed().as_micros());
+        eprintln!("DbRow.select :: total db time: {} µs", &t_1.elapsed().as_micros());
         return Ok(select_result);
     }
 }
@@ -835,7 +886,6 @@ impl<'gb> DbRow<'gb> {
         }
         return Ok(item);
     }
-
 }
 
 pub struct DbQuery {

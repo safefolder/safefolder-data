@@ -6,7 +6,7 @@ use std::{collections::HashMap};
 use crate::functions::constants::*;
 use crate::functions::Formula;
 use crate::storage::table::DbData;
-use crate::functions::Function;
+use crate::functions::*;
 
 lazy_static! {
     static ref RE_IF: Regex = Regex::new(r#"IF\([\n\s\t]{0,}(?P<condition>\{[\w\s]+\}[\s]{0,}(=|<|>|<=|>=)[\s]{0,}((\d+)|("[\w\s]+"))),[\s\n\t]{0,}(?P<expr_true>(\d+)|("[\w\s]+")),[\s\n\t]{0,}(?P<expr_false>(\d+)|("[\w\s]+"))[\s\n\t]{0,}\)|IF\([\s\n\t]{0,}(?P<log_condition>(AND\([\s\n\t]{0,}[\w\W\s\n\t]{1,}[\s\n\t]{0,}\)|OR\([\s\n\t]{0,}[\w\W\s\n\t]{1,}[\s\n\t]{0,}\)|NOT\([\s\n\t]{0,}[\w\W\s\n\t]{1,}[\s\n\t]{0,}\)|XOR\([\s\n\t]{0,}[\w\W\s\n\t]{1,}[\s\n\t]{0,}\))),[\s\n\t]{0,}(?P<log_expr_true>(\d+)|("[\w\s]+")),[\s\n\t]{0,}(?P<log_expr_false>(\d+)|("[\w\s]+"))[\s\n\t]{0,}\)"#).unwrap();
@@ -153,4 +153,112 @@ impl Function for IfFunction {
         formula = format!("\"{}\"", formula);
         return formula;
     }
+}
+
+pub fn and(
+    data_map: &HashMap<String, String>, 
+    attributes: &Vec<FunctionAttributeItem>
+) -> Result<bool, PlanetError> {
+    // We receive assignments, like
+    // AND({Column}=23, {Column2}="pepito", {ColumnC}>6)
+    // We receive attributes, since some attributes might not be assignments, text assign.
+    // AND("3"="3")
+    // AND({Column} = TRIM(" 234 "))
+    // So I can have functions as well
+    // So far simple version
+
+    // 1. I first do this one with all execution fn's
+    // AND({My Field}="pepito", {Status}="c4vhm0gsmpv7omu4aqg0")
+    // tuple = ("MyField", enum::Eq, "pepito")
+    // tuple = {name} {op} {value}
+
+    // 2.
+    // AND(
+    //    OR({This Field}=78, {Other Field}="hola"),
+    //    {This Way}=TRIM(" other ")
+    // )
+    let mut check_all = true;
+    for attribute in attributes {
+        let assignment = attribute.assignment.clone();
+        let attr_type = attribute.attr_type.clone();
+        match attr_type {
+            AttributeType::Text => {
+                if assignment.is_some() {
+                    let assignment = assignment.unwrap();
+                    // pub struct AttributeAssign(String, FormulaOperator, String);
+                    let reference_id = assignment.0;
+                    let name = data_map.get(&reference_id);
+                    if name.is_some() {
+                        let name = name.unwrap();
+                        let op = assignment.1;
+                        let value = assignment.2;
+                        let check: bool;
+                        match op {
+                            FormulaOperator::Eq => {
+                                // name is the data id
+                                // I need to check name == value through function
+                                check = check_string_equal(name, &value)?;
+                                if check == false {
+                                    check_all = false;
+                                }
+                            },
+                            _ => {
+                            }
+                        }    
+                    } else {
+                        check_all = false;
+                    }
+                }        
+            },
+            _ => {
+            }
+        }
+    }
+    return Ok(check_all)
+}
+
+pub fn simple_assign(
+    data_map: &HashMap<String, String>, 
+    attribute: &FunctionAttributeItem
+) -> Result<bool, PlanetError> {
+    // {My Column} = "pepito"
+    // {My Column} = 98.89
+    // {My Column} = TRIM(" pepito ")
+    // {My Column} > 98
+    let mut check_all = true;
+    let assignment = attribute.assignment.clone();
+    let attr_type = attribute.attr_type.clone();
+    match attr_type {
+        AttributeType::Text => {
+            if assignment.is_some() {
+                let assignment = assignment.unwrap();
+                // pub struct AttributeAssign(String, FormulaOperator, String);
+                let reference_id = assignment.0;
+                let name = data_map.get(&reference_id);
+                if name.is_some() {
+                    let name = name.unwrap();
+                    let op = assignment.1;
+                    let value = assignment.2;
+                    let check: bool;
+                    match op {
+                        FormulaOperator::Eq => {
+                            // name is the data id
+                            // I need to check name == value through function
+                            check = check_string_equal(name, &value)?;
+                            if check == false {
+                                check_all = false;
+                            }
+                        },
+                        _ => {
+                        }
+                    }    
+                } else {
+                    check_all = false;
+                }
+            }        
+        },
+        _ => {
+        }
+    }
+    return Ok(check_all)
 }
