@@ -6,6 +6,7 @@ pub mod number;
 pub mod collections;
 
 use std::time::Instant;
+use std::str::FromStr;
 use std::collections::HashMap;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -1061,15 +1062,25 @@ pub fn execute_formula_query(
 ) -> Result<bool, PlanetError> {
     let mut check: bool = true;
     // eprint!("execute_formula :: formula: {:#?}", formula);
+    // In case we have function, like AND, OR, NOT, XOR and other references and functions inside
     let function = formula.function.clone();
     if function.is_some() {
         let function = function.unwrap();
-            let result = execute_function(&function, data_map)?;
-            if result.check.unwrap() == false {
-                check = false;
-            }
+        let result = execute_function(&function, data_map)?;
+        if result.check.unwrap() == false {
+            check = false;
+        }
     }
-    // Deal with everything but functions on the query formula
+    // In case we have 1 direct assignment, like {Column A} = "mine" or {Column B} > 67.8
+    let assignment = formula.assignment.clone();
+    if assignment.is_some() {
+        let assignment = assignment.unwrap();
+        let is_reference = assignment.is_reference;
+        if is_reference == true {
+            let attr_assignment = assignment.assignment.unwrap();
+            check = check_assignment(attr_assignment, assignment.attr_type, data_map)?;
+        }
+    }
     return Ok(check)
 }
 
@@ -1101,6 +1112,15 @@ pub fn execute_function(
     match function_name {
         "AND" => {
             function_result.check = Some(and(data_map, &attributes)?);
+        },
+        "OR" => {
+            function_result.check = Some(or(data_map, &attributes)?);
+        },
+        "NOT" => {
+            function_result.check = Some(not(data_map, &attributes)?);
+        },
+        "XOR" => {
+            function_result.check = Some(xor(data_map, &attributes)?);
         },
         _ => {
             return Err(
@@ -1200,64 +1220,10 @@ pub fn compile_formula_query(
                     attr_source, &formula
                 )?;
 
-                // let log_op = fetch_logical_op(attr_source);
-                // let items: Vec<&str>;
-                // let attribute_operator: FormulaOperator;
-                // match log_op {
-                //     "=" => {
-                //         items = attr_source.split(log_op).collect();
-                //         attribute_operator = FormulaOperator::Eq;
-                //     },
-                //     "=>" => {
-                //         items = attr_source.split(log_op).collect();
-                //         attribute_operator = FormulaOperator::GreaterOrEqual;
-                //     },
-                //     "<=" => {
-                //         items = attr_source.split(log_op).collect();
-                //         attribute_operator = FormulaOperator::SmallerOrEqual;
-                //     },
-                //     ">" => {
-                //         items = attr_source.split(log_op).collect();
-                //         attribute_operator = FormulaOperator::Greater;
-                //     },
-                //     "<" => {
-                //         items = attr_source.split(log_op).collect();
-                //         attribute_operator = FormulaOperator::Smaller;
-                //     },
-                //     _ => {
-                //         return Err(
-                //             PlanetError::new(
-                //                 500, 
-                //                 Some(tr!("Could not validate formula. Formula: {}", &formula)),
-                //             )
-                //         );
-                //     }
-                // }
                 let (reference_name, items_new) = get_assignment_reference(
                     &items, 
                     field_name_map.clone()
                 )?;
-                // let mut items_new: Vec<String> = Vec::new();
-                // let mut reference_name: String = String::from("");
-                // for (count, item) in items.iter().enumerate() {
-                //     // |  {Status}  |
-                //     // eprintln!("compile_formula_query :: item: *{}*", item);
-                //     let mut item_ = *item;
-                //     item_ = item_.trim();
-                //     // eprintln!("compile_formula_query :: item_: *{}*", item_);
-                //     if count == 0 {
-                //         // {Column A} => $column_id
-                //         let mut item_string = item_.to_string();
-                //         item_string = item_string.replace("{", "}").replace("}", "");
-                //         reference_name = item_string.clone();
-                //         let column_id = &field_name_map.get(&item_string).unwrap();
-                //         let column_id = column_id.clone();
-                //         // eprintln!("compile_formula_query :: column_id: {}", column_id);
-                //         item_ = column_id;
-                //     }
-                //     item_replaced = item_.replace("\"", "");
-                //     items_new.push(item_replaced);
-                // }
                 // ["$id", "my value"]
                 // eprintln!("compile_formula_query :: reference_name: {}", &reference_name);
                 // eprintln!("compile_formula_query :: items_new: {:?}", &items_new);
@@ -1407,4 +1373,54 @@ pub fn parse_assign_operator(
         items_string.push(item_string);
     }    
     return Ok((items_string, attribute_operator))
+}
+
+pub fn check_assignment(
+    attr_assignment: AttributeAssign,
+    attr_type: AttributeType,
+    data_map: &HashMap<String, String>,
+) -> Result<bool, PlanetError> {
+    let column_id = attr_assignment.0;
+    let column_id = column_id.as_str();
+    let db_value = data_map.get(column_id).unwrap();
+    let op = attr_assignment.1;
+    let mut value = attr_assignment.2;
+    let check: bool;
+    // We have case when we try to compare dates, but is not supported, functions would need to be used.
+    // Greater and smaller is used for numbers
+    // TODO: Match for bool {Column} = true. How???? TRUE() right?
+    match attr_type {
+        AttributeType::Text | AttributeType::Date => {
+            match op {
+                FormulaOperator::Eq => {
+                    value = value.replace("\"", "");
+                    check = check_string_equal(&db_value, &value)?;
+                },
+                _ => {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!("Assignment for string only support equal operator.")),
+                        )
+                    );
+                },
+            }    
+        },
+        AttributeType::Number => {
+            let value = value.as_str();
+            let value: f64 = FromStr::from_str(value).unwrap();
+            let db_value: f64 = FromStr::from_str(db_value).unwrap();
+            check = check_float_compare(&value, &db_value, op)?;
+        },
+        _ => {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Assignment type not supported. We only support 
+                    Text, Number, Bool and Date")),
+                )
+            );
+        }
+    }
+    return Ok(check)
 }

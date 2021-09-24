@@ -723,6 +723,7 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
             table_name, 
             &table
         )?;
+        eprintln!("DbRow.select :: original formula_query: {:#?}", &formula_query);
         let t_f_2 = &t_f_1.elapsed().as_micros();
         eprintln!("select :: Time compile formula: {} µs", &t_f_2);
 
@@ -778,6 +779,7 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
             let formula_matches: bool;
             let t_item_3 = Instant::now();
             let data_map = item.clone().data.unwrap();
+
             formula_matches = execute_formula_query(&formula_query, &data_map)?;
             eprintln!("select :: formula_matches: {}", &formula_matches);
             eprintln!("DbRow.select :: [{}] formula exec: {} µs", &count, &t_item_3.elapsed().as_micros());

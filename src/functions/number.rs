@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use lazy_static::lazy_static;
 use math::round;
 
-use crate::functions::FunctionAttribute;
+use crate::functions::*;
 use crate::functions::constants::*;
 use crate::functions::Function;
 
@@ -1792,4 +1792,40 @@ impl Function for BooleanFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         return formula;
     }
+}
+
+pub fn check_float_compare(value: &f64, compare_to: &f64, op: FormulaOperator) -> Result<bool, PlanetError> {
+    let mut check: bool = false;
+    match op {
+        FormulaOperator::Greater => {
+            if value > compare_to {
+                check = true;
+            }
+        },
+        FormulaOperator::Smaller => {
+            if value < compare_to {
+                check = true;
+            }
+        },
+        FormulaOperator::GreaterOrEqual => {
+            if value >= compare_to {
+                check = true;
+            }
+        },
+        FormulaOperator::SmallerOrEqual => {
+            if value <= compare_to {
+                check = true;
+            }
+        },
+        _ => {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Operator not supported")),
+                )
+            );
+
+        }
+    }
+    return Ok(check)
 }
