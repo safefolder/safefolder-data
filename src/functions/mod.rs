@@ -5,7 +5,7 @@ pub mod structure;
 pub mod number;
 pub mod collections;
 
-use std::time::Instant;
+// use std::time::Instant;
 use std::str::FromStr;
 use std::collections::HashMap;
 use lazy_static::lazy_static;
@@ -32,6 +32,8 @@ lazy_static! {
     static ref RE_EMBED_FUNC: Regex = Regex::new(r#"\((?P<func_embed>[A-Z]+)"#).unwrap();
     static ref RE_STRING_MATCH: Regex = Regex::new(r#"(?P<string_match>"[\w\s]+"[\s\n\t]{0,}[=><][\s\n\t]{0,}"[\w\s]+")"#).unwrap();
     static ref RE_FORMULA_QUERY: Regex = Regex::new(r#"(?P<assign>\{[\s\w]+\}[\s\t]{0,}(?P<log_op>=|>|<|>=|<=)[\s\t]{0,}.+)|(?P<op>AND|OR|NOT|XOR)\((?P<attrs>.+)\)"#).unwrap();
+    static ref RE_FORMULA_FIELD_FUNCTIONS: Regex = Regex::new(r#"(?P<func>[A-Z]+[("\d)\w,.\s{}-]+)"#).unwrap();
+    static ref RE_FUNCTION_ATTRS: Regex = Regex::new(r#"("[\w\s-]+")|(\{[\w\s]+\})|([A-Z]+\(["\w\s]+\))|([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)"#).unwrap();
 }
 
 // achiever planet functions
@@ -112,7 +114,7 @@ impl FunctionsHanler{
         } else {
             data_map = data_map_wrap.unwrap();
         }
-        eprintln!("FunctionsHandler.do_functions :: data_map: {:#?}", &data_map);
+        // eprintln!("FunctionsHandler.do_functions :: data_map: {:#?}", &data_map);
         match function_name {
             FUNCTION_CONCAT => {
                 formula = ConcatenateFunction::do_replace(
@@ -308,177 +310,218 @@ impl FunctionsHanler{
     }
 }
 
-pub fn validate_formula(formula: &String, formula_format: &String) -> Result<bool, PlanetError> {
+pub fn validate_formula(
+    formula: &String,
+    formula_format: &String,
+) -> Result<bool, PlanetError> {
     let check = true;
-    let formula_obj = Formula::defaults(None, None);
-    let function_text_list = formula_obj.validate(&formula, &formula_format)?;
+    // let formula_obj = Formula::defaults(None, None);
+    // let function_text_list = formula_obj.validate(&formula, &formula_format)?;
+
+    // 1. Get all functions in the formula
+    // (23 + EXP(32) + EXP({Column A}) + ABS(EXP(98))) / 2
+    // => 
+    // (23 + $func1 + $func2 + $func3) / 2
+
+    // I user CompiledFormulaField with functions and formula itself
+    // This would give me a compiled version of any formula field which is fast to process
+    // Then I need to validate specific each function. For this to work, 
+    // I need a function or mode to return all functions inside function, so I have 
+
+    // ABS(EXP(98))
+    // ABS function should validate ABS and EXP, right? Since it is what it is being sent.
+
+    // What we do right now, is validate EXP(98), then ABS({value from EXP(98)})
+    // I can have get_all_functions in a FormulaFieldCompiled
+    // It will give me all the functions inside functions, having the function_text, which 
+    // I can send to the regex bellow. I don't need to execute, only to validate.
+
+    // let expr = &RE_FORMULA_FIELD_FUNCTIONS;
+    // let functions = expr.captures_iter(formula);
+    // let mut count = 1;
+    // for function in functions {
+    //     let function_holder = format!("$func{}", &count);
+    //     eprintln!("validate_formula :: function_holder: {}", &function_holder);
+    //     count += 1;
+    // }
+
+    // compile formula field
+    // It will compile formula and validate all functions referenced in the formula. Will raise error
+    // in case of validation problem.
+    FormulaFieldCompiled::defaults(
+        formula, 
+        formula_format,
+    )?;
 
     // Validate all formula_functions (only ones found in formula from all functions in achiever)
-    let mut number_fails: u32 = 0;
-    let mut failed_functions: Vec<String> = Vec::new();
-    let mut validate_tuple = (number_fails, failed_functions);
-    for function_text in &function_text_list {
-        let parts: Vec<&str> = function_text.split("(").collect();
-        let function_name = parts[0];
-        match function_name {
-            FUNCTION_CONCAT => {
-                validate_tuple = ConcatenateFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_FORMAT => {
-                validate_tuple = FormatFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_JOINLIST => {
-                validate_tuple = JoinListFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_LENGTH => {
-                validate_tuple = LengthFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_LOWER => {
-                validate_tuple = LowerFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_UPPER => {
-                validate_tuple = UpperFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_REPLACE => {
-                validate_tuple = ReplaceFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_MID => {
-                validate_tuple = MidFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_REPT => {
-                validate_tuple = ReptFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_SUBSTITUTE => {
-                validate_tuple = SubstituteFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_TRIM => {
-                validate_tuple = TrimFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_CEILING => {
-                validate_tuple = CeilingFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_FLOOR => {
-                validate_tuple = FloorFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_COUNT => {
-                validate_tuple = CountFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_COUNTA => {
-                validate_tuple = CountAFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_COUNTALL => {
-                validate_tuple = CountAllFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_EVEN => {
-                validate_tuple = EvenFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_EXP => {
-                validate_tuple = ExpFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_INT => {
-                validate_tuple = IntFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_LOG => {
-                validate_tuple = LogFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_MOD => {
-                validate_tuple = ModFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_POWER => {
-                validate_tuple = PowerFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_ROUND => {
-                validate_tuple = RoundFunction::do_validate(function_text, validate_tuple, RoundOption::Basic);
-            },
-            FUNCTION_ROUNDUP => {
-                validate_tuple = RoundFunction::do_validate(function_text, validate_tuple, RoundOption::Up);
-            },
-            FUNCTION_ROUNDDOWN => {
-                validate_tuple = RoundFunction::do_validate(function_text, validate_tuple, RoundOption::Down);
-            },
-            FUNCTION_SQRT => {
-                validate_tuple = SqrtFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_VALUE => {
-                validate_tuple = ValueFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_TRUE => {
-                validate_tuple = BooleanFunction::do_validate(function_text, validate_tuple, BooleanOption::True);
-            },
-            FUNCTION_FALSE => {
-                validate_tuple = BooleanFunction::do_validate(function_text, validate_tuple, BooleanOption::True);
-            },
-            FUNCTION_DATE => {
-                validate_tuple = DateFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_SECOND => {
-                validate_tuple = DateTimeParseFunction::do_validate(function_text, 
-                    DateTimeParseOption::Second, validate_tuple);
-            },
-            FUNCTION_MINUTE => {
-                validate_tuple = DateTimeParseFunction::do_validate(function_text, 
-                    DateTimeParseOption::Minute, validate_tuple);
-            },
-            FUNCTION_HOUR => {
-                validate_tuple = DateTimeParseFunction::do_validate(function_text, 
-                    DateTimeParseOption::Hour, validate_tuple);
-            },
-            FUNCTION_DAY => {
-                validate_tuple = DateParseFunction::do_validate(function_text, DateParseOption::Day, validate_tuple);
-            },
-            FUNCTION_WEEK => {
-                validate_tuple = DateParseFunction::do_validate(function_text, DateParseOption::Week, validate_tuple);
-            },
-            FUNCTION_WEEKDAY => {
-                validate_tuple = DateParseFunction::do_validate(function_text, DateParseOption::WeekDay, validate_tuple);
-            },
-            FUNCTION_MONTH => {
-                validate_tuple = DateParseFunction::do_validate(function_text, DateParseOption::Month, validate_tuple);
-            },
-            FUNCTION_YEAR => {
-                validate_tuple = DateParseFunction::do_validate(function_text, DateParseOption::Year, validate_tuple);
-            },
-            FUNCTION_NOW => {
-                validate_tuple = NowFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_TODAY => {
-                validate_tuple = TodayFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_DAYS => {
-                validate_tuple = DaysFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_DATEADD => {
-                validate_tuple = DateAddDiffFunction::do_validate(function_text, 
-                    DateDeltaOperation::Add, validate_tuple);
-            },
-            FUNCTION_DATEFMT => {
-                validate_tuple = DateFormatFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_IF => {
-                validate_tuple = IfFunction::do_validate(function_text, validate_tuple);
-            },
-            FUNCTION_MIN => {
-                validate_tuple = StatsFunction::do_validate(function_text, validate_tuple, StatOption::Min);
-            },
-            FUNCTION_MAX => {
-                validate_tuple = StatsFunction::do_validate(function_text, validate_tuple, StatOption::Max);
-            },
-            _ => {
-                number_fails += 1;
-            }
-        }
-    }
-    number_fails = validate_tuple.0;
-    failed_functions = validate_tuple.1;
-    if number_fails > 0 {
-        let failed_functions_str = failed_functions.join(", ");
-        return Err(
-            PlanetError::new(
-                500, 
-                Some(tr!("Could not validate formula. Failed functions: {}", &failed_functions_str)),
-            )
-        );
-    }
+    // let mut number_fails: u32 = 0;
+    // let mut failed_functions: Vec<String> = Vec::new();
+    // let mut validate_tuple = (number_fails, failed_functions);
+    // let function_text_list: Vec<String> = Vec::new();
+    // for function_text in &function_text_list {
+    //     let parts: Vec<&str> = function_text.split("(").collect();
+    //     let function_name = parts[0];
+    //     match function_name {
+    //         // FUNCTION_CONCAT => {
+    //         //     validate_tuple = function_validate(
+    //         //         function_text, validate_tuple, &RE_CONCAT_ATTRS, FUNCTION_CONCAT
+    //         //     );
+    //         // },
+    //         // FUNCTION_FORMAT => {
+    //         //     validate_tuple = FormatFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_JOINLIST => {
+    //         //     validate_tuple = JoinListFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_LENGTH => {
+    //         //     validate_tuple = LengthFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_LOWER => {
+    //         //     validate_tuple = LowerFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_UPPER => {
+    //         //     validate_tuple = UpperFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_REPLACE => {
+    //         //     validate_tuple = ReplaceFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_MID => {
+    //         //     validate_tuple = MidFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_REPT => {
+    //         //     validate_tuple = ReptFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_SUBSTITUTE => {
+    //         //     validate_tuple = SubstituteFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_TRIM => {
+    //         //     validate_tuple = TrimFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_CEILING => {
+    //         //     validate_tuple = CeilingFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_FLOOR => {
+    //         //     validate_tuple = FloorFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_COUNT => {
+    //         //     validate_tuple = CountFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_COUNTA => {
+    //         //     validate_tuple = CountAFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_COUNTALL => {
+    //         //     validate_tuple = CountAllFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_EVEN => {
+    //         //     validate_tuple = EvenFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_EXP => {
+    //         //     validate_tuple = ExpFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_INT => {
+    //         //     validate_tuple = IntFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_LOG => {
+    //         //     validate_tuple = LogFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_MOD => {
+    //         //     validate_tuple = ModFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_POWER => {
+    //         //     validate_tuple = PowerFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_ROUND => {
+    //         //     validate_tuple = RoundFunction::do_validate(function_text, validate_tuple, RoundOption::Basic);
+    //         // },
+    //         // FUNCTION_ROUNDUP => {
+    //         //     validate_tuple = RoundFunction::do_validate(function_text, validate_tuple, RoundOption::Up);
+    //         // },
+    //         // FUNCTION_ROUNDDOWN => {
+    //         //     validate_tuple = RoundFunction::do_validate(function_text, validate_tuple, RoundOption::Down);
+    //         // },
+    //         // FUNCTION_SQRT => {
+    //         //     validate_tuple = SqrtFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_VALUE => {
+    //         //     validate_tuple = ValueFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_TRUE => {
+    //         //     validate_tuple = BooleanFunction::do_validate(function_text, validate_tuple, BooleanOption::True);
+    //         // },
+    //         // FUNCTION_FALSE => {
+    //         //     validate_tuple = BooleanFunction::do_validate(function_text, validate_tuple, BooleanOption::True);
+    //         // },
+    //         // FUNCTION_DATE => {
+    //         //     validate_tuple = DateFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_SECOND => {
+    //         //     validate_tuple = DateTimeParseFunction::do_validate(function_text, 
+    //         //         DateTimeParseOption::Second, validate_tuple);
+    //         // },
+    //         // FUNCTION_MINUTE => {
+    //         //     validate_tuple = DateTimeParseFunction::do_validate(function_text, 
+    //         //         DateTimeParseOption::Minute, validate_tuple);
+    //         // },
+    //         // FUNCTION_HOUR => {
+    //         //     validate_tuple = DateTimeParseFunction::do_validate(function_text, 
+    //         //         DateTimeParseOption::Hour, validate_tuple);
+    //         // },
+    //         // FUNCTION_DAY => {
+    //         //     validate_tuple = DateParseFunction::do_validate(function_text, DateParseOption::Day, validate_tuple);
+    //         // },
+    //         // FUNCTION_WEEK => {
+    //         //     validate_tuple = DateParseFunction::do_validate(function_text, DateParseOption::Week, validate_tuple);
+    //         // },
+    //         // FUNCTION_WEEKDAY => {
+    //         //     validate_tuple = DateParseFunction::do_validate(function_text, DateParseOption::WeekDay, validate_tuple);
+    //         // },
+    //         // FUNCTION_MONTH => {
+    //         //     validate_tuple = DateParseFunction::do_validate(function_text, DateParseOption::Month, validate_tuple);
+    //         // },
+    //         // FUNCTION_YEAR => {
+    //         //     validate_tuple = DateParseFunction::do_validate(function_text, DateParseOption::Year, validate_tuple);
+    //         // },
+    //         // FUNCTION_NOW => {
+    //         //     validate_tuple = NowFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_TODAY => {
+    //         //     validate_tuple = TodayFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_DAYS => {
+    //         //     validate_tuple = DaysFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_DATEADD => {
+    //         //     validate_tuple = DateAddDiffFunction::do_validate(function_text, 
+    //         //         DateDeltaOperation::Add, validate_tuple);
+    //         // },
+    //         // FUNCTION_DATEFMT => {
+    //         //     validate_tuple = DateFormatFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_IF => {
+    //         //     validate_tuple = IfFunction::do_validate(function_text, validate_tuple);
+    //         // },
+    //         // FUNCTION_MIN => {
+    //         //     validate_tuple = StatsFunction::do_validate(function_text, validate_tuple, StatOption::Min);
+    //         // },
+    //         // FUNCTION_MAX => {
+    //         //     validate_tuple = StatsFunction::do_validate(function_text, validate_tuple, StatOption::Max);
+    //         // },
+    //         _ => {
+    //             number_fails += 1;
+    //         }
+    //     }
+    // }
+    // number_fails = validate_tuple.0;
+    // failed_functions = validate_tuple.1;
+    // if number_fails > 0 {
+    //     let failed_functions_str = failed_functions.join(", ");
+    //     return Err(
+    //         PlanetError::new(
+    //             500, 
+    //             Some(tr!("Could not validate formula. Failed functions: {}", &failed_functions_str)),
+    //         )
+    //     );
+    // }
     return Ok(check);
 }
 
@@ -866,7 +909,7 @@ impl Formula{
     }
     pub fn execute(self, formula: &String) -> Result<String, PlanetError> {
         // First process the achiever functions, then rest
-        let t_1 = Instant::now();
+        // let t_1 = Instant::now();
         let expr = &RE_ACHIEVER_FUNCTIONS_PARTS;
         let formula_str = formula.as_str();
         let mut formula_string = formula.clone();
@@ -878,8 +921,8 @@ impl Formula{
         let mut only_not_achive_functions;
         let mut function_text_list: Vec<String> = Vec::new();
         // eprintln!("Formula.execute :: achiever functions?: {}", &has_matches);
-        eprintln!("Formula.execute :: perf : header: {} µs", &t_1.elapsed().as_micros());
-        let t_process_formula_1 = Instant::now();
+        // eprintln!("Formula.execute :: perf : header: {} µs", &t_1.elapsed().as_micros());
+        // let t_process_formula_1 = Instant::now();
         while has_matches == true {
             let tuple = self.process_formula_str(
                 expr, 
@@ -904,8 +947,8 @@ impl Formula{
                 break
             }
         }
-        eprintln!("Formula.execute :: perf : process formula: {} µs", &t_process_formula_1.elapsed().as_micros());
-        let t_process_formula_2 = Instant::now();
+        // eprintln!("Formula.execute :: perf : process formula: {} µs", &t_process_formula_1.elapsed().as_micros());
+        // let t_process_formula_2 = Instant::now();
         let formula_str_ = formula_string.as_str();
         // Check function again, for case of IF with non achieve functions inside like AND, OR, etc...
         let expr = &RE_ACHIEVER_FUNCTIONS;
@@ -921,22 +964,22 @@ impl Formula{
             )?;
             formula_string = tuple.0;
         }
-        eprintln!("Formula.execute :: perf : process formula (2): {} µs", &t_process_formula_2.elapsed().as_micros());
+        // eprintln!("Formula.execute :: perf : process formula (2): {} µs", &t_process_formula_2.elapsed().as_micros());
         // This injects references without achiever functions
         if data_map.is_some() && table.is_some() {
-            let t_inyect_1 = Instant::now();
+            // let t_inyect_1 = Instant::now();
             // eprintln!("Formula.execute :: formula before inyect: *{}*", &formula_string);
             let formula_wrap = self.inyect_data_formula(&formula_string);
             // eprintln!("Formula.execute :: formula after inyect: *{:?}*", &formula_wrap);
-            eprintln!("Formula.execute :: perf : inyect formula: {} µs", &t_inyect_1.elapsed().as_micros());
+            // eprintln!("Formula.execute :: perf : inyect formula: {} µs", &t_inyect_1.elapsed().as_micros());
             if formula_wrap.is_some() {
                 formula_string = formula_wrap.unwrap();
-                let t_string_1 = Instant::now();
+                // let t_string_1 = Instant::now();
                 formula_string = self.process_string_matches(&formula_string);
-                eprintln!("Formula.execute :: perf : string matches: {} µs", &t_string_1.elapsed().as_micros());
+                // eprintln!("Formula.execute :: perf : string matches: {} µs", &t_string_1.elapsed().as_micros());
                 // eprintln!("Formula.execute :: formula_new: {}", &formula_string);
                 formula_string = format!("={}", &formula_string);
-                let t_exec_1 = Instant::now();
+                // let t_exec_1 = Instant::now();
                 let formula_ = parse_formula::parse_string_to_formula(
                     &formula_string, 
                     None::<NoCustomFunction>
@@ -945,7 +988,7 @@ impl Formula{
                 let result = calculate::calculate_formula(formula_, None::<NoReference>);
                 // eprintln!("Formula.execute :: calcuated formula_: {:?}", &result);
                 let result = calculate::result_to_string(result);
-                eprintln!("Formula.execute :: perf : exec: {} µs", &t_exec_1.elapsed().as_micros());
+                // eprintln!("Formula.execute :: perf : exec: {} µs", &t_exec_1.elapsed().as_micros());
                 return Ok(result);
             } else {
                 return Err(
@@ -1001,8 +1044,205 @@ impl FormulaQueryCompiled {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FormulaFieldCompiled {
+    pub functions: Option<HashMap<String, CompiledFunction>>,
+    pub formula: String,
+}
+impl FormulaFieldCompiled {
+    pub fn defaults(
+        formula: &String,
+        formula_format: &String,
+    ) -> Result<Self, PlanetError> {
+        // If I have an error in compilation, then does not validate. Compilation uses validate of functions.
+        // This function is the one does compilation from string formula to FormulaFieldCompiled
+        let formula_origin = formula.clone();
+        eprintln!("FormulaFieldCompiled :: formula_origin: {:?}", &formula_origin);
+        eprintln!("FormulaFieldCompiled :: formula_format: {:?}", &formula_format);
+        // eprintln!("FormulaFieldCompiled :: field_type_map: {:#?}", &field_type_map);
+        let expr = &RE_FORMULA_FIELD_FUNCTIONS;
+        let mut formula_processed = formula_origin.clone();
+
+        // let formula_str = formula_origin.as_str();
+        // let formula_str = formula_str.replace("\n", "");
+        // let expr_map = expr.captures(&formula_str);
+        // formula is from this:
+        // (23 + EXP(32) + EXP({Column A}) + ABS(EXP(98))) / 2
+        // to
+        // formula_processed
+        // (23 + $func1 + $func2 + $func3) / 2
+        // I algo need to add functions
+        let mut formula_compiled = FormulaFieldCompiled{
+            functions: None,
+            formula: String::from(""),
+        };
+        // Start processing formula into compiled structure
+        let mut compiled_functions: Vec<CompiledFunction> = Vec::new();
+        let function_list = expr.captures_iter(&formula_origin);
+
+        // 1. Get all functions in the formula in a list [Done]
+        // 2. Compile function. This way I have all data related processed.
+        // 3. Before adding to compiled formula, validate the function and all functions used in function
+        // 4. Write formula with placeholders $func{n}
+
+        // pub struct FunctionAttributeItem {
+        //     pub is_reference: bool,
+        //     pub reference_value: Option<String>,
+        //     pub assignment: Option<AttributeAssign>,
+        //     pub name: String,
+        //     pub value: Option<String>,
+        //     pub attr_type: AttributeType,
+        //     pub function: Option<CompiledFunction>,
+        // }
+
+        let mut count = 1;
+        let mut compiled_functions_map: HashMap<String, CompiledFunction> = HashMap::new();
+        for capture in function_list {
+            eprintln!("FormulaFieldCompiled :: capture: {:?}", &capture);
+            let function_text = capture.get(0).unwrap().as_str();
+            let function_placeholder = format!("$func{}", &count);
+            eprintln!("FormulaFieldCompiled :: function_text: {}", function_text);
+            eprintln!("FormulaFieldCompiled :: function_placeholder: {}", function_placeholder);
+            // CONCAT("mio", "-", "tuyo")
+            let parts: Vec<&str> = function_text.split("(").collect();
+            let function_name = parts[0];
+            eprintln!("FormulaFieldCompiled :: function_name: {}", function_name);
+            // function_name: CONCAT for example
+            let mut main_function: CompiledFunction = CompiledFunction::defaults(
+                &function_name.to_string());
+            main_function.text = Some(function_text.to_string());
+            let mut main_function_attrs: Vec<FunctionAttributeItem> = Vec::new();
+            // let attributes_source: Vec<&str> = attributes_str.split(",").collect();
+            // I need the attributes: simple, references and calls to another functions
+            // I need to add them to function vector in right order
+            let expr = &RE_FUNCTION_ATTRS;
+            let captured_attrs = expr.captures_iter(function_text);
+            for captured_attr in captured_attrs {
+                let mut attr = captured_attr.get(0).unwrap().as_str();
+                eprintln!("FormulaFieldCompiled :: attr: *{}*", attr);
+                // If { found, we have reference
+                // If ( and ) found, we have another function
+                // Else -> we have normal attr. Parse in case string with quotes.
+                // Build FunctionAttributeItem according to these rules
+                // What is attribute name??? Only in reference mode we know.
+                // let field_type = field_type_map_.get(&reference_name);
+                // if field_type.is_some() {
+                //     let field_type = field_type.unwrap();
+                //     attribute_type = get_attribute_type(field_type);
+                // }
+
+                // How I know attribute type?
+                // attribute_type = get_attribute_type(field_type);
+                let mut attribute_type: AttributeType = AttributeType::Text;
+                let mut function_attribute = FunctionAttributeItem::defaults(
+                    &String::from(""), 
+                    attribute_type
+                );
+                let replaced_text: String;
+                if attr.find("{").is_some() {
+                    // Reference
+                    // I have attribute name and also the field type -> attribute_type from table
+                    let attr_string = attr.to_string();
+                    function_attribute.name = attr_string.clone();
+                    attribute_type = get_attribute_type(formula_format);
+                    function_attribute.attr_type = attribute_type;
+                    function_attribute.is_reference = true;
+                } else if attr.find("(").is_some() {
+                    // function
+                    // TODO: Implement functions calling other functions
+                    // attr is the function text to parse to have a CompiledFunction
+                    // I leave this case for end
+                } else {
+                    // Normal attribute, text, date, number
+                    // Attribute type: Text, Number, Bool (Not possible, through function), Date
+                    if attr.find("\"").is_some() {
+                        // Could be text or date, time. How deal with it?
+                        // TODO: Have date strings to check to resolve if we have a date, time or text
+                        function_attribute.attr_type = AttributeType::Text;
+                        replaced_text = attr.replace("\"", "");
+                        // let replaced_text = replaced_text.as_str();
+                        attr = replaced_text.as_str();
+                    } else {
+                        function_attribute.attr_type = AttributeType::Number;
+                    }
+                    // Set value
+                    function_attribute.value = Some(attr.to_string());
+                }
+                main_function_attrs.push(function_attribute);
+            }
+            main_function.attributes = Some(main_function_attrs);
+            compiled_functions.push(main_function.clone());
+            compiled_functions_map.insert(function_placeholder.clone(), main_function.clone());
+            formula_processed = formula_processed.replace(function_text, function_placeholder.as_str());
+            eprintln!("FormulaFieldCompiled :: formula_processed: {:#?}", &formula_processed);
+            count += 1;
+        }
+
+        // TODO: Apply also to the functions linked inside this function as attributes
+        for (function_key, function) in &compiled_functions_map {
+            eprintln!("FormulaFieldCompiled :: function_key: {}", &function_key);
+            let function = function.clone();
+            let function_text = function.text.unwrap();
+            let function_text = function_text.as_str();
+            let function_name = function.name;
+            let function_name = function_name.as_str();
+            let validate = validate_function_text(function_name, function_text)?;
+            eprintln!("FormulaFieldCompiled :: validate: {}", &validate);
+            if validate == false {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("This function is not correctly formatted: {}", function_text)),
+                    )
+                );
+            }
+        }
+
+        // formula_compiled.functions = Some(compiled_functions);
+        formula_compiled.functions = Some(compiled_functions_map);
+        formula_compiled.formula = formula_processed;
+        eprintln!("FormulaFieldCompiled.defaults :: formula_compiled: {:#?}", &formula_compiled);
+
+        return Ok(formula_compiled)
+    }
+}
+
+pub fn validate_function_text(function_name: &str, function_text: &str) -> Result<bool, PlanetError> {
+    let check: bool;
+    match function_name {
+        FUNCTION_CONCAT => {
+            check = *&RE_CONCAT_ATTRS.is_match(function_text);
+        },
+        _ => {
+            check = true;
+        }
+    }
+    return Ok(check)
+}
+
+// Score for this is validate all functions in a text formula, but design  might change with compilation
+// of formulas
+pub fn function_validate_tuple(
+    function_text: &String, 
+    validate_tuple: (u32, Vec<String>),
+    expr: &Regex,
+    function_name: &str,
+ ) -> (u32, Vec<String>) {
+    let (number_fails, mut failed_functions) = validate_tuple;
+    let expr = expr;
+    let check = expr.is_match(&function_text);
+    let mut number_fails = number_fails.clone();
+    if check == false {
+        number_fails += 1;
+        failed_functions.push(String::from(function_name));
+    }
+    return (number_fails, failed_functions);
+}
+
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CompiledFunction {
     pub name: String,
+    pub text: Option<String>,
     pub attributes: Option<Vec<FunctionAttributeItem>>,
 }
 impl CompiledFunction {
@@ -1011,6 +1251,7 @@ impl CompiledFunction {
         let obj = Self{
             name: name,
             attributes: None,
+            text: None,
         };
         return obj;
     }
@@ -1134,12 +1375,13 @@ pub fn execute_function(
     return Ok(function_result)
 }
 
-
 pub fn compile_formula_query(
     formula: &String, 
     db_table: &DbTable,
     table_name: &String,
-    table: &DbData,
+    table: Option<DbData>,
+    field_type_map: Option<HashMap<String, String>>,
+    field_name_map: Option<HashMap<String, String>>,
 ) -> Result<FormulaQueryCompiled, PlanetError> {
     // eprintln!("compile_formula_query...");
     let db_table = db_table.clone();
@@ -1150,12 +1392,28 @@ pub fn compile_formula_query(
     let mut formula_compiled = FormulaQueryCompiled::defaults(
         None, None
     );
-    // let mut formula_function: CompiledFunction;
-    let field_name_map= DbTable::get_field_name_map(
-        &db_table,
-        table_name
-    )?;
-    let field_type_map = DbTable::get_field_type_map(table)?;
+    let field_name_map_: HashMap<String, String>;
+    let field_type_map_: HashMap<String, String>;
+    if table.is_some() {
+        let table = table.unwrap();
+        field_type_map_ = DbTable::get_field_type_map(&table)?;
+        field_name_map_ = DbTable::get_field_name_map(&db_table, table_name)?;
+    } else if field_type_map.is_some() && field_name_map.is_some() {
+        let field_type_map = field_type_map.unwrap();
+        field_type_map_ = field_type_map;
+        let field_name_map = field_name_map.unwrap();
+        field_name_map_ = field_name_map
+    } else {
+        // This means that table is None, field_type_map as well, we raise error letting know about problem
+        return Err(
+            PlanetError::new(
+                500, 
+                Some(tr!("Either the db table instance needs to be informed or the 
+                map for the field types")),
+            )
+        );
+    }
+    
     // "Status": "Select",
     // My Field": "Small Text",
     // If I could field name => field id, then could get id for the field names
@@ -1180,9 +1438,9 @@ pub fn compile_formula_query(
             )?;
             let (reference_name, items_new) = get_assignment_reference(
                 &items, 
-                field_name_map
+                field_name_map_
             )?;
-            let field_type = field_type_map.get(&reference_name);
+            let field_type = field_type_map_.get(&reference_name);
             let mut attribute_type: AttributeType = AttributeType::Text;
             if field_type.is_some() {
                 let field_type = field_type.unwrap();
@@ -1222,12 +1480,12 @@ pub fn compile_formula_query(
 
                 let (reference_name, items_new) = get_assignment_reference(
                     &items, 
-                    field_name_map.clone()
+                    field_name_map_.clone()
                 )?;
                 // ["$id", "my value"]
                 // eprintln!("compile_formula_query :: reference_name: {}", &reference_name);
                 // eprintln!("compile_formula_query :: items_new: {:?}", &items_new);
-                let field_type = field_type_map.get(&reference_name);
+                let field_type = field_type_map_.get(&reference_name);
                 let mut attribute_type: AttributeType = AttributeType::Text;
                 if field_type.is_some() {
                     let field_type = field_type.unwrap();

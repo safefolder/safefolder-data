@@ -20,7 +20,7 @@ use crate::functions::constants::*;
 //     the mod inside functions.
 
 lazy_static! {
-    static ref RE_CONCAT_ATTRS: Regex = Regex::new(r#"("[\w\s-]+")|(\d+)|(\{[\w\s]+\})"#).unwrap();
+    pub static ref RE_CONCAT_ATTRS: Regex = Regex::new(r#"("[\w\s-]+")|(\d+)|(\{[\w\s]+\})"#).unwrap();
     static ref RE_FORMAT_COLUMNS: Regex = Regex::new(r"(\{[\w\s-]+\})").unwrap();
     static ref RE_JOINLIST_ATTRS: Regex = Regex::new(r#"(?P<array>\{[\w\s\d,"-]+\}),[\s+]{0,}(?P<sep>\\{0,1}"[\W]\\{0,1}")"#).unwrap();
     static ref RE_LEN_ATTR: Regex = Regex::new(r#"("[\w\s-]+")|(\{[\w\s]+\})"#).unwrap();
@@ -31,32 +31,6 @@ lazy_static! {
     static ref RE_SUBSTITUTE: Regex = Regex::new(r#"SUBSTITUTE\([\s\n\t]{0,}((?P<text>("[\w\s]+"))|(?P<text_ref>(\{[\w\s]+\})))[\s\n\t]{0,},[\s\n\t]{0,}(?P<old_text>"[\w\s]+")[\s\n\t]{0,},[\s\n\t]{0,}(?P<new_text>"[\w\s]+")[\s\t\n]{0,}\)"#).unwrap();
     static ref RE_TRIM: Regex = Regex::new(r#"TRIM\([\s\n\t]{0,}((?P<text>"[\w\s]+")|(?P<text_ref>\{[\w\s]+\}))[\s\n\t]{0,}\)"#).unwrap();
 }
-
-// This goes towards so far formulas and queries
-// {My Field} = 67
-// AND, OR, NOT, XOR
-// Phase 1) is above. Phase 2) integrate all functions I have, which can be used.
-// Phase 3) is to have full text search functions, like MATCH, functions that deal with languages, stop words, 
-//       snowball analyzer, etc...
-// AND({My Field}="pepito", {Status}="c4vhm0gsmpv7omu4aqg0")
-// AND(
-//    OR({This Field}=78, {Other Field}="hola"),
-//    {This Way}=TRIM(" other ")
-// )
-
-// Cond.1: Functions can have simple values, or calls to other functions.
-// Cond.2: Formulas can use other formulas in ( ... formula ...)
-
-
-// Don't use library for calculations, I need something n my own based on the formula compilation
-// Check that would also apply for:
-// 3 + 4 + ROUNDDOWN(3.4)
-// Calculations and formulas can come in parenthesis like (3 + 4 + ROUNDDOWN(3.4)) inside a query, which needs
-//    to be compiled as another formula.
-
-// Check what is faste in comnpare, String or &str
-
-// data_map and other data should be outside the function itself, so I need struct
 
 pub fn concat(
     data_map: &HashMap<String, String>, 
@@ -90,107 +64,19 @@ pub fn concat(
     return Ok(result)
 }
 
-pub fn check_string_equal(name: &String, value: &String) -> Result<bool, PlanetError> {
-    let check: bool;
-    if name.to_lowercase() == value.to_lowercase() {
-        check = true
-    } else {
-        check = false
-    }
-    return Ok(check)
-}
-
-pub fn check_str_equal(name: &str, value: &str) -> Result<bool, PlanetError> {
-    let check: bool;
-    if name.to_lowercase() == value.to_lowercase() {
-        check = true
-    } else {
-        check = false
-    }
-    return Ok(check)
-}
-
-
-
-
-// pub struct TextFunction {
-//     pub data_map_names: HashMap<String, String>,
-// }
-// impl TextFunction {
-//     pub fn defaults(data_map_names: HashMap<String, String>) -> TextFunction {
-//         let obj = Self{
-//             data_map_names: data_map_names,
-//         };
-//         return obj
+// pub fn concat_validate(
+//     function_text: &String, 
+//     validate_tuple: (u32, Vec<String>)
+//  ) -> (u32, Vec<String>) {
+//     let (number_fails, mut failed_functions) = validate_tuple;
+//     let expr = &RE_CONCAT_ATTRS;
+//     let check = expr.is_match(&function_text);
+//     let mut number_fails = number_fails.clone();
+//     if check == false {
+//         number_fails += 1;
+//         failed_functions.push(String::from(FUNCTION_CONCAT));
 //     }
-//     pub fn concat(&self, attributes: Vec<FunctionAttributeItem>) -> Result<String, PlanetError> {
-//         // CONCAT(arg1, arg2, ...)
-//         // CONCAT("Hola, ", "como estas")
-
-//         // Full Text will also be done in SQL format with some Search functions like MATCH and others
-
-//         // 1. Formula Field: It would have and send data_map_names (My Column -> Value)
-//         // 2. SQL. In this case I have an execution plan outside the function that hits the db, the indices,
-//         //    etc... and would inyect into attributes the values itself with reference and value.
-    
-//         // These function will be able to be inyected in the SQL sent to SQL command SELECT FROM TABLE
-//         // SELECT * FROM "Table Name" WHERE "My Column" = CONCAT("Hola, ", "como estas")
-    
-//         // I need to go through raw index, and search for "Hola, como estas"
-//         // I can also use references, like CONCAT("Hola, ", {Name})
-//         // In this case, I would go to "My Column" index, not searching for any value, just the column, then get 
-//         // "Name" from doc
-    
-//         // Attribute structure
-//         // I need to know if it is a reference or not, so I process reference.
-    
-//         // This function returns the result, like
-//         // "Hola, como estas"
-    
-//         // ->
-//         // attributes: Vec<String>
-    
-//         // Attributes could be like
-//         // ["{My Column}", "-", "other"]
-    
-//         // Would replace {My Column} by the column value
-    
-//         // I need inject data, which save into attributes
-    
-//         // replace needs REGEX for attributes in the function text.
-//         // Uses FunctionAttribute to process the column references
-//         // Replaces function text in formula with replaced attributes. Returns formula received with those
-//         // substitutions
-
-//         let data_map_names = self.data_map_names.clone();
-        
-//         let mut attributes_processed: Vec<String> = Vec::new();
-//         for attribute_item in attributes {
-//             let is_reference = attribute_item.is_reference;
-//             let reference_value_wrap = attribute_item.reference_value;
-//             let value = attribute_item.value;
-//             let mut attribute: String;
-//             if is_reference == true {
-//                 // I can have reference and need to get data from the data_map_names, or reference already comes
-//                 // with value.
-//                 if reference_value_wrap.is_some() {
-//                     let reference_value = reference_value_wrap.unwrap();
-//                     attribute = reference_value;
-//                 } else {
-//                     attribute = value;
-//                 }
-//                 let function_attr = FunctionAttribute::defaults(
-//                     &attribute, Some(true)
-//                 );
-//                 attribute = function_attr.replace(data_map_names.clone()).item_processed.unwrap();
-//             } else {
-//                 attribute = value;
-//             }
-//             attributes_processed.push(attribute);
-//         }
-//         let result = attributes_processed.join("");
-//         return Ok(result)
-//     }
+//     return (number_fails, failed_functions);
 // }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -1371,4 +1257,24 @@ impl Function for TrimFunction {
         formula = format!("\"{}\"", formula);
         return formula;
     }
+}
+
+pub fn check_string_equal(name: &String, value: &String) -> Result<bool, PlanetError> {
+    let check: bool;
+    if name.to_lowercase() == value.to_lowercase() {
+        check = true
+    } else {
+        check = false
+    }
+    return Ok(check)
+}
+
+pub fn check_str_equal(name: &str, value: &str) -> Result<bool, PlanetError> {
+    let check: bool;
+    if name.to_lowercase() == value.to_lowercase() {
+        check = true
+    } else {
+        check = false
+    }
+    return Ok(check)
 }

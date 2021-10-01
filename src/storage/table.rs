@@ -368,16 +368,24 @@ impl<'gb> DbTable<'gb> {
         db_table: &DbTable,
         table_name: &String
     ) -> Result<HashMap<String, String>, PlanetError> {
-        let table = db_table.get_by_name(table_name).unwrap().unwrap();
-        let db_fields = table.data_objects.unwrap();
-        let mut field_id_map: HashMap<String, String> = HashMap::new();
-        for db_field in db_fields.keys() {
-            let field_config = db_fields.get(db_field).unwrap();
-            let field_id = field_config.get(ID).unwrap().clone();
-            let field_name = db_field.clone();
-            field_id_map.insert(field_name, field_id);
+        let table = db_table.get_by_name(table_name)?;
+        if table.is_some() {
+            let table = table.unwrap();
+            let db_fields = table.data_objects.unwrap();
+            let mut field_id_map: HashMap<String, String> = HashMap::new();
+            for db_field in db_fields.keys() {
+                let field_config = db_fields.get(db_field).unwrap();
+                let field_id = field_config.get(ID).unwrap().clone();
+                let field_name = db_field.clone();
+                field_id_map.insert(field_name, field_id);
+            }
+            Ok(field_id_map)
+        } else {
+            return Err(PlanetError::new(
+                500, 
+                Some(tr!("Table does not exist")),
+            ));
         }
-        Ok(field_id_map)
     }
     // Get field_name -> field_type map
     pub fn get_field_type_map(
@@ -721,7 +729,9 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
             &where_formula, 
             &db_table, 
             table_name, 
-            &table
+            Some(table),
+            None,
+            None,
         )?;
         eprintln!("DbRow.select :: original formula_query: {:#?}", &formula_query);
         let t_f_2 = &t_f_1.elapsed().as_micros();

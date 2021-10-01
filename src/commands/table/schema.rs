@@ -2,6 +2,7 @@ extern crate tr;
 extern crate colored;
 
 use std::collections::HashMap;
+use std::time::Instant;
 
 use tr::tr;
 use colored::*;
@@ -31,6 +32,7 @@ pub struct CreateTable<'gb> {
 impl<'gb> Command<DbData> for CreateTable<'gb> {
 
     fn run(&self) -> Result<DbData, PlanetError> {
+        let t_1 = Instant::now();
         let result: Result<DbTable, PlanetError> = DbTable::defaults(
             self.planet_context,
             self.context,
@@ -44,6 +46,7 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                 let config = self.config.clone();
 
                 // db table options with language data
+                let db_table: DbTable = result.unwrap();
                 let mut data: HashMap<String, String> = HashMap::new();
                 let language = config.language.unwrap();
                 let language_codes_list = language.codes.unwrap();
@@ -123,8 +126,6 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                 mine.remove("field_ids");
                 eprintln!("CreateTable.run :: db_data: {:#?}", mine);
 
-                let db_table: DbTable = result.unwrap();
-
                 let response: DbData = db_table.create(&db_data)?;
                 let response_src = response.clone();
                 // response.id
@@ -138,6 +139,7 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                     &table_id.magenta(),
                     format!("{}{}{}", &quote_color.green(), &table_name.green(), &quote_color.green()),
                 );
+                eprintln!("CreateTable.run :: time: {} µs", &t_1.elapsed().as_micros());
 
                 Ok(response_src)
             },

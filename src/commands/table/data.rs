@@ -39,6 +39,7 @@ pub struct InsertIntoTable<'gb> {
 impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
 
     fn run(&self) -> Result<DbData, PlanetError> {
+        let t_1 = Instant::now();
         let command = self.config.command.clone().unwrap_or_default();
         let expr = Regex::new(r#"(INSERT INTO TABLE) "(?P<table_name>[a-zA-Z0-9_ ]+)"#).unwrap();
         let table_name_match = expr.captures(&command).unwrap();
@@ -169,6 +170,7 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                 }
                 eprintln!("InsertIntoTable.run :: I will write: {:#?}", &db_data);
                 let response: DbData = db_row.insert(&table_name, &db_data)?;
+                eprintln!("InsertIntoTable.run :: time: {} µs", &t_1.elapsed().as_micros());
                 return Ok(response);
             },
             Err(error) => {

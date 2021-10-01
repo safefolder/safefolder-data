@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 use validator::{ValidationErrors};
 use crate::commands::table::config::FieldConfig;
-use crate::storage::table::DbData;
+use crate::storage::table::{DbData};
 use crate::planet::PlanetError;
 
 pub trait ConfigStorageField {

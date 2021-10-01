@@ -356,9 +356,11 @@ impl ConfigStorageField for FieldConfig {
         let indexed = field_config.indexed.unwrap_or_default();
         let many = field_config.many.unwrap_or_default();
         let field_name = field_config.name.unwrap_or_default();
-        map.insert(String::from("id"), field_config.id.unwrap_or_default());
+        let field_type = field_config.field_type.unwrap_or_default();
+        let field_id = field_config.id.unwrap_or_default();
+        map.insert(String::from("id"), field_id.clone());
         map.insert(String::from("name"), field_name.clone());
-        map.insert(String::from("field_type"), field_config.field_type.unwrap_or_default());
+        map.insert(String::from("field_type"), field_type.clone());
         map.insert(String::from("default"), field_config.default.unwrap_or_default());
         map.insert(String::from("version"), field_config.version.unwrap_or_default());
         map.insert(String::from("required"), required.to_string());
@@ -370,7 +372,25 @@ impl ConfigStorageField for FieldConfig {
         if formula.is_some() {
             let formula = formula.unwrap();
             let formula_format = field_config.formula_format.unwrap();
-            validate_formula(&formula, &formula_format)?;
+            // field_type_map
+            // let mut field_type_map: HashMap<String, String> = HashMap::new();
+            // field_type_map.insert(field_name.clone(), field_type);
+            // eprintln!("map_object_db :: field_type_map: {:?}", &field_type_map);
+            // field_name_map
+            // let mut field_name_map: HashMap<String, String> = HashMap::new();
+            // field_name_map.insert(field_name.clone(), field_id.clone());
+            // validate_formula(
+            //     db_table,
+            //     &table_name,
+            //     &formula,
+            //     &formula_format,
+            //     &field_type_map,
+            //     &field_name_map,
+            // )?;
+            validate_formula(
+                &formula,
+                &formula_format,
+            )?;
             map.insert(String::from("formula"), formula);
             map.insert(String::from("formula_format"), formula_format);
         }
