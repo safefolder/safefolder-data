@@ -17,7 +17,7 @@ use crate::storage::*;
 use crate::storage::table::{DbData};
 use crate::planet::constants::*;
 use crate::planet::make_bool_str;
-use crate::functions::validate_formula;
+use crate::functions::{validate_formula, FormulaFieldCompiled};
 
 use super::fetch_yaml_config;
 
@@ -349,7 +349,7 @@ impl ConfigStorageField for FieldConfig {
         // eprintln!("parse_from_db :: !!!!!!!!!!!!!!! fields: {:#?}", &fields);
         return fields
     }
-    fn map_object_db(&self) -> Result<HashMap<String, String>, PlanetError> {
+    fn map_object_db(&self, field_type_map: &HashMap<String, String>) -> Result<HashMap<String, String>, PlanetError> {
         let field_config = self.clone();
         let mut map: HashMap<String, String> = HashMap::new();
         let required = field_config.required.unwrap_or_default();
@@ -379,20 +379,18 @@ impl ConfigStorageField for FieldConfig {
             // field_name_map
             // let mut field_name_map: HashMap<String, String> = HashMap::new();
             // field_name_map.insert(field_name.clone(), field_id.clone());
-            // validate_formula(
-            //     db_table,
-            //     &table_name,
-            //     &formula,
-            //     &formula_format,
-            //     &field_type_map,
-            //     &field_name_map,
-            // )?;
-            validate_formula(
-                &formula,
+            let formula_compiled = FormulaFieldCompiled::defaults(
+                &formula, 
                 &formula_format,
+                field_type_map,
             )?;
+            eprintln!("map_object_db :: formula_compiled: {:#?}", &formula_compiled);
+            // TODO: YAML serialize into "formula_compiled" at "map"
+        
             map.insert(String::from("formula"), formula);
             map.insert(String::from("formula_format"), formula_format);
+            // YAML serialized
+            map.insert(String::from("formula_compiled"), String::from(""));
         }
         // Here we encode as string the options as string using yaml encoding
         let options = field_config.options;

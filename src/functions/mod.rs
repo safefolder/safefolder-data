@@ -14,6 +14,7 @@ use regex::Regex;
 use tr::tr;
 use xlformula_engine::{calculate, parse_formula, NoReference, NoCustomFunction};
 
+use crate::commands::table::config::FieldConfig;
 use crate::storage::table::{DbData, DbTable};
 use crate::functions::constants::*;
 use crate::functions::text::*;
@@ -33,7 +34,8 @@ lazy_static! {
     static ref RE_STRING_MATCH: Regex = Regex::new(r#"(?P<string_match>"[\w\s]+"[\s\n\t]{0,}[=><][\s\n\t]{0,}"[\w\s]+")"#).unwrap();
     static ref RE_FORMULA_QUERY: Regex = Regex::new(r#"(?P<assign>\{[\s\w]+\}[\s\t]{0,}(?P<log_op>=|>|<|>=|<=)[\s\t]{0,}.+)|(?P<op>AND|OR|NOT|XOR)\((?P<attrs>.+)\)"#).unwrap();
     static ref RE_FORMULA_FIELD_FUNCTIONS: Regex = Regex::new(r#"(?P<func>[A-Z]+[("\d)\w,.\s{}-]+)"#).unwrap();
-    static ref RE_FUNCTION_ATTRS: Regex = Regex::new(r#"("[\w\s-]+")|(\{[\w\s]+\})|([A-Z]+\(["\w\s]+\))|([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)"#).unwrap();
+    static ref RE_FUNCTION_ATTRS_OLD: Regex = Regex::new(r#"("[\w\s-]+")|(\{[\w\s]+\})|([A-Z]+\(["\w\s]+\))|([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)"#).unwrap();
+    static ref RE_FUNCTION_ATTRS: Regex = Regex::new(r#"[A-Z]+\((?P<attrs>.+)\)"#).unwrap();
 }
 
 // achiever planet functions
@@ -348,10 +350,10 @@ pub fn validate_formula(
     // compile formula field
     // It will compile formula and validate all functions referenced in the formula. Will raise error
     // in case of validation problem.
-    FormulaFieldCompiled::defaults(
-        formula, 
-        formula_format,
-    )?;
+    // FormulaFieldCompiled::defaults(
+    //     formula, 
+    //     formula_format,
+    // )?;
 
     // Validate all formula_functions (only ones found in formula from all functions in achiever)
     // let mut number_fails: u32 = 0;
@@ -1052,25 +1054,17 @@ impl FormulaFieldCompiled {
     pub fn defaults(
         formula: &String,
         formula_format: &String,
+        field_type_map: &HashMap<String, String>,
     ) -> Result<Self, PlanetError> {
         // If I have an error in compilation, then does not validate. Compilation uses validate of functions.
         // This function is the one does compilation from string formula to FormulaFieldCompiled
         let formula_origin = formula.clone();
         eprintln!("FormulaFieldCompiled :: formula_origin: {:?}", &formula_origin);
         eprintln!("FormulaFieldCompiled :: formula_format: {:?}", &formula_format);
-        // eprintln!("FormulaFieldCompiled :: field_type_map: {:#?}", &field_type_map);
         let expr = &RE_FORMULA_FIELD_FUNCTIONS;
         let mut formula_processed = formula_origin.clone();
+        let formula_format = formula_format.clone();
 
-        // let formula_str = formula_origin.as_str();
-        // let formula_str = formula_str.replace("\n", "");
-        // let expr_map = expr.captures(&formula_str);
-        // formula is from this:
-        // (23 + EXP(32) + EXP({Column A}) + ABS(EXP(98))) / 2
-        // to
-        // formula_processed
-        // (23 + $func1 + $func2 + $func3) / 2
-        // I algo need to add functions
         let mut formula_compiled = FormulaFieldCompiled{
             functions: None,
             formula: String::from(""),
@@ -1078,21 +1072,6 @@ impl FormulaFieldCompiled {
         // Start processing formula into compiled structure
         let mut compiled_functions: Vec<CompiledFunction> = Vec::new();
         let function_list = expr.captures_iter(&formula_origin);
-
-        // 1. Get all functions in the formula in a list [Done]
-        // 2. Compile function. This way I have all data related processed.
-        // 3. Before adding to compiled formula, validate the function and all functions used in function
-        // 4. Write formula with placeholders $func{n}
-
-        // pub struct FunctionAttributeItem {
-        //     pub is_reference: bool,
-        //     pub reference_value: Option<String>,
-        //     pub assignment: Option<AttributeAssign>,
-        //     pub name: String,
-        //     pub value: Option<String>,
-        //     pub attr_type: AttributeType,
-        //     pub function: Option<CompiledFunction>,
-        // }
 
         let mut count = 1;
         let mut compiled_functions_map: HashMap<String, CompiledFunction> = HashMap::new();
@@ -1102,74 +1081,11 @@ impl FormulaFieldCompiled {
             let function_placeholder = format!("$func{}", &count);
             eprintln!("FormulaFieldCompiled :: function_text: {}", function_text);
             eprintln!("FormulaFieldCompiled :: function_placeholder: {}", function_placeholder);
-            // CONCAT("mio", "-", "tuyo")
-            let parts: Vec<&str> = function_text.split("(").collect();
-            let function_name = parts[0];
-            eprintln!("FormulaFieldCompiled :: function_name: {}", function_name);
-            // function_name: CONCAT for example
-            let mut main_function: CompiledFunction = CompiledFunction::defaults(
-                &function_name.to_string());
-            main_function.text = Some(function_text.to_string());
-            let mut main_function_attrs: Vec<FunctionAttributeItem> = Vec::new();
-            // let attributes_source: Vec<&str> = attributes_str.split(",").collect();
-            // I need the attributes: simple, references and calls to another functions
-            // I need to add them to function vector in right order
-            let expr = &RE_FUNCTION_ATTRS;
-            let captured_attrs = expr.captures_iter(function_text);
-            for captured_attr in captured_attrs {
-                let mut attr = captured_attr.get(0).unwrap().as_str();
-                eprintln!("FormulaFieldCompiled :: attr: *{}*", attr);
-                // If { found, we have reference
-                // If ( and ) found, we have another function
-                // Else -> we have normal attr. Parse in case string with quotes.
-                // Build FunctionAttributeItem according to these rules
-                // What is attribute name??? Only in reference mode we know.
-                // let field_type = field_type_map_.get(&reference_name);
-                // if field_type.is_some() {
-                //     let field_type = field_type.unwrap();
-                //     attribute_type = get_attribute_type(field_type);
-                // }
-
-                // How I know attribute type?
-                // attribute_type = get_attribute_type(field_type);
-                let mut attribute_type: AttributeType = AttributeType::Text;
-                let mut function_attribute = FunctionAttributeItem::defaults(
-                    &String::from(""), 
-                    attribute_type
-                );
-                let replaced_text: String;
-                if attr.find("{").is_some() {
-                    // Reference
-                    // I have attribute name and also the field type -> attribute_type from table
-                    let attr_string = attr.to_string();
-                    function_attribute.name = attr_string.clone();
-                    attribute_type = get_attribute_type(formula_format);
-                    function_attribute.attr_type = attribute_type;
-                    function_attribute.is_reference = true;
-                } else if attr.find("(").is_some() {
-                    // function
-                    // TODO: Implement functions calling other functions
-                    // attr is the function text to parse to have a CompiledFunction
-                    // I leave this case for end
-                } else {
-                    // Normal attribute, text, date, number
-                    // Attribute type: Text, Number, Bool (Not possible, through function), Date
-                    if attr.find("\"").is_some() {
-                        // Could be text or date, time. How deal with it?
-                        // TODO: Have date strings to check to resolve if we have a date, time or text
-                        function_attribute.attr_type = AttributeType::Text;
-                        replaced_text = attr.replace("\"", "");
-                        // let replaced_text = replaced_text.as_str();
-                        attr = replaced_text.as_str();
-                    } else {
-                        function_attribute.attr_type = AttributeType::Number;
-                    }
-                    // Set value
-                    function_attribute.value = Some(attr.to_string());
-                }
-                main_function_attrs.push(function_attribute);
-            }
-            main_function.attributes = Some(main_function_attrs);
+            let main_function = compile_function_text(
+                function_text, 
+                &formula_format,
+                field_type_map
+            )?;
             compiled_functions.push(main_function.clone());
             compiled_functions_map.insert(function_placeholder.clone(), main_function.clone());
             formula_processed = formula_processed.replace(function_text, function_placeholder.as_str());
@@ -1197,13 +1113,87 @@ impl FormulaFieldCompiled {
             }
         }
 
-        // formula_compiled.functions = Some(compiled_functions);
         formula_compiled.functions = Some(compiled_functions_map);
         formula_compiled.formula = formula_processed;
-        eprintln!("FormulaFieldCompiled.defaults :: formula_compiled: {:#?}", &formula_compiled);
 
         return Ok(formula_compiled)
     }
+}
+
+pub fn compile_function_text(
+    function_text: &str,
+    formula_format: &String,
+    field_type_map: &HashMap<String, String>,
+) -> Result<CompiledFunction, PlanetError> {
+    let formula_format = formula_format.clone();
+    let field_type_map = field_type_map.clone();
+    eprintln!("compile_function_text :: field_type_map: {:#?}", &field_type_map);
+    let parts: Vec<&str> = function_text.split("(").collect();
+    let function_name = parts[0];
+    eprintln!("compile_function_text :: function_name: {}", function_name);
+    // function_name: CONCAT for example
+    let mut main_function: CompiledFunction = CompiledFunction::defaults(
+        &function_name.to_string());
+    main_function.text = Some(function_text.to_string());
+    let mut main_function_attrs: Vec<FunctionAttributeItem> = Vec::new();
+    let expr = &RE_FUNCTION_ATTRS;
+    let attr_map = expr.captures(function_text).unwrap();
+    let attrs = attr_map.name("attrs");
+    if attrs.is_some() {
+        let attrs = attrs.unwrap().as_str();
+        eprintln!("compile_function_text :: [new] attrs: {}", &attrs);
+        let captured_attrs: Vec<&str> = attrs.split(",").collect();
+        for mut attr in captured_attrs {
+            eprintln!("compile_function_text :: attr: *{}*", attr);
+            let mut attribute_type: AttributeType = AttributeType::Text;
+            let mut function_attribute = FunctionAttributeItem::defaults(
+                &String::from(""), 
+                attribute_type
+            );
+            let replaced_text: String;
+            if attr.find("{").is_some() {
+                // Reference
+                // I have attribute name and also the field type -> attribute_type from table
+                let attr_string = attr.to_string();
+                let attr_string = attr_string.replace("{", "").replace("}", "");
+                function_attribute.name = attr_string.clone();
+                let field_type = field_type_map.get(&attr_string);
+                if field_type.is_some() {
+                    let field_type = field_type.unwrap().clone();
+                    attribute_type = get_attribute_type(&field_type, Some(formula_format.clone()));
+                    function_attribute.attr_type = attribute_type;
+                    function_attribute.is_reference = true;
+                }
+            } else if attr.find("(").is_some() {
+                // function
+                eprintln!("compile_function_text :: function_text: {}", &attr);
+                let linked_function = compile_function_text(
+                     attr, &formula_format, &field_type_map
+                )?;
+                let linked_function_text = linked_function.text.clone().unwrap();
+                function_attribute.function = Some(linked_function);
+                function_attribute.name = linked_function_text;
+                // eprintln!("compile_function_text :: linked_function: {:#?}", &linked_function);
+            } else {
+                // Normal attribute, text, date, number
+                // Attribute type: Text, Number, Bool (Not possible, through function), Date
+                if attr.find("\"").is_some() {
+                    // Could be text or date, time. How deal with it?
+                    // TODO: Have date strings to check to resolve if we have a date, time or text
+                    function_attribute.attr_type = AttributeType::Text;
+                    replaced_text = attr.replace("\"", "");
+                    attr = replaced_text.as_str();
+                } else {
+                    function_attribute.attr_type = AttributeType::Number;
+                }
+                // Set value
+                function_attribute.value = Some(attr.to_string());
+            }
+            main_function_attrs.push(function_attribute);    
+        }
+    }
+    main_function.attributes = Some(main_function_attrs);
+    return Ok(main_function)
 }
 
 pub fn validate_function_text(function_name: &str, function_text: &str) -> Result<bool, PlanetError> {
@@ -1211,6 +1201,9 @@ pub fn validate_function_text(function_name: &str, function_text: &str) -> Resul
     match function_name {
         FUNCTION_CONCAT => {
             check = *&RE_CONCAT_ATTRS.is_match(function_text);
+        },
+        FUNCTION_TRIM => {
+            check = *&RE_TRIM.is_match(function_text);
         },
         _ => {
             check = true;
@@ -1444,7 +1437,7 @@ pub fn compile_formula_query(
             let mut attribute_type: AttributeType = AttributeType::Text;
             if field_type.is_some() {
                 let field_type = field_type.unwrap();
-                attribute_type = get_attribute_type(field_type);
+                attribute_type = get_attribute_type(field_type, None);
             }
             let mut function_attribute = FunctionAttributeItem::defaults(
                 &reference_name, 
@@ -1490,7 +1483,7 @@ pub fn compile_formula_query(
                 if field_type.is_some() {
                     let field_type = field_type.unwrap();
                     // eprintln!("compile_formula_query :: field_type: {}", &field_type);
-                    attribute_type = get_attribute_type(field_type);
+                    attribute_type = get_attribute_type(field_type, None);
                     // eprintln!("compile_formula_query :: attribute_type: {:?}", &attribute_type);
                 }
                 let mut function_attribute = FunctionAttributeItem::defaults(
@@ -1547,14 +1540,31 @@ pub fn fetch_logical_op(attribute: &str) -> &str {
     return log_op
 }
 
-pub fn get_attribute_type(field_type: &String) -> AttributeType {
+pub fn get_attribute_type(field_type: &String, formula_format: Option<String>) -> AttributeType {
     let field_type = field_type.clone();
+    let field_type = field_type.to_lowercase();
     let field_type = field_type.as_str();
-    return match field_type {
-        "Small Text" => AttributeType::Text,
-        "select" => AttributeType::Text,
-        _ => AttributeType::Text,
+    let attr_type: AttributeType;
+    match field_type {
+        "checkbox" => {attr_type = AttributeType::Bool},
+        "small text" => {attr_type = AttributeType::Text},
+        "long text" => {attr_type = AttributeType::Text},
+        "select" => {attr_type = AttributeType::Text},
+        "number" => {attr_type = AttributeType::Number},
+        _ => {attr_type = AttributeType::Text},
     }
+    if field_type == "formula" && formula_format.is_some() {
+        let formula_format = formula_format.unwrap().to_lowercase();
+        let formula_format = formula_format.as_str();
+        return match formula_format {
+            "text" => AttributeType::Text,
+            "number" => AttributeType::Number,
+            "date" => AttributeType::Date,
+            "bool" => AttributeType::Bool,
+            _ => AttributeType::Text,
+        }
+    }
+    return attr_type
 }
 
 pub fn get_assignment_reference(

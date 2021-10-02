@@ -65,6 +65,18 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                 let name_field_config = config.name.unwrap();
                 fields.insert(0, name_field_config);
                 let mut field_name_map: HashMap<String, bool> = HashMap::new();
+
+                // field_type_map
+                let mut field_type_map: HashMap<String, String> = HashMap::new();
+                for field in fields.iter() {
+                    let field_name = field.name.clone().unwrap();
+                    let field_type = field.field_type.clone();
+                    if field_type.is_some() {
+                        let field_type = field_type.unwrap();
+                        field_type_map.insert(field_name, field_type);
+                    }
+                }
+
                 for field in fields.iter() {
                     // field simple attributes
                     let field_attrs = field.clone();
@@ -83,7 +95,7 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                             )
                         );                        
                     }
-                    let map = &field.map_object_db()?;
+                    let map = &field.map_object_db(&field_type_map)?;
                     data_objects.insert(String::from(field_name.clone()), map.clone());
                     // field complex attributes like select_data
                     let map_list = &field.map_collections_db();

@@ -31,6 +31,6 @@ fields:
   - name: Concat
     field_type: Formula
     formula: "CONCAT(
-      \"this-is-some-slug\", \" \", {My Field}
+      \"this-is-some-slug\", \" \", {My Field}, TRIM(\" hola \")
     )"
     formula_format: Text
