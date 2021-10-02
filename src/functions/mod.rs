@@ -14,7 +14,6 @@ use regex::Regex;
 use tr::tr;
 use xlformula_engine::{calculate, parse_formula, NoReference, NoCustomFunction};
 
-use crate::commands::table::config::FieldConfig;
 use crate::storage::table::{DbData, DbTable};
 use crate::functions::constants::*;
 use crate::functions::text::*;
@@ -312,220 +311,220 @@ impl FunctionsHanler{
     }
 }
 
-pub fn validate_formula(
-    formula: &String,
-    formula_format: &String,
-) -> Result<bool, PlanetError> {
-    let check = true;
-    // let formula_obj = Formula::defaults(None, None);
-    // let function_text_list = formula_obj.validate(&formula, &formula_format)?;
+// pub fn validate_formula(
+//     formula: &String,
+//     formula_format: &String,
+// ) -> Result<bool, PlanetError> {
+//     let check = true;
+//     // let formula_obj = Formula::defaults(None, None);
+//     // let function_text_list = formula_obj.validate(&formula, &formula_format)?;
 
-    // 1. Get all functions in the formula
-    // (23 + EXP(32) + EXP({Column A}) + ABS(EXP(98))) / 2
-    // => 
-    // (23 + $func1 + $func2 + $func3) / 2
+//     // 1. Get all functions in the formula
+//     // (23 + EXP(32) + EXP({Column A}) + ABS(EXP(98))) / 2
+//     // => 
+//     // (23 + $func1 + $func2 + $func3) / 2
 
-    // I user CompiledFormulaField with functions and formula itself
-    // This would give me a compiled version of any formula field which is fast to process
-    // Then I need to validate specific each function. For this to work, 
-    // I need a function or mode to return all functions inside function, so I have 
+//     // I user CompiledFormulaField with functions and formula itself
+//     // This would give me a compiled version of any formula field which is fast to process
+//     // Then I need to validate specific each function. For this to work, 
+//     // I need a function or mode to return all functions inside function, so I have 
 
-    // ABS(EXP(98))
-    // ABS function should validate ABS and EXP, right? Since it is what it is being sent.
+//     // ABS(EXP(98))
+//     // ABS function should validate ABS and EXP, right? Since it is what it is being sent.
 
-    // What we do right now, is validate EXP(98), then ABS({value from EXP(98)})
-    // I can have get_all_functions in a FormulaFieldCompiled
-    // It will give me all the functions inside functions, having the function_text, which 
-    // I can send to the regex bellow. I don't need to execute, only to validate.
+//     // What we do right now, is validate EXP(98), then ABS({value from EXP(98)})
+//     // I can have get_all_functions in a FormulaFieldCompiled
+//     // It will give me all the functions inside functions, having the function_text, which 
+//     // I can send to the regex bellow. I don't need to execute, only to validate.
 
-    // let expr = &RE_FORMULA_FIELD_FUNCTIONS;
-    // let functions = expr.captures_iter(formula);
-    // let mut count = 1;
-    // for function in functions {
-    //     let function_holder = format!("$func{}", &count);
-    //     eprintln!("validate_formula :: function_holder: {}", &function_holder);
-    //     count += 1;
-    // }
+//     // let expr = &RE_FORMULA_FIELD_FUNCTIONS;
+//     // let functions = expr.captures_iter(formula);
+//     // let mut count = 1;
+//     // for function in functions {
+//     //     let function_holder = format!("$func{}", &count);
+//     //     eprintln!("validate_formula :: function_holder: {}", &function_holder);
+//     //     count += 1;
+//     // }
 
-    // compile formula field
-    // It will compile formula and validate all functions referenced in the formula. Will raise error
-    // in case of validation problem.
-    // FormulaFieldCompiled::defaults(
-    //     formula, 
-    //     formula_format,
-    // )?;
+//     // compile formula field
+//     // It will compile formula and validate all functions referenced in the formula. Will raise error
+//     // in case of validation problem.
+//     // FormulaFieldCompiled::defaults(
+//     //     formula, 
+//     //     formula_format,
+//     // )?;
 
-    // Validate all formula_functions (only ones found in formula from all functions in achiever)
-    // let mut number_fails: u32 = 0;
-    // let mut failed_functions: Vec<String> = Vec::new();
-    // let mut validate_tuple = (number_fails, failed_functions);
-    // let function_text_list: Vec<String> = Vec::new();
-    // for function_text in &function_text_list {
-    //     let parts: Vec<&str> = function_text.split("(").collect();
-    //     let function_name = parts[0];
-    //     match function_name {
-    //         // FUNCTION_CONCAT => {
-    //         //     validate_tuple = function_validate(
-    //         //         function_text, validate_tuple, &RE_CONCAT_ATTRS, FUNCTION_CONCAT
-    //         //     );
-    //         // },
-    //         // FUNCTION_FORMAT => {
-    //         //     validate_tuple = FormatFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_JOINLIST => {
-    //         //     validate_tuple = JoinListFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_LENGTH => {
-    //         //     validate_tuple = LengthFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_LOWER => {
-    //         //     validate_tuple = LowerFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_UPPER => {
-    //         //     validate_tuple = UpperFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_REPLACE => {
-    //         //     validate_tuple = ReplaceFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_MID => {
-    //         //     validate_tuple = MidFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_REPT => {
-    //         //     validate_tuple = ReptFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_SUBSTITUTE => {
-    //         //     validate_tuple = SubstituteFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_TRIM => {
-    //         //     validate_tuple = TrimFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_CEILING => {
-    //         //     validate_tuple = CeilingFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_FLOOR => {
-    //         //     validate_tuple = FloorFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_COUNT => {
-    //         //     validate_tuple = CountFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_COUNTA => {
-    //         //     validate_tuple = CountAFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_COUNTALL => {
-    //         //     validate_tuple = CountAllFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_EVEN => {
-    //         //     validate_tuple = EvenFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_EXP => {
-    //         //     validate_tuple = ExpFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_INT => {
-    //         //     validate_tuple = IntFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_LOG => {
-    //         //     validate_tuple = LogFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_MOD => {
-    //         //     validate_tuple = ModFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_POWER => {
-    //         //     validate_tuple = PowerFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_ROUND => {
-    //         //     validate_tuple = RoundFunction::do_validate(function_text, validate_tuple, RoundOption::Basic);
-    //         // },
-    //         // FUNCTION_ROUNDUP => {
-    //         //     validate_tuple = RoundFunction::do_validate(function_text, validate_tuple, RoundOption::Up);
-    //         // },
-    //         // FUNCTION_ROUNDDOWN => {
-    //         //     validate_tuple = RoundFunction::do_validate(function_text, validate_tuple, RoundOption::Down);
-    //         // },
-    //         // FUNCTION_SQRT => {
-    //         //     validate_tuple = SqrtFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_VALUE => {
-    //         //     validate_tuple = ValueFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_TRUE => {
-    //         //     validate_tuple = BooleanFunction::do_validate(function_text, validate_tuple, BooleanOption::True);
-    //         // },
-    //         // FUNCTION_FALSE => {
-    //         //     validate_tuple = BooleanFunction::do_validate(function_text, validate_tuple, BooleanOption::True);
-    //         // },
-    //         // FUNCTION_DATE => {
-    //         //     validate_tuple = DateFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_SECOND => {
-    //         //     validate_tuple = DateTimeParseFunction::do_validate(function_text, 
-    //         //         DateTimeParseOption::Second, validate_tuple);
-    //         // },
-    //         // FUNCTION_MINUTE => {
-    //         //     validate_tuple = DateTimeParseFunction::do_validate(function_text, 
-    //         //         DateTimeParseOption::Minute, validate_tuple);
-    //         // },
-    //         // FUNCTION_HOUR => {
-    //         //     validate_tuple = DateTimeParseFunction::do_validate(function_text, 
-    //         //         DateTimeParseOption::Hour, validate_tuple);
-    //         // },
-    //         // FUNCTION_DAY => {
-    //         //     validate_tuple = DateParseFunction::do_validate(function_text, DateParseOption::Day, validate_tuple);
-    //         // },
-    //         // FUNCTION_WEEK => {
-    //         //     validate_tuple = DateParseFunction::do_validate(function_text, DateParseOption::Week, validate_tuple);
-    //         // },
-    //         // FUNCTION_WEEKDAY => {
-    //         //     validate_tuple = DateParseFunction::do_validate(function_text, DateParseOption::WeekDay, validate_tuple);
-    //         // },
-    //         // FUNCTION_MONTH => {
-    //         //     validate_tuple = DateParseFunction::do_validate(function_text, DateParseOption::Month, validate_tuple);
-    //         // },
-    //         // FUNCTION_YEAR => {
-    //         //     validate_tuple = DateParseFunction::do_validate(function_text, DateParseOption::Year, validate_tuple);
-    //         // },
-    //         // FUNCTION_NOW => {
-    //         //     validate_tuple = NowFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_TODAY => {
-    //         //     validate_tuple = TodayFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_DAYS => {
-    //         //     validate_tuple = DaysFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_DATEADD => {
-    //         //     validate_tuple = DateAddDiffFunction::do_validate(function_text, 
-    //         //         DateDeltaOperation::Add, validate_tuple);
-    //         // },
-    //         // FUNCTION_DATEFMT => {
-    //         //     validate_tuple = DateFormatFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_IF => {
-    //         //     validate_tuple = IfFunction::do_validate(function_text, validate_tuple);
-    //         // },
-    //         // FUNCTION_MIN => {
-    //         //     validate_tuple = StatsFunction::do_validate(function_text, validate_tuple, StatOption::Min);
-    //         // },
-    //         // FUNCTION_MAX => {
-    //         //     validate_tuple = StatsFunction::do_validate(function_text, validate_tuple, StatOption::Max);
-    //         // },
-    //         _ => {
-    //             number_fails += 1;
-    //         }
-    //     }
-    // }
-    // number_fails = validate_tuple.0;
-    // failed_functions = validate_tuple.1;
-    // if number_fails > 0 {
-    //     let failed_functions_str = failed_functions.join(", ");
-    //     return Err(
-    //         PlanetError::new(
-    //             500, 
-    //             Some(tr!("Could not validate formula. Failed functions: {}", &failed_functions_str)),
-    //         )
-    //     );
-    // }
-    return Ok(check);
-}
+//     // Validate all formula_functions (only ones found in formula from all functions in achiever)
+//     // let mut number_fails: u32 = 0;
+//     // let mut failed_functions: Vec<String> = Vec::new();
+//     // let mut validate_tuple = (number_fails, failed_functions);
+//     // let function_text_list: Vec<String> = Vec::new();
+//     // for function_text in &function_text_list {
+//     //     let parts: Vec<&str> = function_text.split("(").collect();
+//     //     let function_name = parts[0];
+//     //     match function_name {
+//     //         // FUNCTION_CONCAT => {
+//     //         //     validate_tuple = function_validate(
+//     //         //         function_text, validate_tuple, &RE_CONCAT_ATTRS, FUNCTION_CONCAT
+//     //         //     );
+//     //         // },
+//     //         // FUNCTION_FORMAT => {
+//     //         //     validate_tuple = FormatFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_JOINLIST => {
+//     //         //     validate_tuple = JoinListFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_LENGTH => {
+//     //         //     validate_tuple = LengthFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_LOWER => {
+//     //         //     validate_tuple = LowerFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_UPPER => {
+//     //         //     validate_tuple = UpperFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_REPLACE => {
+//     //         //     validate_tuple = ReplaceFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_MID => {
+//     //         //     validate_tuple = MidFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_REPT => {
+//     //         //     validate_tuple = ReptFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_SUBSTITUTE => {
+//     //         //     validate_tuple = SubstituteFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_TRIM => {
+//     //         //     validate_tuple = TrimFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_CEILING => {
+//     //         //     validate_tuple = CeilingFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_FLOOR => {
+//     //         //     validate_tuple = FloorFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_COUNT => {
+//     //         //     validate_tuple = CountFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_COUNTA => {
+//     //         //     validate_tuple = CountAFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_COUNTALL => {
+//     //         //     validate_tuple = CountAllFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_EVEN => {
+//     //         //     validate_tuple = EvenFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_EXP => {
+//     //         //     validate_tuple = ExpFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_INT => {
+//     //         //     validate_tuple = IntFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_LOG => {
+//     //         //     validate_tuple = LogFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_MOD => {
+//     //         //     validate_tuple = ModFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_POWER => {
+//     //         //     validate_tuple = PowerFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_ROUND => {
+//     //         //     validate_tuple = RoundFunction::do_validate(function_text, validate_tuple, RoundOption::Basic);
+//     //         // },
+//     //         // FUNCTION_ROUNDUP => {
+//     //         //     validate_tuple = RoundFunction::do_validate(function_text, validate_tuple, RoundOption::Up);
+//     //         // },
+//     //         // FUNCTION_ROUNDDOWN => {
+//     //         //     validate_tuple = RoundFunction::do_validate(function_text, validate_tuple, RoundOption::Down);
+//     //         // },
+//     //         // FUNCTION_SQRT => {
+//     //         //     validate_tuple = SqrtFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_VALUE => {
+//     //         //     validate_tuple = ValueFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_TRUE => {
+//     //         //     validate_tuple = BooleanFunction::do_validate(function_text, validate_tuple, BooleanOption::True);
+//     //         // },
+//     //         // FUNCTION_FALSE => {
+//     //         //     validate_tuple = BooleanFunction::do_validate(function_text, validate_tuple, BooleanOption::True);
+//     //         // },
+//     //         // FUNCTION_DATE => {
+//     //         //     validate_tuple = DateFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_SECOND => {
+//     //         //     validate_tuple = DateTimeParseFunction::do_validate(function_text, 
+//     //         //         DateTimeParseOption::Second, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_MINUTE => {
+//     //         //     validate_tuple = DateTimeParseFunction::do_validate(function_text, 
+//     //         //         DateTimeParseOption::Minute, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_HOUR => {
+//     //         //     validate_tuple = DateTimeParseFunction::do_validate(function_text, 
+//     //         //         DateTimeParseOption::Hour, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_DAY => {
+//     //         //     validate_tuple = DateParseFunction::do_validate(function_text, DateParseOption::Day, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_WEEK => {
+//     //         //     validate_tuple = DateParseFunction::do_validate(function_text, DateParseOption::Week, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_WEEKDAY => {
+//     //         //     validate_tuple = DateParseFunction::do_validate(function_text, DateParseOption::WeekDay, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_MONTH => {
+//     //         //     validate_tuple = DateParseFunction::do_validate(function_text, DateParseOption::Month, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_YEAR => {
+//     //         //     validate_tuple = DateParseFunction::do_validate(function_text, DateParseOption::Year, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_NOW => {
+//     //         //     validate_tuple = NowFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_TODAY => {
+//     //         //     validate_tuple = TodayFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_DAYS => {
+//     //         //     validate_tuple = DaysFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_DATEADD => {
+//     //         //     validate_tuple = DateAddDiffFunction::do_validate(function_text, 
+//     //         //         DateDeltaOperation::Add, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_DATEFMT => {
+//     //         //     validate_tuple = DateFormatFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_IF => {
+//     //         //     validate_tuple = IfFunction::do_validate(function_text, validate_tuple);
+//     //         // },
+//     //         // FUNCTION_MIN => {
+//     //         //     validate_tuple = StatsFunction::do_validate(function_text, validate_tuple, StatOption::Min);
+//     //         // },
+//     //         // FUNCTION_MAX => {
+//     //         //     validate_tuple = StatsFunction::do_validate(function_text, validate_tuple, StatOption::Max);
+//     //         // },
+//     //         _ => {
+//     //             number_fails += 1;
+//     //         }
+//     //     }
+//     // }
+//     // number_fails = validate_tuple.0;
+//     // failed_functions = validate_tuple.1;
+//     // if number_fails > 0 {
+//     //     let failed_functions_str = failed_functions.join(", ");
+//     //     return Err(
+//     //         PlanetError::new(
+//     //             500, 
+//     //             Some(tr!("Could not validate formula. Failed functions: {}", &failed_functions_str)),
+//     //         )
+//     //     );
+//     // }
+//     return Ok(check);
+// }
 
 pub fn check_achiever_function(function_text: String) -> bool {
     let mut check = false;

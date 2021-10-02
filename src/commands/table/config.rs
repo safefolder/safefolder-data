@@ -17,7 +17,7 @@ use crate::storage::*;
 use crate::storage::table::{DbData};
 use crate::planet::constants::*;
 use crate::planet::make_bool_str;
-use crate::functions::{validate_formula, FormulaFieldCompiled};
+use crate::functions::{FormulaFieldCompiled};
 
 use super::fetch_yaml_config;
 
