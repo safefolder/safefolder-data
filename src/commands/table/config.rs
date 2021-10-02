@@ -372,25 +372,15 @@ impl ConfigStorageField for FieldConfig {
         if formula.is_some() {
             let formula = formula.unwrap();
             let formula_format = field_config.formula_format.unwrap();
-            // field_type_map
-            // let mut field_type_map: HashMap<String, String> = HashMap::new();
-            // field_type_map.insert(field_name.clone(), field_type);
-            // eprintln!("map_object_db :: field_type_map: {:?}", &field_type_map);
-            // field_name_map
-            // let mut field_name_map: HashMap<String, String> = HashMap::new();
-            // field_name_map.insert(field_name.clone(), field_id.clone());
             let formula_compiled = FormulaFieldCompiled::defaults(
                 &formula, 
                 &formula_format,
                 field_type_map,
             )?;
-            eprintln!("map_object_db :: formula_compiled: {:#?}", &formula_compiled);
-            // TODO: YAML serialize into "formula_compiled" at "map"
-        
             map.insert(String::from("formula"), formula);
             map.insert(String::from("formula_format"), formula_format);
-            // YAML serialized
-            map.insert(String::from("formula_compiled"), String::from(""));
+            let formula_serialized = serde_yaml::to_string(&formula_compiled).unwrap();
+            map.insert(String::from("formula_compiled"), formula_serialized);
         }
         // Here we encode as string the options as string using yaml encoding
         let options = field_config.options;
