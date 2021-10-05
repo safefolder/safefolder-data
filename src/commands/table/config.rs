@@ -150,6 +150,7 @@ pub struct FieldConfig {
     pub options: Option<Vec<String>>,
     pub formula: Option<String>,
     pub formula_format: Option<String>,
+    pub formula_compiled: Option<String>,
 }
 
 impl ConfigStorageField for FieldConfig {
@@ -169,6 +170,7 @@ impl ConfigStorageField for FieldConfig {
             many: None,
             formula: None,
             formula_format: None,
+            formula_compiled: None,
         };
         if options.is_some() {
             object.options = Some(options.unwrap());
@@ -215,6 +217,7 @@ impl ConfigStorageField for FieldConfig {
                         options: None,
                         formula: None,
                         formula_format: None,
+                        formula_compiled: None,
                     };
                     return Some(field_config);
                 }
@@ -260,11 +263,15 @@ impl ConfigStorageField for FieldConfig {
                 }
                 // Process formula
                 let formula = field_config_map.get("formula");
+                let formula_compiled = field_config_map.get("formula_compiled");
                 let formula_format = field_config_map.get("formula_format");
                 let mut formula_wrap: Option<String> = None;
+                let mut formula_compiled_wrap: Option<String> = None;
                 let mut formula_format_wrap: Option<String> = None;
-                if formula.is_some() {
+                if formula_compiled.is_some() {
+                    let formula_compiled = formula_compiled.unwrap().clone();
                     let formula = formula.unwrap().clone();
+                    formula_compiled_wrap = Some(formula_compiled);
                     formula_wrap = Some(formula);
                     let formula_format = formula_format.unwrap().clone();
                     formula_format_wrap = Some(formula_format);
@@ -282,6 +289,7 @@ impl ConfigStorageField for FieldConfig {
                     options: options_wrap,
                     formula: formula_wrap,
                     formula_format: formula_format_wrap,
+                    formula_compiled: formula_compiled_wrap,
                 };
                 &map_fields_by_id.insert(field_id, field_config.clone());
                 &map_fields_by_name.insert(field_name.clone(), field_config.clone());

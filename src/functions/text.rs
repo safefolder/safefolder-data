@@ -37,25 +37,30 @@ pub fn concat(
     attributes: Vec<FunctionAttributeItem>
 ) -> Result<String, PlanetError> {
     let mut attributes_processed: Vec<String> = Vec::new();
+    // Case 1: In a formula field, no ref, CONCAT("My ", "places")
+    // Case 2: In a formula field, ref, CONCAT("My "", {Column})
+    // Case 3: I have function as attribute: CONCAT("My "", TRIM({Column}))
     for attribute_item in attributes {
         let is_reference = attribute_item.is_reference;
-        let reference_value_wrap = attribute_item.reference_value;
-        let value = attribute_item.value.unwrap();
+        let value = attribute_item.value;
+        let has_function = attribute_item.function.is_some();
+        let name = attribute_item.name;
         let mut attribute: String;
         if is_reference == true {
-            // I can have reference and need to get data from the data_map_names, or reference already comes
-            // with value.
-            if reference_value_wrap.is_some() {
-                let reference_value = reference_value_wrap.unwrap();
-                attribute = reference_value;
-            } else {
-                attribute = value;
-            }
+            let name = name.unwrap();
+            attribute = name;
             let function_attr = FunctionAttributeNew::defaults(
-                &attribute, Some(true)
+                &attribute, Some(true), Some(true)
             );
             attribute = function_attr.replace(data_map).item_processed.unwrap();
+        } else if has_function {
+            // function as attribute
+            let function = attribute_item.function.unwrap();
+            let result = execute_function(&function, data_map)?;
+            let result_value = result.text;
+            attribute = result_value.unwrap();
         } else {
+            let value = value.unwrap();
             attribute = value;
         }
         attributes_processed.push(attribute);
@@ -64,20 +69,35 @@ pub fn concat(
     return Ok(result)
 }
 
-// pub fn concat_validate(
-//     function_text: &String, 
-//     validate_tuple: (u32, Vec<String>)
-//  ) -> (u32, Vec<String>) {
-//     let (number_fails, mut failed_functions) = validate_tuple;
-//     let expr = &RE_CONCAT_ATTRS;
-//     let check = expr.is_match(&function_text);
-//     let mut number_fails = number_fails.clone();
-//     if check == false {
-//         number_fails += 1;
-//         failed_functions.push(String::from(FUNCTION_CONCAT));
-//     }
-//     return (number_fails, failed_functions);
-// }
+pub fn trim(
+    data_map: &HashMap<String, String>, 
+    attributes: Vec<FunctionAttributeItem>
+) -> Result<String, PlanetError> {
+    let attributes = attributes.clone();
+    let attribute_item = attributes[0].clone();
+    let is_reference = attribute_item.is_reference;
+    let reference_value_wrap = attribute_item.reference_value;
+    let value = attribute_item.value.unwrap();
+    let has_function = attribute_item.function.is_some();
+    let mut attribute: String;
+    if is_reference {
+        let reference_value = reference_value_wrap.unwrap();
+        attribute = reference_value;
+        let function_attr = FunctionAttributeNew::defaults(
+            &attribute, Some(true), Some(true)
+        );
+        attribute = function_attr.replace(data_map).item_processed.unwrap();
+    } else if has_function {
+        let function = attribute_item.function.unwrap();
+        let result = execute_function(&function, data_map)?;
+        let result_value = result.text;
+        attribute = result_value.unwrap();
+    } else {
+        attribute = value;
+    }
+    let result = attribute.trim().to_string();
+    return Ok(result);
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ConcatenateFunction {

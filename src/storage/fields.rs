@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use tr::tr;
+use serde_yaml;
 
 use crate::commands::table::constants::{FIELD_IDS, KEY, SELECT_OPTIONS, VALUE};
 use crate::planet::constants::ID;
@@ -13,7 +14,7 @@ use crate::planet::{PlanetError};
 use crate::storage::table::{DbData};
 use crate::commands::table::config::FieldConfig;
 use crate::storage::constants::*;
-use crate::functions::Formula;
+use crate::functions::{execute_formula_field, FormulaFieldCompiled};
 
 /*
 These are the core fields implemented so we can tackle the security and permissions system
@@ -86,7 +87,7 @@ pub trait ValidateManyField {
     fn is_valid(&self, value: Option<Vec<String>>) -> Result<bool, PlanetError>;
 }
 pub trait ValidateFormulaField {
-    fn is_valid(&self, value: Option<&String>, formula_obj: &Formula) -> Result<bool, PlanetError>;
+    fn is_valid(&self, value: Option<&String>) -> Result<bool, PlanetError>;
 }
 
 pub trait ProcessField {
@@ -1077,7 +1078,7 @@ impl DbDumpString for FormulaField {
 }
 
 impl ValidateFormulaField for FormulaField {
-    fn is_valid(&self, value: Option<&String>, formula_obj: &Formula) -> Result<bool, PlanetError> {
+    fn is_valid(&self, value: Option<&String>) -> Result<bool, PlanetError> {
         let field_config = self.field_config.clone();
         let required = field_config.required.unwrap();
         let name = field_config.name.unwrap();
@@ -1091,11 +1092,8 @@ impl ValidateFormulaField for FormulaField {
                     )),
                 )
             );
-        } else {
-            // let data_map = self.data_map.clone();
-            let is_valid = formula_obj.validate_data(value.unwrap())?;
-            return Ok(is_valid)
         }
+        return Ok(true)
     }
 }
 
@@ -1107,20 +1105,22 @@ impl ProcessField for FormulaField {
     ) -> Result<DbData, PlanetError> {
         let field_config = self.field_config.clone();
         let field_id = field_config.id.unwrap_or_default();
-        let table = self.table.clone();
-        let formula = self.field_config.formula.clone();
-        if formula.is_some() {
-            let mut formula = formula.unwrap();
-            let formula_obj = Formula::defaults(
-                Some(insert_data_map), 
-                Some(table),
-            );
-            self.is_valid(Some(&formula), &formula_obj)?;
+        // let table = self.table.clone();
+        // let formula = self.field_config.formula.clone();
+        let formula_compiled_str = self.field_config.formula_compiled.clone();
+        // eprintln!("FormulaField.process...");
+        if formula_compiled_str.is_some() {
+            let formula_compiled_str = formula_compiled_str.unwrap();
+            // eprintln!("FormulaField.process :: formula_compiled_str: {}", &formula_compiled_str);
+            let formula_compiled: FormulaFieldCompiled = serde_yaml::from_str(
+                formula_compiled_str.as_str()
+            ).unwrap();
+            let formula = execute_formula_field(&formula_compiled, &insert_data_map)?;
+            self.is_valid(Some(&formula))?;
             let mut data: HashMap<String, String> = HashMap::new();
             if db_data.data.is_some() {
                 data = db_data.data.clone().unwrap();
-            }    
-            formula = formula_obj.execute(&formula)?;
+            }
             &data.insert(field_id, formula);
             db_data.data = Some(data);
             return Ok(db_data);

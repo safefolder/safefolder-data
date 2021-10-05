@@ -17,12 +17,12 @@ use xlformula_engine::{calculate, parse_formula, NoReference, NoCustomFunction};
 use crate::storage::table::{DbData, DbTable};
 use crate::functions::constants::*;
 use crate::functions::text::*;
-use crate::functions::date::*;
+// use crate::functions::date::*;
 use crate::functions::number::*;
-use crate::functions::collections::*;
+// use crate::functions::collections::*;
 use crate::functions::structure::*;
 use crate::planet::PlanetError;
-use crate::storage::constants::*;
+// use crate::storage::constants::*;
 
 lazy_static! {
     static ref RE_FORMULA_FUNCTIONS: Regex = Regex::new(r#"([a-zA-Z]+\(.+\))"#).unwrap();
@@ -96,220 +96,220 @@ pub trait Function {
     fn replace(&mut self, formula: String) -> String;
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct FunctionsHanler {
-    pub function_name: String,
-    pub function_text: String,
-    pub data_map: Option<HashMap<String, String>>,
-    pub table: Option<DbData>,
-}
-impl FunctionsHanler{
-    pub fn do_functions(&self, mut formula: String) -> String {
-        let function_name = self.function_name.as_str();
-        // Match all achiever functions here. Used by insert and update data to process formula columns.
-        let data_map: HashMap<String, String>;
-        let data_map_wrap = self.data_map.clone();
-        let table_wrap = self.table.clone();
-        if data_map_wrap.is_none() {
-            data_map = HashMap::new();
-        } else {
-            data_map = data_map_wrap.unwrap();
-        }
-        // eprintln!("FunctionsHandler.do_functions :: data_map: {:#?}", &data_map);
-        match function_name {
-            FUNCTION_CONCAT => {
-                formula = ConcatenateFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula);
-            },
-            FUNCTION_FORMAT => {
-                formula = FormatFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula);
-            },
-            FUNCTION_JOINLIST => {
-                formula = JoinListFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula);
-            },
-            FUNCTION_LENGTH => {
-                formula = LengthFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula);
-            },
-            FUNCTION_LOWER => {
-                formula = LowerFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula);
-            },
-            FUNCTION_UPPER => {
-                formula = UpperFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula);
-            },
-            FUNCTION_REPLACE => {
-                formula = ReplaceFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula);
-            },
-            FUNCTION_MID => {
-                formula = MidFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula);
-            },
-            FUNCTION_REPT => {
-                formula = ReptFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula);
-            },
-            FUNCTION_SUBSTITUTE => {
-                formula = SubstituteFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula);
-            },
-            FUNCTION_TRIM => {
-                formula = TrimFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula);
-            },
-            FUNCTION_CEILING => {
-                formula = CeilingFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula);
-            },
-            FUNCTION_FLOOR => {
-                formula = FloorFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula);
-            },
-            FUNCTION_COUNT => {
-                formula = CountFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula);
-            },
-            FUNCTION_COUNTA => {
-                formula = CountAFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula);
-            },
-            FUNCTION_COUNTALL => {
-                formula = CountAllFunction::do_replace(
-                    &self.function_text, formula);
-            },
-            FUNCTION_EVEN => {
-                formula = EvenFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula);
-            },
-            FUNCTION_EXP => {
-                formula = ExpFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula);
-            },
-            FUNCTION_INT => {
-                formula = IntFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula);
-            },
-            FUNCTION_LOG => {
-                formula = LogFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula);
-            },
-            FUNCTION_MOD => {
-                formula = ModFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula);
-            },
-            FUNCTION_POWER => {
-                formula = PowerFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula);
-            },
-            FUNCTION_ROUND => {
-                formula = RoundFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula, RoundOption::Basic);
-            },
-            FUNCTION_ROUNDUP => {
-                formula = RoundFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula, RoundOption::Up);
-            },
-            FUNCTION_ROUNDDOWN => {
-                formula = RoundFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula, RoundOption::Down);
-            },
-            FUNCTION_SQRT => {
-                formula = SqrtFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula);
-            },
-            FUNCTION_VALUE => {
-                formula = ValueFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula);
-            },
-            FUNCTION_TRUE => {
-                formula = BooleanFunction::do_replace(
-                    &self.function_text, formula, BooleanOption::True);
-            },
-            FUNCTION_FALSE => {
-                formula = BooleanFunction::do_replace(
-                    &self.function_text, formula, BooleanOption::False);
-            },
-            FUNCTION_DATE => {
-                formula = DateFunction::do_replace(
-                    &self.function_text, formula);
-            },
-            FUNCTION_SECOND => {
-                formula = DateTimeParseFunction::do_replace(
-                    &self.function_text, DateTimeParseOption::Second, data_map.clone(), formula);
-            },
-            FUNCTION_MINUTE => {
-                formula = DateTimeParseFunction::do_replace(
-                    &self.function_text, DateTimeParseOption::Minute, data_map.clone(), formula);
-            },
-            FUNCTION_HOUR => {
-                formula = DateTimeParseFunction::do_replace(
-                    &self.function_text, DateTimeParseOption::Hour, data_map.clone(), formula);
-            },
-            FUNCTION_DAY => {
-                formula = DateParseFunction::do_replace(
-                    &self.function_text, DateParseOption::Day, data_map.clone(), formula);
-            },
-            FUNCTION_WEEK => {
-                formula = DateParseFunction::do_replace(
-                    &self.function_text, DateParseOption::Week, data_map.clone(), formula);
-            },
-            FUNCTION_WEEKDAY => {
-                formula = DateParseFunction::do_replace(
-                    &self.function_text, DateParseOption::WeekDay, data_map.clone(), formula);
-            },
-            FUNCTION_MONTH => {
-                formula = DateParseFunction::do_replace(
-                    &self.function_text, DateParseOption::Month, data_map.clone(), formula);
-            },
-            FUNCTION_YEAR => {
-                formula = DateParseFunction::do_replace(
-                    &self.function_text, DateParseOption::Year, data_map.clone(), formula);
-            },
-            FUNCTION_NOW => {
-                formula = NowFunction::do_replace(
-                    &self.function_text, formula);
-            },
-            FUNCTION_TODAY => {
-                formula = TodayFunction::do_replace(
-                    &self.function_text, formula);
-            },
-            FUNCTION_DAYS => {
-                formula = DaysFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula);
-            },
-            FUNCTION_DATEADD => {
-                formula = DateAddDiffFunction::do_replace(
-                    &self.function_text, DateDeltaOperation::Add, data_map.clone(), formula);
-            },
-            FUNCTION_DATEFMT => {
-                formula = DateFormatFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula);
-            },
-            FUNCTION_IF => {
-                if table_wrap.is_some() {
-                    let table = table_wrap.unwrap().clone();
-                    formula = IfFunction::do_replace(
-                        &self.function_text, formula, data_map.clone(), &table);
-                }
-            },
-            FUNCTION_MIN => {
-                formula = StatsFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula, StatOption::Min);
-            },
-            FUNCTION_MAX => {
-                formula = StatsFunction::do_replace(
-                    &self.function_text, data_map.clone(), formula, StatOption::Max);
-            },
-            _ => {
-            }
-        }
-        return formula
-    }
-}
+// #[derive(Debug, Serialize, Deserialize, Clone)]
+// pub struct FunctionsHanler {
+//     pub function_name: String,
+//     pub function_text: String,
+//     pub data_map: Option<HashMap<String, String>>,
+//     pub table: Option<DbData>,
+// }
+// impl FunctionsHanler{
+//     pub fn do_functions(&self, mut formula: String) -> String {
+//         let function_name = self.function_name.as_str();
+//         // Match all achiever functions here. Used by insert and update data to process formula columns.
+//         let data_map: HashMap<String, String>;
+//         let data_map_wrap = self.data_map.clone();
+//         let table_wrap = self.table.clone();
+//         if data_map_wrap.is_none() {
+//             data_map = HashMap::new();
+//         } else {
+//             data_map = data_map_wrap.unwrap();
+//         }
+//         // eprintln!("FunctionsHandler.do_functions :: data_map: {:#?}", &data_map);
+//         match function_name {
+//             FUNCTION_CONCAT => {
+//                 formula = ConcatenateFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula);
+//             },
+//             FUNCTION_FORMAT => {
+//                 formula = FormatFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula);
+//             },
+//             FUNCTION_JOINLIST => {
+//                 formula = JoinListFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula);
+//             },
+//             FUNCTION_LENGTH => {
+//                 formula = LengthFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula);
+//             },
+//             FUNCTION_LOWER => {
+//                 formula = LowerFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula);
+//             },
+//             FUNCTION_UPPER => {
+//                 formula = UpperFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula);
+//             },
+//             FUNCTION_REPLACE => {
+//                 formula = ReplaceFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula);
+//             },
+//             FUNCTION_MID => {
+//                 formula = MidFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula);
+//             },
+//             FUNCTION_REPT => {
+//                 formula = ReptFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula);
+//             },
+//             FUNCTION_SUBSTITUTE => {
+//                 formula = SubstituteFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula);
+//             },
+//             FUNCTION_TRIM => {
+//                 formula = TrimFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula);
+//             },
+//             FUNCTION_CEILING => {
+//                 formula = CeilingFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula);
+//             },
+//             FUNCTION_FLOOR => {
+//                 formula = FloorFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula);
+//             },
+//             FUNCTION_COUNT => {
+//                 formula = CountFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula);
+//             },
+//             FUNCTION_COUNTA => {
+//                 formula = CountAFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula);
+//             },
+//             FUNCTION_COUNTALL => {
+//                 formula = CountAllFunction::do_replace(
+//                     &self.function_text, formula);
+//             },
+//             FUNCTION_EVEN => {
+//                 formula = EvenFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula);
+//             },
+//             FUNCTION_EXP => {
+//                 formula = ExpFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula);
+//             },
+//             FUNCTION_INT => {
+//                 formula = IntFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula);
+//             },
+//             FUNCTION_LOG => {
+//                 formula = LogFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula);
+//             },
+//             FUNCTION_MOD => {
+//                 formula = ModFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula);
+//             },
+//             FUNCTION_POWER => {
+//                 formula = PowerFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula);
+//             },
+//             FUNCTION_ROUND => {
+//                 formula = RoundFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula, RoundOption::Basic);
+//             },
+//             FUNCTION_ROUNDUP => {
+//                 formula = RoundFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula, RoundOption::Up);
+//             },
+//             FUNCTION_ROUNDDOWN => {
+//                 formula = RoundFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula, RoundOption::Down);
+//             },
+//             FUNCTION_SQRT => {
+//                 formula = SqrtFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula);
+//             },
+//             FUNCTION_VALUE => {
+//                 formula = ValueFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula);
+//             },
+//             FUNCTION_TRUE => {
+//                 formula = BooleanFunction::do_replace(
+//                     &self.function_text, formula, BooleanOption::True);
+//             },
+//             FUNCTION_FALSE => {
+//                 formula = BooleanFunction::do_replace(
+//                     &self.function_text, formula, BooleanOption::False);
+//             },
+//             FUNCTION_DATE => {
+//                 formula = DateFunction::do_replace(
+//                     &self.function_text, formula);
+//             },
+//             FUNCTION_SECOND => {
+//                 formula = DateTimeParseFunction::do_replace(
+//                     &self.function_text, DateTimeParseOption::Second, data_map.clone(), formula);
+//             },
+//             FUNCTION_MINUTE => {
+//                 formula = DateTimeParseFunction::do_replace(
+//                     &self.function_text, DateTimeParseOption::Minute, data_map.clone(), formula);
+//             },
+//             FUNCTION_HOUR => {
+//                 formula = DateTimeParseFunction::do_replace(
+//                     &self.function_text, DateTimeParseOption::Hour, data_map.clone(), formula);
+//             },
+//             FUNCTION_DAY => {
+//                 formula = DateParseFunction::do_replace(
+//                     &self.function_text, DateParseOption::Day, data_map.clone(), formula);
+//             },
+//             FUNCTION_WEEK => {
+//                 formula = DateParseFunction::do_replace(
+//                     &self.function_text, DateParseOption::Week, data_map.clone(), formula);
+//             },
+//             FUNCTION_WEEKDAY => {
+//                 formula = DateParseFunction::do_replace(
+//                     &self.function_text, DateParseOption::WeekDay, data_map.clone(), formula);
+//             },
+//             FUNCTION_MONTH => {
+//                 formula = DateParseFunction::do_replace(
+//                     &self.function_text, DateParseOption::Month, data_map.clone(), formula);
+//             },
+//             FUNCTION_YEAR => {
+//                 formula = DateParseFunction::do_replace(
+//                     &self.function_text, DateParseOption::Year, data_map.clone(), formula);
+//             },
+//             FUNCTION_NOW => {
+//                 formula = NowFunction::do_replace(
+//                     &self.function_text, formula);
+//             },
+//             FUNCTION_TODAY => {
+//                 formula = TodayFunction::do_replace(
+//                     &self.function_text, formula);
+//             },
+//             FUNCTION_DAYS => {
+//                 formula = DaysFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula);
+//             },
+//             FUNCTION_DATEADD => {
+//                 formula = DateAddDiffFunction::do_replace(
+//                     &self.function_text, DateDeltaOperation::Add, data_map.clone(), formula);
+//             },
+//             FUNCTION_DATEFMT => {
+//                 formula = DateFormatFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula);
+//             },
+//             FUNCTION_IF => {
+//                 if table_wrap.is_some() {
+//                     let table = table_wrap.unwrap().clone();
+//                     formula = IfFunction::do_replace(
+//                         &self.function_text, formula, data_map.clone(), &table);
+//                 }
+//             },
+//             FUNCTION_MIN => {
+//                 formula = StatsFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula, StatOption::Min);
+//             },
+//             FUNCTION_MAX => {
+//                 formula = StatsFunction::do_replace(
+//                     &self.function_text, data_map.clone(), formula, StatOption::Max);
+//             },
+//             _ => {
+//             }
+//         }
+//         return formula
+//     }
+// }
 
 // pub fn validate_formula(
 //     formula: &String,
@@ -594,10 +594,11 @@ impl FunctionAttribute {
 pub struct FunctionAttributeNew{
     pub item: String,
     pub remove_quotes: Option<bool>,
-    pub item_processed: Option<String>,    
+    pub item_processed: Option<String>,
+    pub skip_curl: Option<bool>,
 }
 impl FunctionAttributeNew {
-    pub fn defaults(attribute: &String, remove_quotes: Option<bool>) -> FunctionAttributeNew {
+    pub fn defaults(attribute: &String, remove_quotes: Option<bool>, skip_curl: Option<bool>) -> FunctionAttributeNew {
         let mut remove_quotes_value: bool = false;
         if remove_quotes.is_some() {
             remove_quotes_value = true;
@@ -606,6 +607,7 @@ impl FunctionAttributeNew {
             item: attribute.clone(),
             remove_quotes: Some(remove_quotes_value),
             item_processed: None,
+            skip_curl: skip_curl,
         };
         return obj
     }
@@ -616,21 +618,30 @@ impl FunctionAttributeNew {
             item = item.replace("\"", "");
         }
         let item_string: String;
-        let item_find = item.find("{");
+        let skip_curl = self.skip_curl;
         let mut obj = self.clone();
-        if item_find.is_some() && item_find.unwrap() == 0 {
-            // I have a column, need to get data from data_map
-            item = item.replace("{", "").replace("}", "");
+        if skip_curl.is_none() {
+            let item_find = item.find("{");
+            if item_find.is_some() && item_find.unwrap() == 0 {
+                item = item.replace("{", "").replace("}", "");
+                let item_value = data_map.get(&item);
+                if item_value.is_some() {
+                    let item_value = item_value.unwrap().clone();
+                    item_string = item_value;
+                    obj.item_processed = Some(item_string);
+                }
+            } else {
+                item_string = item.to_string();    
+                obj.item_processed = Some(item_string);
+            }
+        } else {
             let item_value = data_map.get(&item);
             if item_value.is_some() {
                 let item_value = item_value.unwrap().clone();
                 item_string = item_value;
                 obj.item_processed = Some(item_string);
             }
-        } else {
-            item_string = item.to_string();
-            obj.item_processed = Some(item_string);
-        }
+        }        
         return obj;
     }
 }
@@ -641,377 +652,376 @@ pub enum FormulaProcessMode {
     Execute
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Formula {
-    item_data: Option<HashMap<String, String>>, 
-    table: Option<DbData>,
-}
-impl Formula{
-    pub fn defaults(
-        item_data: Option<HashMap<String, String>>, 
-        table: Option<DbData>
-    ) -> Formula {
-        let obj = Self{
-            item_data: item_data,
-            table: table,
-        };
+// #[derive(Debug, Serialize, Deserialize, Clone)]
+// pub struct Formula {
+//     item_data: Option<HashMap<String, String>>, 
+//     table: Option<DbData>,
+// }
+// impl Formula{
+//     pub fn defaults(
+//         item_data: Option<HashMap<String, String>>, 
+//         table: Option<DbData>
+//     ) -> Formula {
+//         let obj = Self{
+//             item_data: item_data,
+//             table: table,
+//         };
 
-        // eprintln!("Formula.defaults :: obj: {:#?}", &obj);
+//         // eprintln!("Formula.defaults :: obj: {:#?}", &obj);
 
-        return obj
-    }
-    fn process_formula_str(
-        &self, 
-        expr: &Regex, 
-        formula_string: String, 
-        mut function_text_list: Vec<String>,
-        replaced_text: Option<&str>,
-        mode: FormulaProcessMode,
-    ) -> Result<(String, Vec<String>, bool, bool), PlanetError> {
-        let data_map = self.item_data.clone();
-        let table = self.table.clone();
-        let mut achiever_functions: Vec<String> = Vec::new();
-        let formula_str = formula_string.as_str();
-        let replaced_text = replaced_text.unwrap_or_default();
-        for function_name_item in FORMULA_FUNCTIONS {
-            achiever_functions.push(function_name_item.to_string());
-        }
-        let mut formula_new_string = formula_str.clone().to_string();
-        let mut only_not_achive_functions = false;
-        let mut not_achiever_counter = 0;
-        // let t_1 = Instant::now();
-        let capture_list = expr.captures_iter(formula_str);
-        // eprintln!("Formula.process_formula_str :: capture_list : {} ms", &t_1.elapsed().as_millis());
-        for capture in capture_list {
-            let function_text = capture.get(0).unwrap().as_str();
-            let function_text_string = function_text.to_string();
-            let check_achiever = check_achiever_function(function_text_string.clone());
-            if check_achiever == true {
-                let function_name = get_function_name(function_text_string.clone());
-                if achiever_functions.contains(&function_name) == true {
+//         return obj
+//     }
+//     fn process_formula_str(
+//         &self, 
+//         expr: &Regex, 
+//         formula_string: String, 
+//         mut function_text_list: Vec<String>,
+//         replaced_text: Option<&str>,
+//         mode: FormulaProcessMode,
+//     ) -> Result<(String, Vec<String>, bool, bool), PlanetError> {
+//         let data_map = self.item_data.clone();
+//         let table = self.table.clone();
+//         let mut achiever_functions: Vec<String> = Vec::new();
+//         let formula_str = formula_string.as_str();
+//         let replaced_text = replaced_text.unwrap_or_default();
+//         for function_name_item in FORMULA_FUNCTIONS {
+//             achiever_functions.push(function_name_item.to_string());
+//         }
+//         let mut formula_new_string = formula_str.clone().to_string();
+//         let mut only_not_achive_functions = false;
+//         let mut not_achiever_counter = 0;
+//         // let t_1 = Instant::now();
+//         let capture_list = expr.captures_iter(formula_str);
+//         // eprintln!("Formula.process_formula_str :: capture_list : {} ms", &t_1.elapsed().as_millis());
+//         for capture in capture_list {
+//             let function_text = capture.get(0).unwrap().as_str();
+//             let function_text_string = function_text.to_string();
+//             let check_achiever = check_achiever_function(function_text_string.clone());
+//             if check_achiever == true {
+//                 let function_name = get_function_name(function_text_string.clone());
+//                 if achiever_functions.contains(&function_name) == true {
                     
-                    match mode {
-                        FormulaProcessMode::Validate => {
-                            function_text_list.push(function_text_string);
-                            formula_new_string = formula_new_string.replace(function_text, replaced_text);
-                        },
-                        FormulaProcessMode::Execute => {
-                            let handler = FunctionsHanler{
-                                function_name: function_name.clone(),
-                                function_text: function_text_string,
-                                data_map: data_map.clone(),
-                                table: table.clone(),
-                            };
-                            formula_new_string = handler.do_functions(formula_new_string.clone());
-                        },
-                    }
-                } else {
-                    return Err(
-                        PlanetError::new(
-                            500, 
-                            Some(tr!("Function \"{}\" does not exist. Check your spelling.", &function_name)),
-                        )
-                    );
-                }
-            } else {
-                not_achiever_counter += 1;
-            }
-        }
-        let has_matches = expr.clone().captures(formula_new_string.as_str()).is_some();
-        if not_achiever_counter == 1 {
-            only_not_achive_functions = true;
-        }
-        return Ok(
-            (
-                formula_new_string,
-                function_text_list,
-                has_matches,
-                only_not_achive_functions,
-            )
-        )
-    }
-    pub fn validate(&self, formula: &String, formula_format: &String) -> Result<Vec<String>, PlanetError> {
-        let expr = &RE_ACHIEVER_FUNCTIONS_PARTS;
-        let formula = formula.clone();
-        let formula_str = formula.as_str();
-        let mut has_matches = expr.captures(formula_str).is_some();
-        let mut sequence: u8 = 1;
-        let max_counter = 20;
-        let mut achiever_functions: Vec<String> = Vec::new();
-        for function_name_item in FORMULA_FUNCTIONS {
-            achiever_functions.push(function_name_item.to_string());
-        }
-        let mut function_text_list: Vec<String> = Vec::new();
-        let formula_format_str = formula_format.as_str();
-        let replaced_text: &str;
-        match formula_format_str {
-            FORMULA_FORMAT_TEXT => {
-                replaced_text = "\"\"";
-            },
-            FORMULA_FORMAT_NUMBER => {
-                replaced_text = "1"
-            },
-            FORMULA_FORMAT_DATE => {
-                replaced_text = "01-Jan-2021"
-            },
-            _ => {
-                replaced_text = "\"\"";
-            },
-        }
-        let mut formula_string: String = formula_str.to_string();
-        let mut only_not_achive_functions: bool;
-        while has_matches == true {
-            let tuple = self.process_formula_str(
-                expr, 
-                formula_string.clone(), 
-                function_text_list.clone(), 
-                Some(replaced_text),
-                FormulaProcessMode::Validate,
-            )?;
-            formula_string = tuple.0;
-            function_text_list = tuple.1;
-            has_matches = tuple.2;
-            only_not_achive_functions = tuple.3;
-            sequence += 1;
-            if only_not_achive_functions == true {
-                break
-            }
-            if sequence > max_counter {
-                break
-            }
-            if has_matches == false {
-                break
-            }
-        }
-        let formula_str_ = formula_string.as_str();
-        // Check function again, for case of IF with non achieve functions inside like AND, OR, etc...
-        let expr = RE_ACHIEVER_FUNCTIONS.clone();
-        let has_matches = expr.captures(&formula_str_);
-        if has_matches.is_some() {
-            // IF formula with AND, OR, NOT, etc... global functions from Lib used
-            for capture in expr.captures_iter(formula_str) {
-                let function_text = capture.get(0).unwrap().as_str();
-                let function_text_string = function_text.to_string();
-                let check_achiever = check_achiever_function(function_text_string.clone());
-                if check_achiever == true {
-                    function_text_list.push(function_text_string);
-                }
-            }
-        }
-        return Ok(function_text_list)
-    }
-    pub fn validate_data(&self, formula: &String) -> Result<bool, PlanetError> {
-        let expr = RE_FORMULA_VALID.clone();
-        let mut check = true;
-        let data_map = self.item_data.clone().unwrap();
-        for capture in expr.captures_iter(formula.as_str()) {
-            let field_ref = capture.get(0).unwrap().as_str();
-            let field_ref = field_ref.replace("{", "").replace("}", "");
-            let field_ref_value = data_map.get(&field_ref);
-            if field_ref_value.is_none() {
-                check = false;
-                break;
-            }
-        }
-        return Ok(check)
-    }
-    fn process_string_matches(&self, formula: &String) -> String {
-        // let t_1 = Instant::now();
-        let formula = formula.clone();
-        let formula_str = formula.as_str();
-        let expr = &RE_STRING_MATCH;
-        let mut formula_new = formula.clone();
-        // let t_capture_list = Instant::now();
-        let list_captures = expr.captures_iter(formula_str);
-        // eprintln!("Formula.process_string_matches :: perf : capture_list: {} ms", &t_capture_list.elapsed().as_millis());
-        // eprintln!("Formula.process_string_matches :: perf : header: {} ms", &t_1.elapsed().as_millis());
-        for capture in list_captures {
-            // let t_item_1 = Instant::now();
-            let item = capture.get(0).unwrap().as_str();
-            // let equal_greater = item.find("=>");
-            // let smaller_equal = item.find("<=");
-            let equal = item.find("=");
-            if equal.is_some() {
-                let fields: Vec<&str> = item.split("=").collect();
-                let name = fields[0].trim();
-                let value = fields[1].trim();
-                if name != value {
-                    formula_new = formula_new.replace(item, "1=2");
-                } else {
-                    formula_new = formula_new.replace(item, "1=1");
-                }
-            }
-            // eprintln!("Formula.process_string_matches :: perf : item {}: {} ms", &item, &t_item_1.elapsed().as_millis());
-        }
-        // eprintln!("Formula.process_string_matches :: perf : total: {} ms", &t_1.elapsed().as_millis());
-        return formula_new
-    }
-    pub fn inyect_data_formula(&self, formula: &String) -> Option<String> {
-        let table_wrap = self.table.clone();
-        let data_map_wrap = self.item_data.clone();
-        let mut formula = formula.clone();
-        let formula_str = formula.clone();
-        let formula_str = formula_str.as_str();
-        if table_wrap.is_some() && data_map_wrap.is_some() {
-            let table = table_wrap.unwrap();
-            let data_map = data_map_wrap.unwrap();
-            // This replaces the column data with its value and return the formula to be processed
-            let field_type_map = DbTable::get_field_type_map(&table);
-            if field_type_map.is_ok() {
-                let field_type_map = field_type_map.unwrap();
-                let expr = RE_FORMULA_VALID.clone();
-                // let mut formula = formula.clone();
-                for capture in expr.captures_iter(formula_str) {
-                    let field_ref = capture.get(0).unwrap().as_str();
-                    let field_ref = field_ref.replace("{", "").replace("}", "");
-                    let field_ref_value = data_map.get(&field_ref);
-                    if field_ref_value.is_some() {
-                        let field_ref_value = field_ref_value.unwrap();
-                        // Check is we have string field_type or not string one
-                        let field_type = field_type_map.get(&field_ref.to_string());
-                        if field_type.is_some() {
-                            let field_type = field_type.unwrap().clone();
-                            // eprintln!("Formula.inyect_data_formula :: field_type: {}", &field_type);
-                            let replace_string: String;
-                            // field formula????
-                            // TODO: Add fields as you implement them
-                            match field_type.as_str() {
-                                FIELD_SMALL_TEXT => {
-                                    replace_string = format!("\"{}\"", &field_ref_value);
-                                },
-                                FIELD_LONG_TEXT => {
-                                    replace_string = format!("\"{}\"", &field_ref_value);
-                                },
-                                FIELD_SELECT => {
-                                    replace_string = format!("\"{}\"", &field_ref_value);
-                                },
-                                FIELD_NUMBER => {
-                                    replace_string = format!("{}", &field_ref_value);
-                                },
-                                _ => {
-                                    replace_string = field_ref_value.clone();
-                                }
-                            }
-                            let field_to_replace = format!("{}{}{}", 
-                                String::from("{"),
-                                &field_ref,
-                                String::from("}"),
-                            );
-                            formula = formula.replace(&field_to_replace, &replace_string);
-                        }
-                    }
-                }
-                return Some(formula);
-            }
-            return None;
-        } else {
-            return None;
-        }
-    }
-    pub fn execute(self, formula: &String) -> Result<String, PlanetError> {
-        // First process the achiever functions, then rest
-        // let t_1 = Instant::now();
-        let expr = &RE_ACHIEVER_FUNCTIONS_PARTS;
-        let formula_str = formula.as_str();
-        let mut formula_string = formula.clone();
-        let data_map = self.item_data.clone();
-        let table = self.table.clone();
-        let mut has_matches = expr.captures(&formula_str).is_some();
-        let mut sequence: u8 = 1;
-        let max_counter = 20;
-        let mut only_not_achive_functions;
-        let mut function_text_list: Vec<String> = Vec::new();
-        // eprintln!("Formula.execute :: achiever functions?: {}", &has_matches);
-        // eprintln!("Formula.execute :: perf : header: {} µs", &t_1.elapsed().as_micros());
-        // let t_process_formula_1 = Instant::now();
-        while has_matches == true {
-            let tuple = self.process_formula_str(
-                expr, 
-                formula_string.clone(), 
-                function_text_list.clone(), 
-                None,
-                FormulaProcessMode::Execute,
-            )?;
-            formula_string = tuple.0;
-            function_text_list = tuple.1;
-            has_matches = tuple.2;
-            only_not_achive_functions = tuple.3;
-
-            sequence += 1;
-            if only_not_achive_functions == true {
-                break
-            }
-            if sequence > max_counter {
-                break
-            }
-            if has_matches == false {
-                break
-            }
-        }
-        // eprintln!("Formula.execute :: perf : process formula: {} µs", &t_process_formula_1.elapsed().as_micros());
-        // let t_process_formula_2 = Instant::now();
-        let formula_str_ = formula_string.as_str();
-        // Check function again, for case of IF with non achieve functions inside like AND, OR, etc...
-        let expr = &RE_ACHIEVER_FUNCTIONS;
-        let has_matches = expr.captures(&formula_str_).is_some();
-        // eprintln!("Formula.execute :: [2] achiever functions?: {}", &has_matches);
-        if has_matches == true {
-            let tuple = self.process_formula_str(
-                expr, 
-                formula_string.clone(), 
-                function_text_list.clone(), 
-                None,
-                FormulaProcessMode::Execute,
-            )?;
-            formula_string = tuple.0;
-        }
-        // eprintln!("Formula.execute :: perf : process formula (2): {} µs", &t_process_formula_2.elapsed().as_micros());
-        // This injects references without achiever functions
-        if data_map.is_some() && table.is_some() {
-            // let t_inyect_1 = Instant::now();
-            // eprintln!("Formula.execute :: formula before inyect: *{}*", &formula_string);
-            let formula_wrap = self.inyect_data_formula(&formula_string);
-            // eprintln!("Formula.execute :: formula after inyect: *{:?}*", &formula_wrap);
-            // eprintln!("Formula.execute :: perf : inyect formula: {} µs", &t_inyect_1.elapsed().as_micros());
-            if formula_wrap.is_some() {
-                formula_string = formula_wrap.unwrap();
-                // let t_string_1 = Instant::now();
-                formula_string = self.process_string_matches(&formula_string);
-                // eprintln!("Formula.execute :: perf : string matches: {} µs", &t_string_1.elapsed().as_micros());
-                // eprintln!("Formula.execute :: formula_new: {}", &formula_string);
-                formula_string = format!("={}", &formula_string);
-                // let t_exec_1 = Instant::now();
-                let formula_ = parse_formula::parse_string_to_formula(
-                    &formula_string, 
-                    None::<NoCustomFunction>
-                );
-                // eprintln!("Formula.execute :: formula_: {:?}", &formula_);
-                let result = calculate::calculate_formula(formula_, None::<NoReference>);
-                // eprintln!("Formula.execute :: calcuated formula_: {:?}", &result);
-                let result = calculate::result_to_string(result);
-                // eprintln!("Formula.execute :: perf : exec: {} µs", &t_exec_1.elapsed().as_micros());
-                return Ok(result);
-            } else {
-                return Err(
-                    PlanetError::new(
-                        500, 
-                        Some(tr!("Formula could not execute due to bad format in the references like {My Reference} or
-                        data problem on the target data associated with the reference.")),
-                    )
-                );
-            }
-        } else {
-            // I have no data and table information, skip references, simply execute formula I have
-            let formula_ = parse_formula::parse_string_to_formula(
-                &formula, 
-                None::<NoCustomFunction>
-            );
-            let result = calculate::calculate_formula(formula_, None::<NoReference>);
-            let result = calculate::result_to_string(result);
-            return Ok(result);
-        }        
-    }
-}
+//                     match mode {
+//                         FormulaProcessMode::Validate => {
+//                             function_text_list.push(function_text_string);
+//                             formula_new_string = formula_new_string.replace(function_text, replaced_text);
+//                         },
+//                         FormulaProcessMode::Execute => {
+//                             let handler = FunctionsHanler{
+//                                 function_name: function_name.clone(),
+//                                 function_text: function_text_string,
+//                                 data_map: data_map.clone(),
+//                                 table: table.clone(),
+//                             };
+//                             formula_new_string = handler.do_functions(formula_new_string.clone());
+//                         },
+//                     }
+//                 } else {
+//                     return Err(
+//                         PlanetError::new(
+//                             500, 
+//                             Some(tr!("Function \"{}\" does not exist. Check your spelling.", &function_name)),
+//                         )
+//                     );
+//                 }
+//             } else {
+//                 not_achiever_counter += 1;
+//             }
+//         }
+//         let has_matches = expr.clone().captures(formula_new_string.as_str()).is_some();
+//         if not_achiever_counter == 1 {
+//             only_not_achive_functions = true;
+//         }
+//         return Ok(
+//             (
+//                 formula_new_string,
+//                 function_text_list,
+//                 has_matches,
+//                 only_not_achive_functions,
+//             )
+//         )
+//     }
+//     pub fn validate(&self, formula: &String, formula_format: &String) -> Result<Vec<String>, PlanetError> {
+//         let expr = &RE_ACHIEVER_FUNCTIONS_PARTS;
+//         let formula = formula.clone();
+//         let formula_str = formula.as_str();
+//         let mut has_matches = expr.captures(formula_str).is_some();
+//         let mut sequence: u8 = 1;
+//         let max_counter = 20;
+//         let mut achiever_functions: Vec<String> = Vec::new();
+//         for function_name_item in FORMULA_FUNCTIONS {
+//             achiever_functions.push(function_name_item.to_string());
+//         }
+//         let mut function_text_list: Vec<String> = Vec::new();
+//         let formula_format_str = formula_format.as_str();
+//         let replaced_text: &str;
+//         match formula_format_str {
+//             FORMULA_FORMAT_TEXT => {
+//                 replaced_text = "\"\"";
+//             },
+//             FORMULA_FORMAT_NUMBER => {
+//                 replaced_text = "1"
+//             },
+//             FORMULA_FORMAT_DATE => {
+//                 replaced_text = "01-Jan-2021"
+//             },
+//             _ => {
+//                 replaced_text = "\"\"";
+//             },
+//         }
+//         let mut formula_string: String = formula_str.to_string();
+//         let mut only_not_achive_functions: bool;
+//         while has_matches == true {
+//             let tuple = self.process_formula_str(
+//                 expr, 
+//                 formula_string.clone(), 
+//                 function_text_list.clone(), 
+//                 Some(replaced_text),
+//                 FormulaProcessMode::Validate,
+//             )?;
+//             formula_string = tuple.0;
+//             function_text_list = tuple.1;
+//             has_matches = tuple.2;
+//             only_not_achive_functions = tuple.3;
+//             sequence += 1;
+//             if only_not_achive_functions == true {
+//                 break
+//             }
+//             if sequence > max_counter {
+//                 break
+//             }
+//             if has_matches == false {
+//                 break
+//             }
+//         }
+//         let formula_str_ = formula_string.as_str();
+//         // Check function again, for case of IF with non achieve functions inside like AND, OR, etc...
+//         let expr = RE_ACHIEVER_FUNCTIONS.clone();
+//         let has_matches = expr.captures(&formula_str_);
+//         if has_matches.is_some() {
+//             // IF formula with AND, OR, NOT, etc... global functions from Lib used
+//             for capture in expr.captures_iter(formula_str) {
+//                 let function_text = capture.get(0).unwrap().as_str();
+//                 let function_text_string = function_text.to_string();
+//                 let check_achiever = check_achiever_function(function_text_string.clone());
+//                 if check_achiever == true {
+//                     function_text_list.push(function_text_string);
+//                 }
+//             }
+//         }
+//         return Ok(function_text_list)
+//     }
+//     pub fn validate_data(&self, formula: &String) -> Result<bool, PlanetError> {
+//         let expr = RE_FORMULA_VALID.clone();
+//         let mut check = true;
+//         let data_map = self.item_data.clone().unwrap();
+//         for capture in expr.captures_iter(formula.as_str()) {
+//             let field_ref = capture.get(0).unwrap().as_str();
+//             let field_ref = field_ref.replace("{", "").replace("}", "");
+//             let field_ref_value = data_map.get(&field_ref);
+//             if field_ref_value.is_none() {
+//                 check = false;
+//                 break;
+//             }
+//         }
+//         return Ok(check)
+//     }
+//     fn process_string_matches(&self, formula: &String) -> String {
+//         // let t_1 = Instant::now();
+//         let formula = formula.clone();
+//         let formula_str = formula.as_str();
+//         let expr = &RE_STRING_MATCH;
+//         let mut formula_new = formula.clone();
+//         // let t_capture_list = Instant::now();
+//         let list_captures = expr.captures_iter(formula_str);
+//         // eprintln!("Formula.process_string_matches :: perf : capture_list: {} ms", &t_capture_list.elapsed().as_millis());
+//         // eprintln!("Formula.process_string_matches :: perf : header: {} ms", &t_1.elapsed().as_millis());
+//         for capture in list_captures {
+//             // let t_item_1 = Instant::now();
+//             let item = capture.get(0).unwrap().as_str();
+//             // let equal_greater = item.find("=>");
+//             // let smaller_equal = item.find("<=");
+//             let equal = item.find("=");
+//             if equal.is_some() {
+//                 let fields: Vec<&str> = item.split("=").collect();
+//                 let name = fields[0].trim();
+//                 let value = fields[1].trim();
+//                 if name != value {
+//                     formula_new = formula_new.replace(item, "1=2");
+//                 } else {
+//                     formula_new = formula_new.replace(item, "1=1");
+//                 }
+//             }
+//             // eprintln!("Formula.process_string_matches :: perf : item {}: {} ms", &item, &t_item_1.elapsed().as_millis());
+//         }
+//         // eprintln!("Formula.process_string_matches :: perf : total: {} ms", &t_1.elapsed().as_millis());
+//         return formula_new
+//     }
+//     pub fn inyect_data_formula(&self, formula: &String) -> Option<String> {
+//         let table_wrap = self.table.clone();
+//         let data_map_wrap = self.item_data.clone();
+//         let mut formula = formula.clone();
+//         let formula_str = formula.clone();
+//         let formula_str = formula_str.as_str();
+//         if table_wrap.is_some() && data_map_wrap.is_some() {
+//             let table = table_wrap.unwrap();
+//             let data_map = data_map_wrap.unwrap();
+//             // This replaces the column data with its value and return the formula to be processed
+//             let field_type_map = DbTable::get_field_type_map(&table);
+//             if field_type_map.is_ok() {
+//                 let field_type_map = field_type_map.unwrap();
+//                 let expr = RE_FORMULA_VALID.clone();
+//                 // let mut formula = formula.clone();
+//                 for capture in expr.captures_iter(formula_str) {
+//                     let field_ref = capture.get(0).unwrap().as_str();
+//                     let field_ref = field_ref.replace("{", "").replace("}", "");
+//                     let field_ref_value = data_map.get(&field_ref);
+//                     if field_ref_value.is_some() {
+//                         let field_ref_value = field_ref_value.unwrap();
+//                         // Check is we have string field_type or not string one
+//                         let field_type = field_type_map.get(&field_ref.to_string());
+//                         if field_type.is_some() {
+//                             let field_type = field_type.unwrap().clone();
+//                             // eprintln!("Formula.inyect_data_formula :: field_type: {}", &field_type);
+//                             let replace_string: String;
+//                             // field formula????
+//                             // TODO: Add fields as you implement them
+//                             match field_type.as_str() {
+//                                 FIELD_SMALL_TEXT => {
+//                                     replace_string = format!("\"{}\"", &field_ref_value);
+//                                 },
+//                                 FIELD_LONG_TEXT => {
+//                                     replace_string = format!("\"{}\"", &field_ref_value);
+//                                 },
+//                                 FIELD_SELECT => {
+//                                     replace_string = format!("\"{}\"", &field_ref_value);
+//                                 },
+//                                 FIELD_NUMBER => {
+//                                     replace_string = format!("{}", &field_ref_value);
+//                                 },
+//                                 _ => {
+//                                     replace_string = field_ref_value.clone();
+//                                 }
+//                             }
+//                             let field_to_replace = format!("{}{}{}", 
+//                                 String::from("{"),
+//                                 &field_ref,
+//                                 String::from("}"),
+//                             );
+//                             formula = formula.replace(&field_to_replace, &replace_string);
+//                         }
+//                     }
+//                 }
+//                 return Some(formula);
+//             }
+//             return None;
+//         } else {
+//             return None;
+//         }
+//     }
+//     pub fn execute(self, formula: &String) -> Result<String, PlanetError> {
+//         // First process the achiever functions, then rest
+//         // let t_1 = Instant::now();
+//         let expr = &RE_ACHIEVER_FUNCTIONS_PARTS;
+//         let formula_str = formula.as_str();
+//         let mut formula_string = formula.clone();
+//         let data_map = self.item_data.clone();
+//         let table = self.table.clone();
+//         let mut has_matches = expr.captures(&formula_str).is_some();
+//         let mut sequence: u8 = 1;
+//         let max_counter = 20;
+//         let mut only_not_achive_functions;
+//         let mut function_text_list: Vec<String> = Vec::new();
+//         // eprintln!("Formula.execute :: achiever functions?: {}", &has_matches);
+//         // eprintln!("Formula.execute :: perf : header: {} µs", &t_1.elapsed().as_micros());
+//         // let t_process_formula_1 = Instant::now();
+//         while has_matches == true {
+//             let tuple = self.process_formula_str(
+//                 expr, 
+//                 formula_string.clone(), 
+//                 function_text_list.clone(), 
+//                 None,
+//                 FormulaProcessMode::Execute,
+//             )?;
+//             formula_string = tuple.0;
+//             function_text_list = tuple.1;
+//             has_matches = tuple.2;
+//             only_not_achive_functions = tuple.3;
+//             sequence += 1;
+//             if only_not_achive_functions == true {
+//                 break
+//             }
+//             if sequence > max_counter {
+//                 break
+//             }
+//             if has_matches == false {
+//                 break
+//             }
+//         }
+//         // eprintln!("Formula.execute :: perf : process formula: {} µs", &t_process_formula_1.elapsed().as_micros());
+//         // let t_process_formula_2 = Instant::now();
+//         let formula_str_ = formula_string.as_str();
+//         // Check function again, for case of IF with non achieve functions inside like AND, OR, etc...
+//         let expr = &RE_ACHIEVER_FUNCTIONS;
+//         let has_matches = expr.captures(&formula_str_).is_some();
+//         // eprintln!("Formula.execute :: [2] achiever functions?: {}", &has_matches);
+//         if has_matches == true {
+//             let tuple = self.process_formula_str(
+//                 expr, 
+//                 formula_string.clone(), 
+//                 function_text_list.clone(), 
+//                 None,
+//                 FormulaProcessMode::Execute,
+//             )?;
+//             formula_string = tuple.0;
+//         }
+//         // eprintln!("Formula.execute :: perf : process formula (2): {} µs", &t_process_formula_2.elapsed().as_micros());
+//         // This injects references without achiever functions
+//         if data_map.is_some() && table.is_some() {
+//             // let t_inyect_1 = Instant::now();
+//             // eprintln!("Formula.execute :: formula before inyect: *{}*", &formula_string);
+//             let formula_wrap = self.inyect_data_formula(&formula_string);
+//             // eprintln!("Formula.execute :: formula after inyect: *{:?}*", &formula_wrap);
+//             // eprintln!("Formula.execute :: perf : inyect formula: {} µs", &t_inyect_1.elapsed().as_micros());
+//             if formula_wrap.is_some() {
+//                 formula_string = formula_wrap.unwrap();
+//                 // let t_string_1 = Instant::now();
+//                 formula_string = self.process_string_matches(&formula_string);
+//                 // eprintln!("Formula.execute :: perf : string matches: {} µs", &t_string_1.elapsed().as_micros());
+//                 // eprintln!("Formula.execute :: formula_new: {}", &formula_string);
+//                 formula_string = format!("={}", &formula_string);
+//                 // let t_exec_1 = Instant::now();
+//                 let formula_ = parse_formula::parse_string_to_formula(
+//                     &formula_string, 
+//                     None::<NoCustomFunction>
+//                 );
+//                 // eprintln!("Formula.execute :: formula_: {:?}", &formula_);
+//                 let result = calculate::calculate_formula(formula_, None::<NoReference>);
+//                 // eprintln!("Formula.execute :: calcuated formula_: {:?}", &result);
+//                 let result = calculate::result_to_string(result);
+//                 // eprintln!("Formula.execute :: perf : exec: {} µs", &t_exec_1.elapsed().as_micros());
+//                 return Ok(result);
+//             } else {
+//                 return Err(
+//                     PlanetError::new(
+//                         500, 
+//                         Some(tr!("Formula could not execute due to bad format in the references like {My Reference} or
+//                         data problem on the target data associated with the reference.")),
+//                     )
+//                 );
+//             }
+//         } else {
+//             // I have no data and table information, skip references, simply execute formula I have
+//             let formula_ = parse_formula::parse_string_to_formula(
+//                 &formula, 
+//                 None::<NoCustomFunction>
+//             );
+//             let result = calculate::calculate_formula(formula_, None::<NoReference>);
+//             let result = calculate::result_to_string(result);
+//             return Ok(result);
+//         }        
+//     }
+// }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum AttributeType {
@@ -1058,8 +1068,8 @@ impl FormulaFieldCompiled {
         // If I have an error in compilation, then does not validate. Compilation uses validate of functions.
         // This function is the one does compilation from string formula to FormulaFieldCompiled
         let formula_origin = formula.clone();
-        eprintln!("FormulaFieldCompiled :: formula_origin: {:?}", &formula_origin);
-        eprintln!("FormulaFieldCompiled :: formula_format: {:?}", &formula_format);
+        // eprintln!("FormulaFieldCompiled :: formula_origin: {:?}", &formula_origin);
+        // eprintln!("FormulaFieldCompiled :: formula_format: {:?}", &formula_format);
         let expr = &RE_FORMULA_FIELD_FUNCTIONS;
         let mut formula_processed = formula_origin.clone();
         let formula_format = formula_format.clone();
@@ -1075,11 +1085,11 @@ impl FormulaFieldCompiled {
         let mut count = 1;
         let mut compiled_functions_map: HashMap<String, CompiledFunction> = HashMap::new();
         for capture in function_list {
-            eprintln!("FormulaFieldCompiled :: capture: {:?}", &capture);
+            // eprintln!("FormulaFieldCompiled :: capture: {:?}", &capture);
             let function_text = capture.get(0).unwrap().as_str();
             let function_placeholder = format!("$func{}", &count);
-            eprintln!("FormulaFieldCompiled :: function_text: {}", function_text);
-            eprintln!("FormulaFieldCompiled :: function_placeholder: {}", function_placeholder);
+            // eprintln!("FormulaFieldCompiled :: function_text: {}", function_text);
+            // eprintln!("FormulaFieldCompiled :: function_placeholder: {}", function_placeholder);
             let main_function = compile_function_text(
                 function_text, 
                 &formula_format,
@@ -1088,20 +1098,20 @@ impl FormulaFieldCompiled {
             compiled_functions.push(main_function.clone());
             compiled_functions_map.insert(function_placeholder.clone(), main_function.clone());
             formula_processed = formula_processed.replace(function_text, function_placeholder.as_str());
-            eprintln!("FormulaFieldCompiled :: formula_processed: {:#?}", &formula_processed);
+            // eprintln!("FormulaFieldCompiled :: formula_processed: {:#?}", &formula_processed);
             count += 1;
         }
 
         // TODO: Apply also to the functions linked inside this function as attributes
-        for (function_key, function) in &compiled_functions_map {
-            eprintln!("FormulaFieldCompiled :: function_key: {}", &function_key);
+        for (_, function) in &compiled_functions_map {
+            // eprintln!("FormulaFieldCompiled :: function_key: {}", &function_key);
             let function = function.clone();
             let function_text = function.text.unwrap();
             let function_text = function_text.as_str();
             let function_name = function.name;
             let function_name = function_name.as_str();
             let validate = validate_function_text(function_name, function_text)?;
-            eprintln!("FormulaFieldCompiled :: validate: {}", &validate);
+            // eprintln!("FormulaFieldCompiled :: validate: {}", &validate);
             if validate == false {
                 return Err(
                     PlanetError::new(
@@ -1115,6 +1125,8 @@ impl FormulaFieldCompiled {
         formula_compiled.functions = Some(compiled_functions_map);
         formula_compiled.formula = formula_processed;
 
+        eprintln!("FormulaFieldCompiled :: formula_compiled: {:#?}", &formula_compiled);
+
         return Ok(formula_compiled)
     }
 }
@@ -1126,10 +1138,10 @@ pub fn compile_function_text(
 ) -> Result<CompiledFunction, PlanetError> {
     let formula_format = formula_format.clone();
     let field_type_map = field_type_map.clone();
-    eprintln!("compile_function_text :: field_type_map: {:#?}", &field_type_map);
+    // eprintln!("compile_function_text :: field_type_map: {:#?}", &field_type_map);
     let parts: Vec<&str> = function_text.split("(").collect();
     let function_name = parts[0];
-    eprintln!("compile_function_text :: function_name: {}", function_name);
+    // eprintln!("compile_function_text :: function_name: {}", function_name);
     // function_name: CONCAT for example
     let mut main_function: CompiledFunction = CompiledFunction::defaults(
         &function_name.to_string());
@@ -1143,6 +1155,7 @@ pub fn compile_function_text(
         eprintln!("compile_function_text :: [new] attrs: {}", &attrs);
         let captured_attrs: Vec<&str> = attrs.split(",").collect();
         for mut attr in captured_attrs {
+            attr = attr.trim();
             eprintln!("compile_function_text :: attr: *{}*", attr);
             let mut attribute_type: AttributeType = AttributeType::Text;
             let mut function_attribute = FunctionAttributeItem::defaults(
@@ -1155,7 +1168,7 @@ pub fn compile_function_text(
                 // I have attribute name and also the field type -> attribute_type from table
                 let attr_string = attr.to_string();
                 let attr_string = attr_string.replace("{", "").replace("}", "");
-                function_attribute.name = attr_string.clone();
+                function_attribute.name = Some(attr_string.clone());
                 let field_type = field_type_map.get(&attr_string);
                 if field_type.is_some() {
                     let field_type = field_type.unwrap().clone();
@@ -1165,13 +1178,13 @@ pub fn compile_function_text(
                 }
             } else if attr.find("(").is_some() {
                 // function
-                eprintln!("compile_function_text :: function_text: {}", &attr);
+                // eprintln!("compile_function_text :: function_text: {}", &attr);
                 let linked_function = compile_function_text(
                      attr, &formula_format, &field_type_map
                 )?;
                 let linked_function_text = linked_function.text.clone().unwrap();
                 function_attribute.function = Some(linked_function);
-                function_attribute.name = linked_function_text;
+                function_attribute.name = Some(linked_function_text);
                 // eprintln!("compile_function_text :: linked_function: {:#?}", &linked_function);
             } else {
                 // Normal attribute, text, date, number
@@ -1188,7 +1201,7 @@ pub fn compile_function_text(
                 // Set value
                 function_attribute.value = Some(attr.to_string());
             }
-            main_function_attrs.push(function_attribute);    
+            main_function_attrs.push(function_attribute);
         }
     }
     main_function.attributes = Some(main_function_attrs);
@@ -1267,7 +1280,7 @@ pub struct FunctionAttributeItem {
     pub is_reference: bool,
     pub reference_value: Option<String>,
     pub assignment: Option<AttributeAssign>,
-    pub name: String,
+    pub name: Option<String>,
     pub value: Option<String>,
     pub attr_type: AttributeType,
     pub function: Option<CompiledFunction>,
@@ -1280,7 +1293,7 @@ impl FunctionAttributeItem {
             is_reference: false,
             reference_value: None,
             assignment: None,
-            name: name,
+            name: Some(name),
             value: None,
             attr_type: attr_type,
             function: None,
@@ -1315,6 +1328,68 @@ pub fn execute_formula_query(
         }
     }
     return Ok(check)
+}
+
+pub fn execute_formula_field(
+    formula: &FormulaFieldCompiled, 
+    data_map: &HashMap<String, String>
+) -> Result<String, PlanetError> {
+    // This needs to execute the formula for a field
+    // The type will depend on the formula_format on what we return
+    // 1. I execute the functions in the formula and substitute result by placeholder and call LIB
+    let functions = formula.functions.clone();
+    let mut formula_str = formula.formula.clone();
+    if functions.is_some() {
+        // $func1 => Function compiled
+        let functions = functions.unwrap();
+        for (function_key, function) in functions {
+            let function_key = function_key.as_str();
+            let function_result = execute_function(&function, data_map)?;
+            let result_str = function_result.text;
+            let result_number = function_result.number;
+            let result_date = function_result.date;
+            let result_bool = function_result.check;
+            if result_str.is_some() {
+                let result_str = result_str.unwrap();
+                let replaced_str = result_str.as_str();
+                formula_str = formula_str.replace(function_key, replaced_str);
+                formula_str = format!("{}{}{}", String::from("\""), formula_str, String::from("\""));
+            } else if result_number.is_some() {
+                let result_number = result_number.unwrap();
+                let replaced_str = result_number.to_string();
+                let replaced_str = replaced_str.as_str();
+                formula_str = formula_str.replace(function_key, replaced_str);
+            } else if result_date.is_some() {
+                let result_date = result_date.unwrap();
+                let replaced_str = result_date.as_str();
+                formula_str = formula_str.replace(function_key, replaced_str);
+                formula_str = format!("{}{}{}", String::from("\""), formula_str, String::from("\""));
+            } else if result_bool.is_some() {
+                let result_bool = result_bool.unwrap();
+                let replaced_str: &str;
+                if result_bool == true {
+                    replaced_str = "1";
+                } else {
+                    replaced_str = "0";
+                }
+                formula_str = formula_str.replace(function_key, replaced_str);
+            }
+        }
+    }
+    // execute formula_str with LIB to provide result, which output will depend on formula_format from config
+    // Check how it is on Formula object
+    let formula_string = format!("={}", &formula_str);
+    // let t_exec_1 = Instant::now();
+    let formula_ = parse_formula::parse_string_to_formula(
+        &formula_string, 
+        None::<NoCustomFunction>
+    );
+    // eprintln!("execute_formula_field :: formula_: {:?}", &formula_);
+    let result = calculate::calculate_formula(formula_, None::<NoReference>);
+    // eprintln!("execute_formula_field :: calcuated formula_: {:?}", &result);
+    let result = calculate::result_to_string(result);
+    // eprintln!("execute_formula_field :: perf : exec: {} µs", &t_exec_1.elapsed().as_micros());
+    return Ok(result)
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -1354,6 +1429,12 @@ pub fn execute_function(
         },
         "XOR" => {
             function_result.check = Some(xor(data_map, &attributes)?);
+        },
+        "CONCAT" => {
+            function_result.text = Some(concat(&data_map, attributes.clone())?);
+        },
+        "TRIM" => {
+            function_result.text = Some(trim(&data_map, attributes.clone())?);
         },
         _ => {
             return Err(

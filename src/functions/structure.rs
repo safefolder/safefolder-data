@@ -1,11 +1,10 @@
-use serde::{Deserialize, Serialize};
+// use serde::{Deserialize, Serialize};
 use lazy_static::lazy_static;
 use regex::{Regex};
 use std::{collections::HashMap};
 
-use crate::functions::constants::*;
-use crate::functions::Formula;
-use crate::storage::table::DbData;
+// use crate::functions::constants::*;
+// use crate::storage::table::DbData;
 use crate::functions::*;
 
 lazy_static! {
@@ -14,146 +13,146 @@ lazy_static! {
 }
 
 // IF({Sales} > 50, "Win", "Loose")
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct IfFunction {
-    pub function_text: String,
-    pub condition: Option<String>,
-    pub expr_true: Option<String>,
-    pub expr_false: Option<String>,
-    pub data_map: Option<HashMap<String, String>>,
-    pub table: Option<DbData>,
-}
-impl IfFunction {
-    pub fn defaults(function_text: &String, data_map: Option<HashMap<String, String>>, table: Option<DbData>) -> IfFunction {
-        // IF({My Column} = 3, "Mine", "Yours")
-        // IF({My Column} > 3, "Mine", "Yours")
-        // IF({My Column}>3, "Mine", "Yours")
-        // IF({My Column}>3,"Mine","Yours")
-        // IF({My Column} >= 3, "Mine", "Yours")
-        // IF({My Column} = "pepito mio", "Mine", "Yours")
-        // IF(AND({My Column} = 23, {My Other Column} > 4, {My Text Column} = "pepito"),"mine","yours")
-        let matches = RE_IF.captures(function_text).unwrap();
-        let condition = matches.name("condition");
-        let expr_true = matches.name("expr_true");
-        let expr_false = matches.name("expr_false");
-        let log_condition = matches.name("log_condition");
-        let log_expr_true = matches.name("log_expr_true");
-        let log_expr_false = matches.name("log_expr_false");
+// #[derive(Debug, Serialize, Deserialize, Clone)]
+// pub struct IfFunction {
+//     pub function_text: String,
+//     pub condition: Option<String>,
+//     pub expr_true: Option<String>,
+//     pub expr_false: Option<String>,
+//     pub data_map: Option<HashMap<String, String>>,
+//     pub table: Option<DbData>,
+// }
+// impl IfFunction {
+//     pub fn defaults(function_text: &String, data_map: Option<HashMap<String, String>>, table: Option<DbData>) -> IfFunction {
+//         // IF({My Column} = 3, "Mine", "Yours")
+//         // IF({My Column} > 3, "Mine", "Yours")
+//         // IF({My Column}>3, "Mine", "Yours")
+//         // IF({My Column}>3,"Mine","Yours")
+//         // IF({My Column} >= 3, "Mine", "Yours")
+//         // IF({My Column} = "pepito mio", "Mine", "Yours")
+//         // IF(AND({My Column} = 23, {My Other Column} > 4, {My Text Column} = "pepito"),"mine","yours")
+//         let matches = RE_IF.captures(function_text).unwrap();
+//         let condition = matches.name("condition");
+//         let expr_true = matches.name("expr_true");
+//         let expr_false = matches.name("expr_false");
+//         let log_condition = matches.name("log_condition");
+//         let log_expr_true = matches.name("log_expr_true");
+//         let log_expr_false = matches.name("log_expr_false");
 
-        let mut condition_wrap: Option<String> = None;
-        let mut expr_true_wrap: Option<String> = None;
-        let mut expr_false_wrap: Option<String> = None;
+//         let mut condition_wrap: Option<String> = None;
+//         let mut expr_true_wrap: Option<String> = None;
+//         let mut expr_false_wrap: Option<String> = None;
 
-        if condition.is_some() && expr_true.is_some() && expr_false.is_some() {
-            condition_wrap = Some(condition.unwrap().as_str().to_string());
-            expr_true_wrap = Some(expr_true.unwrap().as_str().to_string());
-            expr_false_wrap = Some(expr_false.unwrap().as_str().to_string());
-        }
-        if log_condition.is_some() && log_expr_true.is_some() && log_expr_false.is_some() {
-            condition_wrap = Some(log_condition.unwrap().as_str().to_string());
-            expr_true_wrap = Some(log_expr_true.unwrap().as_str().to_string());
-            expr_false_wrap = Some(log_expr_false.unwrap().as_str().to_string());
-        }
+//         if condition.is_some() && expr_true.is_some() && expr_false.is_some() {
+//             condition_wrap = Some(condition.unwrap().as_str().to_string());
+//             expr_true_wrap = Some(expr_true.unwrap().as_str().to_string());
+//             expr_false_wrap = Some(expr_false.unwrap().as_str().to_string());
+//         }
+//         if log_condition.is_some() && log_expr_true.is_some() && log_expr_false.is_some() {
+//             condition_wrap = Some(log_condition.unwrap().as_str().to_string());
+//             expr_true_wrap = Some(log_expr_true.unwrap().as_str().to_string());
+//             expr_false_wrap = Some(log_expr_false.unwrap().as_str().to_string());
+//         }
 
-        let obj = Self{
-            function_text: function_text.clone(),
-            condition: condition_wrap,
-            expr_true: expr_true_wrap,
-            expr_false: expr_false_wrap,
-            data_map: data_map,
-            table: table,
-        };
+//         let obj = Self{
+//             function_text: function_text.clone(),
+//             condition: condition_wrap,
+//             expr_true: expr_true_wrap,
+//             expr_false: expr_false_wrap,
+//             data_map: data_map,
+//             table: table,
+//         };
         
-        return obj
-    }
-    pub fn do_validate(
-        function_text: &String, 
-        validate_tuple: (u32, Vec<String>),
-    ) -> (u32, Vec<String>) {
-        let (number_fails, mut failed_functions) = validate_tuple;
-        let concat_obj = IfFunction::defaults(
-            &function_text, None, None
-        );
-        let check = concat_obj.validate();
-        let mut number_fails = number_fails.clone();
-        if check == false {
-            number_fails += 1;
-            failed_functions.push(String::from(FUNCTION_IF));
-        }
-        return (number_fails, failed_functions);
-    }
-    pub fn do_replace(
-        function_text: &String, 
-        mut formula: String,
-        insert_data_map: HashMap<String, String>,
-        table: &DbData,
-    ) -> String {
-        let table = table.clone();
-        let mut concat_obj = IfFunction::defaults(
-            &function_text, Some(insert_data_map), Some(table)
-        );
-        formula = concat_obj.replace(formula);
-        return formula
-    }
-}
-impl Function for IfFunction {
-    fn validate(&self) -> bool {
-        let expr = RE_IF.clone();
-        let function_text = self.function_text.clone();
-        let check = expr.is_match(&function_text);
-        return check
-    }
-    fn replace(&mut self, formula: String) -> String {
-        // let insert_data_map = insert_data_map.clone();
-        let insert_data_map = self.data_map.clone().unwrap();
-        let function_text = self.function_text.clone();
-        let mut formula = formula.clone();
-        // let table = table.clone();
-        let table = self.table.clone().unwrap();
+//         return obj
+//     }
+//     pub fn do_validate(
+//         function_text: &String, 
+//         validate_tuple: (u32, Vec<String>),
+//     ) -> (u32, Vec<String>) {
+//         let (number_fails, mut failed_functions) = validate_tuple;
+//         let concat_obj = IfFunction::defaults(
+//             &function_text, None, None
+//         );
+//         let check = concat_obj.validate();
+//         let mut number_fails = number_fails.clone();
+//         if check == false {
+//             number_fails += 1;
+//             failed_functions.push(String::from(FUNCTION_IF));
+//         }
+//         return (number_fails, failed_functions);
+//     }
+//     pub fn do_replace(
+//         function_text: &String, 
+//         mut formula: String,
+//         insert_data_map: HashMap<String, String>,
+//         table: &DbData,
+//     ) -> String {
+//         let table = table.clone();
+//         let mut concat_obj = IfFunction::defaults(
+//             &function_text, Some(insert_data_map), Some(table)
+//         );
+//         formula = concat_obj.replace(formula);
+//         return formula
+//     }
+// }
+// impl Function for IfFunction {
+//     fn validate(&self) -> bool {
+//         let expr = RE_IF.clone();
+//         let function_text = self.function_text.clone();
+//         let check = expr.is_match(&function_text);
+//         return check
+//     }
+//     fn replace(&mut self, formula: String) -> String {
+//         // let insert_data_map = insert_data_map.clone();
+//         let insert_data_map = self.data_map.clone().unwrap();
+//         let function_text = self.function_text.clone();
+//         let mut formula = formula.clone();
+//         // let table = table.clone();
+//         let table = self.table.clone().unwrap();
 
-        let expr_true_wrap = self.expr_true.clone();
-        let expr_false_wrap = self.expr_false.clone();
-        let expr_true = expr_true_wrap.unwrap();
-        let expr_false = expr_false_wrap.unwrap();
+//         let expr_true_wrap = self.expr_true.clone();
+//         let expr_false_wrap = self.expr_false.clone();
+//         let expr_true = expr_true_wrap.unwrap();
+//         let expr_false = expr_false_wrap.unwrap();
 
-        let formula_obj = Formula::defaults(
-            Some(insert_data_map),
-            Some(table.clone()),
-        );
-        let formula_wrap = formula_obj.inyect_data_formula(&formula);
-        let formula_if = formula_wrap.unwrap();
-        let replacement_string: String;
+//         let formula_obj = Formula::defaults(
+//             Some(insert_data_map),
+//             Some(table.clone()),
+//         );
+//         let formula_wrap = formula_obj.inyect_data_formula(&formula);
+//         let formula_if = formula_wrap.unwrap();
+//         let replacement_string: String;
 
-        let matches = RE_IF_REPLACED.captures(&formula_if);
-        let matches = matches.unwrap();
-        let processed_condition = matches.name("condition").unwrap().as_str().to_string();
-        let formula_obj = Formula::defaults(
-            self.data_map.clone(),
-            self.table.clone(),
-        );
-        let result = formula_obj.execute(&processed_condition).unwrap();
+//         let matches = RE_IF_REPLACED.captures(&formula_if);
+//         let matches = matches.unwrap();
+//         let processed_condition = matches.name("condition").unwrap().as_str().to_string();
+//         let formula_obj = Formula::defaults(
+//             self.data_map.clone(),
+//             self.table.clone(),
+//         );
+//         let result = formula_obj.execute(&processed_condition).unwrap();
 
-        if result == "TRUE" {
-            let formula_obj = Formula::defaults(
-                self.data_map.clone(), 
-                self.table.clone()
-            );
-            let result = formula_obj.execute(&expr_true).unwrap();
-            replacement_string = result;
-        } else {
-            let formula_obj = Formula::defaults(
-                self.data_map.clone(), 
-                self.table.clone()
-            );
-            let result = formula_obj.execute(&expr_false).unwrap();
-            replacement_string = result;
-        }
+//         if result == "TRUE" {
+//             let formula_obj = Formula::defaults(
+//                 self.data_map.clone(), 
+//                 self.table.clone()
+//             );
+//             let result = formula_obj.execute(&expr_true).unwrap();
+//             replacement_string = result;
+//         } else {
+//             let formula_obj = Formula::defaults(
+//                 self.data_map.clone(), 
+//                 self.table.clone()
+//             );
+//             let result = formula_obj.execute(&expr_false).unwrap();
+//             replacement_string = result;
+//         }
 
-        formula = formula.replace(function_text.as_str(), replacement_string.as_str());
-        formula = format!("\"{}\"", formula);
-        return formula;
-    }
-}
+//         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
+//         formula = format!("\"{}\"", formula);
+//         return formula;
+//     }
+// }
 
 pub fn and(
     data_map: &HashMap<String, String>, 
