@@ -1115,6 +1115,7 @@ impl ProcessField for FormulaField {
             let formula_compiled: FormulaFieldCompiled = serde_yaml::from_str(
                 formula_compiled_str.as_str()
             ).unwrap();
+            // eprintln!("FormulaField.process :: formula_compiled: {:#?}", &formula_compiled);
             let formula = execute_formula_field(&formula_compiled, &insert_data_map)?;
             self.is_valid(Some(&formula))?;
             let mut data: HashMap<String, String> = HashMap::new();

@@ -50,3 +50,7 @@ pub const FUNCTION_LAST_MODIFIED_TIME: &str = "LAST_MODIFIED_TIME";
 pub const FUNCTION_RECORD_ID: &str = "RECORD_ID";
 pub const FUNCTION_TRUE: &str = "TRUE";
 pub const FUNCTION_FALSE: &str = "FALSE";
+pub const FUNCTION_AND: &str = "AND";
+pub const FUNCTION_OR: &str = "OR";
+pub const FUNCTION_NOT: &str = "NOT";
+pub const FUNCTION_XOR: &str = "XOR";

@@ -83,7 +83,7 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
 
                 // I need a way to get list of instance FieldConfig (fields)
                 let config_fields = FieldConfig::parse_from_db(&table);
-                eprintln!("InsertIntoTable.run :: config_fields: {:#?}", &config_fields);
+                // eprintln!("InsertIntoTable.run :: config_fields: {:#?}", &config_fields);
                 
                 let insert_data_map: HashMap<String, String> = self.config.data.clone().unwrap();
                 

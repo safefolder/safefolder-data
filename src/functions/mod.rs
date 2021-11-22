@@ -10,7 +10,7 @@ use std::str::FromStr;
 use std::collections::HashMap;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use regex::Regex;
+use regex::{Regex, CaptureMatches};
 use tr::tr;
 use xlformula_engine::{calculate, parse_formula, NoReference, NoCustomFunction};
 
@@ -20,7 +20,7 @@ use crate::functions::text::*;
 // use crate::functions::date::*;
 use crate::functions::number::*;
 // use crate::functions::collections::*;
-use crate::functions::structure::*;
+// use crate::functions::structure::*;
 use crate::planet::PlanetError;
 // use crate::storage::constants::*;
 
@@ -32,9 +32,10 @@ lazy_static! {
     static ref RE_EMBED_FUNC: Regex = Regex::new(r#"\((?P<func_embed>[A-Z]+)"#).unwrap();
     static ref RE_STRING_MATCH: Regex = Regex::new(r#"(?P<string_match>"[\w\s]+"[\s\n\t]{0,}[=><][\s\n\t]{0,}"[\w\s]+")"#).unwrap();
     static ref RE_FORMULA_QUERY: Regex = Regex::new(r#"(?P<assign>\{[\s\w]+\}[\s\t]{0,}(?P<log_op>=|>|<|>=|<=)[\s\t]{0,}.+)|(?P<op>AND|OR|NOT|XOR)\((?P<attrs>.+)\)"#).unwrap();
-    static ref RE_FORMULA_FIELD_FUNCTIONS: Regex = Regex::new(r#"(?P<func>[A-Z]+[("\d)\w,.\s{}-]+)"#).unwrap();
+    static ref RE_FORMULA_FIELD_FUNCTIONS: Regex = Regex::new(r#"(?P<func>[A-Z]+[("\d)\w,\W.\s{}-]+)"#).unwrap();
     static ref RE_FUNCTION_ATTRS_OLD: Regex = Regex::new(r#"("[\w\s-]+")|(\{[\w\s]+\})|([A-Z]+\(["\w\s]+\))|([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)"#).unwrap();
     static ref RE_FUNCTION_ATTRS: Regex = Regex::new(r#"[A-Z]+\((?P<attrs>.+)\)"#).unwrap();
+    static ref RE_ATTR_TYPE_RESOLVE: Regex = Regex::new(r#"(?P<ref>\{[\w\s]+\})|(?P<func>[A-Z]+\(.+\))|(?P<bool>TRUE|FALSE)|(?P<string>\\{0,}"[,;_\{\}\w\s-]+\\{0,}")|(?P<number>^[+-]?[0-9]+\.?[0-9]*|^\.[0-9]+)"#).unwrap();
 }
 
 // achiever planet functions
@@ -1107,16 +1108,17 @@ impl FormulaFieldCompiled {
             // eprintln!("FormulaFieldCompiled :: function_key: {}", &function_key);
             let function = function.clone();
             let function_text = function.text.unwrap();
-            let function_text = function_text.as_str();
             let function_name = function.name;
-            let function_name = function_name.as_str();
-            let validate = validate_function_text(function_name, function_text)?;
+            let mut function_parse = FunctionParse::defaults(&function_name);
+            function_parse.text = Some(function_text.clone());
+            let function_parse = process_function(&function_parse, None)?;
+            let validate = function_parse.validate;
             // eprintln!("FormulaFieldCompiled :: validate: {}", &validate);
-            if validate == false {
+            if validate.unwrap() == false {
                 return Err(
                     PlanetError::new(
                         500, 
-                        Some(tr!("This function is not correctly formatted: {}", function_text)),
+                        Some(tr!("This function is not correctly formatted: {}", function_text.clone())),
                     )
                 );
             }
@@ -1125,7 +1127,7 @@ impl FormulaFieldCompiled {
         formula_compiled.functions = Some(compiled_functions_map);
         formula_compiled.formula = formula_processed;
 
-        eprintln!("FormulaFieldCompiled :: formula_compiled: {:#?}", &formula_compiled);
+        // eprintln!("FormulaFieldCompiled :: formula_compiled: {:#?}", &formula_compiled);
 
         return Ok(formula_compiled)
     }
@@ -1136,93 +1138,323 @@ pub fn compile_function_text(
     formula_format: &String,
     field_type_map: &HashMap<String, String>,
 ) -> Result<CompiledFunction, PlanetError> {
+    // eprintln!("compile_function_text :: function_text: {}", &function_text);
     let formula_format = formula_format.clone();
     let field_type_map = field_type_map.clone();
     // eprintln!("compile_function_text :: field_type_map: {:#?}", &field_type_map);
     let parts: Vec<&str> = function_text.split("(").collect();
     let function_name = parts[0];
     // eprintln!("compile_function_text :: function_name: {}", function_name);
+    let mut function_parse = FunctionParse::defaults(&function_name.to_string());
+    function_parse.text = Some(function_text.to_string());
+    let function_parse = process_function(&function_parse, None)?;
+    // eprintln!("compile_function_text :: function_parse from coded function: {:#?}", &function_parse);
+    let validate = function_parse.validate.unwrap();
+    if validate == false {
+        return Err(
+            PlanetError::new(
+                500, 
+                Some(tr!("function {} not having the expected format", &function_text)),
+            )
+        );
+    }
     // function_name: CONCAT for example
     let mut main_function: CompiledFunction = CompiledFunction::defaults(
         &function_name.to_string());
     main_function.text = Some(function_text.to_string());
     let mut main_function_attrs: Vec<FunctionAttributeItem> = Vec::new();
-    let expr = &RE_FUNCTION_ATTRS;
-    let attr_map = expr.captures(function_text).unwrap();
-    let attrs = attr_map.name("attrs");
-    if attrs.is_some() {
-        let attrs = attrs.unwrap().as_str();
-        eprintln!("compile_function_text :: [new] attrs: {}", &attrs);
-        let captured_attrs: Vec<&str> = attrs.split(",").collect();
-        for mut attr in captured_attrs {
-            attr = attr.trim();
-            eprintln!("compile_function_text :: attr: *{}*", attr);
-            let mut attribute_type: AttributeType = AttributeType::Text;
-            let mut function_attribute = FunctionAttributeItem::defaults(
-                &String::from(""), 
-                attribute_type
+    let function_attributes = function_parse.attributes;
+    if function_attributes.is_none() {
+        return Err(
+            PlanetError::new(
+                500, 
+                Some(tr!("function {} not having the expected format", &function_text)),
+            )
+        );
+    }
+    let function_attributes = function_attributes.unwrap();
+    // eprintln!("compile_function_text :: captured_attrs: {:?}", &captured_attrs);
+    for attr_ in function_attributes {
+        let mut attr = attr_.as_str();
+        attr = attr.trim();
+        // eprintln!("compile_function_text :: attr: {}", &attr);
+        let mut attribute_type: AttributeType = AttributeType::Text;
+        let mut function_attribute = FunctionAttributeItem::defaults(
+            None, 
+            attribute_type
+        );
+        let replaced_text: String;
+        // Here we resolve the attribute type, if reference, function, string, number, boolean through Regex
+        let expr = &RE_ATTR_TYPE_RESOLVE;
+        let attr_type_resolve = expr.captures(attr);
+        if attr_type_resolve.is_none() {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Attribute \"{}\" does not have correct format", &attr)),
+                )
             );
-            let replaced_text: String;
-            if attr.find("{").is_some() {
-                // Reference
-                // I have attribute name and also the field type -> attribute_type from table
-                let attr_string = attr.to_string();
-                let attr_string = attr_string.replace("{", "").replace("}", "");
-                function_attribute.name = Some(attr_string.clone());
-                let field_type = field_type_map.get(&attr_string);
-                if field_type.is_some() {
-                    let field_type = field_type.unwrap().clone();
-                    attribute_type = get_attribute_type(&field_type, Some(formula_format.clone()));
-                    function_attribute.attr_type = attribute_type;
-                    function_attribute.is_reference = true;
-                }
-            } else if attr.find("(").is_some() {
-                // function
-                // eprintln!("compile_function_text :: function_text: {}", &attr);
-                let linked_function = compile_function_text(
-                     attr, &formula_format, &field_type_map
-                )?;
-                let linked_function_text = linked_function.text.clone().unwrap();
-                function_attribute.function = Some(linked_function);
-                function_attribute.name = Some(linked_function_text);
-                // eprintln!("compile_function_text :: linked_function: {:#?}", &linked_function);
-            } else {
-                // Normal attribute, text, date, number
-                // Attribute type: Text, Number, Bool (Not possible, through function), Date
-                if attr.find("\"").is_some() {
-                    // Could be text or date, time. How deal with it?
-                    // TODO: Have date strings to check to resolve if we have a date, time or text
-                    function_attribute.attr_type = AttributeType::Text;
-                    replaced_text = attr.replace("\"", "");
-                    attr = replaced_text.as_str();
-                } else {
-                    function_attribute.attr_type = AttributeType::Number;
-                }
-                // Set value
-                function_attribute.value = Some(attr.to_string());
-            }
-            main_function_attrs.push(function_attribute);
         }
+        let attr_type_resolve = attr_type_resolve.unwrap();
+        // eprintln!("compile_function_text :: attr_type_resolve: {:?}", &attr_type_resolve);
+        let attr_type_ref = attr_type_resolve.name("ref");
+        let attr_type_func = attr_type_resolve.name("func");
+        let attr_type_bool = attr_type_resolve.name("bool");
+        let attr_type_string = attr_type_resolve.name("string");
+        let attr_type_number = attr_type_resolve.name("number");
+        if attr_type_ref.is_some() && function_name != FUNCTION_FORMAT {
+            // Reference
+            // I have attribute name and also the field type -> attribute_type from table
+            // eprintln!("compile_function_text :: [{}] is reference", &attr);
+            let attr_string = attr.to_string();
+            let attr_string = attr_string.
+                replace("\"", "").
+                replace("{", "").
+                replace("}", "");
+            function_attribute.name = Some(attr_string.clone());
+            function_attribute.reference_value = Some(attr_string.clone());
+            let field_type = field_type_map.get(&attr_string);
+            if field_type.is_some() {
+                let field_type = field_type.unwrap().clone();
+                attribute_type = get_attribute_type(&field_type, Some(formula_format.clone()));
+                function_attribute.attr_type = attribute_type;
+                function_attribute.is_reference = true;
+            }
+        } else if attr_type_func.is_some() {
+            // function
+            // eprintln!("compile_function_text :: [{}] is function", &attr);
+            let linked_function = compile_function_text(
+                    attr, &formula_format, &field_type_map
+            )?;
+            let linked_function_text = linked_function.text.clone().unwrap();
+            function_attribute.function = Some(linked_function);
+            function_attribute.name = Some(linked_function_text);
+        } else if attr_type_bool.is_some() {
+            // eprintln!("compile_function_text :: [{}] is boolean", &attr);
+            function_attribute.attr_type = AttributeType::Bool;
+            function_attribute.value = Some(attr.to_string());
+        } else if attr_type_string.is_some() {
+            // Could be text or date, time. How deal with it?
+            // TODO: Have date strings to check to resolve if we have a date, time or text
+            // eprintln!("compile_function_text :: [{}] is string, date, time", &attr);
+            function_attribute.attr_type = AttributeType::Text;
+            replaced_text = attr.replace("\"", "");
+            attr = replaced_text.as_str();
+            function_attribute.value = Some(attr.to_string());
+        } else if attr_type_number.is_some() {
+            // eprintln!("compile_function_text :: [{}] is number", &attr);
+            function_attribute.attr_type = AttributeType::Number;
+            function_attribute.value = Some(attr.to_string());
+        }
+        main_function_attrs.push(function_attribute);
     }
     main_function.attributes = Some(main_function_attrs);
     return Ok(main_function)
 }
 
-pub fn validate_function_text(function_name: &str, function_text: &str) -> Result<bool, PlanetError> {
-    let check: bool;
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FunctionResult {
+    pub text: Option<String>,
+    pub date: Option<String>,
+    pub check: Option<bool>,
+    pub number: Option<usize>,
+}
+impl FunctionResult {
+    pub fn defaults() -> Self {
+        let obj = FunctionResult{
+            text: None,
+            date: None,
+            check: None,
+            number: None,
+        };
+        return obj
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FunctionParse {
+    name: String,
+    text: Option<String>,
+    validate: Option<bool>,
+    attributes: Option<Vec<String>>,
+    compiled_attributes: Option<Vec<FunctionAttributeItem>>,
+    result: Option<FunctionResult>,
+}
+impl FunctionParse {
+    pub fn defaults(name: &String) -> Self {
+        let obj = FunctionParse{
+            name: name.clone(),
+            text: None,
+            validate: None,
+            attributes: None,
+            compiled_attributes: None,
+            result: None,
+        };
+        return obj;
+    }
+}
+
+pub fn prepare_function_parse(
+    function_parse: &FunctionParse, 
+    data_map: Option<HashMap<String, String>>,
+) -> (Option<String>, String, Vec<FunctionAttributeItem>, FunctionResult, HashMap<String, String>) {
+    let mut function = function_parse.clone();
+    let function_text_wrap = function.text;
+    let mut function_text: String = String::from("");
+    if function_text_wrap.is_some() {
+        function_text = function_text_wrap.clone().unwrap();
+    }
+    let data_map_wrap = data_map;
+    let mut data_map: HashMap<String, String> = HashMap::new();
+    if data_map_wrap.is_some() {
+        data_map = data_map_wrap.unwrap();
+    }
+    let compiled_attrtibutes_wrap = function.compiled_attributes;
+    let mut compiled_attributes: Vec<FunctionAttributeItem> = Vec::new();
+    if compiled_attrtibutes_wrap.is_some() {
+        compiled_attributes = compiled_attrtibutes_wrap.unwrap();
+    }
+    let function_result = FunctionResult::defaults();
+    function.result = Some(function_result.clone());
+    return (
+        function_text_wrap,
+        function_text.to_string(),
+        compiled_attributes,
+        function_result,
+        data_map,
+    )
+}
+
+pub fn process_function(
+    function_parse: &FunctionParse, 
+    data_map: Option<HashMap<String, String>>,
+) -> Result<FunctionParse, PlanetError> {
+    // let list_items = Some(expr.captures_iter(function_text));
+    // I need either check or list of attributes, so I have only one function to deal with Regex expr.
+    let mut function = function_parse.clone();
+    // eprintln!("process_function :: function: {:#?}", &function);
+    let data_map_wrap = data_map;
+    let function_name = function.name.as_str();
     match function_name {
         FUNCTION_CONCAT => {
-            check = *&RE_CONCAT_ATTRS.is_match(function_text);
+            function = Concat::defaults(Some(function), data_map_wrap.clone()).handle()?;
         },
         FUNCTION_TRIM => {
-            check = *&RE_TRIM.is_match(function_text);
+            function = Trim::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_FORMAT => {
+            function = Format::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_JOINLIST => {
+            function = JoinList::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_LENGTH => {
+            function = Length::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_LOWER => {
+            function = Lower::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_UPPER => {
+            function = Upper::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_REPLACE => {
+            function = Replace::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_MID => {
+            function = Mid::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_REPT => {
+            function = Rept::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_SUBSTITUTE => {
+            function = Substitute::defaults(Some(function), data_map_wrap.clone()).handle()?;
         },
         _ => {
-            check = true;
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Function \"{}\" not supported", &function_name)),
+                )
+            );
         }
     }
-    return Ok(check)
+    return Ok(function)
 }
+
+// pub fn execute_function(
+//     function: &CompiledFunction, 
+//     data_map: &HashMap<String, String>
+// ) -> Result<FunctionResult, PlanetError> {
+//     // Here we match which function and we call function directly. We get result as a value and return
+//     let function_name = function.name.clone();
+//     let function_name = function_name.as_str();
+//     let attributes = function.attributes.clone();
+//     let attributes = attributes.unwrap();
+//     // eprintln!("execute_function :: function_name: {} attributes: {:#?}", function_name, &attributes);
+//     let mut function_result = FunctionResult{
+//         text: None,
+//         date: None,
+//         check: None,
+//         number: None,
+//     };
+//     // Here I map all the functions, ones used by formula queries and ones as formula field
+//     match function_name {
+//         FUNCTION_AND => {
+//             function_result.check = Some(and(data_map, &attributes)?);
+//         },
+//         FUNCTION_OR => {
+//             function_result.check = Some(or(data_map, &attributes)?);
+//         },
+//         FUNCTION_NOT => {
+//             function_result.check = Some(not(data_map, &attributes)?);
+//         },
+//         FUNCTION_XOR => {
+//             function_result.check = Some(xor(data_map, &attributes)?);
+//         },
+//         FUNCTION_CONCAT => {
+//             function_result.text = Some(concat(&data_map, attributes.clone())?);
+//         },
+//         FUNCTION_TRIM => {
+//             function_result.text = Some(trim(&data_map, attributes.clone())?);
+//         },
+//         FUNCTION_FORMAT => {
+//             function_result.text = Some(format(&data_map, attributes.clone())?);
+//         },
+//         FUNCTION_JOINLIST => {
+//             function_result.text = Some(join_list(&data_map, attributes.clone())?);
+//         },
+//         FUNCTION_LENGTH => {
+//             function_result.text = Some(length(&data_map, attributes.clone())?);
+//         },
+//         FUNCTION_LOWER => {
+//             function_result.text = Some(lower(&data_map, attributes.clone())?);
+//         },
+//         FUNCTION_UPPER => {
+//             function_result.text = Some(upper(&data_map, attributes.clone())?);
+//         },
+//         FUNCTION_REPLACE => {
+//             function_result.text = Some(replace(&data_map, attributes.clone())?);
+//         },
+//         FUNCTION_MID => {
+//             function_result.text = Some(mid(&data_map, attributes.clone())?);
+//         },
+//         FUNCTION_REPT => {
+//             function_result.text = Some(rept(&data_map, attributes.clone())?);
+//         },
+//         FUNCTION_SUBSTITUTE => {
+//             function_result.text = Some(substitute(&data_map, attributes.clone())?);
+//         },
+//         _ => {
+//             return Err(
+//                 PlanetError::new(
+//                     500, 
+//                     Some(tr!("Function \"{}\" not supported", &function_name)),
+//                 )
+//             );
+//         }
+//     }
+//     return Ok(function_result)
+// }
 
 // Score for this is validate all functions in a text formula, but design  might change with compilation
 // of formulas
@@ -1286,14 +1518,13 @@ pub struct FunctionAttributeItem {
     pub function: Option<CompiledFunction>,
 }
 impl FunctionAttributeItem {
-    pub fn defaults(name: &String, attr_type: AttributeType) -> Self {
-        let name = name.clone();
+    pub fn defaults(name: Option<String>, attr_type: AttributeType) -> Self {
         let attr_type = attr_type.clone();
         let obj = Self{
             is_reference: false,
             reference_value: None,
             assignment: None,
-            name: Some(name),
+            name: name,
             value: None,
             attr_type: attr_type,
             function: None,
@@ -1312,7 +1543,9 @@ pub fn execute_formula_query(
     let function = formula.function.clone();
     if function.is_some() {
         let function = function.unwrap();
-        let result = execute_function(&function, data_map)?;
+        let function_parse = FunctionParse::defaults(&function.name);
+        let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
+        let result = function_parse.result.unwrap();
         if result.check.unwrap() == false {
             check = false;
         }
@@ -1343,8 +1576,15 @@ pub fn execute_formula_field(
         // $func1 => Function compiled
         let functions = functions.unwrap();
         for (function_key, function) in functions {
+            let function = function.clone();
             let function_key = function_key.as_str();
-            let function_result = execute_function(&function, data_map)?;
+            let mut function_parse = FunctionParse::defaults(&function.name);
+            function_parse.text = function.text;
+            function_parse.compiled_attributes = function.attributes;
+            let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
+            // eprintln!("execute_formula_field :: function_parse: {:#?}", &function_parse);
+            // eprintln!("execute_formula_field :: function: {:#?}", function.clone());
+            let function_result = function_parse.result.unwrap();
             let result_str = function_result.text;
             let result_number = function_result.number;
             let result_date = function_result.date;
@@ -1390,62 +1630,6 @@ pub fn execute_formula_field(
     let result = calculate::result_to_string(result);
     // eprintln!("execute_formula_field :: perf : exec: {} µs", &t_exec_1.elapsed().as_micros());
     return Ok(result)
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct FunctionResult {
-    pub text: Option<String>,
-    pub date: Option<String>,
-    pub check: Option<bool>,
-    pub number: Option<usize>,
-}
-
-pub fn execute_function(
-    function: &CompiledFunction, 
-    data_map: &HashMap<String, String>
-) -> Result<FunctionResult, PlanetError> {
-    // Here we match which function and we call function directly. We get result as a value and return
-    let function_name = function.name.clone();
-    let function_name = function_name.as_str();
-    let attributes = function.attributes.clone();
-    let attributes = attributes.unwrap();
-    // eprintln!("execute_function :: function_name: {} attributes: {:#?}", function_name, &attributes);
-    let mut function_result = FunctionResult{
-        text: None,
-        date: None,
-        check: None,
-        number: None,
-    };
-    // Here I map all the functions, ones used by formula queries and ones as formula field
-    match function_name {
-        "AND" => {
-            function_result.check = Some(and(data_map, &attributes)?);
-        },
-        "OR" => {
-            function_result.check = Some(or(data_map, &attributes)?);
-        },
-        "NOT" => {
-            function_result.check = Some(not(data_map, &attributes)?);
-        },
-        "XOR" => {
-            function_result.check = Some(xor(data_map, &attributes)?);
-        },
-        "CONCAT" => {
-            function_result.text = Some(concat(&data_map, attributes.clone())?);
-        },
-        "TRIM" => {
-            function_result.text = Some(trim(&data_map, attributes.clone())?);
-        },
-        _ => {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!("Function \"{}\" not supported", &function_name)),
-                )
-            );
-        }
-    }
-    return Ok(function_result)
 }
 
 pub fn compile_formula_query(
@@ -1520,7 +1704,7 @@ pub fn compile_formula_query(
                 attribute_type = get_attribute_type(field_type, None);
             }
             let mut function_attribute = FunctionAttributeItem::defaults(
-                &reference_name, 
+                Some(reference_name), 
                 attribute_type
             );
             function_attribute.is_reference = true;
@@ -1567,7 +1751,7 @@ pub fn compile_formula_query(
                     // eprintln!("compile_formula_query :: attribute_type: {:?}", &attribute_type);
                 }
                 let mut function_attribute = FunctionAttributeItem::defaults(
-                    &reference_name, 
+                    Some(reference_name), 
                     attribute_type
                 );
                 function_attribute.is_reference = true;
@@ -1771,4 +1955,22 @@ pub fn check_assignment(
         }
     }
     return Ok(check)
+}
+
+pub fn get_vector_regex_attributes(list_items: CaptureMatches) -> Vec<String> {
+    let mut attributes: Vec<String> = Vec::new();
+    for item in list_items {
+        let attr = item.get(0).unwrap().as_str();
+        let attr = attr.to_string();
+        attributes.push(attr);
+    }
+    return attributes
+}
+
+pub fn prepare_string_attribute(attr: String) -> String {
+    let mut attr = attr.clone();
+    if attr.find("\"").is_none() {
+        attr = format!("\"{}\"", &attr);
+    }
+    return attr
 }

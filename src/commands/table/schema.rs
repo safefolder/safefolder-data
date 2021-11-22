@@ -137,6 +137,7 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                 let mut mine = db_data.clone().data_collections.unwrap();
                 mine.remove("field_ids");
                 eprintln!("CreateTable.run :: db_data: {:#?}", mine);
+                // eprintln!("CreateTable.run :: db_data all: {:#?}", db_data.clone());
 
                 let response: DbData = db_table.create(&db_data)?;
                 let response_src = response.clone();
