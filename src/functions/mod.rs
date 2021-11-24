@@ -35,7 +35,7 @@ lazy_static! {
     static ref RE_FORMULA_FIELD_FUNCTIONS: Regex = Regex::new(r#"(?P<func>[A-Z]+[("\d)\w,\W.\s{}-]+)"#).unwrap();
     static ref RE_FUNCTION_ATTRS_OLD: Regex = Regex::new(r#"("[\w\s-]+")|(\{[\w\s]+\})|([A-Z]+\(["\w\s]+\))|([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)"#).unwrap();
     static ref RE_FUNCTION_ATTRS: Regex = Regex::new(r#"[A-Z]+\((?P<attrs>.+)\)"#).unwrap();
-    static ref RE_ATTR_TYPE_RESOLVE: Regex = Regex::new(r#"(?P<ref>\{[\w\s]+\})|(?P<func>[A-Z]+\(.+\))|(?P<bool>TRUE|FALSE)|(?P<string>\\{0,}"[,;_\{\}\w\s-]+\\{0,}")|(?P<number>^[+-]?[0-9]+\.?[0-9]*|^\.[0-9]+)"#).unwrap();
+    static ref RE_ATTR_TYPE_RESOLVE: Regex = Regex::new(r#"(?P<ref>\{[\w\s]+\})|(?P<func>[A-Z]+\(.+\))|(?P<bool>TRUE|FALSE)|(?P<string>\\{0,}"[,;_.\\$€\{\}\w\s-]+\\{0,}")|(?P<number>^[+-]?[0-9]+\.?[0-9]*|^\.[0-9]+)|(?P<null>null)"#).unwrap();
 }
 
 // achiever planet functions
@@ -1127,7 +1127,7 @@ impl FormulaFieldCompiled {
         formula_compiled.functions = Some(compiled_functions_map);
         formula_compiled.formula = formula_processed;
 
-        // eprintln!("FormulaFieldCompiled :: formula_compiled: {:#?}", &formula_compiled);
+        eprintln!("FormulaFieldCompiled :: formula_compiled: {:#?}", &formula_compiled);
 
         return Ok(formula_compiled)
     }
@@ -1154,7 +1154,7 @@ pub fn compile_function_text(
         return Err(
             PlanetError::new(
                 500, 
-                Some(tr!("function {} not having the expected format", &function_text)),
+                Some(tr!("function {} not having the expected format, validation error", &function_text)),
             )
         );
     }
@@ -1168,7 +1168,7 @@ pub fn compile_function_text(
         return Err(
             PlanetError::new(
                 500, 
-                Some(tr!("function {} not having the expected format", &function_text)),
+                Some(tr!("function {} not having the expected format, attributes error", &function_text)),
             )
         );
     }
@@ -1191,7 +1191,7 @@ pub fn compile_function_text(
             return Err(
                 PlanetError::new(
                     500, 
-                    Some(tr!("Attribute \"{}\" does not have correct format", &attr)),
+                    Some(tr!("Attribute \"{}\" does not have correct format, regex error", &attr)),
                 )
             );
         }
@@ -1368,6 +1368,60 @@ pub fn process_function(
         },
         FUNCTION_SUBSTITUTE => {
             function = Substitute::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_CEILING => {
+            function = Ceiling::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_FLOOR => {
+            function = Floor::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_COUNT => {
+            function = Count::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_COUNTA => {
+            function = CountA::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_COUNTALL => {
+            function = CountAll::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_EVEN => {
+            function = Even::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_EXP => {
+            function = Exp::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_INT => {
+            function = Int::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_LOG => {
+            function = Log::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_MOD => {
+            function = Mod::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_POWER => {
+            function = Power::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_ROUND => {
+            function = Round::defaults(Some(function), data_map_wrap.clone()).handle(RoundOption::Basic)?;
+        },
+        FUNCTION_ROUNDUP => {
+            function = Round::defaults(Some(function), data_map_wrap.clone()).handle(RoundOption::Up)?;
+        },
+        FUNCTION_ROUNDDOWN => {
+            function = Round::defaults(Some(function), data_map_wrap.clone()).handle(RoundOption::Down)?;
+        },
+        FUNCTION_SQRT => {
+            function = Sqrt::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_VALUE => {
+            function = Value::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_TRUE => {
+            function = Boolean::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_FALSE => {
+            function = Boolean::defaults(Some(function), data_map_wrap.clone()).handle()?;
         },
         _ => {
             return Err(

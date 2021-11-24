@@ -6,8 +6,8 @@ use lazy_static::lazy_static;
 use math::round;
 
 use crate::functions::*;
-use crate::functions::constants::*;
-use crate::functions::Function;
+// use crate::functions::constants::*;
+// use crate::functions::Function;
 
 
 lazy_static! {
@@ -27,11 +27,1466 @@ lazy_static! {
     static ref RE_ROUND_DOWN: Regex = Regex::new(r#"ROUNDDOWN\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits>\d+){0,}[\s\n\t]{0,}\)|ROUNDDOWN\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits_ref>\d+){0,}[\s\n\t]{0,}\)"#).unwrap();
     static ref RE_SQRT: Regex = Regex::new(r#"SQRT\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\s\n\t]{0,}\)|SQRT\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\s\n\t]{0,}\)"#).unwrap();
     static ref RE_VALUE: Regex = Regex::new(r#"VALUE\([\s\n\t]{0,}(?P<text>"[\w\d,.{0,}\$€{0,}]+")[\s\n\t]{0,}\)|VALUE\([\s\n\t]{0,}(?P<text_ref>\{[\w\s]+\})[\s\n\t]{0,}\)"#).unwrap();
-    static ref RE_BOOLEAN: Regex = Regex::new(r#"TRUE\(\)|FALSE\(\)"#).unwrap();
+    static ref RE_BOOLEAN: Regex = Regex::new(r#"TRUE\(\)|FALSE\(\)|TRUE|FALSE"#).unwrap();
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum RoundOption {
+    Basic,
+    Up,
+    Down,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum BooleanOption {
+    True,
+    False,
+}
+
+pub trait NumberFunction {
+    fn handle(&mut self) -> Result<FunctionParse, PlanetError>;
+    fn execute(&self) -> Result<String, PlanetError>;
+}
+pub trait RoundNumberFunction {
+    fn handle(&mut self, option: RoundOption) -> Result<FunctionParse, PlanetError>;
+    fn execute(&self, option: RoundOption) -> Result<String, PlanetError>;
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Ceiling {
+    function: Option<FunctionParse>,
+    data_map: Option<HashMap<String, String>>,
+    attributes: Option<Vec<FunctionAttributeItem>>
+}
+impl Ceiling {
+    pub fn defaults(
+        function: Option<FunctionParse>, 
+        data_map: Option<HashMap<String, String>>
+    ) -> Self {
+        return Self{function: function, data_map: data_map, attributes: None};
+    }
+}
+impl NumberFunction for Ceiling {
+    fn handle(&mut self) -> Result<FunctionParse, PlanetError> {
+        let function_parse = &self.function.clone().unwrap();
+        let data_map = self.data_map.clone();
+        let expr = &RE_CEILING;
+        let mut function = function_parse.clone();
+        let data_map_wrap = data_map.clone();
+        let (
+            function_text_wrap, 
+            function_text, 
+            compiled_attributes,
+            mut function_result,
+            data_map,
+        ) = prepare_function_parse(function_parse, data_map.clone());
+        if function_text_wrap.is_some() {
+            function.validate = Some(expr.is_match(function_text.as_str()));
+            if function.validate.unwrap() {
+                let matches = &expr.captures(function_text.as_str()).unwrap();
+                let attr_number = matches.name("number");
+                let attr_number_ref = matches.name("number_ref");
+                let attr_significance = matches.name("significance");
+                let mut attributes_: Vec<String> = Vec::new();
+                if attr_number.is_some() {
+                    let number = attr_number.unwrap();
+                    let number_string = number.as_str().to_string();
+                    attributes_.push(number_string);
+                } else if attr_number_ref.is_some() {
+                    let number_ref_string = attr_number_ref.unwrap().as_str().to_string();
+                    attributes_.push(number_ref_string);
+                }
+                if attr_significance.is_some() {
+                    let significance = attr_significance.unwrap();
+                    let significance_string = significance.as_str().to_string();
+                    attributes_.push(significance_string);
+                }
+                function.attributes = Some(attributes_);
+            }
+        }
+        if data_map_wrap.is_some() {
+            self.attributes = Some(compiled_attributes);
+            self.data_map = Some(data_map);
+            function_result.text = Some(self.execute()?);
+            function.result = Some(function_result.clone());
+        }
+        return Ok(function)
+    }
+    fn execute(&self) -> Result<String, PlanetError> {
+        let attributes = self.attributes.clone().unwrap();
+        let data_map = &self.data_map.clone().unwrap();
+        let attribute_item = attributes[0].clone();
+        let reference_value_wrap = attribute_item.reference_value;
+        let significance_string = attributes[1].clone().value.unwrap_or_default();
+        let mut significance: i8 = FromStr::from_str(&significance_string.as_str()).unwrap();
+        significance = significance - 1;
+        let is_reference = attribute_item.is_reference;
+        let number: f64;
+        if is_reference {
+            let reference_value = reference_value_wrap.unwrap();
+            let function_attr = FunctionAttributeNew::defaults(
+                &reference_value, Some(true), Some(true)
+            );
+            let replaced_string = function_attr.replace(data_map).item_processed.unwrap();
+            number = FromStr::from_str(replaced_string.as_str()).unwrap();
+        } else {
+            let number_str = attribute_item.value.unwrap_or_default().clone();
+            let number_str = number_str.as_str();
+            number = FromStr::from_str(number_str).unwrap();
+        }
+        let number = round::ceil(number, significance);
+        let result = number.to_string();
+        return Ok(result)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Floor {
+    function: Option<FunctionParse>,
+    data_map: Option<HashMap<String, String>>,
+    attributes: Option<Vec<FunctionAttributeItem>>
+}
+impl Floor {
+    pub fn defaults(
+        function: Option<FunctionParse>, 
+        data_map: Option<HashMap<String, String>>
+    ) -> Self {
+        return Self{function: function, data_map: data_map, attributes: None};
+    }
+}
+impl NumberFunction for Floor {
+    fn handle(&mut self) -> Result<FunctionParse, PlanetError> {
+        // FLOOR(number, significance)
+        let function_parse = &self.function.clone().unwrap();
+        let data_map = self.data_map.clone();
+        let expr = &RE_FLOOR;
+        let mut function = function_parse.clone();
+        let data_map_wrap = data_map.clone();
+        let (
+            function_text_wrap, 
+            function_text, 
+            compiled_attributes,
+            mut function_result,
+            data_map,
+        ) = prepare_function_parse(function_parse, data_map.clone());
+        if function_text_wrap.is_some() {
+            function.validate = Some(expr.is_match(function_text.as_str()));
+            if function.validate.unwrap() {
+                let matches = &expr.captures(function_text.as_str()).unwrap();
+                let attr_number = matches.name("number");
+                let attr_number_ref = matches.name("number_ref");
+                let attr_significance = matches.name("significance");
+                let mut attributes_: Vec<String> = Vec::new();
+                if attr_number.is_some() {
+                    let number = attr_number.unwrap();
+                    let number_string = number.as_str().to_string();
+                    attributes_.push(number_string);
+                } else if attr_number_ref.is_some() {
+                    let number_ref_string = attr_number_ref.unwrap().as_str().to_string();
+                    attributes_.push(number_ref_string);
+                }
+                if attr_significance.is_some() {
+                    let significance = attr_significance.unwrap();
+                    let significance_string = significance.as_str().to_string();
+                    attributes_.push(significance_string);
+                }
+                function.attributes = Some(attributes_);
+            }
+        }
+        if data_map_wrap.is_some() {
+            self.attributes = Some(compiled_attributes);
+            self.data_map = Some(data_map);
+            function_result.text = Some(self.execute()?);
+            function.result = Some(function_result.clone());
+        }
+        return Ok(function)
+    }
+    fn execute(&self) -> Result<String, PlanetError> {
+        let attributes = self.attributes.clone().unwrap();
+        let data_map = &self.data_map.clone().unwrap();
+        let attribute_item = attributes[0].clone();
+        let reference_value_wrap = attribute_item.reference_value;
+        let significance_string = attributes[1].clone().value.unwrap_or_default();
+        let mut significance: i8 = FromStr::from_str(&significance_string.as_str()).unwrap();
+        significance = significance - 1;
+        let is_reference = attribute_item.is_reference;
+        let number: f64;
+        if is_reference {
+            let reference_value = reference_value_wrap.unwrap();
+            let function_attr = FunctionAttributeNew::defaults(
+                &reference_value, Some(true), Some(true)
+            );
+            let replaced_string = function_attr.replace(data_map).item_processed.unwrap();
+            number = FromStr::from_str(replaced_string.as_str()).unwrap();
+        } else {
+            let number_str = attribute_item.value.unwrap_or_default().clone();
+            let number_str = number_str.as_str();
+            number = FromStr::from_str(number_str).unwrap();
+        }
+        let number = round::floor(number, significance);
+        return Ok(number.to_string())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Count {
+    function: Option<FunctionParse>,
+    data_map: Option<HashMap<String, String>>,
+    attributes: Option<Vec<FunctionAttributeItem>>
+}
+impl Count {
+    pub fn defaults(
+        function: Option<FunctionParse>, 
+        data_map: Option<HashMap<String, String>>
+    ) -> Self {
+        return Self{function: function, data_map: data_map, attributes: None};
+    }
+}
+impl NumberFunction for Count {
+    fn handle(&mut self) -> Result<FunctionParse, PlanetError> {
+        // COUNT(value1, value2, ...))
+        let function_parse = &self.function.clone().unwrap();
+        let data_map = self.data_map.clone();
+        let expr = &RE_COUNT;
+        let mut function = function_parse.clone();
+        let data_map_wrap = data_map.clone();
+        let (
+            function_text_wrap, 
+            function_text, 
+            compiled_attributes,
+            mut function_result,
+            data_map,
+        ) = prepare_function_parse(function_parse, data_map.clone());
+        if function_text_wrap.is_some() {
+            function.validate = Some(expr.is_match(function_text.as_str()));
+            if function.validate.unwrap() {
+                let matches = &expr.captures(function_text.as_str()).unwrap();
+                let attrs = matches.name("attrs");
+                if attrs.is_some() {
+                    let attrs = attrs.unwrap().as_str().to_string();
+                    let mut attributes_: Vec<String> = Vec::new();
+                    attributes_.push(attrs);
+                    function.attributes = Some(attributes_);
+                }
+            }
+        }
+        if data_map_wrap.is_some() {
+            self.attributes = Some(compiled_attributes);
+            self.data_map = Some(data_map);
+            function_result.text = Some(self.execute()?);
+            function.result = Some(function_result.clone());
+        }
+        return Ok(function)
+    }
+    fn execute(&self) -> Result<String, PlanetError> {
+        let attributes = self.attributes.clone().unwrap();
+        let data_map = &self.data_map.clone().unwrap();
+        let attribute_item = attributes[0].clone();
+        let attrs = attribute_item.value.unwrap_or_default();
+        let items: Vec<&str> = attrs.split(",").collect();
+        let mut number_items: Vec<String> = Vec::new();
+        for mut item in items {
+            item = item.trim();
+            let is_string = item.to_string().find("\"");
+            let is_ref = item.to_string().find("{");
+            if is_ref.is_some() {
+                let item_ = &item.trim().to_string();
+                let function_attr = FunctionAttribute::defaults(
+                    item_, 
+                    Some(true)
+                );
+                let result = function_attr.replace(data_map.clone());
+                let result = result.item_processed.clone();
+                let result = result.unwrap();
+                let result = result.as_str();
+                let is_string = result.to_string().find("\"");
+                if is_string.is_none() {
+                    number_items.push(result.to_string());
+                }
+            } else {
+                if is_string.is_none() {
+                    number_items.push(item.to_string());
+                }
+            }
+        }
+        let count = number_items.len();
+        return Ok(count.to_string())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CountA {
+    function: Option<FunctionParse>,
+    data_map: Option<HashMap<String, String>>,
+    attributes: Option<Vec<FunctionAttributeItem>>
+}
+impl CountA {
+    pub fn defaults(
+        function: Option<FunctionParse>, 
+        data_map: Option<HashMap<String, String>>
+    ) -> Self {
+        return Self{function: function, data_map: data_map, attributes: None};
+    }
+}
+impl NumberFunction for CountA {
+    fn handle(&mut self) -> Result<FunctionParse, PlanetError> {
+        // COUNT(value1, value2, ...))
+        let function_parse = &self.function.clone().unwrap();
+        let data_map = self.data_map.clone();
+        let expr = &RE_COUNTA;
+        let mut function = function_parse.clone();
+        let data_map_wrap = data_map.clone();
+        let (
+            function_text_wrap, 
+            function_text, 
+            compiled_attributes,
+            mut function_result,
+            data_map,
+        ) = prepare_function_parse(function_parse, data_map.clone());
+        if function_text_wrap.is_some() {
+            function.validate = Some(expr.is_match(function_text.as_str()));
+            if function.validate.unwrap() {
+                let matches = &expr.captures(function_text.as_str()).unwrap();
+                let attrs = matches.name("attrs");
+                if attrs.is_some() {
+                    let attrs = attrs.unwrap().as_str().to_string();
+                    let mut attributes_: Vec<String> = Vec::new();
+                    attributes_.push(attrs);
+                    function.attributes = Some(attributes_);
+                }
+            }
+        }
+        if data_map_wrap.is_some() {
+            self.attributes = Some(compiled_attributes);
+            self.data_map = Some(data_map);
+            function_result.text = Some(self.execute()?);
+            function.result = Some(function_result.clone());
+        }
+        return Ok(function)
+    }
+    fn execute(&self) -> Result<String, PlanetError> {
+        let attributes = self.attributes.clone().unwrap();
+        let data_map = &self.data_map.clone().unwrap();
+        let attribute_item = attributes[0].clone();
+        let attrs = attribute_item.value.unwrap_or_default();
+        let items: Vec<&str> = attrs.split(",").collect();
+        let mut number_items: Vec<String> = Vec::new();
+        for mut item in items {
+            item = item.trim();
+            let is_string = item.to_string().find("\"");
+            let is_null = item.to_lowercase() == "null";
+            let is_ref = item.to_string().find("{");
+            if is_ref.is_some() {
+                let item_ = &item.trim().to_string();
+                let function_attr = FunctionAttribute::defaults(
+                    item_, 
+                    Some(true)
+                );
+                let result = function_attr.replace(data_map.clone());
+                let result = result.item_processed.clone();
+                let result = result.unwrap();
+                let result = result.as_str();
+                let is_string = result.to_string().find("\"");
+                if is_string.is_some() {
+                    if item != "\"\"" {
+                        number_items.push(result.to_string());
+                    }
+                } else {
+                    if is_null == false {
+                        number_items.push(item.to_string());
+                    }
+                }
+            } else {
+                if is_string.is_some() {
+                    if item != "\"\"" {
+                        number_items.push(item.to_string());
+                    }
+                } else {
+                    if is_null == false {
+                        number_items.push(item.to_string());
+                    }
+                }
+            }
+        }
+        let count = number_items.len();
+        return Ok(count.to_string())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CountAll {
+    function: Option<FunctionParse>,
+    data_map: Option<HashMap<String, String>>,
+    attributes: Option<Vec<FunctionAttributeItem>>
+}
+impl CountAll {
+    pub fn defaults(
+        function: Option<FunctionParse>, 
+        data_map: Option<HashMap<String, String>>
+    ) -> Self {
+        return Self{function: function, data_map: data_map, attributes: None};
+    }
+}
+impl NumberFunction for CountAll {
+    fn handle(&mut self) -> Result<FunctionParse, PlanetError> {
+        // COUNT(value1, value2, ...))
+        let function_parse = &self.function.clone().unwrap();
+        let data_map = self.data_map.clone();
+        let expr = &RE_COUNTALL;
+        let mut function = function_parse.clone();
+        let data_map_wrap = data_map.clone();
+        let (
+            function_text_wrap, 
+            function_text, 
+            compiled_attributes,
+            mut function_result,
+            data_map,
+        ) = prepare_function_parse(function_parse, data_map.clone());
+        if function_text_wrap.is_some() {
+            function.validate = Some(expr.is_match(function_text.as_str()));
+            if function.validate.unwrap() {
+                let matches = &expr.captures(function_text.as_str()).unwrap();
+                let attrs = matches.name("attrs");
+                if attrs.is_some() {
+                    let attrs = attrs.unwrap().as_str().to_string();
+                    let mut attributes_: Vec<String> = Vec::new();
+                    attributes_.push(attrs);
+                    function.attributes = Some(attributes_);
+                }
+            }
+        }
+        if data_map_wrap.is_some() {
+            self.attributes = Some(compiled_attributes);
+            self.data_map = Some(data_map);
+            function_result.text = Some(self.execute()?);
+            function.result = Some(function_result.clone());
+        }
+        return Ok(function)
+    }
+    fn execute(&self) -> Result<String, PlanetError> {
+        let attributes = self.attributes.clone().unwrap();
+        // let data_map = &self.data_map.clone().unwrap();
+        let attribute_item = attributes[0].clone();
+        let attrs = attribute_item.value.unwrap_or_default();
+        let items: Vec<&str> = attrs.split(",").collect();
+        let mut number_items: Vec<String> = Vec::new();
+        for mut item in items {
+            item = item.trim();
+            number_items.push(item.to_string());
+        }
+        let count = number_items.len();
+        return Ok(count.to_string())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Even {
+    function: Option<FunctionParse>,
+    data_map: Option<HashMap<String, String>>,
+    attributes: Option<Vec<FunctionAttributeItem>>
+}
+impl Even {
+    pub fn defaults(
+        function: Option<FunctionParse>, 
+        data_map: Option<HashMap<String, String>>
+    ) -> Self {
+        return Self{function: function, data_map: data_map, attributes: None};
+    }
+}
+impl NumberFunction for Even {
+    fn handle(&mut self) -> Result<FunctionParse, PlanetError> {
+        // EVEN(number)
+        // EVEN(1.5) => 2
+        // EVEN(3) => 4
+        // EVEN(2) => 2
+        // EVEN(-1) => -2
+        // EVEN({Column}) => 2
+        let function_parse = &self.function.clone().unwrap();
+        let data_map = self.data_map.clone();
+        let expr = &RE_EVEN;
+        let mut function = function_parse.clone();
+        let data_map_wrap = data_map.clone();
+        let (
+            function_text_wrap, 
+            function_text, 
+            compiled_attributes,
+            mut function_result,
+            data_map,
+        ) = prepare_function_parse(function_parse, data_map.clone());
+        if function_text_wrap.is_some() {
+            function.validate = Some(expr.is_match(function_text.as_str()));
+            if function.validate.unwrap() {
+                let matches = &expr.captures(function_text.as_str()).unwrap();
+                let attr_number = matches.name("number");
+                let attr_number_ref = matches.name("number_ref");
+                let mut attributes_: Vec<String> = Vec::new();
+                if attr_number.is_some() {
+                    let number_string = attr_number.unwrap().as_str().to_string();
+                    attributes_.push(number_string);
+                } else if attr_number_ref.is_some() {
+                    let number_ref = attr_number_ref.unwrap().as_str().to_string();
+                    attributes_.push(number_ref);
+                }
+                function.attributes = Some(attributes_);
+            }
+        }
+        if data_map_wrap.is_some() {
+            self.attributes = Some(compiled_attributes);
+            self.data_map = Some(data_map);
+            function_result.text = Some(self.execute()?);
+            function.result = Some(function_result.clone());
+        }
+        return Ok(function)
+    }
+    fn execute(&self) -> Result<String, PlanetError> {
+        let attributes = self.attributes.clone().unwrap();
+        let data_map = &self.data_map.clone().unwrap();
+        let attribute_item = attributes[0].clone();
+        let is_reference = attribute_item.is_reference;
+        let number: f64;
+        let mut rounded_int: i32;
+        if is_reference {
+            let number_ref = attribute_item.reference_value.unwrap_or_default();
+            let function_attr = FunctionAttribute::defaults(
+                &number_ref, 
+                Some(true)
+            );
+            let result = function_attr.replace(data_map.clone());
+            let result = result.item_processed.clone();
+            number = FromStr::from_str(result.unwrap().as_str()).unwrap();
+        } else {
+            let number_string = attribute_item.value.unwrap_or_default();
+            number = FromStr::from_str(number_string.as_str()).unwrap();
+        }
+        let rounded = number.round();
+        rounded_int = FromStr::from_str(rounded.to_string().as_str()).unwrap();
+        let is_even = rounded_int%2 == 0;
+        if is_even == false && rounded_int > 0 {
+            rounded_int += 1;
+        } else if is_even == true && rounded_int < 0 {
+            rounded_int -= 1;
+        }
+        return Ok(rounded_int.to_string())
+    }
+}
+
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Exp {
+    function: Option<FunctionParse>,
+    data_map: Option<HashMap<String, String>>,
+    attributes: Option<Vec<FunctionAttributeItem>>
+}
+impl Exp {
+    pub fn defaults(
+        function: Option<FunctionParse>, 
+        data_map: Option<HashMap<String, String>>
+    ) -> Self {
+        return Self{function: function, data_map: data_map, attributes: None};
+    }
+}
+impl NumberFunction for Exp {
+    fn handle(&mut self) -> Result<FunctionParse, PlanetError> {
+        // EXP(number)
+        // EXP(1) => 2.71828183
+        let function_parse = &self.function.clone().unwrap();
+        let data_map = self.data_map.clone();
+        let expr = &RE_EXP;
+        let mut function = function_parse.clone();
+        let data_map_wrap = data_map.clone();
+        let (
+            function_text_wrap, 
+            function_text, 
+            compiled_attributes,
+            mut function_result,
+            data_map,
+        ) = prepare_function_parse(function_parse, data_map.clone());
+        if function_text_wrap.is_some() {
+            function.validate = Some(expr.is_match(function_text.as_str()));
+            if function.validate.unwrap() {
+                let matches = &expr.captures(function_text.as_str()).unwrap();
+                let attr_number = matches.name("number");
+                let attr_number_ref = matches.name("number_ref");
+                let mut attributes_: Vec<String> = Vec::new();
+                if attr_number.is_some() {
+                    let number_string = attr_number.unwrap().as_str().to_string();
+                    attributes_.push(number_string);
+                } else if attr_number_ref.is_some() {
+                    let number_ref = attr_number_ref.unwrap().as_str().to_string();
+                    attributes_.push(number_ref);
+                }
+                function.attributes = Some(attributes_);
+            }
+        }
+        if data_map_wrap.is_some() {
+            self.attributes = Some(compiled_attributes);
+            self.data_map = Some(data_map);
+            function_result.text = Some(self.execute()?);
+            function.result = Some(function_result.clone());
+        }
+        return Ok(function)
+    }
+    fn execute(&self) -> Result<String, PlanetError> {
+        let attributes = self.attributes.clone().unwrap();
+        let data_map = &self.data_map.clone().unwrap();
+        let attribute_item = attributes[0].clone();
+        let is_reference = attribute_item.is_reference;
+        let number: f64;
+        let number_result: f64;
+        if is_reference {
+            let number_ref = attribute_item.reference_value.unwrap_or_default();
+            let function_attr = FunctionAttribute::defaults(
+                &number_ref, 
+                Some(true)
+            );
+            let result = function_attr.replace(data_map.clone());
+            let result_string = result.item_processed.clone().unwrap_or_default();
+            number = FromStr::from_str(result_string.as_str()).unwrap();
+        } else {
+            let number_string = attribute_item.value.unwrap_or_default();
+            number = FromStr::from_str(number_string.as_str()).unwrap();
+        }
+        number_result = number.exp();
+        return Ok(number_result.to_string())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Int {
+    function: Option<FunctionParse>,
+    data_map: Option<HashMap<String, String>>,
+    attributes: Option<Vec<FunctionAttributeItem>>
+}
+impl Int {
+    pub fn defaults(
+        function: Option<FunctionParse>, 
+        data_map: Option<HashMap<String, String>>
+    ) -> Self {
+        return Self{function: function, data_map: data_map, attributes: None};
+    }
+}
+impl NumberFunction for Int {
+    fn handle(&mut self) -> Result<FunctionParse, PlanetError> {
+        // INT(number)
+        // INT(8.9) => 8
+        let function_parse = &self.function.clone().unwrap();
+        let data_map = self.data_map.clone();
+        let expr = &RE_INT;
+        let mut function = function_parse.clone();
+        let data_map_wrap = data_map.clone();
+        let (
+            function_text_wrap, 
+            function_text, 
+            compiled_attributes,
+            mut function_result,
+            data_map,
+        ) = prepare_function_parse(function_parse, data_map.clone());
+        if function_text_wrap.is_some() {
+            function.validate = Some(expr.is_match(function_text.as_str()));
+            if function.validate.unwrap() {
+                let matches = &expr.captures(function_text.as_str()).unwrap();
+                let attr_number = matches.name("number");
+                let attr_number_ref = matches.name("number_ref");
+                let mut attributes_: Vec<String> = Vec::new();
+                if attr_number.is_some() {
+                    let number_string = attr_number.unwrap().as_str().to_string();
+                    attributes_.push(number_string);
+                } else if attr_number_ref.is_some() {
+                    let number_ref = attr_number_ref.unwrap().as_str().to_string();
+                    attributes_.push(number_ref);
+                }
+                function.attributes = Some(attributes_);
+            }
+        }
+        if data_map_wrap.is_some() {
+            self.attributes = Some(compiled_attributes);
+            self.data_map = Some(data_map);
+            function_result.text = Some(self.execute()?);
+            function.result = Some(function_result.clone());
+        }
+        return Ok(function)
+    }
+    fn execute(&self) -> Result<String, PlanetError> {
+        let attributes = self.attributes.clone().unwrap();
+        let data_map = &self.data_map.clone().unwrap();
+        let attribute_item = attributes[0].clone();
+        let is_reference = attribute_item.is_reference;
+        let mut number: f64;
+        if is_reference {
+            let number_ref = attribute_item.reference_value.unwrap_or_default();
+            let function_attr = FunctionAttribute::defaults(
+                &number_ref, 
+                Some(true)
+            );
+            let result = function_attr.replace(data_map.clone());
+            let result_string = result.item_processed.clone().unwrap_or_default();
+            number = FromStr::from_str(result_string.as_str()).unwrap();
+        } else {
+            let number_string = attribute_item.value.unwrap_or_default();
+            number = FromStr::from_str(number_string.as_str()).unwrap();
+        }
+        number = number.trunc();
+        let number_str = number.to_string();
+        let number_str = number_str.as_str();
+        let number_result: isize = FromStr::from_str(number_str).unwrap();
+        return Ok(number_result.to_string())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Log {
+    function: Option<FunctionParse>,
+    data_map: Option<HashMap<String, String>>,
+    attributes: Option<Vec<FunctionAttributeItem>>
+}
+impl Log {
+    pub fn defaults(
+        function: Option<FunctionParse>, 
+        data_map: Option<HashMap<String, String>>
+    ) -> Self {
+        return Self{function: function, data_map: data_map, attributes: None};
+    }
+}
+impl NumberFunction for Log {
+    fn handle(&mut self) -> Result<FunctionParse, PlanetError> {
+        // LOG(number)
+        // LOG(number, [base])
+        // LOG(10) = 1
+        // LOG(8, 2) = 3
+        let function_parse = &self.function.clone().unwrap();
+        let data_map = self.data_map.clone();
+        let expr = &RE_LOG;
+        let mut function = function_parse.clone();
+        let data_map_wrap = data_map.clone();
+        let (
+            function_text_wrap, 
+            function_text, 
+            compiled_attributes,
+            mut function_result,
+            data_map,
+        ) = prepare_function_parse(function_parse, data_map.clone());
+        if function_text_wrap.is_some() {
+            function.validate = Some(expr.is_match(function_text.as_str()));
+            if function.validate.unwrap() {
+                let matches = &expr.captures(function_text.as_str()).unwrap();
+                let attr_number = matches.name("number");
+                let attr_number_ref = matches.name("number_ref");
+                let attr_base = matches.name("base");
+                let attr_base_ref = matches.name("base_ref");
+                let mut attributes_: Vec<String> = Vec::new();
+                if attr_number.is_some() {
+                    let number_string = attr_number.unwrap();
+                    let number_string = number_string.as_str().to_string();
+                    attributes_.push(number_string);
+                } else if attr_number_ref.is_some() {
+                    let number_ref = attr_number_ref.unwrap().as_str().to_string();
+                    attributes_.push(number_ref);
+                }
+                if attr_base.is_some() {
+                    let base = attr_base.unwrap().as_str();
+                    let base: usize = FromStr::from_str(base).unwrap();
+                    attributes_.push(base.to_string());
+                }
+                if attr_base_ref.is_some() {
+                    let base = attr_base_ref.unwrap().as_str();
+                    let base_ref: usize = FromStr::from_str(base).unwrap();
+                    attributes_.push(base_ref.to_string());
+                }
+                function.attributes = Some(attributes_);
+            }
+        }
+        if data_map_wrap.is_some() {
+            self.attributes = Some(compiled_attributes);
+            self.data_map = Some(data_map);
+            function_result.text = Some(self.execute()?);
+            function.result = Some(function_result.clone());
+        }
+        return Ok(function)
+    }
+    fn execute(&self) -> Result<String, PlanetError> {
+        let attributes = self.attributes.clone().unwrap();
+        let data_map = &self.data_map.clone().unwrap();
+        let attribute_item = attributes[0].clone();
+        let base_item = attributes[1].clone();
+        let is_reference = attribute_item.is_reference;
+        let is_base_reference = base_item.is_reference;
+        let mut number: f64;
+        let mut base: f64 = 10.0;
+        if is_reference {
+            let number_ref = attribute_item.reference_value.unwrap();
+            let function_attr = FunctionAttribute::defaults(
+                &number_ref, 
+                Some(true)
+            );
+            let result = function_attr.replace(data_map.clone());
+            let result = result.item_processed.clone();
+            number = FromStr::from_str(result.unwrap().as_str()).unwrap();
+        } else {
+            let number_string = attribute_item.value.unwrap_or_default();
+            number = FromStr::from_str(number_string.as_str()).unwrap();
+        }
+        if is_base_reference {
+            let base_ref = base_item.reference_value.unwrap();
+            let function_attr = FunctionAttribute::defaults(
+                &base_ref, 
+                Some(true)
+            );
+            let result = function_attr.replace(data_map.clone());
+            let result = result.item_processed.clone();
+            base = FromStr::from_str(result.unwrap().as_str()).unwrap();
+        } else {
+            if base_item.value.is_some() {
+                let base_string = base_item.value.unwrap();
+                base = FromStr::from_str(base_string.as_str()).unwrap();
+            }
+        }
+        number = number.log(base);
+        let number_str = number.to_string();
+        let number_str = number_str.as_str();
+        let number_result: isize = FromStr::from_str(number_str).unwrap();
+        return Ok(number_result.to_string())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Mod {
+    function: Option<FunctionParse>,
+    data_map: Option<HashMap<String, String>>,
+    attributes: Option<Vec<FunctionAttributeItem>>
+}
+impl Mod {
+    pub fn defaults(
+        function: Option<FunctionParse>, 
+        data_map: Option<HashMap<String, String>>
+    ) -> Self {
+        return Self{function: function, data_map: data_map, attributes: None};
+    }
+}
+impl NumberFunction for Mod {
+    fn handle(&mut self) -> Result<FunctionParse, PlanetError> {
+        // MOD(number, divisor)
+        let function_parse = &self.function.clone().unwrap();
+        let data_map = self.data_map.clone();
+        let expr = &RE_MOD;
+        let mut function = function_parse.clone();
+        let data_map_wrap = data_map.clone();
+        let (
+            function_text_wrap, 
+            function_text, 
+            compiled_attributes,
+            mut function_result,
+            data_map,
+        ) = prepare_function_parse(function_parse, data_map.clone());
+        if function_text_wrap.is_some() {
+            function.validate = Some(expr.is_match(function_text.as_str()));
+            if function.validate.unwrap() {
+                let matches = &expr.captures(function_text.as_str()).unwrap();
+                let attr_number = matches.name("number");
+                let attr_number_ref = matches.name("number_ref");
+                let attr_divisor = matches.name("divisor");
+                let attr_divisor_ref = matches.name("divisor_ref");
+                let mut attributes_: Vec<String> = Vec::new();
+                if attr_number.is_some() {
+                    let number_string = attr_number.unwrap().as_str().to_string();
+                    attributes_.push(number_string);
+                } else if attr_number_ref.is_some() {
+                    let number_ref = attr_number_ref.unwrap().as_str().to_string();
+                    attributes_.push(number_ref);
+                }
+                if attr_divisor.is_some() {
+                    let divisor = attr_divisor.unwrap().as_str();
+                    attributes_.push(divisor.to_string());
+                }
+                if attr_divisor_ref.is_some() {
+                    let divisor = attr_divisor_ref.unwrap().as_str();
+                    attributes_.push(divisor.to_string());
+                }
+                function.attributes = Some(attributes_);
+            }
+        }
+        if data_map_wrap.is_some() {
+            self.attributes = Some(compiled_attributes);
+            self.data_map = Some(data_map);
+            function_result.text = Some(self.execute()?);
+            function.result = Some(function_result.clone());
+        }
+        return Ok(function)
+    }
+    fn execute(&self) -> Result<String, PlanetError> {
+        let attributes = self.attributes.clone().unwrap();
+        let data_map = &self.data_map.clone().unwrap();
+        let attribute_item = attributes[0].clone();
+        let divisor_item = attributes[1].clone();
+        let is_reference = attribute_item.is_reference;
+        let is_divisor_reference = divisor_item.is_reference;
+        let mut number: f64;
+        let mut divisor: f64 = 10.0;
+        if is_reference {
+            let number_ref = attribute_item.reference_value.unwrap_or_default();
+            let function_attr = FunctionAttribute::defaults(
+                &number_ref, 
+                Some(true)
+            );
+            let result = function_attr.replace(data_map.clone());
+            let result = result.item_processed.clone();
+            number = FromStr::from_str(result.unwrap().as_str()).unwrap();
+        } else {
+            let number_string = attribute_item.value.unwrap_or_default();
+            number = FromStr::from_str(number_string.as_str()).unwrap();
+        }
+        if is_divisor_reference {
+            let divisor_ref = divisor_item.reference_value.unwrap_or_default();
+            let function_attr = FunctionAttribute::defaults(
+                &divisor_ref, 
+                Some(true)
+            );
+            let result = function_attr.replace(data_map.clone());
+            let result = result.item_processed.clone();
+            divisor = FromStr::from_str(result.unwrap().as_str()).unwrap();
+        } else {
+            if divisor_item.reference_value.is_some() {
+                let divisor_string = divisor_item.reference_value.unwrap();
+                divisor = FromStr::from_str(divisor_string.as_str()).unwrap();
+            }
+        }
+        number = number%divisor;
+        let number_str = number.to_string();
+        let number_str = number_str.as_str();
+        let number_result: isize = FromStr::from_str(number_str).unwrap();
+        return Ok(number_result.to_string())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Power {
+    function: Option<FunctionParse>,
+    data_map: Option<HashMap<String, String>>,
+    attributes: Option<Vec<FunctionAttributeItem>>
+}
+impl Power {
+    pub fn defaults(
+        function: Option<FunctionParse>, 
+        data_map: Option<HashMap<String, String>>
+    ) -> Self {
+        return Self{function: function, data_map: data_map, attributes: None};
+    }
+}
+impl NumberFunction for Power {
+    fn handle(&mut self) -> Result<FunctionParse, PlanetError> {
+        // POWER(number, power)
+        let function_parse = &self.function.clone().unwrap();
+        let data_map = self.data_map.clone();
+        let expr = &RE_POWER;
+        let mut function = function_parse.clone();
+        let data_map_wrap = data_map.clone();
+        let (
+            function_text_wrap, 
+            function_text, 
+            compiled_attributes,
+            mut function_result,
+            data_map,
+        ) = prepare_function_parse(function_parse, data_map.clone());
+        if function_text_wrap.is_some() {
+            function.validate = Some(expr.is_match(function_text.as_str()));
+            if function.validate.unwrap() {
+                let matches = &expr.captures(function_text.as_str()).unwrap();
+                let attr_number = matches.name("number");
+                let attr_number_ref = matches.name("number_ref");
+                let attr_power = matches.name("power");
+                let attr_power_ref = matches.name("power_ref");
+                let mut attributes_: Vec<String> = Vec::new();
+                if attr_number.is_some() {
+                    let number_string = attr_number.unwrap().as_str().to_string();
+                    attributes_.push(number_string);
+                } else if attr_number_ref.is_some() {
+                    let number_ref = attr_number_ref.unwrap().as_str().to_string();
+                    attributes_.push(number_ref);
+                }
+                if attr_power.is_some() {
+                    let power_string = attr_power.unwrap().as_str().to_string();
+                    attributes_.push(power_string);
+                }
+                if attr_power_ref.is_some() {
+                    let power_ref_string = attr_power_ref.unwrap().as_str().to_string();
+                    attributes_.push(power_ref_string);
+                }
+                function.attributes = Some(attributes_);
+            }
+        }
+        if data_map_wrap.is_some() {
+            self.attributes = Some(compiled_attributes);
+            self.data_map = Some(data_map);
+            function_result.text = Some(self.execute()?);
+            function.result = Some(function_result.clone());
+        }
+        return Ok(function)
+    }
+    fn execute(&self) -> Result<String, PlanetError> {
+        let attributes = self.attributes.clone().unwrap();
+        let data_map = &self.data_map.clone().unwrap();
+        let attribute_item = attributes[0].clone();
+        let is_reference = attribute_item.is_reference;
+        let power_item = attributes[1].clone();
+        let is_power_reference = power_item.is_reference;
+        let mut number: f64;
+        let mut power: f64 = 10.0;
+        if is_reference {
+            let number_ref = attribute_item.reference_value.unwrap();
+            let function_attr = FunctionAttribute::defaults(
+                &number_ref, 
+                Some(true)
+            );
+            let result = function_attr.replace(data_map.clone());
+            let result = result.item_processed.clone();
+            number = FromStr::from_str(result.unwrap().as_str()).unwrap();
+        } else {
+            let number_string = attribute_item.value.unwrap_or_default();
+            number = FromStr::from_str(number_string.as_str()).unwrap();
+        }
+        if is_power_reference {
+            let power_ref = power_item.reference_value.unwrap();
+            let function_attr = FunctionAttribute::defaults(
+                &power_ref, 
+                Some(true)
+            );
+            let result = function_attr.replace(data_map.clone());
+            let result = result.item_processed.clone();
+            power = FromStr::from_str(result.unwrap().as_str()).unwrap();
+        } else {
+            if power_item.value.is_some() {
+                let power_string = power_item.value.unwrap();
+                power = FromStr::from_str(power_string.as_str()).unwrap();
+            }
+        }
+        number = number.powf(power);
+        let number_str = number.to_string();
+        let number_str = number_str.as_str();
+        let number_result: f64 = FromStr::from_str(number_str).unwrap();
+        return Ok(number_result.to_string())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Round {
+    function: Option<FunctionParse>,
+    data_map: Option<HashMap<String, String>>,
+    attributes: Option<Vec<FunctionAttributeItem>>
+}
+impl Round {
+    pub fn defaults(
+        function: Option<FunctionParse>, 
+        data_map: Option<HashMap<String, String>>
+    ) -> Self {
+        return Self{function: function, data_map: data_map, attributes: None};
+    }
+}
+impl RoundNumberFunction for Round {
+    fn handle(&mut self, option: RoundOption) -> Result<FunctionParse, PlanetError> {
+        // ROUND(number, digits)
+        let function_parse = &self.function.clone().unwrap();
+        let data_map = self.data_map.clone();
+        let mut function = function_parse.clone();
+        let data_map_wrap = data_map.clone();
+        let (
+            function_text_wrap, 
+            function_text, 
+            compiled_attributes,
+            mut function_result,
+            data_map,
+        ) = prepare_function_parse(function_parse, data_map.clone());
+        let expr = &RE_ROUND;
+        let expr_up = &RE_ROUND_UP;
+        let expr_down = &RE_ROUND_DOWN;
+        if function_text_wrap.is_some() {
+            match option {
+                RoundOption::Basic => {
+                    function.validate = Some(expr.is_match(function_text.as_str()));
+                }
+                RoundOption::Up => {
+                    function.validate = Some(expr_up.is_match(function_text.as_str()));
+                }
+                RoundOption::Down => {
+                    function.validate = Some(expr_down.is_match(function_text.as_str()));
+                }
+            }
+            if function.validate.unwrap() {
+                let matches: Captures;
+                match option {
+                    RoundOption::Basic => {
+                        matches = expr.captures(function_text.as_str()).unwrap();
+                    }
+                    RoundOption::Up => {
+                        matches = expr_up.captures(function_text.as_str()).unwrap();
+                    }
+                    RoundOption::Down => {
+                        matches = expr_down.captures(function_text.as_str()).unwrap();
+                    }
+                }
+                let attr_number = matches.name("number");
+                let attr_number_ref = matches.name("number_ref");
+                let attr_digits = matches.name("digits");
+                let attr_digits_ref = matches.name("digits_ref");
+                let mut attributes_: Vec<String> = Vec::new();
+                if attr_number.is_some() {
+                    let number_string = attr_number.unwrap().as_str().to_string();
+                    attributes_.push(number_string);
+                } else if attr_number_ref.is_some() {
+                    let number_ref = attr_number_ref.unwrap().as_str().to_string();
+                    attributes_.push(number_ref);
+                }
+                if attr_digits.is_some() {
+                    let digits_string = attr_digits.unwrap().as_str().to_string();
+                    attributes_.push(digits_string);
+                }
+                if attr_digits_ref.is_some() {
+                    let digits_ref_string = attr_digits_ref.unwrap().as_str().to_string();
+                    attributes_.push(digits_ref_string);
+                }
+                function.attributes = Some(attributes_);
+            }
+        }
+        if data_map_wrap.is_some() {
+            self.attributes = Some(compiled_attributes);
+            self.data_map = Some(data_map);
+            function_result.text = Some(self.execute(option)?);
+            function.result = Some(function_result.clone());
+        }
+        return Ok(function)
+    }
+    fn execute(&self, option: RoundOption) -> Result<String, PlanetError> {
+        let attributes = self.attributes.clone().unwrap();
+        let data_map = &self.data_map.clone().unwrap();
+        let attribute_item = attributes[0].clone();
+        let is_reference = attribute_item.is_reference;
+        let digits_item = attributes[1].clone();
+        let is_digits_reference = digits_item.is_reference;
+        let mut number: f64;
+        let mut digits: i8 = 2;
+        if is_reference {
+            let number_ref = attribute_item.reference_value.unwrap();
+            let function_attr = FunctionAttribute::defaults(
+                &number_ref, 
+                Some(true)
+            );
+            let result = function_attr.replace(data_map.clone());
+            let result = result.item_processed.clone();
+            number = FromStr::from_str(result.unwrap().as_str()).unwrap();
+        } else {
+            let number_string = attribute_item.value.unwrap();
+            number = FromStr::from_str(number_string.as_str()).unwrap();
+        }
+        if is_digits_reference {
+            let number_ref = digits_item.reference_value.unwrap();
+            let function_attr = FunctionAttribute::defaults(
+                &number_ref, 
+                Some(true)
+            );
+            let result = function_attr.replace(data_map.clone());
+            let result = result.item_processed.clone();
+            digits = FromStr::from_str(result.unwrap().as_str()).unwrap();
+        } else {
+            if digits_item.value.is_some() {
+                let digits_string = digits_item.value.unwrap();
+                digits = FromStr::from_str(digits_string.as_str()).unwrap();
+            }
+        }
+        match option {
+            RoundOption::Basic => {
+                number = round::half_away_from_zero(number, digits);
+            },
+            RoundOption::Up => {
+                number = round::ceil(number, digits);
+            },
+            RoundOption::Down => {
+                number = round::floor(number, digits);
+            },
+        }
+        let number_str = number.to_string();
+        let number_str = number_str.as_str();
+        let number_result: f64 = FromStr::from_str(number_str).unwrap();
+        return Ok(number_result.to_string())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Sqrt {
+    function: Option<FunctionParse>,
+    data_map: Option<HashMap<String, String>>,
+    attributes: Option<Vec<FunctionAttributeItem>>
+}
+impl Sqrt {
+    pub fn defaults(
+        function: Option<FunctionParse>, 
+        data_map: Option<HashMap<String, String>>
+    ) -> Self {
+        return Self{function: function, data_map: data_map, attributes: None};
+    }
+}
+impl NumberFunction for Sqrt {
+    fn handle(&mut self) -> Result<FunctionParse, PlanetError> {
+        // SQRT(number)
+        let function_parse = &self.function.clone().unwrap();
+        let data_map = self.data_map.clone();
+        let expr = &RE_SQRT;
+        let mut function = function_parse.clone();
+        let data_map_wrap = data_map.clone();
+        let (
+            function_text_wrap, 
+            function_text, 
+            compiled_attributes,
+            mut function_result,
+            data_map,
+        ) = prepare_function_parse(function_parse, data_map.clone());
+        if function_text_wrap.is_some() {
+            function.validate = Some(expr.is_match(function_text.as_str()));
+            if function.validate.unwrap() {
+                let matches = RE_SQRT.captures(function_text.as_str()).unwrap();
+                let attr_number = matches.name("number");
+                let attr_number_ref = matches.name("number_ref");
+                let mut attributes_: Vec<String> = Vec::new();
+                if attr_number.is_some() {
+                    let number_string = attr_number.unwrap().as_str().to_string();
+                    attributes_.push(number_string);
+                } else if attr_number_ref.is_some() {
+                    let number_string = attr_number_ref.unwrap().as_str().to_string();
+                    attributes_.push(number_string);
+                }
+                function.attributes = Some(attributes_);
+            }
+        }
+        if data_map_wrap.is_some() {
+            self.attributes = Some(compiled_attributes);
+            self.data_map = Some(data_map);
+            function_result.text = Some(self.execute()?);
+            function.result = Some(function_result.clone());
+        }
+        return Ok(function)
+    }
+    fn execute(&self) -> Result<String, PlanetError> {
+        let attributes = self.attributes.clone().unwrap();
+        let data_map = &self.data_map.clone().unwrap();
+        let attribute_item = attributes[0].clone();
+        let is_reference = attribute_item.is_reference;
+        let mut number: f64;
+        if is_reference {
+            let number_ref = attribute_item.reference_value.unwrap();
+            let function_attr = FunctionAttribute::defaults(
+                &number_ref, 
+                Some(true)
+            );
+            let result = function_attr.replace(data_map.clone());
+            let result = result.item_processed.clone();
+            number = FromStr::from_str(result.unwrap().as_str()).unwrap();
+        } else {
+            let number_string = attribute_item.value.unwrap();
+            number = FromStr::from_str(number_string.as_str()).unwrap();
+        }
+        number = number.sqrt();
+        let number_str = number.to_string();
+        let number_str = number_str.as_str();
+        let number_result: f64 = FromStr::from_str(number_str).unwrap();
+        return Ok(number_result.to_string())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Value {
+    function: Option<FunctionParse>,
+    data_map: Option<HashMap<String, String>>,
+    attributes: Option<Vec<FunctionAttributeItem>>
+}
+impl Value {
+    pub fn defaults(
+        function: Option<FunctionParse>, 
+        data_map: Option<HashMap<String, String>>
+    ) -> Self {
+        return Self{function: function, data_map: data_map, attributes: None};
+    }
+}
+impl NumberFunction for Value {
+    fn handle(&mut self) -> Result<FunctionParse, PlanetError> {
+        // VALUE(text)
+        let function_parse = &self.function.clone().unwrap();
+        let data_map = self.data_map.clone();
+        let expr = &RE_VALUE;
+        let mut function = function_parse.clone();
+        let data_map_wrap = data_map.clone();
+        let (
+            function_text_wrap, 
+            function_text, 
+            compiled_attributes,
+            mut function_result,
+            data_map,
+        ) = prepare_function_parse(function_parse, data_map.clone());
+        if function_text_wrap.is_some() {
+            function.validate = Some(expr.is_match(function_text.as_str()));
+            if function.validate.unwrap() {
+                let matches = &expr.captures(function_text.as_str()).unwrap();
+                let attr_text = matches.name("text");
+                let attr_text_ref = matches.name("text_ref");
+                let mut attributes_: Vec<String> = Vec::new();
+                if attr_text.is_some() {
+                    let text = attr_text.unwrap().as_str().to_string();
+                    attributes_.push(text);
+                } else if attr_text_ref.is_some() {
+                    let text_ref = attr_text_ref.unwrap().as_str().to_string();
+                    attributes_.push(text_ref);
+                }
+                function.attributes = Some(attributes_);
+            }
+        }
+        if data_map_wrap.is_some() {
+            self.attributes = Some(compiled_attributes);
+            self.data_map = Some(data_map);
+            function_result.text = Some(self.execute()?);
+            function.result = Some(function_result.clone());
+        }
+        return Ok(function)
+    }
+    fn execute(&self) -> Result<String, PlanetError> {
+        let attributes = self.attributes.clone().unwrap();
+        let data_map = &self.data_map.clone().unwrap();
+        let attribute_item = attributes[0].clone();
+        let is_reference = attribute_item.is_reference;
+        let mut text: String;
+        if is_reference {
+            let text_ref = attribute_item.reference_value.unwrap();
+            let function_attr = FunctionAttribute::defaults(
+                &text_ref, 
+                Some(true)
+            );
+            let result = function_attr.replace(data_map.clone());
+            let result = result.item_processed.clone();
+            text = result.unwrap().as_str().to_string();
+        } else {
+            text = attribute_item.value.unwrap();
+        }
+        let number: f64;
+        text = text.replace("$", "").replace("€", "");
+        text = text.replace("\"", "");
+        let has_multiple_punc = text.find(",").is_some() && text.find(".").is_some();
+        if has_multiple_punc {
+            // , could be thousand sep or decimals
+            // . could be thousand or decimals
+            let index_dot = text.find(".").unwrap();
+            let index_comma = text.find(",").unwrap();
+            if index_comma > index_dot {
+                // 1.200,98
+                text = text.replace(".", "");
+                text = text.replace(",", ".");
+                // 1200.98
+            } else {
+                // 1,200.98
+                text = text.replace(",", "");
+                // 1200.98
+            }
+        } else {
+            let index_comma = text.find(",");
+            if index_comma.is_some() {
+                // 920,98
+                text = text.replace(",", ".");
+                // 920.98
+            }
+        }
+        number = FromStr::from_str(text.as_str()).unwrap();
+        return Ok(number.to_string())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Boolean {
+    function: Option<FunctionParse>,
+    data_map: Option<HashMap<String, String>>,
+    attributes: Option<Vec<FunctionAttributeItem>>
+}
+impl Boolean {
+    pub fn defaults(
+        function: Option<FunctionParse>, 
+        data_map: Option<HashMap<String, String>>
+    ) -> Self {
+        return Self{function: function, data_map: data_map, attributes: None};
+    }
+}
+impl NumberFunction for Boolean {
+    fn handle(&mut self) -> Result<FunctionParse, PlanetError> {
+        // TRUE() or FALSE()
+        // TRUE or FALSE
+        let function_parse = &self.function.clone().unwrap();
+        let data_map = self.data_map.clone();
+        let expr = &RE_BOOLEAN;
+        let mut function = function_parse.clone();
+        let data_map_wrap = data_map.clone();
+        let (
+            function_text_wrap, 
+            function_text, 
+            compiled_attributes,
+            mut function_result,
+            data_map,
+        ) = prepare_function_parse(function_parse, data_map.clone());
+        if function_text_wrap.is_some() {
+            function.validate = Some(expr.is_match(function_text.as_str()));
+            if function.validate.unwrap() {
+                let attributes_: Vec<String> = Vec::new();
+                function.attributes = Some(attributes_);
+            }
+        }
+        if data_map_wrap.is_some() {
+            self.attributes = Some(compiled_attributes);
+            self.data_map = Some(data_map);
+            function_result.text = Some(self.execute()?);
+            function.result = Some(function_result.clone());
+        }
+        return Ok(function)
+    }
+    fn execute(&self) -> Result<String, PlanetError> {
+        let function_parse = &self.function.clone().unwrap().clone();
+        let function_text = function_parse.clone().text.unwrap_or_default();
+        let mut number: u8 = 0;
+        if function_text.find("TRUE").is_some() {
+            number = 1;
+        }
+        return Ok(number.to_string())
+    }
+}
+
+pub fn check_float_compare(value: &f64, compare_to: &f64, op: FormulaOperator) -> Result<bool, PlanetError> {
+    let mut check: bool = false;
+    match op {
+        FormulaOperator::Greater => {
+            if value > compare_to {
+                check = true;
+            }
+        },
+        FormulaOperator::Smaller => {
+            if value < compare_to {
+                check = true;
+            }
+        },
+        FormulaOperator::GreaterOrEqual => {
+            if value >= compare_to {
+                check = true;
+            }
+        },
+        FormulaOperator::SmallerOrEqual => {
+            if value <= compare_to {
+                check = true;
+            }
+        },
+        _ => {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Operator not supported")),
+                )
+            );
+
+        }
+    }
+    return Ok(check)
 }
 
 // CEILING(number, significance)
-#[derive(Debug, Serialize, Deserialize, Clone)]
+/* #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CeilingFunction {
     pub function_text: String,
     pub number: Option<f64>,
@@ -150,9 +1605,9 @@ impl Function for CeilingFunction {
         return formula;
     }
 }
-
+ */
 // FLOOR(number, significance)
-#[derive(Debug, Serialize, Deserialize, Clone)]
+/* #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FloorFunction {
     pub function_text: String,
     pub number: Option<f64>,
@@ -271,9 +1726,9 @@ impl Function for FloorFunction {
         return formula;
     }
 }
-
+ */
 // COUNT(value1, value2, ...))
-#[derive(Debug, Serialize, Deserialize, Clone)]
+/* #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CountFunction {
     pub function_text: String,
     pub attrs: Option<String>,
@@ -380,9 +1835,10 @@ impl Function for CountFunction {
         return formula;
     }
 }
+ */
 
 // COUNTA(value1, value2, ...))
-#[derive(Debug, Serialize, Deserialize, Clone)]
+/* #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CountAFunction {
     pub function_text: String,
     pub attrs: Option<String>,
@@ -502,10 +1958,10 @@ impl Function for CountAFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         return formula;
     }
-}
+} */
 
 // COUNTALL(value1, value2, ...))
-#[derive(Debug, Serialize, Deserialize, Clone)]
+/* #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CountAllFunction {
     pub function_text: String,
     pub attrs: Option<String>,
@@ -591,9 +2047,10 @@ impl Function for CountAllFunction {
         return formula;
     }
 }
+ */
 
 // EVEN(number)
-#[derive(Debug, Serialize, Deserialize, Clone)]
+/* #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EvenFunction {
     pub function_text: String,
     pub number: Option<f64>,
@@ -701,10 +2158,10 @@ impl Function for EvenFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         return formula;
     }
-}
+} */
 
 // EXP(number)
-#[derive(Debug, Serialize, Deserialize, Clone)]
+/* #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ExpFunction {
     pub function_text: String,
     pub number: Option<f64>,
@@ -801,10 +2258,10 @@ impl Function for ExpFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         return formula;
     }
-}
+} */
 
 // INT(number)
-#[derive(Debug, Serialize, Deserialize, Clone)]
+/* #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct IntFunction {
     pub function_text: String,
     pub number: Option<f64>,
@@ -902,11 +2359,11 @@ impl Function for IntFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         return formula;
     }
-}
+} */
 
 // LOG(number)
 // LOG(number, [base])
-#[derive(Debug, Serialize, Deserialize, Clone)]
+/* #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LogFunction {
     pub function_text: String,
     pub number: Option<f64>,
@@ -1035,10 +2492,10 @@ impl Function for LogFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         return formula;
     }
-}
+} */
 
 // MOD(number, divisor)
-#[derive(Debug, Serialize, Deserialize, Clone)]
+/* #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ModFunction {
     pub function_text: String,
     pub number: Option<f64>,
@@ -1164,10 +2621,10 @@ impl Function for ModFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         return formula;
     }
-}
+} */
 
 // POWER(number, power)
-#[derive(Debug, Serialize, Deserialize, Clone)]
+/* #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PowerFunction {
     pub function_text: String,
     pub number: Option<f64>,
@@ -1293,19 +2750,12 @@ impl Function for PowerFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         return formula;
     }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum RoundOption {
-    Basic,
-    Up,
-    Down,
-}
+} */
 
 // ROUND(number, digits)
 // ROUNDUP(number, digits)
 // ROUNDDOWN(number, digits)
-#[derive(Debug, Serialize, Deserialize, Clone)]
+/* #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RoundFunction {
     pub function_text: String,
     pub number: Option<f64>,
@@ -1480,10 +2930,10 @@ impl Function for RoundFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         return formula;
     }
-}
+} */
 
 // SQRT(number)
-#[derive(Debug, Serialize, Deserialize, Clone)]
+/* #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SqrtFunction {
     pub function_text: String,
     pub number: Option<f64>,
@@ -1580,10 +3030,10 @@ impl Function for SqrtFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         return formula;
     }
-}
+} */
 
 // VALUE(text)
-#[derive(Debug, Serialize, Deserialize, Clone)]
+/* #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ValueFunction {
     pub function_text: String,
     pub text: Option<String>,
@@ -1704,16 +3154,10 @@ impl Function for ValueFunction {
         formula = formula.replace(function_text.as_str(), replacement_string.as_str());
         return formula;
     }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum BooleanOption {
-    True,
-    False,
-}
+} */
 
 // TRUE() or FALSE()
-#[derive(Debug, Serialize, Deserialize, Clone)]
+/* #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BooleanFunction {
     pub function_text: String,
     pub option: BooleanOption,
@@ -1793,39 +3237,4 @@ impl Function for BooleanFunction {
         return formula;
     }
 }
-
-pub fn check_float_compare(value: &f64, compare_to: &f64, op: FormulaOperator) -> Result<bool, PlanetError> {
-    let mut check: bool = false;
-    match op {
-        FormulaOperator::Greater => {
-            if value > compare_to {
-                check = true;
-            }
-        },
-        FormulaOperator::Smaller => {
-            if value < compare_to {
-                check = true;
-            }
-        },
-        FormulaOperator::GreaterOrEqual => {
-            if value >= compare_to {
-                check = true;
-            }
-        },
-        FormulaOperator::SmallerOrEqual => {
-            if value <= compare_to {
-                check = true;
-            }
-        },
-        _ => {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!("Operator not supported")),
-                )
-            );
-
-        }
-    }
-    return Ok(check)
-}
+ */
