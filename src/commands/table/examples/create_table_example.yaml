@@ -268,3 +268,82 @@ fields:
     field_type: Formula
     formula: FALSE()
     formula_format: Check
+  - name: Date
+    field_type: Formula
+    formula: "DATE(
+      2021, 
+      8, 
+      12
+    )"
+    formula_format: Date
+  - name: Day 01
+    field_type: Formula
+    formula: "DAY(
+      \"2021-08-21T14:32:11+00:00\"
+    )"
+    formula_format: Number
+  - name: Day 02
+    field_type: Formula
+    formula: "DAY(
+      \"2021-08-25 06:26:00\"
+    )"
+    formula_format: Number
+  - name: Day 03
+    field_type: Formula
+    formula: "DAY(\"25-AUG-2021 06:26:00\")"
+    formula_format: Number
+  - name: Day 04
+    field_type: Formula
+    formula: "DAY(
+      \"25-AUG-2021\"
+    )"
+    formula_format: Number
+  - name: Week
+    field_type: Formula
+    formula: "WEEK(\"25-AUG-2021\")"
+    formula_format: Number
+  - name: Minute
+    field_type: Formula
+    formula: "MINUTE(
+      \"25-AUG-2021 06:26:00\"
+    )"
+    formula_format: Number
+  - name: Now
+    field_type: Formula
+    formula: NOW()
+    formula_format: Date
+  - name: Today
+    field_type: Formula
+    formula: TODAY()
+    formula_format: Date
+  - name: Days
+    field_type: Formula
+    formula: "DAYS(
+      \"05-Sep-2021\", 
+      \"21-Aug-2021\"
+    )"
+    formula_format: Number
+  - name: DateAdd Date
+    field_type: Formula
+    formula: "DATEADD(
+      \"26-Aug-2021\", 
+      5, 
+      \"days\"
+    )"
+    formula_format: Date
+  - name: DateAdd DateTime
+    field_type: Formula
+    formula: "DATEADD(
+      \"26-Aug-2021 12:45:00\", 
+      45, 
+      \"minutes\"
+    )"
+    formula_format: Date
+  - name: Date format
+    field_type: Formula
+    formula: "DATEFMT(
+      \"21-Aug-2021 13:45:22\", 
+      \"{DD} was the day, {YYYY} the year. I love {Do} of months\"
+    )"
+    formula_format: Text
+

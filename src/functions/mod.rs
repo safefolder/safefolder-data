@@ -17,7 +17,7 @@ use xlformula_engine::{calculate, parse_formula, NoReference, NoCustomFunction};
 use crate::storage::table::{DbData, DbTable};
 use crate::functions::constants::*;
 use crate::functions::text::*;
-// use crate::functions::date::*;
+use crate::functions::date::*;
 use crate::functions::number::*;
 // use crate::functions::collections::*;
 // use crate::functions::structure::*;
@@ -35,7 +35,7 @@ lazy_static! {
     static ref RE_FORMULA_FIELD_FUNCTIONS: Regex = Regex::new(r#"(?P<func>[A-Z]+[("\d)\w,\W.\s{}-]+)"#).unwrap();
     static ref RE_FUNCTION_ATTRS_OLD: Regex = Regex::new(r#"("[\w\s-]+")|(\{[\w\s]+\})|([A-Z]+\(["\w\s]+\))|([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)"#).unwrap();
     static ref RE_FUNCTION_ATTRS: Regex = Regex::new(r#"[A-Z]+\((?P<attrs>.+)\)"#).unwrap();
-    static ref RE_ATTR_TYPE_RESOLVE: Regex = Regex::new(r#"(?P<ref>\{[\w\s]+\})|(?P<func>[A-Z]+\(.+\))|(?P<bool>TRUE|FALSE)|(?P<string>\\{0,}"[,;_.\\$€\{\}\w\s-]+\\{0,}")|(?P<number>^[+-]?[0-9]+\.?[0-9]*|^\.[0-9]+)|(?P<null>null)"#).unwrap();
+    static ref RE_ATTR_TYPE_RESOLVE: Regex = Regex::new(r#"(?P<ref>\{[\w\s]+\})|(?P<func>[A-Z]+\(.+\))|(?P<bool>TRUE|FALSE)|(?P<string>\\{0,}"[,;_.\\$€:\-\+\{\}\w\s-]+\\{0,}")|(?P<number>^[+-]?[0-9]+\.?[0-9]*|^\.[0-9]+)|(?P<null>null)"#).unwrap();
 }
 
 // achiever planet functions
@@ -1148,7 +1148,7 @@ pub fn compile_function_text(
     let mut function_parse = FunctionParse::defaults(&function_name.to_string());
     function_parse.text = Some(function_text.to_string());
     let function_parse = process_function(&function_parse, None)?;
-    // eprintln!("compile_function_text :: function_parse from coded function: {:#?}", &function_parse);
+    eprintln!("compile_function_text :: function_parse from coded function: {:#?}", &function_parse);
     let validate = function_parse.validate.unwrap();
     if validate == false {
         return Err(
@@ -1177,7 +1177,7 @@ pub fn compile_function_text(
     for attr_ in function_attributes {
         let mut attr = attr_.as_str();
         attr = attr.trim();
-        // eprintln!("compile_function_text :: attr: {}", &attr);
+        eprintln!("compile_function_text :: attr: {}", &attr);
         let mut attribute_type: AttributeType = AttributeType::Text;
         let mut function_attribute = FunctionAttributeItem::defaults(
             None, 
@@ -1403,13 +1403,16 @@ pub fn process_function(
             function = Power::defaults(Some(function), data_map_wrap.clone()).handle()?;
         },
         FUNCTION_ROUND => {
-            function = Round::defaults(Some(function), data_map_wrap.clone()).handle(RoundOption::Basic)?;
+            function = Round::defaults(Some(function), data_map_wrap.clone()).handle(
+                RoundOption::Basic)?;
         },
         FUNCTION_ROUNDUP => {
-            function = Round::defaults(Some(function), data_map_wrap.clone()).handle(RoundOption::Up)?;
+            function = Round::defaults(Some(function), data_map_wrap.clone()).handle(
+                RoundOption::Up)?;
         },
         FUNCTION_ROUNDDOWN => {
-            function = Round::defaults(Some(function), data_map_wrap.clone()).handle(RoundOption::Down)?;
+            function = Round::defaults(Some(function), data_map_wrap.clone()).handle(
+                RoundOption::Down)?;
         },
         FUNCTION_SQRT => {
             function = Sqrt::defaults(Some(function), data_map_wrap.clone()).handle()?;
@@ -1422,6 +1425,57 @@ pub fn process_function(
         },
         FUNCTION_FALSE => {
             function = Boolean::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_DATE => {
+            function = Date::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_SECOND => {
+            function = DateTimeParse::defaults(Some(function), data_map_wrap.clone()).handle(
+                DateTimeParseOption::Second)?;
+        },
+        FUNCTION_MINUTE => {
+            function = DateTimeParse::defaults(Some(function), data_map_wrap.clone()).handle(
+                DateTimeParseOption::Minute)?;
+        },
+        FUNCTION_HOUR => {
+            function = DateTimeParse::defaults(Some(function), data_map_wrap.clone()).handle(
+                DateTimeParseOption::Hour)?;
+        },
+        FUNCTION_DAY => {
+            function = DateParse::defaults(Some(function), data_map_wrap.clone()).handle(
+                DateParseOption::Day)?;
+        },
+        FUNCTION_WEEK => {
+            function = DateParse::defaults(Some(function), data_map_wrap.clone()).handle(
+                DateParseOption::Week)?;
+        },
+        FUNCTION_WEEKDAY => {
+            function = DateParse::defaults(Some(function), data_map_wrap.clone()).handle(
+                DateParseOption::WeekDay)?;
+        },
+        FUNCTION_MONTH => {
+            function = DateParse::defaults(Some(function), data_map_wrap.clone()).handle(
+                DateParseOption::Month)?;
+        },
+        FUNCTION_NOW => {
+            function = Now::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_TODAY => {
+            function = Today::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_DAYS => {
+            function = Days::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_DATEADD => {
+            function = DateAddDiff::defaults(Some(function), data_map_wrap.clone()).handle(
+                DateDeltaOperation::Add)?;
+        },
+        FUNCTION_DATEDIF => {
+            function = DateAddDiff::defaults(Some(function), data_map_wrap.clone()).handle(
+                DateDeltaOperation::Diff)?;
+        },
+        FUNCTION_DATEFMT => {
+            function = DateFormat::defaults(Some(function), data_map_wrap.clone()).handle()?;
         },
         _ => {
             return Err(
