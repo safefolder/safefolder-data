@@ -4,9 +4,7 @@ use std::{collections::HashMap};
 use serde::{Deserialize, Serialize};
 use lazy_static::lazy_static;
 
-use crate::functions::FunctionAttribute;
-use crate::functions::constants::*;
-use crate::functions::Function;
+use crate::functions::*;
 
 
 lazy_static! {
@@ -20,133 +18,103 @@ pub enum StatOption {
     Max,
 }
 
-// MIN(1,2,3,4)
-// MAX(1,2,3,4)
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct StatsFunction {
-    pub function_text: String,
-    pub sequence: Option<String>,
-    pub sequence_ref: Option<String>,
-    pub option: StatOption,
-    pub data_map: Option<HashMap<String, String>>,
+pub trait CollectionStatsFunction {
+    fn handle(&mut self, option: StatOption) -> Result<FunctionParse, PlanetError>;
+    fn execute(&self, option: StatOption) -> Result<String, PlanetError>;
 }
-impl StatsFunction {
-    pub fn defaults(function_text: &String, option: StatOption, data_map: Option<HashMap<String, String>>) -> StatsFunction {
-        // MIN(1,2,3,4)
-        // MIN({My Column}) (Having Set, or other collection of numbers)
-        // MIN(-4, 1.9, 2.34)
-        // MAX(1,2,3,4)
 
-        let matches: Captures;
-        match option {
-            StatOption::Min => {
-                matches = RE_MIN.captures(function_text).unwrap();
-            },
-            StatOption::Max => {
-                matches = RE_MAX.captures(function_text).unwrap();
-            },
-        }
-
-        let attr_sequence = matches.name("sequence");
-        let attr_sequence_ref = matches.name("sequence_ref");
-
-        let mut sequence_wrap: Option<String> = None;
-        let mut sequence_ref_wrap: Option<String> = None;
-
-        if attr_sequence.is_some() {
-            let sequence: String = attr_sequence.unwrap().as_str().to_string();
-            sequence_wrap = Some(sequence)
-        }
-        if attr_sequence_ref.is_some() {
-            let sequence_ref: String = attr_sequence_ref.unwrap().as_str().to_string();
-            sequence_ref_wrap = Some(sequence_ref)
-        }
-
-        let obj = Self{
-            function_text: function_text.clone(),
-            sequence: sequence_wrap,
-            sequence_ref: sequence_ref_wrap,
-            option: option,
-            data_map: data_map,
-        };
-
-        return obj
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Stats {
+    function: Option<FunctionParse>,
+    data_map: Option<HashMap<String, String>>,
+    attributes: Option<Vec<FunctionAttributeItem>>
+}
+impl Stats {
+    pub fn defaults(
+        function: Option<FunctionParse>, 
+        data_map: Option<HashMap<String, String>>
+    ) -> Self {
+        return Self{function: function, data_map: data_map, attributes: None};
     }
-    pub fn do_validate(
-        function_text: &String, 
-        validate_tuple: (u32, Vec<String>),
-        option: StatOption
-    ) -> (u32, Vec<String>) {
-        let (number_fails, mut failed_functions) = validate_tuple;
-        let concat_obj = StatsFunction::defaults(
-            &function_text, option.clone(), None
-        );
-        let check = concat_obj.validate();
-        let mut number_fails = number_fails.clone();
-        if check == false {
-            number_fails += 1;
+}
+impl CollectionStatsFunction for Stats {
+    fn handle(&mut self, option: StatOption) -> Result<FunctionParse, PlanetError> {
+        // MIN(1,2,3,4)
+        // MIN({Column})
+        // MAX(1,2,3,4)
+        // MAX({Column})
+        let function_parse = &self.function.clone().unwrap();
+        let data_map = self.data_map.clone();
+        let expr_min = &RE_MIN;
+        let expr_max = &RE_MAX;
+        let mut function = function_parse.clone();
+        let data_map_wrap = data_map.clone();
+        let (
+            function_text_wrap, 
+            function_text, 
+            compiled_attributes,
+            mut function_result,
+            data_map,
+        ) = prepare_function_parse(function_parse, data_map.clone());
+        if function_text_wrap.is_some() {
             match option {
                 StatOption::Min => {
-                    failed_functions.push(String::from(FUNCTION_MIN));
+                    function.validate = Some(expr_min.is_match(function_text.as_str()));
                 },
                 StatOption::Max => {
-                    failed_functions.push(String::from(FUNCTION_MAX));
+                    function.validate = Some(expr_max.is_match(function_text.as_str()));
                 },
             }
-            
+            if function.validate.unwrap() {
+                let matches: Captures;
+                match option {
+                    StatOption::Min => {
+                        matches = expr_min.captures(function_text.as_str()).unwrap();
+                    },
+                    StatOption::Max => {
+                        matches = expr_max.captures(function_text.as_str()).unwrap();
+                    },
+                }        
+                let attr_sequence = matches.name("sequence");
+                let attr_sequence_ref = matches.name("sequence_ref");
+                let mut attributes_: Vec<String> = Vec::new();
+        
+                if attr_sequence.is_some() {
+                    let sequence: String = attr_sequence.unwrap().as_str().to_string();
+                    attributes_.push(sequence);
+                }
+                if attr_sequence_ref.is_some() {
+                    let sequence_ref: String = attr_sequence_ref.unwrap().as_str().to_string();
+                    attributes_.push(sequence_ref);
+                }
+                function.attributes = Some(attributes_);
+            }
         }
-        return (number_fails, failed_functions);
-    }
-    pub fn do_replace(
-        function_text: &String, 
-        data_map: HashMap<String, String>, 
-        mut formula: String,
-        option: StatOption
-    ) -> String {
-        let data_map = data_map.clone();
-        let mut concat_obj = StatsFunction::defaults(
-            &function_text, option, Some(data_map)
-        );
-        formula = concat_obj.replace(formula);
-        return formula
-    }
-}
-impl Function for StatsFunction {
-    fn validate(&self) -> bool {
-        let expr: Regex;
-        let option = self.option.clone();
-        match option {
-            StatOption::Min => {
-                expr = RE_MIN.clone();
-            },
-            StatOption::Max => {
-                expr = RE_MAX.clone();
-            },
+        if data_map_wrap.is_some() {
+            self.attributes = Some(compiled_attributes);
+            self.data_map = Some(data_map);
+            function_result.text = Some(self.execute(option)?);
+            function.result = Some(function_result.clone());
         }
-        let function_text = self.function_text.clone();
-        let check = expr.is_match(&function_text);
-        return check
+        return Ok(function)
     }
-    fn replace(&mut self, formula: String) -> String {
-        let data_map = self.data_map.clone().unwrap();
-        let function_text = self.function_text.clone();
-        let mut formula = formula.clone();
-        let replacement_string: String;
-        let option = self.option.clone();
-
-        let sequence_wrap = self.sequence.clone();
-        let sequence_ref_wrap = self.sequence_ref.clone();
+    fn execute(&self, option: StatOption) -> Result<String, PlanetError> {
+        let attributes = self.attributes.clone().unwrap();
+        let data_map = &self.data_map.clone().unwrap();
+        let sequence_item = attributes[0].clone();
+        let is_reference = sequence_item.is_reference;
         let mut sequence: String;
-        if sequence_wrap.is_some() {
-            sequence = sequence_wrap.unwrap();
-        } else {
-            let sequence_ref = sequence_ref_wrap.unwrap();
+        let replacement_string: String;
+        if is_reference {
+            let sequence_ref = sequence_item.reference_value.unwrap();
             let function_attr = FunctionAttribute::defaults(
                 &sequence_ref, 
                 Some(true)
             );
             sequence = function_attr.replace(data_map.clone()).item_processed.unwrap();
             // To do when I have Set field, since design can change
+        } else {
+            sequence = sequence_item.value.unwrap_or_default();
         }
         sequence = sequence.replace("\"", "");
         let mut sequence_list: Vec<f64> = Vec::new();
@@ -182,11 +150,7 @@ impl Function for StatsFunction {
                 stat_result = max;
             },
         }
-
         replacement_string = stat_result.to_string();
-
-        formula = formula.replace(function_text.as_str(), replacement_string.as_str());
-        return formula;
+        return Ok(replacement_string)
     }
-
 }

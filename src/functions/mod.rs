@@ -19,7 +19,7 @@ use crate::functions::constants::*;
 use crate::functions::text::*;
 use crate::functions::date::*;
 use crate::functions::number::*;
-// use crate::functions::collections::*;
+use crate::functions::collections::*;
 // use crate::functions::structure::*;
 use crate::planet::PlanetError;
 // use crate::storage::constants::*;
@@ -1476,6 +1476,14 @@ pub fn process_function(
         },
         FUNCTION_DATEFMT => {
             function = DateFormat::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_MIN => {
+            function = Stats::defaults(Some(function), data_map_wrap.clone()).handle(
+                StatOption::Min)?;
+        },
+        FUNCTION_MAX => {
+            function = Stats::defaults(Some(function), data_map_wrap.clone()).handle(
+                StatOption::Max)?;
         },
         _ => {
             return Err(

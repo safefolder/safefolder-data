@@ -346,4 +346,19 @@ fields:
       \"{DD} was the day, {YYYY} the year. I love {Do} of months\"
     )"
     formula_format: Text
-
+  - name: MIN
+    field_type: Formula
+    formula: "MIN(
+      -4, 
+      1.9, 
+      2.34
+    )"
+    formula_format: Number
+  - name: MAX
+    field_type: Formula
+    formula: "MAX(
+      -4, 
+      1.9, 
+      2.34
+    )"
+    formula_format: Number
