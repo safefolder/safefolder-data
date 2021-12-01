@@ -1023,7 +1023,7 @@ impl FormulaField {
         if value_db.is_some() {
             let value_db = value_db.unwrap().clone();
             let value = field_obj.get_value(Some(&value_db)).unwrap();
-            let yaml_out_str = field_obj.get_yaml_out(yaml_out_str, &value);    
+            let yaml_out_str = field_obj.get_yaml_out(yaml_out_str, &value);
             return Ok(yaml_out_str)
         }
         let yaml_out_str = yaml_out_str.clone();

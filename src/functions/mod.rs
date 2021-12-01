@@ -32,10 +32,12 @@ lazy_static! {
     static ref RE_EMBED_FUNC: Regex = Regex::new(r#"\((?P<func_embed>[A-Z]+)"#).unwrap();
     static ref RE_STRING_MATCH: Regex = Regex::new(r#"(?P<string_match>"[\w\s]+"[\s\n\t]{0,}[=><][\s\n\t]{0,}"[\w\s]+")"#).unwrap();
     static ref RE_FORMULA_QUERY: Regex = Regex::new(r#"(?P<assign>\{[\s\w]+\}[\s\t]{0,}(?P<log_op>=|>|<|>=|<=)[\s\t]{0,}.+)|(?P<op>AND|OR|NOT|XOR)\((?P<attrs>.+)\)"#).unwrap();
-    static ref RE_FORMULA_FIELD_FUNCTIONS: Regex = Regex::new(r#"(?P<func>[A-Z]+[("\d)\w,\W.\s{}-]+)"#).unwrap();
+    static ref RE_FORMULA_FIELD_FUNCTIONS: Regex = Regex::new(r#"(?P<func>[A-Z]+[("\d,-.;_:+$€\s\w{})]+)"#).unwrap();
     static ref RE_FUNCTION_ATTRS_OLD: Regex = Regex::new(r#"("[\w\s-]+")|(\{[\w\s]+\})|([A-Z]+\(["\w\s]+\))|([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)"#).unwrap();
     static ref RE_FUNCTION_ATTRS: Regex = Regex::new(r#"[A-Z]+\((?P<attrs>.+)\)"#).unwrap();
     static ref RE_ATTR_TYPE_RESOLVE: Regex = Regex::new(r#"(?P<ref>\{[\w\s]+\})|(?P<func>[A-Z]+\(.+\))|(?P<bool>TRUE|FALSE)|(?P<string>\\{0,}"[,;_.\\$€:\-\+\{\}\w\s-]+\\{0,}")|(?P<number>^[+-]?[0-9]+\.?[0-9]*|^\.[0-9]+)|(?P<null>null)"#).unwrap();
+    static ref RE_FORMULA_FUNCTION_PIECES: Regex = Regex::new(r#"[A-Z]+\(.[^()]+\)"#).unwrap();
+    static ref RE_FORMULA_FUNCTION_VARIABLES: Regex = Regex::new(r#"(?P<func>\$func_\d)"#).unwrap();
 }
 
 // achiever planet functions
@@ -1071,7 +1073,9 @@ impl FormulaFieldCompiled {
         let formula_origin = formula.clone();
         // eprintln!("FormulaFieldCompiled :: formula_origin: {:?}", &formula_origin);
         // eprintln!("FormulaFieldCompiled :: formula_format: {:?}", &formula_format);
-        let expr = &RE_FORMULA_FIELD_FUNCTIONS;
+        let function_map= compile_formula(formula_origin.clone()).unwrap();
+        // eprintln!("FormulaFieldCompiled :: final_formula: {} function_map: {:?}", &final_formula, &function_map);
+        // let expr = &RE_FORMULA_FIELD_FUNCTIONS;
         let mut formula_processed = formula_origin.clone();
         let formula_format = formula_format.clone();
 
@@ -1079,28 +1083,25 @@ impl FormulaFieldCompiled {
             functions: None,
             formula: String::from(""),
         };
-        // Start processing formula into compiled structure
-        let mut compiled_functions: Vec<CompiledFunction> = Vec::new();
-        let function_list = expr.captures_iter(&formula_origin);
-
-        let mut count = 1;
         let mut compiled_functions_map: HashMap<String, CompiledFunction> = HashMap::new();
-        for capture in function_list {
-            // eprintln!("FormulaFieldCompiled :: capture: {:?}", &capture);
-            let function_text = capture.get(0).unwrap().as_str();
-            let function_placeholder = format!("$func{}", &count);
-            // eprintln!("FormulaFieldCompiled :: function_text: {}", function_text);
-            // eprintln!("FormulaFieldCompiled :: function_placeholder: {}", function_placeholder);
-            let main_function = compile_function_text(
-                function_text, 
-                &formula_format,
-                field_type_map
-            )?;
-            compiled_functions.push(main_function.clone());
-            compiled_functions_map.insert(function_placeholder.clone(), main_function.clone());
-            formula_processed = formula_processed.replace(function_text, function_placeholder.as_str());
-            // eprintln!("FormulaFieldCompiled :: formula_processed: {:#?}", &formula_processed);
-            count += 1;
+        let mut compiled_functions: Vec<CompiledFunction> = Vec::new();
+        let expr = &RE_FORMULA_FUNCTION_VARIABLES;
+        for (function_placeholder, function_text) in function_map {
+            let function_text = function_text.as_str();
+            let function_list_ = expr.captures(function_text);
+            if function_list_.is_none() {
+                // eprintln!("FormulaFieldCompiled :: function_text: {}", function_text);
+                // eprintln!("FormulaFieldCompiled :: function_placeholder: {}", function_placeholder);
+                let main_function = compile_function_text(
+                    function_text, 
+                    &formula_format,
+                    field_type_map
+                )?;
+                compiled_functions.push(main_function.clone());
+                compiled_functions_map.insert(function_placeholder.clone(), main_function.clone());
+                formula_processed = formula_processed.replace(function_text, function_placeholder.as_str());
+                // eprintln!("FormulaFieldCompiled :: formula_processed: {:#?}", &formula_processed);
+            }
         }
 
         // TODO: Apply also to the functions linked inside this function as attributes
@@ -1127,10 +1128,82 @@ impl FormulaFieldCompiled {
         formula_compiled.functions = Some(compiled_functions_map);
         formula_compiled.formula = formula_processed;
 
-        eprintln!("FormulaFieldCompiled :: formula_compiled: {:#?}", &formula_compiled);
+        // eprintln!("FormulaFieldCompiled :: formula_compiled: {:#?}", &formula_compiled);
 
         return Ok(formula_compiled)
     }
+}
+
+pub fn compile_formula(
+    formula: String
+) -> Result<HashMap<String, String>, PlanetError> {
+    let expr = &RE_FORMULA_FUNCTION_PIECES;
+    // Number tries I repeat processing of functions left
+    let tries = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+    let mut count = 1;
+    let mut function_map_: HashMap<String, String> = HashMap::new();
+    let mut function_map: HashMap<String, String> = HashMap::new();
+    let mut final_formula = formula.clone();
+    for _ in tries {
+        let final_formula_ = final_formula.clone();
+        let final_formula_ = final_formula_.as_str();
+        let functions = expr.captures_iter(final_formula_);
+        let mut have_functions = false;
+        for function in functions {
+            have_functions = true;
+            let function_text = function.get(0).unwrap().as_str();
+            let function_text_string = function_text.to_string();
+            // TRIM(" hola ") ) or MINE(" hola 02 "), etc...
+            let function_placeholder = format!("$func_{}", &count);
+            final_formula = final_formula.replace(function_text, &function_placeholder);
+            function_map_.insert(function_placeholder.clone(), function_text_string);
+            count += 1;
+        }
+        // Check I have 
+        if !have_functions {
+            // I should have all function placeholders with $func_XX, no functions left to process
+            break
+        }
+    }
+    // I return the final formula text and the function text map????
+    // {"$func_1": "TRIM(\" hola \")", "$func_3": "TRIM(\" comino \")", "$func_4": "CONCAT( \"this-is-some-slug\", \" \", {My Field}, $func_1 )", "$func_5": "TRIM($func_2)", "$func_2": "MINE(\" hola 02 \")"}
+    // post process function map
+    let expr = &RE_FORMULA_FUNCTION_VARIABLES;
+    for (k, v) in function_map_.clone() {
+        let has_func = v.clone().find("$func_").is_some();
+        if has_func {
+            let mut function_value = v.clone();
+            let function_value_str = v.as_str();
+            let function_variables = expr.captures_iter(function_value_str);
+            for function_variable in function_variables {
+                let function_variable_text = function_variable.get(0).unwrap().as_str();
+                let function_content = function_map_.get(function_variable_text);
+                if function_content.is_some() {
+                    let function_content = function_content.unwrap().clone();
+                    function_value = function_value.replace(
+                        function_variable_text, 
+                        function_content.as_str()
+                    );
+                    function_map_.insert(k.clone(), function_value.clone());
+                }
+            }
+        }
+    }
+    // Clean function_map for keys not final in the final formula
+    let expr = &RE_FORMULA_FUNCTION_VARIABLES;
+    let final_formula_ = final_formula.clone();
+    let final_formula_ = final_formula_.as_str();
+    let function_list_ = expr.captures_iter(final_formula_);
+    for function_item in function_list_ {
+        let function_item_text = function_item.get(0).unwrap().as_str();
+        let function_item_text = function_item_text.to_string();
+        let function_item_text_value = function_map_.get(&function_item_text);
+        if function_item_text_value.is_some() {
+            let function_item_text_value = function_item_text_value.unwrap().clone();
+            function_map.insert(function_item_text, function_item_text_value);
+        }
+    }
+    return Ok(function_map)
 }
 
 pub fn compile_function_text(
@@ -1144,11 +1217,12 @@ pub fn compile_function_text(
     // eprintln!("compile_function_text :: field_type_map: {:#?}", &field_type_map);
     let parts: Vec<&str> = function_text.split("(").collect();
     let function_name = parts[0];
+    // eprintln!("compile_function_text :: parts: {:?}", &parts);
     // eprintln!("compile_function_text :: function_name: {}", function_name);
     let mut function_parse = FunctionParse::defaults(&function_name.to_string());
     function_parse.text = Some(function_text.to_string());
     let function_parse = process_function(&function_parse, None)?;
-    eprintln!("compile_function_text :: function_parse from coded function: {:#?}", &function_parse);
+    // eprintln!("compile_function_text :: function_parse from coded function: {:#?}", &function_parse);
     let validate = function_parse.validate.unwrap();
     if validate == false {
         return Err(
@@ -1177,7 +1251,7 @@ pub fn compile_function_text(
     for attr_ in function_attributes {
         let mut attr = attr_.as_str();
         attr = attr.trim();
-        eprintln!("compile_function_text :: attr: {}", &attr);
+        // eprintln!("compile_function_text :: attr: {}", &attr);
         let mut attribute_type: AttributeType = AttributeType::Text;
         let mut function_attribute = FunctionAttributeItem::defaults(
             None, 
