@@ -109,9 +109,10 @@ impl CollectionStatsFunction for Stats {
             let sequence_ref = sequence_item.reference_value.unwrap();
             let function_attr = FunctionAttribute::defaults(
                 &sequence_ref, 
+                Some(true),
                 Some(true)
             );
-            sequence = function_attr.replace(data_map.clone()).item_processed.unwrap();
+            sequence = function_attr.replace(data_map).item_processed.unwrap();
             // To do when I have Set field, since design can change
         } else {
             sequence = sequence_item.value.unwrap_or_default();

@@ -17,7 +17,7 @@ use crate::storage::*;
 use crate::storage::table::{DbData};
 use crate::planet::constants::*;
 use crate::planet::make_bool_str;
-use crate::functions::{FormulaFieldCompiled};
+use crate::functions::{Formula};
 
 use super::fetch_yaml_config;
 
@@ -380,8 +380,8 @@ impl ConfigStorageField for FieldConfig {
         if formula.is_some() {
             let formula = formula.unwrap();
             let formula_format = field_config.formula_format.unwrap();
-            let formula_compiled = FormulaFieldCompiled::defaults(
-                &formula, 
+            let formula_compiled = Formula::defaults(
+                &formula,
                 &formula_format,
                 field_type_map,
             )?;

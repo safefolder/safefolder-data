@@ -80,26 +80,27 @@ impl TextFunction for Concat {
         for attribute_item in attributes {
             let is_reference = attribute_item.is_reference;
             let value = attribute_item.value;
-            let has_function = attribute_item.function.is_some();
+            // let has_function = attribute_item.function.is_some();
+            let has_function = false;
             let name = attribute_item.name;
-            let mut attribute: String;
+            let mut attribute: String = String::from("");
             if is_reference == true {
                 let name = name.unwrap();
                 attribute = name;
-                let function_attr = FunctionAttributeNew::defaults(
+                let function_attr = FunctionAttribute::defaults(
                     &attribute, Some(true), Some(true)
                 );
                 attribute = function_attr.replace(data_map).item_processed.unwrap();
             } else if has_function {
                 // function as attribute
-                let function = attribute_item.function.unwrap().clone();
-                let mut function_parse = FunctionParse::defaults(&function.name);
-                function_parse.text = function.text;
-                function_parse.compiled_attributes = function.attributes;
-                let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
-                let result = function_parse.result.unwrap();
-                let result_value = result.text;
-                attribute = result_value.unwrap();
+                // let function = attribute_item.function.unwrap().clone();
+                // let mut function_parse = FunctionParse::defaults(&function.name);
+                // function_parse.text = function.text;
+                // function_parse.compiled_attributes = function.attributes;
+                // let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
+                // let result = function_parse.result.unwrap();
+                // let result_value = result.text;
+                // attribute = result_value.unwrap();
             } else {
                 let value = value.unwrap();
                 attribute = value;
@@ -172,22 +173,23 @@ impl TextFunction for Trim {
         let is_reference = attribute_item.is_reference;
         let reference_value_wrap = attribute_item.reference_value;
         let value = attribute_item.value.unwrap_or_default();
-        let has_function = attribute_item.function.is_some();
-        let mut attribute: String;
+        // let has_function = attribute_item.function.is_some();
+        let has_function = false;
+        let mut attribute: String = String::from("");
         if is_reference {
             let reference_value = reference_value_wrap.unwrap();
             attribute = reference_value;
-            let function_attr = FunctionAttributeNew::defaults(
+            let function_attr = FunctionAttribute::defaults(
                 &attribute, Some(true), Some(true)
             );
             attribute = function_attr.replace(data_map).item_processed.unwrap();
         } else if has_function {
-            let function = attribute_item.function.unwrap();
-            let function_parse = FunctionParse::defaults(&function.name);
-            let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
-            let result = function_parse.result.unwrap();
-            let result_value = result.text;
-        attribute = result_value.unwrap();
+            // let function = attribute_item.function.unwrap();
+            // let function_parse = FunctionParse::defaults(&function.name);
+            // let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
+            // let result = function_parse.result.unwrap();
+            // let result_value = result.text;
+            // attribute = result_value.unwrap();
         } else {
             attribute = value;
         }
@@ -435,22 +437,23 @@ impl TextFunction for Length {
         let is_reference = attribute_item.is_reference;
         let reference_value_wrap = attribute_item.reference_value;
         let value = attribute_item.value.unwrap_or_default();
-        let has_function = attribute_item.function.is_some();
-        let mut attribute: String;
+        // let has_function = attribute_item.function.is_some();
+        let has_function = false;
+        let mut attribute: String = String::from("");
         if is_reference {
             let reference_value = reference_value_wrap.unwrap();
             attribute = reference_value;
-            let function_attr = FunctionAttributeNew::defaults(
+            let function_attr = FunctionAttribute::defaults(
                 &attribute, Some(true), Some(true)
             );
             attribute = function_attr.replace(data_map).item_processed.unwrap();
         } else if has_function {
-            let function = attribute_item.function.unwrap();
-            let function_parse = FunctionParse::defaults(&function.name);
-            let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
-            let result = function_parse.result.unwrap();
-            let result_value = result.text;
-        attribute = result_value.unwrap();
+            // let function = attribute_item.function.unwrap();
+            // let function_parse = FunctionParse::defaults(&function.name);
+            // let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
+            // let result = function_parse.result.unwrap();
+            // let result_value = result.text;
+            // attribute = result_value.unwrap();
         } else {
             attribute = value;
         }
@@ -514,22 +517,23 @@ impl TextFunction for Lower {
         let is_reference = attribute_item.is_reference;
         let reference_value_wrap = attribute_item.reference_value;
         let value = attribute_item.value.unwrap_or_default();
-        let has_function = attribute_item.function.is_some();
-        let mut attribute: String;
+        // let has_function = attribute_item.function.is_some();
+        let has_function = false;
+        let mut attribute: String = String::from("");
         if is_reference {
             let reference_value = reference_value_wrap.unwrap();
             attribute = reference_value;
-            let function_attr = FunctionAttributeNew::defaults(
+            let function_attr = FunctionAttribute::defaults(
                 &attribute, Some(true), Some(true)
             );
             attribute = function_attr.replace(data_map).item_processed.unwrap();
         } else if has_function {
-            let function = attribute_item.function.unwrap();
-            let function_parse = FunctionParse::defaults(&function.name);
-            let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
-            let result = function_parse.result.unwrap();
-            let result_value = result.text;
-        attribute = result_value.unwrap();
+            // let function = attribute_item.function.unwrap();
+            // let function_parse = FunctionParse::defaults(&function.name);
+            // let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
+            // let result = function_parse.result.unwrap();
+            // let result_value = result.text;
+            // attribute = result_value.unwrap();
         } else {
             attribute = value;
         }
@@ -593,22 +597,23 @@ impl TextFunction for Upper {
         let is_reference = attribute_item.is_reference;
         let reference_value_wrap = attribute_item.reference_value;
         let value = attribute_item.value.unwrap_or_default();
-        let has_function = attribute_item.function.is_some();
-        let mut attribute: String;
+        // let has_function = attribute_item.function.is_some();
+        let has_function = false;
+        let mut attribute: String = String::from("");
         if is_reference {
             let reference_value = reference_value_wrap.unwrap();
             attribute = reference_value;
-            let function_attr = FunctionAttributeNew::defaults(
+            let function_attr = FunctionAttribute::defaults(
                 &attribute, Some(true), Some(true)
             );
             attribute = function_attr.replace(data_map).item_processed.unwrap();
         } else if has_function {
-            let function = attribute_item.function.unwrap();
-            let function_parse = FunctionParse::defaults(&function.name);
-            let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
-            let result = function_parse.result.unwrap();
-            let result_value = result.text;
-        attribute = result_value.unwrap();
+            // let function = attribute_item.function.unwrap();
+            // let function_parse = FunctionParse::defaults(&function.name);
+            // let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
+            // let result = function_parse.result.unwrap();
+            // let result_value = result.text;
+            // attribute = result_value.unwrap();
         } else {
             attribute = value;
         }
@@ -691,26 +696,27 @@ impl TextFunction for Replace {
         let mut new_text_value = new_text.value.unwrap();
         let is_reference = old_text.is_reference;
         let reference_value_wrap = old_text.reference_value.clone();
-        let is_function = new_text.function.is_some();
+        // let is_function = new_text.function.is_some();
+        let is_function = false;
         let replacement_string: String;
-        let mut old_text_value: String;
+        let mut old_text_value: String = String::from("");
         if is_reference {
             let reference_value = reference_value_wrap.unwrap();
             old_text_value = reference_value;
-            let function_attr = FunctionAttributeNew::defaults(
+            let function_attr = FunctionAttribute::defaults(
                 &old_text_value, Some(true), Some(true)
             );
             old_text_value = function_attr.replace(data_map).item_processed.unwrap();
         } else if is_function {
-            let function = new_text.function.unwrap().clone();
-            let mut function_parse = FunctionParse::defaults(&function.name);
-            function_parse.text = function.text;
-            function_parse.compiled_attributes = function.attributes;
-            let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
-            let result = function_parse.result.unwrap();
-            let result_value = result.text;
-            new_text_value = result_value.unwrap();
-            old_text_value = old_text.value.unwrap();
+            // let function = new_text.function.unwrap().clone();
+            // let mut function_parse = FunctionParse::defaults(&function.name);
+            // function_parse.text = function.text;
+            // function_parse.compiled_attributes = function.attributes;
+            // let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
+            // let result = function_parse.result.unwrap();
+            // let result_value = result.text;
+            // new_text_value = result_value.unwrap();
+            // old_text_value = old_text.value.unwrap();
         } else {
             old_text_value = old_text.value.unwrap();
         }
@@ -800,23 +806,24 @@ impl TextFunction for Mid {
         let num_chars_value: usize = FromStr::from_str(num_chars_value.as_str()).unwrap();
         let is_reference = text.is_reference;
         let reference_value_wrap = text.reference_value.clone();
-        let is_function = text.function.is_some();
+        // let is_function = text.function.is_some();
+        let is_function = false;
         if is_reference {
             let reference_value = reference_value_wrap.unwrap();
             text_value = reference_value;
-            let function_attr = FunctionAttributeNew::defaults(
+            let function_attr = FunctionAttribute::defaults(
                 &text_value, Some(true), Some(true)
             );
             text_value = function_attr.replace(data_map).item_processed.unwrap();
         } else if is_function {
-            let function = text.function.unwrap();
-            let mut function_parse = FunctionParse::defaults(&function.name);
-            function_parse.text = function.text;
-            function_parse.compiled_attributes = function.attributes;
-            let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
-            let result = function_parse.result.unwrap();
-            let result_value = result.text;
-        text_value = result_value.unwrap();
+            // let function = text.function.unwrap();
+            // let mut function_parse = FunctionParse::defaults(&function.name);
+            // function_parse.text = function.text;
+            // function_parse.compiled_attributes = function.attributes;
+            // let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
+            // let result = function_parse.result.unwrap();
+            // let result_value = result.text;
+            // text_value = result_value.unwrap();
         } else {
             text_value = text_value;
         }
@@ -899,23 +906,24 @@ impl TextFunction for Rept {
         let number_times_value: usize = FromStr::from_str(number_times_value.as_str()).unwrap();
         let is_reference = text.is_reference;
         let reference_value_wrap = text.reference_value.clone();
-        let is_function = text.function.is_some();
+        // let is_function = text.function.is_some();
+        let is_function = false;
         if is_reference {
             let reference_value = reference_value_wrap.unwrap();
             text_value = reference_value;
-            let function_attr = FunctionAttributeNew::defaults(
+            let function_attr = FunctionAttribute::defaults(
                 &text_value, Some(true), Some(true)
             );
             text_value = function_attr.replace(data_map).item_processed.unwrap();
         } else if is_function {
-            let function = text.function.unwrap();
-            let mut function_parse = FunctionParse::defaults(&function.name);
-            function_parse.text = function.text;
-            function_parse.compiled_attributes = function.attributes;
-            let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
-            let result = function_parse.result.unwrap();
-            let result_value = result.text;
-        text_value = result_value.unwrap();
+            // let function = text.function.unwrap();
+            // let mut function_parse = FunctionParse::defaults(&function.name);
+            // function_parse.text = function.text;
+            // function_parse.compiled_attributes = function.attributes;
+            // let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
+            // let result = function_parse.result.unwrap();
+            // let result_value = result.text;
+            // text_value = result_value.unwrap();
         } else {
             text_value = text_value;
         }
@@ -997,23 +1005,24 @@ impl TextFunction for Substitute {
         let new_text_value = new_text_value.as_str();
         let is_reference = text.is_reference;
         let reference_value_wrap = text.reference_value.clone();
-        let is_function = text.function.is_some();
+        // let is_function = text.function.is_some();
+        let is_function = false;
         if is_reference {
             let reference_value = reference_value_wrap.unwrap();
             text_value = reference_value;
-            let function_attr = FunctionAttributeNew::defaults(
+            let function_attr = FunctionAttribute::defaults(
                 &text_value, Some(true), Some(true)
             );
             text_value = function_attr.replace(data_map).item_processed.unwrap();
         } else if is_function {
-            let function = text.function.unwrap();
-            let mut function_parse = FunctionParse::defaults(&function.name);
-            function_parse.text = function.text;
-            function_parse.compiled_attributes = function.attributes;
-            let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
-            let result = function_parse.result.unwrap();
-            let result_value = result.text;
-        text_value = result_value.unwrap();
+            // let function = text.function.unwrap();
+            // let mut function_parse = FunctionParse::defaults(&function.name);
+            // function_parse.text = function.text;
+            // function_parse.compiled_attributes = function.attributes;
+            // let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
+            // let result = function_parse.result.unwrap();
+            // let result_value = result.text;
+            // text_value = result_value.unwrap();
         } else {
             text_value = text_value;
         }

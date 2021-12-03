@@ -19,6 +19,7 @@ use crate::functions::text::*;
 use crate::functions::date::*;
 use crate::functions::number::*;
 use crate::functions::collections::*;
+use crate::functions::structure::*;
 use crate::planet::PlanetError;
 
 lazy_static! {
@@ -119,56 +120,11 @@ pub fn get_function_name(function_text: String) -> String {
 pub struct FunctionAttribute{
     pub item: String,
     pub remove_quotes: Option<bool>,
-    pub item_processed: Option<String>,    
-}
-impl FunctionAttribute {
-    pub fn defaults(attribute: &String, remove_quotes: Option<bool>) -> FunctionAttribute {
-        let mut remove_quotes_value: bool = false;
-        if remove_quotes.is_some() {
-            remove_quotes_value = true;
-        }
-        let obj = Self{
-            item: attribute.clone(),
-            remove_quotes: Some(remove_quotes_value),
-            item_processed: None,
-        };
-        return obj
-    }
-    pub fn replace(&self, data_map: HashMap<String, String>) -> Self {
-        let mut item = self.item.clone();
-        let remove_quotes = self.remove_quotes.unwrap();
-        if remove_quotes == true {
-            item = item.replace("\"", "");
-        }
-        let item_string: String;
-        let item_find = item.find("{");
-        let mut obj = self.clone();
-        if item_find.is_some() && item_find.unwrap() == 0 {
-            // I have a column, need to get data from data_map
-            item = item.replace("{", "").replace("}", "");
-            let item_value = data_map.get(&item);
-            if item_value.is_some() {
-                let item_value = item_value.unwrap().clone();
-                item_string = item_value;
-                obj.item_processed = Some(item_string);
-            }
-        } else {
-            item_string = item.to_string();
-            obj.item_processed = Some(item_string);
-        }
-        return obj;
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct FunctionAttributeNew{
-    pub item: String,
-    pub remove_quotes: Option<bool>,
     pub item_processed: Option<String>,
     pub skip_curl: Option<bool>,
 }
-impl FunctionAttributeNew {
-    pub fn defaults(attribute: &String, remove_quotes: Option<bool>, skip_curl: Option<bool>) -> FunctionAttributeNew {
+impl FunctionAttribute {
+    pub fn defaults(attribute: &String, remove_quotes: Option<bool>, skip_curl: Option<bool>) -> Self {
         let mut remove_quotes_value: bool = false;
         if remove_quotes.is_some() {
             remove_quotes_value = true;
@@ -254,11 +210,12 @@ impl FormulaQueryCompiled {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct FormulaFieldCompiled {
+pub struct Formula {
     pub functions: Option<HashMap<String, CompiledFunction>>,
+    pub assignment: Option<AttributeAssign>,
     pub formula: String,
 }
-impl FormulaFieldCompiled {
+impl Formula {
     pub fn defaults(
         formula: &String,
         formula_format: &String,
@@ -269,20 +226,21 @@ impl FormulaFieldCompiled {
         let formula_origin = formula.clone();
         // eprintln!("FormulaFieldCompiled :: formula_origin: {:?}", &formula_origin);
         // eprintln!("FormulaFieldCompiled :: formula_format: {:?}", &formula_format);
-        let function_map= compile_formula(formula_origin.clone()).unwrap();
+        let formula_map= compile_formula(formula_origin.clone()).unwrap();
         // eprintln!("FormulaFieldCompiled :: final_formula: {} function_map: {:?}", &final_formula, &function_map);
         // let expr = &RE_FORMULA_FIELD_FUNCTIONS;
         let mut formula_processed = formula_origin.clone();
         let formula_format = formula_format.clone();
 
-        let mut formula_compiled = FormulaFieldCompiled{
+        let mut formula_compiled = Formula{
             functions: None,
+            assignment: None,
             formula: String::from(""),
         };
         let mut compiled_functions_map: HashMap<String, CompiledFunction> = HashMap::new();
         let mut compiled_functions: Vec<CompiledFunction> = Vec::new();
         let expr = &RE_FORMULA_FUNCTION_VARIABLES;
-        for (function_placeholder, function_text) in function_map {
+        for (function_placeholder, function_text) in formula_map {
             let function_text = function_text.as_str();
             let function_list_ = expr.captures(function_text);
             if function_list_.is_none() {
@@ -323,6 +281,8 @@ impl FormulaFieldCompiled {
 
         formula_compiled.functions = Some(compiled_functions_map);
         formula_compiled.formula = formula_processed;
+
+        // assignment
 
         // eprintln!("FormulaFieldCompiled :: formula_compiled: {:#?}", &formula_compiled);
 
@@ -399,6 +359,17 @@ pub fn compile_formula(
             function_map.insert(function_item_text, function_item_text_value);
         }
     }
+
+    // let assignment = formula.assignment.clone();
+    // if assignment.is_some() {
+    //     let assignment = assignment.unwrap();
+    //     let is_reference = assignment.is_reference;
+    //     if is_reference == true {
+    //         let attr_assignment = assignment.assignment.unwrap();
+    //         check = check_assignment(attr_assignment, assignment.attr_type, data_map)?;
+    //     }
+    // }
+
     return Ok(function_map)
 }
 
@@ -493,12 +464,12 @@ pub fn compile_function_text(
         } else if attr_type_func.is_some() {
             // function
             // eprintln!("compile_function_text :: [{}] is function", &attr);
-            let linked_function = compile_function_text(
-                    attr, &formula_format, &field_type_map
-            )?;
-            let linked_function_text = linked_function.text.clone().unwrap();
-            function_attribute.function = Some(linked_function);
-            function_attribute.name = Some(linked_function_text);
+            // let linked_function = compile_function_text(
+            //         attr, &formula_format, &field_type_map
+            // )?;
+            // let linked_function_text = linked_function.text.clone().unwrap();
+            // function_attribute.function = Some(linked_function);
+            // function_attribute.name = Some(linked_function_text);
         } else if attr_type_bool.is_some() {
             // eprintln!("compile_function_text :: [{}] is boolean", &attr);
             function_attribute.attr_type = AttributeType::Bool;
@@ -755,6 +726,9 @@ pub fn process_function(
             function = Stats::defaults(Some(function), data_map_wrap.clone()).handle(
                 StatOption::Max)?;
         },
+        FUNCTION_IF => {
+            // function = If::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
         _ => {
             return Err(
                 PlanetError::new(
@@ -826,7 +800,7 @@ pub struct FunctionAttributeItem {
     pub name: Option<String>,
     pub value: Option<String>,
     pub attr_type: AttributeType,
-    pub function: Option<CompiledFunction>,
+    pub formula: Option<Formula>,
 }
 impl FunctionAttributeItem {
     pub fn defaults(name: Option<String>, attr_type: AttributeType) -> Self {
@@ -838,7 +812,7 @@ impl FunctionAttributeItem {
             name: name,
             value: None,
             attr_type: attr_type,
-            function: None,
+            formula: None,
         };
         return obj
     }
@@ -874,8 +848,8 @@ pub fn execute_formula_query(
     return Ok(check)
 }
 
-pub fn execute_formula_field(
-    formula: &FormulaFieldCompiled, 
+pub fn execute_formula(
+    formula: &Formula, 
     data_map: &HashMap<String, String>
 ) -> Result<String, PlanetError> {
     // This needs to execute the formula for a field

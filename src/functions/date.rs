@@ -274,8 +274,8 @@ impl DateTimeFunction for DateTimeParse {
         let mut date: String;
         if is_reference {
             let date_ = date_item.reference_value.unwrap_or_default();
-            let function_attr = FunctionAttribute::defaults(&date_, Some(true));
-            date = function_attr.replace(data_map.clone()).item_processed.unwrap();
+            let function_attr = FunctionAttribute::defaults(&date_, Some(true), Some(true));
+            date = function_attr.replace(data_map).item_processed.unwrap();
         } else {
             date = date_item.value.unwrap_or_default();
         }
@@ -461,8 +461,8 @@ impl DateParseFunction for DateParse {
         let mut date: String;
         if is_reference {
             let date_ = date_item.reference_value.unwrap_or_default();
-            let function_attr = FunctionAttribute::defaults(&date_, Some(true));
-            date = function_attr.replace(data_map.clone()).item_processed.unwrap();
+            let function_attr = FunctionAttribute::defaults(&date_, Some(true), Some(true));
+            date = function_attr.replace(data_map).item_processed.unwrap();
         } else {
             date = date_item.value.unwrap_or_default();
         }
@@ -746,11 +746,11 @@ impl DateFunction for Days {
             let start_date_ref = start_date_item.reference_value.unwrap_or_default();
             let end_date_ref = end_date_item.reference_value.unwrap_or_default();
             let function_attr = FunctionAttribute::defaults(&start_date_ref, 
-                Some(true));
-            let start_date_ref_processed = function_attr.replace(data_map.clone()).item_processed.unwrap();
+                Some(true), Some(true));
+            let start_date_ref_processed = function_attr.replace(data_map).item_processed.unwrap();
             let function_attr = FunctionAttribute::defaults(&end_date_ref, 
-                Some(true));
-            let end_date_ref_processed = function_attr.replace(data_map.clone()).item_processed.unwrap();
+                Some(true), Some(true));
+            let end_date_ref_processed = function_attr.replace(data_map).item_processed.unwrap();
             let start_date_obj = NaiveDate::parse_from_str(
                 start_date_ref_processed.as_str(), 
                 "%d-%b-%Y"
@@ -925,9 +925,10 @@ impl DateAddDiffFunction for DateAddDiff {
             // I need to get from data_map the date string
             let function_attr = FunctionAttribute::defaults(
                 &date_ref, 
+                Some(true),
                 Some(true)
             );
-            let date = function_attr.replace(data_map.clone()).item_processed.unwrap();
+            let date = function_attr.replace(data_map).item_processed.unwrap();
             has_time = *&date.find(" ").is_some();
             if has_time == true {
                 date_obj = get_date_object_human_time(&date).unwrap();

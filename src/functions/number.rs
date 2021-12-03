@@ -120,7 +120,7 @@ impl NumberFunction for Ceiling {
         let number: f64;
         if is_reference {
             let reference_value = reference_value_wrap.unwrap();
-            let function_attr = FunctionAttributeNew::defaults(
+            let function_attr = FunctionAttribute::defaults(
                 &reference_value, Some(true), Some(true)
             );
             let replaced_string = function_attr.replace(data_map).item_processed.unwrap();
@@ -209,7 +209,7 @@ impl NumberFunction for Floor {
         let number: f64;
         if is_reference {
             let reference_value = reference_value_wrap.unwrap();
-            let function_attr = FunctionAttributeNew::defaults(
+            let function_attr = FunctionAttribute::defaults(
                 &reference_value, Some(true), Some(true)
             );
             let replaced_string = function_attr.replace(data_map).item_processed.unwrap();
@@ -289,9 +289,10 @@ impl NumberFunction for Count {
                 let item_ = &item.trim().to_string();
                 let function_attr = FunctionAttribute::defaults(
                     item_, 
+                    Some(true),
                     Some(true)
                 );
-                let result = function_attr.replace(data_map.clone());
+                let result = function_attr.replace(data_map);
                 let result = result.item_processed.clone();
                 let result = result.unwrap();
                 let result = result.as_str();
@@ -376,9 +377,10 @@ impl NumberFunction for CountA {
                 let item_ = &item.trim().to_string();
                 let function_attr = FunctionAttribute::defaults(
                     item_, 
+                    Some(true),
                     Some(true)
                 );
-                let result = function_attr.replace(data_map.clone());
+                let result = function_attr.replace(data_map);
                 let result = result.item_processed.clone();
                 let result = result.unwrap();
                 let result = result.as_str();
@@ -545,9 +547,10 @@ impl NumberFunction for Even {
             let number_ref = attribute_item.reference_value.unwrap_or_default();
             let function_attr = FunctionAttribute::defaults(
                 &number_ref, 
+                Some(true),
                 Some(true)
             );
-            let result = function_attr.replace(data_map.clone());
+            let result = function_attr.replace(data_map);
             let result = result.item_processed.clone();
             number = FromStr::from_str(result.unwrap().as_str()).unwrap();
         } else {
@@ -633,9 +636,10 @@ impl NumberFunction for Exp {
             let number_ref = attribute_item.reference_value.unwrap_or_default();
             let function_attr = FunctionAttribute::defaults(
                 &number_ref, 
+                Some(true),
                 Some(true)
             );
-            let result = function_attr.replace(data_map.clone());
+            let result = function_attr.replace(data_map);
             let result_string = result.item_processed.clone().unwrap_or_default();
             number = FromStr::from_str(result_string.as_str()).unwrap();
         } else {
@@ -712,9 +716,10 @@ impl NumberFunction for Int {
             let number_ref = attribute_item.reference_value.unwrap_or_default();
             let function_attr = FunctionAttribute::defaults(
                 &number_ref, 
+                Some(true),
                 Some(true)
             );
-            let result = function_attr.replace(data_map.clone());
+            let result = function_attr.replace(data_map);
             let result_string = result.item_processed.clone().unwrap_or_default();
             number = FromStr::from_str(result_string.as_str()).unwrap();
         } else {
@@ -812,9 +817,10 @@ impl NumberFunction for Log {
             let number_ref = attribute_item.reference_value.unwrap();
             let function_attr = FunctionAttribute::defaults(
                 &number_ref, 
+                Some(true),
                 Some(true)
             );
-            let result = function_attr.replace(data_map.clone());
+            let result = function_attr.replace(data_map);
             let result = result.item_processed.clone();
             number = FromStr::from_str(result.unwrap().as_str()).unwrap();
         } else {
@@ -825,9 +831,10 @@ impl NumberFunction for Log {
             let base_ref = base_item.reference_value.unwrap();
             let function_attr = FunctionAttribute::defaults(
                 &base_ref, 
+                Some(true),
                 Some(true)
             );
-            let result = function_attr.replace(data_map.clone());
+            let result = function_attr.replace(data_map);
             let result = result.item_processed.clone();
             base = FromStr::from_str(result.unwrap().as_str()).unwrap();
         } else {
@@ -921,9 +928,10 @@ impl NumberFunction for Mod {
             let number_ref = attribute_item.reference_value.unwrap_or_default();
             let function_attr = FunctionAttribute::defaults(
                 &number_ref, 
+                Some(true),
                 Some(true)
             );
-            let result = function_attr.replace(data_map.clone());
+            let result = function_attr.replace(data_map);
             let result = result.item_processed.clone();
             number = FromStr::from_str(result.unwrap().as_str()).unwrap();
         } else {
@@ -934,9 +942,10 @@ impl NumberFunction for Mod {
             let divisor_ref = divisor_item.reference_value.unwrap_or_default();
             let function_attr = FunctionAttribute::defaults(
                 &divisor_ref, 
+                Some(true),
                 Some(true)
             );
-            let result = function_attr.replace(data_map.clone());
+            let result = function_attr.replace(data_map);
             let result = result.item_processed.clone();
             divisor = FromStr::from_str(result.unwrap().as_str()).unwrap();
         } else {
@@ -1030,9 +1039,10 @@ impl NumberFunction for Power {
             let number_ref = attribute_item.reference_value.unwrap();
             let function_attr = FunctionAttribute::defaults(
                 &number_ref, 
+                Some(true),
                 Some(true)
             );
-            let result = function_attr.replace(data_map.clone());
+            let result = function_attr.replace(data_map);
             let result = result.item_processed.clone();
             number = FromStr::from_str(result.unwrap().as_str()).unwrap();
         } else {
@@ -1043,9 +1053,10 @@ impl NumberFunction for Power {
             let power_ref = power_item.reference_value.unwrap();
             let function_attr = FunctionAttribute::defaults(
                 &power_ref, 
+                Some(true),
                 Some(true)
             );
-            let result = function_attr.replace(data_map.clone());
+            let result = function_attr.replace(data_map);
             let result = result.item_processed.clone();
             power = FromStr::from_str(result.unwrap().as_str()).unwrap();
         } else {
@@ -1162,9 +1173,10 @@ impl RoundNumberFunction for Round {
             let number_ref = attribute_item.reference_value.unwrap();
             let function_attr = FunctionAttribute::defaults(
                 &number_ref, 
+                Some(true),
                 Some(true)
             );
-            let result = function_attr.replace(data_map.clone());
+            let result = function_attr.replace(data_map);
             let result = result.item_processed.clone();
             number = FromStr::from_str(result.unwrap().as_str()).unwrap();
         } else {
@@ -1175,9 +1187,10 @@ impl RoundNumberFunction for Round {
             let number_ref = digits_item.reference_value.unwrap();
             let function_attr = FunctionAttribute::defaults(
                 &number_ref, 
+                Some(true),
                 Some(true)
             );
-            let result = function_attr.replace(data_map.clone());
+            let result = function_attr.replace(data_map);
             let result = result.item_processed.clone();
             digits = FromStr::from_str(result.unwrap().as_str()).unwrap();
         } else {
@@ -1268,9 +1281,10 @@ impl NumberFunction for Sqrt {
             let number_ref = attribute_item.reference_value.unwrap();
             let function_attr = FunctionAttribute::defaults(
                 &number_ref, 
+                Some(true),
                 Some(true)
             );
-            let result = function_attr.replace(data_map.clone());
+            let result = function_attr.replace(data_map);
             let result = result.item_processed.clone();
             number = FromStr::from_str(result.unwrap().as_str()).unwrap();
         } else {
@@ -1349,9 +1363,10 @@ impl NumberFunction for Value {
             let text_ref = attribute_item.reference_value.unwrap();
             let function_attr = FunctionAttribute::defaults(
                 &text_ref, 
+                Some(true),
                 Some(true)
             );
-            let result = function_attr.replace(data_map.clone());
+            let result = function_attr.replace(data_map);
             let result = result.item_processed.clone();
             text = result.unwrap().as_str().to_string();
         } else {

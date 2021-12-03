@@ -14,7 +14,7 @@ use crate::planet::{PlanetError};
 use crate::storage::table::{DbData};
 use crate::commands::table::config::FieldConfig;
 use crate::storage::constants::*;
-use crate::functions::{execute_formula_field, FormulaFieldCompiled};
+use crate::functions::{execute_formula, Formula};
 
 /*
 These are the core fields implemented so we can tackle the security and permissions system
@@ -1112,11 +1112,11 @@ impl ProcessField for FormulaField {
         if formula_compiled_str.is_some() {
             let formula_compiled_str = formula_compiled_str.unwrap();
             // eprintln!("FormulaField.process :: formula_compiled_str: {}", &formula_compiled_str);
-            let formula_compiled: FormulaFieldCompiled = serde_yaml::from_str(
+            let formula_compiled: Formula = serde_yaml::from_str(
                 formula_compiled_str.as_str()
             ).unwrap();
             // eprintln!("FormulaField.process :: formula_compiled: {:#?}", &formula_compiled);
-            let formula = execute_formula_field(&formula_compiled, &insert_data_map)?;
+            let formula = execute_formula(&formula_compiled, &insert_data_map)?;
             self.is_valid(Some(&formula))?;
             let mut data: HashMap<String, String> = HashMap::new();
             if db_data.data.is_some() {
