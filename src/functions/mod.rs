@@ -36,6 +36,7 @@ lazy_static! {
     static ref RE_ATTR_TYPE_RESOLVE: Regex = Regex::new(r#"(?P<ref>\{[\w\s]+\})|(?P<func>[A-Z]+\(.+\))|(?P<bool>TRUE|FALSE)|(?P<string>\\{0,}"[,;_.\\$€:\-\+\{\}\w\s-]+\\{0,}")|(?P<number>^[+-]?[0-9]+\.?[0-9]*|^\.[0-9]+)|(?P<null>null)"#).unwrap();
     static ref RE_FORMULA_FUNCTION_PIECES: Regex = Regex::new(r#"[A-Z]+\(.[^()]+\)"#).unwrap();
     static ref RE_FORMULA_FUNCTION_VARIABLES: Regex = Regex::new(r#"(?P<func>\$func_\d)"#).unwrap();
+    static ref RE_FORMULA_VARIABLES: Regex = Regex::new(r#"(?P<formula>\$formula_\d)"#).unwrap();
 }
 
 // achiever planet functions
@@ -288,6 +289,93 @@ impl Formula {
 
         return Ok(formula_compiled)
     }
+}
+
+pub fn formula_attr_collection(
+    attrs_string: String
+) -> Result<Vec<String>, PlanetError> {
+    let mut attributes: Vec<String> = Vec::new();
+    let expr = &RE_FORMULA_FUNCTION_PIECES;
+    let tries = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+    let mut count = 1;
+    let mut formula_map_: HashMap<String, String> = HashMap::new();
+    let mut formula_map: HashMap<String, String> = HashMap::new();
+    let mut final_attrs = attrs_string.clone();
+    for _ in tries {
+        let final_attrs_ = final_attrs.clone();
+        let final_attrs_ = final_attrs_.as_str();
+        let attributes = expr.captures_iter(final_attrs_);
+        let mut have_formulas = false;
+        for attribute in attributes {
+            have_formulas = true;
+            let function_text = attribute.get(0).unwrap().as_str();
+            let function_text_string = function_text.to_string();
+            let function_placeholder = format!("$formula_{}", &count);
+            final_attrs = final_attrs.replace(function_text, &function_placeholder);
+            formula_map_.insert(function_placeholder.clone(), function_text_string);
+            count += 1;
+        }
+        if !have_formulas {
+            // I should have all function placeholders with $formula_XX, no functions left to process
+            break
+        }
+    }
+    let expr = &RE_FORMULA_VARIABLES;
+    let final_attrs_ = final_attrs.clone();
+    let final_attrs_ = final_attrs_.as_str();
+    for (k, v) in formula_map_.clone() {
+        let has_formula = v.clone().find("$formula_").is_some();
+        if has_formula {
+            let mut formula_value = v.clone();
+            let formula_value_str = v.as_str();
+            let formula_variables = expr.captures_iter(formula_value_str);
+            for formula_variable in formula_variables {
+                let formula_variable_text = formula_variable.get(0).unwrap().as_str();
+                let formula_content = formula_map_.get(formula_variable_text);
+                if formula_content.is_some() {
+                    let formula_content = formula_content.unwrap().clone();
+                    formula_value = formula_value.replace(
+                        formula_variable_text, 
+                        formula_content.as_str()
+                    );
+                    formula_map_.insert(k.clone(), formula_value.clone());
+                }
+            }
+        }
+    }
+    // Clean function_map for keys not final in the final formula
+    let expr = &RE_FORMULA_VARIABLES;
+    let final_attrs_ = final_attrs.clone();
+    let final_attrs_ = final_attrs_.as_str();
+    let formula_list_ = expr.captures_iter(final_attrs_);
+    for formula_item in formula_list_ {
+        let formula_item_text = formula_item.get(0).unwrap().as_str();
+        let formula_item_text = formula_item_text.to_string();
+        let formula_item_text_value = formula_map_.get(&formula_item_text);
+        if formula_item_text_value.is_some() {
+            let formula_item_text_value = formula_item_text_value.unwrap().clone();
+            formula_map.insert(formula_item_text, formula_item_text_value);
+        }
+    }
+    eprintln!("formula_attr_collection :: formula_map: {:#?}", &formula_map);
+    let final_attrs_items: Vec<&str> = final_attrs_.split(",").collect();
+    for mut item in final_attrs_items {
+        item = item.trim();
+        let mut replaced_item = item.to_string();
+        let formula_list_ = expr.captures_iter(item);
+        for formula_item in formula_list_ {
+            let formula_item_text = formula_item.get(0).unwrap().as_str();
+            let formula_item_text = formula_item_text.to_string();    
+            let formula_item_text_value = formula_map.get(&formula_item_text);
+            if formula_item_text_value.is_some() {
+                let formula_item_text_value = formula_item_text_value.unwrap().clone();
+                replaced_item = item.replace(&formula_item_text, &formula_item_text_value);
+            }
+        }
+        attributes.push(replaced_item);
+    }
+    eprintln!("formula_attr_collection :: attributes: {:?}", &attributes);
+    return Ok(attributes)
 }
 
 pub fn compile_formula(
@@ -727,8 +815,21 @@ pub fn process_function(
                 StatOption::Max)?;
         },
         FUNCTION_IF => {
-            // function = If::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            function = If::defaults(Some(function), data_map_wrap.clone()).handle()?;
         },
+        FUNCTION_AND => {
+            function = And::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_OR => {
+            function = Or::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_NOT => {
+            function = Not::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+        FUNCTION_XOR => {
+            function = Xor::defaults(Some(function), data_map_wrap.clone()).handle()?;
+        },
+
         _ => {
             return Err(
                 PlanetError::new(
@@ -815,6 +916,40 @@ impl FunctionAttributeItem {
             formula: None,
         };
         return obj
+    }
+    pub fn get_value(&self, data_map: &HashMap<String, String>) -> Result<String, PlanetError> {
+        let data_map = data_map.clone();
+        let is_reference = self.is_reference;
+        let formula = self.formula.clone();
+        let attribute_name = self.name.clone().unwrap();
+        let attribute_value = self.value.clone().unwrap_or_default();
+        let value: String;
+        if is_reference {
+            // FUNC({Column}) : I get value from data_map, key Column
+            let function_attr = FunctionAttribute::defaults(
+                &attribute_name, Some(true), Some(true)
+            );
+            value = function_attr.replace(&data_map).item_processed.unwrap();
+        } else if formula.is_some() {
+            // I execute the formula and return value
+            // execute_formula(formula: &Formula, data_map: &HashMap<String, String>)
+            let formula = formula.unwrap();
+            value = execute_formula(&formula, &data_map)?;
+        } else {
+            // I get value and return it
+            value = attribute_value;
+        }
+        return Ok(value)
+    }
+    pub fn check_assignment(&self, data_map: &HashMap<String, String>) -> bool {
+        let attr_type = self.attr_type.clone();
+        let assignment = self.assignment.clone();
+        let mut check = false;
+        if assignment.is_some() {
+            let assignment = assignment.unwrap();
+            check = check_assignment(assignment, attr_type, data_map).unwrap();
+        }
+        return check
     }
 }
 

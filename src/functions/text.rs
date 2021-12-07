@@ -48,8 +48,8 @@ impl TextFunction for Concat {
         let mut function = function_parse.clone();
         let data_map_wrap = data_map.clone();
         let (
-            function_text_wrap, 
-            function_text, 
+            function_text_wrap,
+            function_text,
             compiled_attributes,
             mut function_result,
             data_map,
@@ -59,7 +59,7 @@ impl TextFunction for Concat {
             if function.validate.unwrap() {
                 function.attributes = Some(get_vector_regex_attributes(
                     expr.captures_iter(function_text.as_str()))
-                );                    
+                );
             }
         }
         if data_map_wrap.is_some() {
