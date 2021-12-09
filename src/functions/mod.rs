@@ -33,7 +33,7 @@ lazy_static! {
     static ref RE_FORMULA_FIELD_FUNCTIONS: Regex = Regex::new(r#"(?P<func>[A-Z]+[("\d,-.;_:+$€\s\w{})]+)"#).unwrap();
     static ref RE_FUNCTION_ATTRS_OLD: Regex = Regex::new(r#"("[\w\s-]+")|(\{[\w\s]+\})|([A-Z]+\(["\w\s]+\))|([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)"#).unwrap();
     static ref RE_FUNCTION_ATTRS: Regex = Regex::new(r#"[A-Z]+\((?P<attrs>.+)\)"#).unwrap();
-    static ref RE_ATTR_TYPE_RESOLVE: Regex = Regex::new(r#"(?P<ref>\{[\w\s]+\})|(?P<func>[A-Z]+\(.+\))|(?P<bool>TRUE|FALSE)|(?P<string>\\{0,}"[,;_.\\$€:\-\+\{\}\w\s-]+\\{0,}")|(?P<number>^[+-]?[0-9]+\.?[0-9]*|^\.[0-9]+)|(?P<null>null)"#).unwrap();
+    static ref RE_ATTR_TYPE_RESOLVE: Regex = Regex::new(r#"(?P<ref>\{[\w\s]+\})|(?P<formula>[A-Z]+\(.+\).*)|(?P<bool>TRUE|FALSE)|(?P<string>\\{0,}"[,;_.\\$€:\-\+\{\}\w\s-]+\\{0,}")|(?P<number>^[+-]?[0-9]+\.?[0-9]*|^\.[0-9]+)|(?P<null>null)"#).unwrap();
     static ref RE_FORMULA_FUNCTION_PIECES: Regex = Regex::new(r#"[A-Z]+\(.[^()]+\)"#).unwrap();
     static ref RE_FORMULA_FUNCTION_VARIABLES: Regex = Regex::new(r#"(?P<func>\$func_\d)"#).unwrap();
     static ref RE_FORMULA_VARIABLES: Regex = Regex::new(r#"(?P<formula>\$formula_\d)"#).unwrap();
@@ -230,6 +230,9 @@ impl Formula {
         // If I have an error in compilation, then does not validate. Compilation uses validate of functions.
         // This function is the one does compilation from string formula to FormulaFieldCompiled
         let formula_origin = formula.clone();
+        let field_name_map_i = field_name_map.clone();
+        let db_table_i = db_table.clone();
+        let table_name_i = table_name.clone();
         // eprintln!("FormulaFieldCompiled :: formula_origin: {:?}", &formula_origin);
         // eprintln!("FormulaFieldCompiled :: formula_format: {:?}", &formula_format);
         let formula_map= compile_formula(formula_origin.clone()).unwrap();
@@ -260,6 +263,7 @@ impl Formula {
         let mut compiled_functions_map: HashMap<String, CompiledFunction> = HashMap::new();
         let mut compiled_functions: Vec<CompiledFunction> = Vec::new();
         let expr = &RE_FORMULA_FUNCTION_VARIABLES;
+        
         for (function_placeholder, function_text) in formula_map {
             let function_text = function_text.as_str();
             let function_list_ = expr.captures(function_text);
@@ -269,7 +273,10 @@ impl Formula {
                 let main_function = compile_function_text(
                     function_text, 
                     &formula_format,
-                    &field_type_map_
+                    &field_type_map_,
+                    field_name_map_i.clone(),
+                    db_table_i.clone(),
+                    table_name_i.clone(),
                 )?;
                 compiled_functions.push(main_function.clone());
                 compiled_functions_map.insert(function_placeholder.clone(), main_function.clone());
@@ -303,15 +310,6 @@ impl Formula {
         let formula_processed_string = formula_processed.clone();
         let formula_processed_str = formula_processed_string.as_str();
         formula_compiled.formula = formula_processed;
-
-        // process assignment
-        // {Counter} > 5, would have result of 1 if true, 0 if false
-        // capture log_op which is =, <, >, etc...
-        // I need to process these possible cases:
-        // {My Column} = "pepito"
-        // {My Column} = 98.89
-        // {My Column} = TRIM(" pepito ")
-        // {My Column} > 98
 
         // I need to parse the assignment in case it exists
         let has_functions = formula_compiled.functions.is_some();
@@ -402,8 +400,6 @@ pub fn formula_attr_collection(
         }
     }
     let expr = &RE_FORMULA_VARIABLES;
-    let final_attrs_ = final_attrs.clone();
-    let final_attrs_ = final_attrs_.as_str();
     for (k, v) in formula_map_.clone() {
         let has_formula = v.clone().find("$formula_").is_some();
         if has_formula {
@@ -536,6 +532,9 @@ pub fn compile_function_text(
     function_text: &str,
     formula_format: &String,
     field_type_map: &HashMap<String, String>,
+    field_name_map: Option<HashMap<String, String>>,
+    db_table: Option<DbTable>,
+    table_name: Option<String>,
 ) -> Result<CompiledFunction, PlanetError> {
     // eprintln!("compile_function_text :: function_text: {}", &function_text);
     let formula_format = formula_format.clone();
@@ -598,7 +597,7 @@ pub fn compile_function_text(
         let attr_type_resolve = attr_type_resolve.unwrap();
         // eprintln!("compile_function_text :: attr_type_resolve: {:?}", &attr_type_resolve);
         let attr_type_ref = attr_type_resolve.name("ref");
-        let attr_type_func = attr_type_resolve.name("func");
+        let attr_type_formula = attr_type_resolve.name("formula");
         let attr_type_bool = attr_type_resolve.name("bool");
         let attr_type_string = attr_type_resolve.name("string");
         let attr_type_number = attr_type_resolve.name("number");
@@ -620,15 +619,20 @@ pub fn compile_function_text(
                 function_attribute.attr_type = attribute_type;
                 function_attribute.is_reference = true;
             }
-        } else if attr_type_func.is_some() {
-            // function
-            // eprintln!("compile_function_text :: [{}] is function", &attr);
-            // let linked_function = compile_function_text(
-            //         attr, &formula_format, &field_type_map
-            // )?;
-            // let linked_function_text = linked_function.text.clone().unwrap();
-            // function_attribute.function = Some(linked_function);
-            // function_attribute.name = Some(linked_function_text);
+        } else if attr_type_formula.is_some() {
+            // formula
+            let function_attribute_string = attr.to_string();
+            let formula_compiled = Formula::defaults(
+                &function_attribute_string.clone(),
+                &formula_format,
+                None,
+                Some(field_type_map.clone()),
+                field_name_map.clone(),
+                db_table.clone(),
+                table_name.clone(),
+            )?;
+            function_attribute.formula = Some(formula_compiled);
+            function_attribute.name = Some(function_attribute_string);
         } else if attr_type_bool.is_some() {
             // eprintln!("compile_function_text :: [{}] is boolean", &attr);
             function_attribute.attr_type = AttributeType::Bool;
@@ -992,23 +996,30 @@ impl FunctionAttributeItem {
         let data_map = data_map.clone();
         let is_reference = self.is_reference;
         let formula = self.formula.clone();
-        let attribute_name = self.name.clone().unwrap();
+        let attribute_name = self.name.clone().unwrap_or_default();
         let attribute_value = self.value.clone().unwrap_or_default();
+        eprintln!("FunctionAttributeItem.get_value :: name: {}", &attribute_name);
         let value: String;
         if is_reference {
+            eprintln!("FunctionAttributeItem.get_value :: is_reference");
             // FUNC({Column}) : I get value from data_map, key Column
             let function_attr = FunctionAttribute::defaults(
                 &attribute_name, Some(true), Some(true)
             );
             value = function_attr.replace(&data_map).item_processed.unwrap();
+            eprintln!("FunctionAttributeItem.get_value :: {}={}", &attribute_name, &value);
         } else if formula.is_some() {
+            eprintln!("FunctionAttributeItem.get_value :: formula");
             // I execute the formula and return value
             // execute_formula(formula: &Formula, data_map: &HashMap<String, String>)
             let formula = formula.unwrap();
             value = execute_formula(&formula, &data_map)?;
+            eprintln!("FunctionAttributeItem.get_value :: {}={}", &attribute_name, &value);
         } else {
+            eprintln!("FunctionAttributeItem.get_value :: normal");
             // I get value and return it
             value = attribute_value;
+            eprintln!("FunctionAttributeItem.get_value :: {}={}", &attribute_name, &value);
         }
         return Ok(value)
     }

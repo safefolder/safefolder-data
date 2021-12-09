@@ -78,33 +78,33 @@ impl TextFunction for Concat {
         // Case 2: In a formula field, ref, CONCAT("My "", {Column})
         // Case 3: I have function as attribute: CONCAT("My "", TRIM({Column}))
         for attribute_item in attributes {
-            let is_reference = attribute_item.is_reference;
-            let value = attribute_item.value;
+            // let is_reference = attribute_item.is_reference;
+            // let value = attribute_item.value;
             // let has_function = attribute_item.function.is_some();
-            let has_function = false;
-            let name = attribute_item.name;
-            let mut attribute: String = String::from("");
-            if is_reference == true {
-                let name = name.unwrap();
-                attribute = name;
-                let function_attr = FunctionAttribute::defaults(
-                    &attribute, Some(true), Some(true)
-                );
-                attribute = function_attr.replace(data_map).item_processed.unwrap();
-            } else if has_function {
-                // function as attribute
-                // let function = attribute_item.function.unwrap().clone();
-                // let mut function_parse = FunctionParse::defaults(&function.name);
-                // function_parse.text = function.text;
-                // function_parse.compiled_attributes = function.attributes;
-                // let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
-                // let result = function_parse.result.unwrap();
-                // let result_value = result.text;
-                // attribute = result_value.unwrap();
-            } else {
-                let value = value.unwrap();
-                attribute = value;
-            }
+            // let has_function = false;
+            // let name = attribute_item.name;
+            // if is_reference == true {
+            //     let name = name.unwrap();
+            //     attribute = name;
+            //     let function_attr = FunctionAttribute::defaults(
+            //         &attribute, Some(true), Some(true)
+            //     );
+            //     attribute = function_attr.replace(data_map).item_processed.unwrap();
+            // } else if has_function {
+            //     // function as attribute
+            //     // let function = attribute_item.function.unwrap().clone();
+            //     // let mut function_parse = FunctionParse::defaults(&function.name);
+            //     // function_parse.text = function.text;
+            //     // function_parse.compiled_attributes = function.attributes;
+            //     // let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
+            //     // let result = function_parse.result.unwrap();
+            //     // let result_value = result.text;
+            //     // attribute = result_value.unwrap();
+            // } else {
+            //     let value = value.unwrap();
+            //     attribute = value;
+            // }
+            let attribute = attribute_item.get_value(data_map)?;
             attributes_processed.push(attribute);
         }
         let result = attributes_processed.join("");
@@ -693,7 +693,7 @@ impl TextFunction for Replace {
         let num_chars_value = num_chars.value.unwrap();
         let num_chars_value: u32 = FromStr::from_str(num_chars_value.as_str()).unwrap();
         let new_text = attributes[3].clone();
-        let mut new_text_value = new_text.value.unwrap();
+        let new_text_value = new_text.value.unwrap();
         let is_reference = old_text.is_reference;
         let reference_value_wrap = old_text.reference_value.clone();
         // let is_function = new_text.function.is_some();
