@@ -64,29 +64,27 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                 // name field
                 let name_field_config = config.name.unwrap();
                 fields.insert(0, name_field_config);
-                let mut field_name_map: HashMap<String, bool> = HashMap::new();
+                let mut field_name_map: HashMap<String, String> = HashMap::new();
 
-                // field_type_map
+                // populate field_type_map and field_name_map
                 let mut field_type_map: HashMap<String, String> = HashMap::new();
                 for field in fields.iter() {
+                    let field_attrs = field.clone();
                     let field_name = field.name.clone().unwrap();
                     let field_type = field.field_type.clone();
+                    let mut field_id_map: HashMap<String, String> = HashMap::new();
+                    let field_id = String::from(ID);
+                    field_id_map.insert(field_id.clone(), field_attrs.id.unwrap());
+                    &field_ids.push(field_id_map);
                     if field_type.is_some() {
                         let field_type = field_type.unwrap();
                         field_type_map.insert(field_name, field_type);
                     }
-                }
-
-                for field in fields.iter() {
-                    // field simple attributes
-                    let field_attrs = field.clone();
-                    let mut field_id_map: HashMap<String, String> = HashMap::new();
-                    field_id_map.insert(String::from(ID), field_attrs.id.unwrap());
-                    &field_ids.push(field_id_map);
                     let field_name = field_attrs.name.unwrap_or_default().clone();
                     let field_name_str = &field_name.as_str();
                     if field_name_map.has_element(field_name_str) == false {
-                        field_name_map.insert(field_name.clone(), true);
+                        // id => name
+                        field_name_map.insert(field_id.clone(), field_name.clone());
                     } else {
                         return Err(
                             PlanetError::new(
@@ -95,7 +93,18 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                             )
                         );                        
                     }
-                    let map = &field.map_object_db(&field_type_map)?;
+                }
+
+                for field in fields.iter() {
+                    // field simple attributes
+                    let field_attrs = field.clone();
+                    let field_name = field_attrs.name.unwrap_or_default().clone();
+                    let map = &field.map_object_db(
+                        &field_type_map,
+                        &field_name_map,
+                        &db_table,
+                        table_name,
+                    )?;
                     data_objects.insert(String::from(field_name.clone()), map.clone());
                     // field complex attributes like select_data
                     let map_list = &field.map_collections_db();

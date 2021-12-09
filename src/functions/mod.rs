@@ -37,6 +37,7 @@ lazy_static! {
     static ref RE_FORMULA_FUNCTION_PIECES: Regex = Regex::new(r#"[A-Z]+\(.[^()]+\)"#).unwrap();
     static ref RE_FORMULA_FUNCTION_VARIABLES: Regex = Regex::new(r#"(?P<func>\$func_\d)"#).unwrap();
     static ref RE_FORMULA_VARIABLES: Regex = Regex::new(r#"(?P<formula>\$formula_\d)"#).unwrap();
+    static ref RE_FORMULA_ASSIGN: Regex = Regex::new(r#"(?P<assign>(?P<name>\{[\s\w]+\})[\s\t]{0,}(?P<op>=|>|<|>=|<=)[\s\t]{0,}((?P<function>\$func_\d+)|(?P<value>"*[\.\w\d\s]+"*)))"#).unwrap();
 }
 
 // achiever planet functions
@@ -220,7 +221,11 @@ impl Formula {
     pub fn defaults(
         formula: &String,
         formula_format: &String,
-        field_type_map: &HashMap<String, String>,
+        table: Option<DbData>,
+        field_type_map: Option<HashMap<String, String>>,
+        field_name_map: Option<HashMap<String, String>>,
+        db_table: Option<DbTable>,
+        table_name: Option<String>,
     ) -> Result<Self, PlanetError> {
         // If I have an error in compilation, then does not validate. Compilation uses validate of functions.
         // This function is the one does compilation from string formula to FormulaFieldCompiled
@@ -232,6 +237,20 @@ impl Formula {
         // let expr = &RE_FORMULA_FIELD_FUNCTIONS;
         let mut formula_processed = formula_origin.clone();
         let formula_format = formula_format.clone();
+        let mut field_name_map_: HashMap<String, String> = HashMap::new();
+        let mut field_type_map_: HashMap<String, String> = HashMap::new();
+        if table.is_some() {
+            let table = table.unwrap();
+            let db_table = db_table.unwrap();
+            let table_name = table_name.unwrap();
+            field_type_map_ = DbTable::get_field_type_map(&table)?;
+            field_name_map_ = DbTable::get_field_name_map(&db_table, &table_name)?;
+        } else if field_type_map.is_some() && field_name_map.is_some() {
+            let field_type_map = field_type_map.unwrap();
+            field_type_map_ = field_type_map;
+            let field_name_map = field_name_map.unwrap();
+            field_name_map_ = field_name_map
+        }
 
         let mut formula_compiled = Formula{
             functions: None,
@@ -250,7 +269,7 @@ impl Formula {
                 let main_function = compile_function_text(
                     function_text, 
                     &formula_format,
-                    field_type_map
+                    &field_type_map_
                 )?;
                 compiled_functions.push(main_function.clone());
                 compiled_functions_map.insert(function_placeholder.clone(), main_function.clone());
@@ -281,9 +300,71 @@ impl Formula {
         }
 
         formula_compiled.functions = Some(compiled_functions_map);
+        let formula_processed_string = formula_processed.clone();
+        let formula_processed_str = formula_processed_string.as_str();
         formula_compiled.formula = formula_processed;
 
-        // assignment
+        // process assignment
+        // {Counter} > 5, would have result of 1 if true, 0 if false
+        // capture log_op which is =, <, >, etc...
+        // I need to process these possible cases:
+        // {My Column} = "pepito"
+        // {My Column} = 98.89
+        // {My Column} = TRIM(" pepito ")
+        // {My Column} > 98
+
+        // I need to parse the assignment in case it exists
+        let has_functions = formula_compiled.functions.is_some();
+        if !has_functions {
+            // Since I have no functions, reference will be an assignment
+            let expr = &RE_FORMULA_ASSIGN;
+            let assignment = expr.captures(&formula_processed_str);
+            if assignment.is_some() {
+                let mut formula_assign = formula_processed_string.clone();
+                let assignment = assignment.unwrap();
+                let assign = assignment.name("assign").unwrap().as_str().to_string();
+                let name = assignment.name("name").unwrap().as_str().to_string();
+                let op = assignment.name("op").unwrap().as_str().to_string();
+                let value = assignment.name("value").unwrap().as_str().to_string();
+                let function = assignment.name("function");
+                eprintln!("Formula::assign: {} {}{}{}", &assign, &name, &op, &value);
+                if function.is_some() {
+                    let functions_map = formula_compiled.functions.clone();
+                    if functions_map.is_some() {
+                        let functions_map = functions_map.unwrap();
+                        for (function_key, function) in functions_map {
+                            formula_assign = formula_assign.replace(&function_key, &function.text.unwrap());
+                        }
+                    }
+                }
+                let (items, attribute_operator) = parse_assign_operator(
+                    &assign, &formula_assign
+                )?;
+                let (reference_name, items_new) = get_assignment_reference(
+                    &items, 
+                    field_name_map_
+                )?;
+                let field_type = field_type_map_.get(&reference_name);
+                let mut attribute_type: AttributeType = AttributeType::Text;
+                if field_type.is_some() {
+                    let field_type = field_type.unwrap();
+                    attribute_type = get_attribute_type(field_type, None);
+                }
+                let mut function_attribute = FunctionAttributeItem::defaults(
+                    Some(reference_name), 
+                    attribute_type
+                );
+                function_attribute.is_reference = true;
+                let assignment = Some(
+                    AttributeAssign(
+                        items_new[0].clone(), 
+                        attribute_operator, 
+                        items_new[1].clone()
+                    )
+                );
+                formula_compiled.assignment = assignment;
+            }
+        }
 
         // eprintln!("FormulaFieldCompiled :: formula_compiled: {:#?}", &formula_compiled);
 
@@ -447,16 +528,6 @@ pub fn compile_formula(
             function_map.insert(function_item_text, function_item_text_value);
         }
     }
-
-    // let assignment = formula.assignment.clone();
-    // if assignment.is_some() {
-    //     let assignment = assignment.unwrap();
-    //     let is_reference = assignment.is_reference;
-    //     if is_reference == true {
-    //         let attr_assignment = assignment.assignment.unwrap();
-    //         check = check_assignment(attr_assignment, assignment.attr_type, data_map)?;
-    //     }
-    // }
 
     return Ok(function_map)
 }
@@ -987,6 +1058,9 @@ pub fn execute_formula(
     formula: &Formula, 
     data_map: &HashMap<String, String>
 ) -> Result<String, PlanetError> {
+    // 23 + LOG(34)
+    // FUNC(attr1, attr2, ...)
+    // FUNC(FUNC(attr1, attr2, ...))
     // This needs to execute the formula for a field
     // The type will depend on the formula_format on what we return
     // 1. I execute the functions in the formula and substitute result by placeholder and call LIB

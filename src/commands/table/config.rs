@@ -14,7 +14,7 @@ use crate::planet::{PlanetContext, PlanetError};
 
 use crate::storage::constants::*;
 use crate::storage::*;
-use crate::storage::table::{DbData};
+use crate::storage::table::{DbData, DbTable};
 use crate::planet::constants::*;
 use crate::planet::make_bool_str;
 use crate::functions::{Formula};
@@ -357,7 +357,13 @@ impl ConfigStorageField for FieldConfig {
         // eprintln!("parse_from_db :: !!!!!!!!!!!!!!! fields: {:#?}", &fields);
         return fields
     }
-    fn map_object_db(&self, field_type_map: &HashMap<String, String>) -> Result<HashMap<String, String>, PlanetError> {
+    fn map_object_db(
+        &self, 
+        field_type_map: &HashMap<String, String>,
+        field_name_map: &HashMap<String, String>,
+        db_table: &DbTable,
+        table_name: &String
+    ) -> Result<HashMap<String, String>, PlanetError> {
         let field_config = self.clone();
         let mut map: HashMap<String, String> = HashMap::new();
         let required = field_config.required.unwrap_or_default();
@@ -380,10 +386,18 @@ impl ConfigStorageField for FieldConfig {
         if formula.is_some() {
             let formula = formula.unwrap();
             let formula_format = field_config.formula_format.unwrap();
+            let field_type_map = field_type_map.clone();
+            let field_name_map = field_name_map.clone();
+            let db_table = db_table.clone();
+            let table_name = table_name.clone();
             let formula_compiled = Formula::defaults(
                 &formula,
                 &formula_format,
-                field_type_map,
+                None,
+                Some(field_type_map),
+                Some(field_name_map),
+                Some(db_table),
+                Some(table_name),
             )?;
             map.insert(String::from("formula"), formula);
             map.insert(String::from("formula_format"), formula_format);
