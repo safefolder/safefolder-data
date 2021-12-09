@@ -78,32 +78,6 @@ impl TextFunction for Concat {
         // Case 2: In a formula field, ref, CONCAT("My "", {Column})
         // Case 3: I have function as attribute: CONCAT("My "", TRIM({Column}))
         for attribute_item in attributes {
-            // let is_reference = attribute_item.is_reference;
-            // let value = attribute_item.value;
-            // let has_function = attribute_item.function.is_some();
-            // let has_function = false;
-            // let name = attribute_item.name;
-            // if is_reference == true {
-            //     let name = name.unwrap();
-            //     attribute = name;
-            //     let function_attr = FunctionAttribute::defaults(
-            //         &attribute, Some(true), Some(true)
-            //     );
-            //     attribute = function_attr.replace(data_map).item_processed.unwrap();
-            // } else if has_function {
-            //     // function as attribute
-            //     // let function = attribute_item.function.unwrap().clone();
-            //     // let mut function_parse = FunctionParse::defaults(&function.name);
-            //     // function_parse.text = function.text;
-            //     // function_parse.compiled_attributes = function.attributes;
-            //     // let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
-            //     // let result = function_parse.result.unwrap();
-            //     // let result_value = result.text;
-            //     // attribute = result_value.unwrap();
-            // } else {
-            //     let value = value.unwrap();
-            //     attribute = value;
-            // }
             let attribute = attribute_item.get_value(data_map)?;
             attributes_processed.push(attribute);
         }
@@ -170,29 +144,7 @@ impl TextFunction for Trim {
         let data_map = &self.data_map.clone().unwrap();
         let attributes = attributes.clone();
         let attribute_item = attributes[0].clone();
-        let is_reference = attribute_item.is_reference;
-        let reference_value_wrap = attribute_item.reference_value;
-        let value = attribute_item.value.unwrap_or_default();
-        // let has_function = attribute_item.function.is_some();
-        let has_function = false;
-        let mut attribute: String = String::from("");
-        if is_reference {
-            let reference_value = reference_value_wrap.unwrap();
-            attribute = reference_value;
-            let function_attr = FunctionAttribute::defaults(
-                &attribute, Some(true), Some(true)
-            );
-            attribute = function_attr.replace(data_map).item_processed.unwrap();
-        } else if has_function {
-            // let function = attribute_item.function.unwrap();
-            // let function_parse = FunctionParse::defaults(&function.name);
-            // let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
-            // let result = function_parse.result.unwrap();
-            // let result_value = result.text;
-            // attribute = result_value.unwrap();
-        } else {
-            attribute = value;
-        }
+        let attribute = attribute_item.get_value(data_map)?;
         let result = attribute.trim().to_string();
         return Ok(result);
     
@@ -215,6 +167,7 @@ impl Format {
 }
 impl TextFunction for Format {
     fn handle(&mut self) -> Result<FunctionParse, PlanetError> {
+        // FORMAT("Hello-{Column A}-45")
         let function_parse = &self.function.clone().unwrap();
         let data_map = self.data_map.clone();
         let expr = &RE_FORMAT_ATTR;
@@ -297,6 +250,8 @@ impl JoinList {
 }
 impl TextFunction for JoinList {
     fn handle(&mut self) -> Result<FunctionParse, PlanetError> {
+        // JOINLIST({My Column}, ",")
+        // JOINLIST({1, 2, 3}, ",") => "1,2,3"
         let function_parse = &self.function.clone().unwrap();
         let data_map = self.data_map.clone();
         let expr = &RE_JOINLIST_ATTRS;
@@ -313,6 +268,7 @@ impl TextFunction for JoinList {
             function.validate = Some(expr.is_match(function_text.as_str()));
             if function.validate.unwrap() {
                 let attr_map = RE_JOINLIST_ATTRS.captures(function_text.as_str()).unwrap();
+                // array is either a reference or a set/list of values
                 let array = attr_map.name("array").unwrap().as_str().to_string();
                 let sep = attr_map.name("sep").unwrap().as_str().replace("\"", "");
                 let mut attributes_: Vec<String> = Vec::new();
@@ -346,7 +302,7 @@ impl TextFunction for JoinList {
         let array_value = &array.value;
         let separator = &attributes[1];
         let separator_value = &separator.value;
-        // {1,2,3} or {"a","b","c"}
+        // {1,2,3} or {"a","b","c"} or {Column}
         let mut array_items_wrap: Option<Vec<String>> = None;
         if array_value.is_some() {
             let array_value = array_value.clone().unwrap();
@@ -398,6 +354,9 @@ impl Length {
 }
 impl TextFunction for Length {
     fn handle(&mut self) -> Result<FunctionParse, PlanetError> {
+        // LEN("my string") => 8
+        // LEN({My Column}) => 23
+        // LEN(TRIM(" hello world "))
         let function_parse = &self.function.clone().unwrap();
         let data_map = self.data_map.clone();
         let expr = &RE_LEN_ATTR;
@@ -429,34 +388,9 @@ impl TextFunction for Length {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
-        // LEN("my string") => 8
-        // LEN({My Column}) => 23
-        // LEN(TRIM(" hello world "))
         let attributes = attributes.clone();
         let attribute_item = attributes[0].clone();
-        let is_reference = attribute_item.is_reference;
-        let reference_value_wrap = attribute_item.reference_value;
-        let value = attribute_item.value.unwrap_or_default();
-        // let has_function = attribute_item.function.is_some();
-        let has_function = false;
-        let mut attribute: String = String::from("");
-        if is_reference {
-            let reference_value = reference_value_wrap.unwrap();
-            attribute = reference_value;
-            let function_attr = FunctionAttribute::defaults(
-                &attribute, Some(true), Some(true)
-            );
-            attribute = function_attr.replace(data_map).item_processed.unwrap();
-        } else if has_function {
-            // let function = attribute_item.function.unwrap();
-            // let function_parse = FunctionParse::defaults(&function.name);
-            // let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
-            // let result = function_parse.result.unwrap();
-            // let result_value = result.text;
-            // attribute = result_value.unwrap();
-        } else {
-            attribute = value;
-        }
+        let attribute = attribute_item.get_value(data_map)?;
         let length = attribute.len().to_string();
         return Ok(length)
     }
@@ -478,6 +412,9 @@ impl Lower {
 }
 impl TextFunction for Lower {
     fn handle(&mut self) -> Result<FunctionParse, PlanetError> {
+        // LOWER("my string")
+        // LOWER({My Column})
+        // LOWER(TRIM(" HELLO WORLD "))
         let function_parse = &self.function.clone().unwrap();
         let data_map = self.data_map.clone();
         let expr = &RE_SINGLE_ATTR;
@@ -509,34 +446,9 @@ impl TextFunction for Lower {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
-        // LOWER("my string")
-        // LOWER({My Column})
-        // LOWER(TRIM(" HELLO WORLD "))
         let attributes = attributes.clone();
         let attribute_item = attributes[0].clone();
-        let is_reference = attribute_item.is_reference;
-        let reference_value_wrap = attribute_item.reference_value;
-        let value = attribute_item.value.unwrap_or_default();
-        // let has_function = attribute_item.function.is_some();
-        let has_function = false;
-        let mut attribute: String = String::from("");
-        if is_reference {
-            let reference_value = reference_value_wrap.unwrap();
-            attribute = reference_value;
-            let function_attr = FunctionAttribute::defaults(
-                &attribute, Some(true), Some(true)
-            );
-            attribute = function_attr.replace(data_map).item_processed.unwrap();
-        } else if has_function {
-            // let function = attribute_item.function.unwrap();
-            // let function_parse = FunctionParse::defaults(&function.name);
-            // let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
-            // let result = function_parse.result.unwrap();
-            // let result_value = result.text;
-            // attribute = result_value.unwrap();
-        } else {
-            attribute = value;
-        }
+        let attribute = attribute_item.get_value(data_map)?;
         let result_lower = attribute.to_lowercase();
         return Ok(result_lower)
     }
@@ -558,6 +470,9 @@ impl Upper {
 }
 impl TextFunction for Upper {
     fn handle(&mut self) -> Result<FunctionParse, PlanetError> {
+        // UPPER("my string")
+        // UPPER({My Column})
+        // UPPER(TRIM(" HELLO WORLD "))
         let function_parse = &self.function.clone().unwrap();
         let data_map = self.data_map.clone();
         let expr = &RE_SINGLE_ATTR;
@@ -589,34 +504,9 @@ impl TextFunction for Upper {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
-        // UPPER("my string")
-        // UPPER({My Column})
-        // UPPER(TRIM(" HELLO WORLD "))
         let attributes = attributes.clone();
         let attribute_item = attributes[0].clone();
-        let is_reference = attribute_item.is_reference;
-        let reference_value_wrap = attribute_item.reference_value;
-        let value = attribute_item.value.unwrap_or_default();
-        // let has_function = attribute_item.function.is_some();
-        let has_function = false;
-        let mut attribute: String = String::from("");
-        if is_reference {
-            let reference_value = reference_value_wrap.unwrap();
-            attribute = reference_value;
-            let function_attr = FunctionAttribute::defaults(
-                &attribute, Some(true), Some(true)
-            );
-            attribute = function_attr.replace(data_map).item_processed.unwrap();
-        } else if has_function {
-            // let function = attribute_item.function.unwrap();
-            // let function_parse = FunctionParse::defaults(&function.name);
-            // let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
-            // let result = function_parse.result.unwrap();
-            // let result_value = result.text;
-            // attribute = result_value.unwrap();
-        } else {
-            attribute = value;
-        }
+        let attribute = attribute_item.get_value(data_map)?;
         let result_upper = attribute.to_uppercase();
         return Ok(result_upper)
     }
@@ -638,6 +528,13 @@ impl Replace {
 }
 impl TextFunction for Replace {
     fn handle(&mut self) -> Result<FunctionParse, PlanetError> {
+        // REPLACE(old_text, start_num, num_chars, new_text)
+        // REPLACE(old_text, start_num, num_chars, new_text)
+        // REPLACE({My Column}, start_num, num_chars, new_text)
+        // old_text     Required. Text in which you want to replace some characters.
+        // start_num    Required. The position of the character in old_text that you want to replace with new_text.
+        // num_chars    Required. The number of characters in old_text that you want REPLACE to replace with new_text.
+        // new_text     Required. The text that will replace characters in old_text.
         let function_parse = &self.function.clone().unwrap();
         let data_map = self.data_map.clone();
         let expr = &RE_REPLACE;
@@ -674,16 +571,9 @@ impl TextFunction for Replace {
         }
         return Ok(function)
     }
-    // REPLACE(old_text, start_num, num_chars, new_text)
-    // old_text     Required. Text in which you want to replace some characters.
-    // start_num    Required. The position of the character in old_text that you want to replace with new_text.
-    // num_chars    Required. The number of characters in old_text that you want REPLACE to replace with new_text.
-    // new_text     Required. The text that will replace characters in old_text.
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
-        // REPLACE(old_text, start_num, num_chars, new_text)
-        // REPLACE({My Column}, start_num, num_chars, new_text)
         let attributes = attributes.clone();
         let old_text = attributes[0].clone();
         let start_num = attributes[1].clone();
@@ -694,32 +584,8 @@ impl TextFunction for Replace {
         let num_chars_value: u32 = FromStr::from_str(num_chars_value.as_str()).unwrap();
         let new_text = attributes[3].clone();
         let new_text_value = new_text.value.unwrap();
-        let is_reference = old_text.is_reference;
-        let reference_value_wrap = old_text.reference_value.clone();
-        // let is_function = new_text.function.is_some();
-        let is_function = false;
         let replacement_string: String;
-        let mut old_text_value: String = String::from("");
-        if is_reference {
-            let reference_value = reference_value_wrap.unwrap();
-            old_text_value = reference_value;
-            let function_attr = FunctionAttribute::defaults(
-                &old_text_value, Some(true), Some(true)
-            );
-            old_text_value = function_attr.replace(data_map).item_processed.unwrap();
-        } else if is_function {
-            // let function = new_text.function.unwrap().clone();
-            // let mut function_parse = FunctionParse::defaults(&function.name);
-            // function_parse.text = function.text;
-            // function_parse.compiled_attributes = function.attributes;
-            // let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
-            // let result = function_parse.result.unwrap();
-            // let result_value = result.text;
-            // new_text_value = result_value.unwrap();
-            // old_text_value = old_text.value.unwrap();
-        } else {
-            old_text_value = old_text.value.unwrap();
-        }
+        let old_text_value = old_text.get_value(data_map)?;
         let mut piece: String = String::from("");
         for (i, item) in old_text_value.chars().enumerate() {
             let i = i as u32;
@@ -750,6 +616,7 @@ impl Mid {
 }
 impl TextFunction for Mid {
     fn handle(&mut self) -> Result<FunctionParse, PlanetError> {
+        // MID(text, start_num, num_chars)
         let function_parse = &self.function.clone().unwrap();
         let data_map = self.data_map.clone();
         let expr = &RE_MID;
@@ -794,39 +661,15 @@ impl TextFunction for Mid {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
-        // MID(text, start_num, num_chars)
         let attributes = attributes.clone();
         let text = attributes[0].clone();
-        let mut text_value = text.value.unwrap_or_default();
         let start_num = attributes[1].clone();
         let start_num_value = start_num.value.unwrap();
         let start_num_value: usize = FromStr::from_str(start_num_value.as_str()).unwrap();
         let num_chars = attributes[2].clone();
         let num_chars_value = num_chars.value.unwrap();
         let num_chars_value: usize = FromStr::from_str(num_chars_value.as_str()).unwrap();
-        let is_reference = text.is_reference;
-        let reference_value_wrap = text.reference_value.clone();
-        // let is_function = text.function.is_some();
-        let is_function = false;
-        if is_reference {
-            let reference_value = reference_value_wrap.unwrap();
-            text_value = reference_value;
-            let function_attr = FunctionAttribute::defaults(
-                &text_value, Some(true), Some(true)
-            );
-            text_value = function_attr.replace(data_map).item_processed.unwrap();
-        } else if is_function {
-            // let function = text.function.unwrap();
-            // let mut function_parse = FunctionParse::defaults(&function.name);
-            // function_parse.text = function.text;
-            // function_parse.compiled_attributes = function.attributes;
-            // let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
-            // let result = function_parse.result.unwrap();
-            // let result_value = result.text;
-            // text_value = result_value.unwrap();
-        } else {
-            text_value = text_value;
-        }
+        let text_value = text.get_value(data_map)?;
         let mut text_new = String::from("");
         for (i, char) in text_value.chars().enumerate() {
             let count = i+1;
@@ -855,6 +698,7 @@ impl Rept {
 }
 impl TextFunction for Rept {
     fn handle(&mut self) -> Result<FunctionParse, PlanetError> {
+        // REPT(text, number_times)
         let function_parse = &self.function.clone().unwrap();
         let data_map = self.data_map.clone();
         let expr = &RE_REPT;
@@ -897,36 +741,12 @@ impl TextFunction for Rept {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
-        // REPT(text, number_times)
         let attributes = attributes.clone();
         let text = attributes[0].clone();
-        let mut text_value = text.value.unwrap_or_default();
         let number_times = attributes[1].clone();
         let number_times_value = number_times.value.unwrap();
         let number_times_value: usize = FromStr::from_str(number_times_value.as_str()).unwrap();
-        let is_reference = text.is_reference;
-        let reference_value_wrap = text.reference_value.clone();
-        // let is_function = text.function.is_some();
-        let is_function = false;
-        if is_reference {
-            let reference_value = reference_value_wrap.unwrap();
-            text_value = reference_value;
-            let function_attr = FunctionAttribute::defaults(
-                &text_value, Some(true), Some(true)
-            );
-            text_value = function_attr.replace(data_map).item_processed.unwrap();
-        } else if is_function {
-            // let function = text.function.unwrap();
-            // let mut function_parse = FunctionParse::defaults(&function.name);
-            // function_parse.text = function.text;
-            // function_parse.compiled_attributes = function.attributes;
-            // let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
-            // let result = function_parse.result.unwrap();
-            // let result_value = result.text;
-            // text_value = result_value.unwrap();
-        } else {
-            text_value = text_value;
-        }
+        let text_value = text.get_value(data_map)?;
         let text_value_str = text_value.as_str();
         let text_value_str = text_value_str.repeat(number_times_value);
         return Ok(text_value_str)
@@ -949,6 +769,7 @@ impl Substitute {
 }
 impl TextFunction for Substitute {
     fn handle(&mut self) -> Result<FunctionParse, PlanetError> {
+        // SUBSTITUTE(text, old_text, new_text)
         let function_parse = &self.function.clone().unwrap();
         let data_map = self.data_map.clone();
         let expr = &RE_SUBSTITUTE;
@@ -993,39 +814,15 @@ impl TextFunction for Substitute {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
-        // SUBSTITUTE(text, old_text, new_text)
         let attributes = attributes.clone();
         let text = attributes[0].clone();
-        let mut text_value = text.value.unwrap_or_default();
         let old_text = attributes[1].clone();
         let old_text_value = old_text.value.unwrap();
         let old_text_value = old_text_value.as_str();
         let new_text = attributes[2].clone();
         let new_text_value = new_text.value.unwrap();
         let new_text_value = new_text_value.as_str();
-        let is_reference = text.is_reference;
-        let reference_value_wrap = text.reference_value.clone();
-        // let is_function = text.function.is_some();
-        let is_function = false;
-        if is_reference {
-            let reference_value = reference_value_wrap.unwrap();
-            text_value = reference_value;
-            let function_attr = FunctionAttribute::defaults(
-                &text_value, Some(true), Some(true)
-            );
-            text_value = function_attr.replace(data_map).item_processed.unwrap();
-        } else if is_function {
-            // let function = text.function.unwrap();
-            // let mut function_parse = FunctionParse::defaults(&function.name);
-            // function_parse.text = function.text;
-            // function_parse.compiled_attributes = function.attributes;
-            // let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
-            // let result = function_parse.result.unwrap();
-            // let result_value = result.text;
-            // text_value = result_value.unwrap();
-        } else {
-            text_value = text_value;
-        }
+        let mut text_value = text.get_value(data_map)?;
         text_value = text_value.replace(old_text_value, new_text_value);
         return Ok(text_value)
     }
