@@ -7,7 +7,7 @@ use math::round;
 use crate::functions::*;
 
 lazy_static! {
-    pub static ref RE_NUMBER_ATTRS: Regex = Regex::new(r#"("[\w\s-]+")|(\d+)|(\{[\w\s]+\})|([A-Z]+\(["\w\s-]+\))"#).unwrap();
+    pub static ref RE_NUMBER_ATTRS: Regex = Regex::new(r#"("[\w\s-]*")|([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|(\{[\w\s]+\})|([A-Z]+\(["\w\s-]+\))|(null)"#).unwrap();
     pub static ref RE_CEILING: Regex = Regex::new(r#"CEILING\([\s\n\t]{0,}((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|(?P<number_ref>\{[\w\s]+\}))[\s\n\t]{0,},[\s\n\t]{0,}(?P<significance>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\s\n\t]{0,}\)"#).unwrap();
     pub static ref RE_FLOOR: Regex = Regex::new(r#"FLOOR\([\s\n\t]{0,}((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|(?P<number_ref>\{[\w\s]+\}))[\s\n\t]{0,},[\s\n\t]{0,}(?P<significance>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\s\n\t]{0,}\)"#).unwrap();
     pub static ref RE_COUNT: Regex = Regex::new(r#"COUNT\([\s\n\t]{0,}(?P<attrs>[\w\W\s\n\t]{0,})[\s\n\t]{0,}\)"#).unwrap();

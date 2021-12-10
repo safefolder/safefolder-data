@@ -33,8 +33,8 @@ lazy_static! {
     static ref RE_FORMULA_FIELD_FUNCTIONS: Regex = Regex::new(r#"(?P<func>[A-Z]+[("\d,-.;_:+$€\s\w{})]+)"#).unwrap();
     static ref RE_FUNCTION_ATTRS_OLD: Regex = Regex::new(r#"("[\w\s-]+")|(\{[\w\s]+\})|([A-Z]+\(["\w\s]+\))|([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)"#).unwrap();
     static ref RE_FUNCTION_ATTRS: Regex = Regex::new(r#"[A-Z]+\((?P<attrs>.+)\)"#).unwrap();
-    static ref RE_ATTR_TYPE_RESOLVE: Regex = Regex::new(r#"(?P<ref>\{[\w\s]+\})|(?P<formula>[A-Z]+\(.+\).*)|(?P<bool>TRUE|FALSE)|(?P<string>\\{0,}"[,;_.\\$€:\-\+\{\}\w\s-]+\\{0,}")|(?P<number>^[+-]?[0-9]+\.?[0-9]*|^\.[0-9]+)|(?P<null>null)"#).unwrap();
-    static ref RE_FORMULA_FUNCTION_PIECES: Regex = Regex::new(r#"[A-Z]+\(.[^()]+\)"#).unwrap();
+    static ref RE_ATTR_TYPE_RESOLVE: Regex = Regex::new(r#"(?P<ref>\{[\w\s]+\})|(?P<formula>[A-Z]+\(.+\).*)|(?P<bool>TRUE|FALSE)|(?P<string>\\{0,}"[,;_.\\$€:\-\+\{\}\w\s-]*\\{0,}")|(?P<number>^[+-]?[0-9]+\.?[0-9]*|^\.[0-9]+)|(?P<null>null)"#).unwrap();
+    static ref RE_FORMULA_FUNCTION_PIECES: Regex = Regex::new(r#"[A-Z]+\((.[^()]*)*\)"#).unwrap();
     static ref RE_FORMULA_FUNCTION_VARIABLES: Regex = Regex::new(r#"(?P<func>\$func_\d)"#).unwrap();
     static ref RE_FORMULA_VARIABLES: Regex = Regex::new(r#"(?P<formula>\$formula_\d)"#).unwrap();
     static ref RE_FORMULA_ASSIGN: Regex = Regex::new(r#"(?P<assign>(?P<name>\{[\s\w]+\})[\s\t]{0,}(?P<op>=|>|<|>=|<=)[\s\t]{0,}((?P<function>\$func_\d+)|(?P<value>"*[\.\w\d\s]+"*)))"#).unwrap();
@@ -236,7 +236,7 @@ impl Formula {
         // eprintln!("FormulaFieldCompiled :: formula_origin: {:?}", &formula_origin);
         // eprintln!("FormulaFieldCompiled :: formula_format: {:?}", &formula_format);
         let formula_map= compile_formula(formula_origin.clone()).unwrap();
-        // eprintln!("FormulaFieldCompiled :: final_formula: {} function_map: {:?}", &final_formula, &function_map);
+        eprintln!("FormulaFieldCompiled :: formula_map: {:?}", &formula_map);
         // let expr = &RE_FORMULA_FIELD_FUNCTIONS;
         let mut formula_processed = formula_origin.clone();
         let formula_format = formula_format.clone();
@@ -365,6 +365,7 @@ impl Formula {
         }
 
         // eprintln!("FormulaFieldCompiled :: formula_compiled: {:#?}", &formula_compiled);
+        eprintln!("FormulaFieldCompiled :: formula_compiled: {:?}", &formula_compiled);
 
         return Ok(formula_compiled)
     }

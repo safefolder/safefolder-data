@@ -20,7 +20,7 @@ lazy_static! {
     static ref RE_SECOND: Regex = Regex::new(r#"SECOND\([\s\n\t]{0,}(?P<date>"\d{4}-\d{2}-\d{2}T{0,1}[\s]{0,1}\d{2}:\d{2}:\d{2}(\+\d{2}:\d{2}){0,1}")[\s\n\t]{0,}\)|SECOND\([\s\n\t]{0,}(?P<date_alt>"\d{2}-[a-zA-Z]{3}-\d{4}([\s]{0,1}\d{2}:\d{2}:\d{2}){0,1}(\+\d{2}:\d{2}){0,1}")[\s\n\t]{0,}\)|SECOND\([\s\n\t]{0,}(?P<date_ref>\{[\w\s]+\})[\s\n\t]{0,}\)"#).unwrap();
     static ref RE_NOW: Regex = Regex::new(r#"NOW\(\)"#).unwrap();
     static ref RE_TODAY: Regex = Regex::new(r#"TODAY\(\)"#).unwrap();
-    static ref RE_DAYS: Regex = Regex::new(r#"(DAYS\([\s\n\t]{0,}(?P<end_date>"\d{1,2}-[a-zA-Z]{3}-\d{4}")[\s\n\t]{0,},[\s\n\t]{0,}(?P<start_date>"\d{1,2}-[a-zA-Z]{3}-\d{4}"))[\s\n\t]{0,}\)|DAYS\([\s\n\t]{0,}((?P<end_date_ref>\{[\w\s]+\})[\s\n\t]{0,},[\s\n\t]{0,}(?P<start_date_ref>\{[\w\s]+\}))[\s\n\t]{0,}\)"#).unwrap();
+    static ref RE_DAYS: Regex = Regex::new(r#"(DAYS\([\s\n\t]{0,}(?P<start_date>"\d{1,2}-[a-zA-Z]{3}-\d{4}")[\s\n\t]{0,},[\s\n\t]{0,}(?P<end_date>"\d{1,2}-[a-zA-Z]{3}-\d{4}"))[\s\n\t]{0,}\)|DAYS\([\s\n\t]{0,}((?P<start_date_ref>\{[\w\s]+\})[\s\n\t]{0,},[\s\n\t]{0,}(?P<end_date_ref>\{[\w\s]+\}))[\s\n\t]{0,}\)"#).unwrap();
     static ref RE_DATEADD: Regex = Regex::new(r#"DATEADD\([\s\n\t]{0,}(?P<date>"\d{1,2}-[a-zA-Z]{3}-\d{4}")[\s\n\t]{0,},[\s\n\t]{0,}(?P<number>\d+)[\s\n\t]{0,},[\s\n\t]{0,}(?P<units>("days")|("months")|("milliseconds")|("seconds")|("minutes")|("hours")|("weeks")|("quarters")|("years"))[\s\n\t]{0,}\)|DATEADD\([\s\n\t]{0,}(?P<datetime>"\d{1,2}-[a-zA-Z]{3}-\d{4}[\s]{1}\d{1,2}:\d{1,2}:\d{1,2}")[\s\n\t]{0,},[\s\n\t]{0,}(?P<dt_number>\d+)[\s\n\t]{0,},[\s\n\t]{0,}(?P<dt_units>("days")|("months")|("milliseconds")|("seconds")|("minutes")|("hours")|("weeks")|("quarters")|("years"))[\s\n\t]{0,}\)|DATEADD\([\s\n\t]{0,}(?P<date_ref>\{[\w\s]+\})[\s\n\t]{0,},[\s\n\t]{0,}(?P<ref_number>\d{1,2})[\s\n\t]{0,},[\s\n\t]{0,}(?P<ref_units>("days")|("months")|("milliseconds")|("seconds")|("minutes")|("hours")|("weeks")|("quarters")|("years"))[\s\n\t]{0,}\)"#).unwrap();
     static ref RE_DATEDIF: Regex = Regex::new(r#"DATEDIF\([\s\n\t]{0,}(?P<date>"\d{1,2}-[a-zA-Z]{3}-\d{4}")[\s\n\t]{0,},[\s\n\t]{0,}(?P<number>\d+)[\s\n\t]{0,},[\s\n\t]{0,}(?P<units>("days")|("months")|("milliseconds")|("seconds")|("minutes")|("hours")|("weeks")|("quarters")|("years"))[\s\n\t]{0,}\)|DATEDIF\([\s\n\t]{0,}(?P<datetime>"\d{1,2}-[a-zA-Z]{3}-\d{4}[\s]{1}\d{1,2}:\d{1,2}:\d{1,2}")[\s\n\t]{0,},[\s\n\t]{0,}(?P<dt_number>\d+)[\s\n\t]{0,},[\s\n\t]{0,}(?P<dt_units>("days")|("months")|("milliseconds")|("seconds")|("minutes")|("hours")|("weeks")|("quarters")|("years"))[\s\n\t]{0,}\)|DATEDIF\([\s\n\t]{0,}(?P<date_ref>\{[\w\s]+\})[\s\n\t]{0,},[\s\n\t]{0,}(?<ref_number>\d{1,2})[\s\n\t]{0,},[\s\n\t]{0,}(?P<ref_units>("days")|("months")|("milliseconds")|("seconds")|("minutes")|("hours")|("weeks")|("quarters")|("years"))[\s\n\t]{0,}\)"#).unwrap();
     static ref RE_DATEFMT: Regex = Regex::new(r#"DATEFMT\([\s\n\t]{0,}(?P<date>"\d{1,2}-[a-zA-Z]{3}-\d{4}")[\s\n\t]{0,},[\s\n\t]{0,}(?P<format>"[\{a-zA-Z-/,:_\s\}].+")[\s\n\t]{0,}\)|DATEFMT\([\s\n\t]{0,}(?P<datetime>"\d{1,2}-[a-zA-Z]{3}-\d{4}\s{1}\d{2}:\d{2}:\d{2}")[\s\n\t]{0,},[\s\n\t]{0,}(?P<dt_format>"[\{a-zA-Z-/,:_\s\}].+")[\s\n\t]{0,}\)|DATEFMT\([\s\n\t]{0,}(?P<ref>\{[\w\s]+\})[\s\n\t]{0,},[\s\n\t]{0,}(?P<ref_format>"[\{a-zA-Z-/,:_\s\}].+")[\s\n\t]{0,}\)"#).unwrap();
@@ -1132,8 +1132,8 @@ impl DateFunction for DateFormat {
                         function.validate = Some(false);
                     }
                     attributes_.push(date_string.clone());
-                    attributes_.push(mode);
                     attributes_.push(format_string);
+                    attributes_.push(mode);
                 } else if datetime.is_some() && dt_fmt.is_some() {
                     let date_string = datetime.unwrap().as_str().to_string();
                     let format_string = dt_fmt.unwrap().as_str().to_string();
@@ -1143,14 +1143,14 @@ impl DateFunction for DateFormat {
                     }        
                     mode = String::from("\"datetime\"");
                     attributes_.push(date_string.clone());
-                    attributes_.push(mode);
                     attributes_.push(format_string);
+                    attributes_.push(mode);
                 } else if date_ref.is_some() && ref_fmt.is_some() {
                     let date_string = date_ref.unwrap().as_str().to_string();
                     let format_string = ref_fmt.unwrap().as_str().to_string();
                     attributes_.push(date_string);
-                    attributes_.push(mode);
                     attributes_.push(format_string);
+                    attributes_.push(mode);
                 }
                 function.attributes = Some(attributes_);
             }
@@ -1168,10 +1168,10 @@ impl DateFunction for DateFormat {
         let data_map = &self.data_map.clone().unwrap();
         let date_item = attributes[0].clone();
         let date_value = date_item.get_value(data_map)?;
-        let mode_item = attributes[1].clone();
-        let mode_value = mode_item.get_value(data_map)?;
-        let format_item = attributes[2].clone();
+        let format_item = attributes[1].clone();
         let format_value = format_item.get_value(data_map)?;
+        let mode_item = attributes[2].clone();
+        let mode_value = mode_item.get_value(data_map)?;
         // let date_string = date_item.value.unwrap_or_default();
         // let format = format_item.value.unwrap_or_default();
         // let mode = mode_item.value.unwrap_or_default();
