@@ -7,23 +7,24 @@ use math::round;
 use crate::functions::*;
 
 lazy_static! {
-    static ref RE_CEILING: Regex = Regex::new(r#"CEILING\([\s\n\t]{0,}((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|(?P<number_ref>\{[\w\s]+\}))[\s\n\t]{0,},[\s\n\t]{0,}(?P<significance>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\s\n\t]{0,}\)"#).unwrap();
-    static ref RE_FLOOR: Regex = Regex::new(r#"FLOOR\([\s\n\t]{0,}((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|(?P<number_ref>\{[\w\s]+\}))[\s\n\t]{0,},[\s\n\t]{0,}(?P<significance>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\s\n\t]{0,}\)"#).unwrap();
-    static ref RE_COUNT: Regex = Regex::new(r#"COUNT\([\s\n\t]{0,}(?P<attrs>[\w\W\s\n\t]{0,})[\s\n\t]{0,}\)"#).unwrap();
-    static ref RE_COUNTA: Regex = Regex::new(r#"COUNTA\([\s\n\t]{0,}(?P<attrs>[\w\W\s\n\t]{0,})[\s\n\t]{0,}\)"#).unwrap();
-    static ref RE_COUNTALL: Regex = Regex::new(r#"COUNTALL\([\s\n\t]{0,}(?P<attrs>[\w\W\s\n\t]{0,})[\s\n\t]{0,}\)"#).unwrap();
-    static ref RE_EVEN: Regex = Regex::new(r#"EVEN\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\s\n\t]{0,}\)|EVEN\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\s\n\t]{0,}\)"#).unwrap();
-    static ref RE_EXP: Regex = Regex::new(r#"EXP\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\s\n\t]{0,}\)|EXP\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\s\n\t]{0,}\)"#).unwrap();
-    static ref RE_INT: Regex = Regex::new(r#"INT\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\s\n\t]{0,}\)|INT\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\s\n\t]{0,}\)"#).unwrap();
-    static ref RE_LOG: Regex = Regex::new(r#"LOG\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},{0,}[\n\s\t]{0,}(?P<base>\d+){0,}[\s\n\t]{0,}\)|LOG\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},{0,}[\n\s\t]{0,}(?P<base_ref>\d+){0,}[\s\n\t]{0,}\)"#).unwrap();
-    static ref RE_MOD: Regex = Regex::new(r#"MOD\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<divisor>\d+){0,}[\s\n\t]{0,}\)|MOD\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<divisor_ref>\d+){0,}[\s\n\t]{0,}\)"#).unwrap();
-    static ref RE_POWER: Regex = Regex::new(r#"POWER\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<power>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+){0,}[\s\n\t]{0,}\)|POWER\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<power_ref>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+){0,}[\s\n\t]{0,}\)"#).unwrap();
-    static ref RE_ROUND: Regex = Regex::new(r#"ROUND\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits>\d+){0,}[\s\n\t]{0,}\)|ROUND\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits_ref>\d+){0,}[\s\n\t]{0,}\)"#).unwrap();
-    static ref RE_ROUND_UP: Regex = Regex::new(r#"ROUNDUP\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits>\d+){0,}[\s\n\t]{0,}\)|ROUNDUP\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits_ref>\d+){0,}[\s\n\t]{0,}\)"#).unwrap();
-    static ref RE_ROUND_DOWN: Regex = Regex::new(r#"ROUNDDOWN\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits>\d+){0,}[\s\n\t]{0,}\)|ROUNDDOWN\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits_ref>\d+){0,}[\s\n\t]{0,}\)"#).unwrap();
-    static ref RE_SQRT: Regex = Regex::new(r#"SQRT\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\s\n\t]{0,}\)|SQRT\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\s\n\t]{0,}\)"#).unwrap();
-    static ref RE_VALUE: Regex = Regex::new(r#"VALUE\([\s\n\t]{0,}(?P<text>"[\w\d,.{0,}\$€{0,}]+")[\s\n\t]{0,}\)|VALUE\([\s\n\t]{0,}(?P<text_ref>\{[\w\s]+\})[\s\n\t]{0,}\)"#).unwrap();
-    static ref RE_BOOLEAN: Regex = Regex::new(r#"TRUE\(\)|FALSE\(\)|TRUE|FALSE"#).unwrap();
+    pub static ref RE_NUMBER_ATTRS: Regex = Regex::new(r#"("[\w\s-]+")|(\d+)|(\{[\w\s]+\})|([A-Z]+\(["\w\s-]+\))"#).unwrap();
+    pub static ref RE_CEILING: Regex = Regex::new(r#"CEILING\([\s\n\t]{0,}((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|(?P<number_ref>\{[\w\s]+\}))[\s\n\t]{0,},[\s\n\t]{0,}(?P<significance>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_FLOOR: Regex = Regex::new(r#"FLOOR\([\s\n\t]{0,}((?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|(?P<number_ref>\{[\w\s]+\}))[\s\n\t]{0,},[\s\n\t]{0,}(?P<significance>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_COUNT: Regex = Regex::new(r#"COUNT\([\s\n\t]{0,}(?P<attrs>[\w\W\s\n\t]{0,})[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_COUNTA: Regex = Regex::new(r#"COUNTA\([\s\n\t]{0,}(?P<attrs>[\w\W\s\n\t]{0,})[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_COUNTALL: Regex = Regex::new(r#"COUNTALL\([\s\n\t]{0,}(?P<attrs>[\w\W\s\n\t]{0,})[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_EVEN: Regex = Regex::new(r#"EVEN\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\s\n\t]{0,}\)|EVEN\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_EXP: Regex = Regex::new(r#"EXP\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\s\n\t]{0,}\)|EXP\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_INT: Regex = Regex::new(r#"INT\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\s\n\t]{0,}\)|INT\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_LOG: Regex = Regex::new(r#"LOG\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},{0,}[\n\s\t]{0,}(?P<base>\d+){0,}[\s\n\t]{0,}\)|LOG\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},{0,}[\n\s\t]{0,}(?P<base_ref>\d+){0,}[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_MOD: Regex = Regex::new(r#"MOD\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<divisor>\d+){0,}[\s\n\t]{0,}\)|MOD\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<divisor_ref>\d+){0,}[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_POWER: Regex = Regex::new(r#"POWER\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<power>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+){0,}[\s\n\t]{0,}\)|POWER\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<power_ref>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+){0,}[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_ROUND: Regex = Regex::new(r#"ROUND\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits>\d+){0,}[\s\n\t]{0,}\)|ROUND\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits_ref>\d+){0,}[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_ROUND_UP: Regex = Regex::new(r#"ROUNDUP\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits>\d+){0,}[\s\n\t]{0,}\)|ROUNDUP\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits_ref>\d+){0,}[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_ROUND_DOWN: Regex = Regex::new(r#"ROUNDDOWN\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits>\d+){0,}[\s\n\t]{0,}\)|ROUNDDOWN\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits_ref>\d+){0,}[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_SQRT: Regex = Regex::new(r#"SQRT\([\s\n\t]{0,}(?P<number>[+-]?[0-9]+\.?[0-9]*|\.[0-9]+)[\s\n\t]{0,}\)|SQRT\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_VALUE: Regex = Regex::new(r#"VALUE\([\s\n\t]{0,}(?P<text>"[\w\d,.{0,}\$€{0,}]+")[\s\n\t]{0,}\)|VALUE\([\s\n\t]{0,}(?P<text_ref>\{[\w\s]+\})[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_BOOLEAN: Regex = Regex::new(r#"TRUE\(\)|FALSE\(\)|TRUE|FALSE"#).unwrap();
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -112,25 +113,30 @@ impl NumberFunction for Ceiling {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
         let attribute_item = attributes[0].clone();
-        let reference_value_wrap = attribute_item.reference_value;
-        let significance_string = attributes[1].clone().value.unwrap_or_default();
+        let number_string = attribute_item.get_value(data_map)?;
+        let number_str = number_string.as_str();
+        let mut number: f64 = FromStr::from_str(number_str).unwrap();
+        // let reference_value_wrap = attribute_item.reference_value;
+        // let significance_string = attributes[1].clone().value.unwrap_or_default();
+        let significance_item = attributes[1].clone();
+        let significance_string = significance_item.get_value(data_map)?;
         let mut significance: i8 = FromStr::from_str(&significance_string.as_str()).unwrap();
         significance = significance - 1;
-        let is_reference = attribute_item.is_reference;
-        let number: f64;
-        if is_reference {
-            let reference_value = reference_value_wrap.unwrap();
-            let function_attr = FunctionAttribute::defaults(
-                &reference_value, Some(true), Some(true)
-            );
-            let replaced_string = function_attr.replace(data_map).item_processed.unwrap();
-            number = FromStr::from_str(replaced_string.as_str()).unwrap();
-        } else {
-            let number_str = attribute_item.value.unwrap_or_default().clone();
-            let number_str = number_str.as_str();
-            number = FromStr::from_str(number_str).unwrap();
-        }
-        let number = round::ceil(number, significance);
+        // let is_reference = attribute_item.is_reference;
+        // let number: f64;
+        // if is_reference {
+        //     let reference_value = reference_value_wrap.unwrap();
+        //     let function_attr = FunctionAttribute::defaults(
+        //         &reference_value, Some(true), Some(true)
+        //     );
+        //     let replaced_string = function_attr.replace(data_map).item_processed.unwrap();
+        //     number = FromStr::from_str(replaced_string.as_str()).unwrap();
+        // } else {
+        //     let number_str = attribute_item.value.unwrap_or_default().clone();
+        //     let number_str = number_str.as_str();
+        //     number = FromStr::from_str(number_str).unwrap();
+        // }
+        number = round::ceil(number, significance);
         let result = number.to_string();
         return Ok(result)
     }
@@ -201,25 +207,30 @@ impl NumberFunction for Floor {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
         let attribute_item = attributes[0].clone();
-        let reference_value_wrap = attribute_item.reference_value;
-        let significance_string = attributes[1].clone().value.unwrap_or_default();
+        let number_string = attribute_item.get_value(data_map)?;
+        let number_str = number_string.as_str();
+        let mut number: f64 = FromStr::from_str(number_str).unwrap();
+        // let reference_value_wrap = attribute_item.reference_value;
+        let significance_item = attributes[1].clone();
+        // let significance_string = attributes[1].clone().value.unwrap_or_default();
+        let significance_string = significance_item.get_value(data_map)?;
         let mut significance: i8 = FromStr::from_str(&significance_string.as_str()).unwrap();
         significance = significance - 1;
-        let is_reference = attribute_item.is_reference;
-        let number: f64;
-        if is_reference {
-            let reference_value = reference_value_wrap.unwrap();
-            let function_attr = FunctionAttribute::defaults(
-                &reference_value, Some(true), Some(true)
-            );
-            let replaced_string = function_attr.replace(data_map).item_processed.unwrap();
-            number = FromStr::from_str(replaced_string.as_str()).unwrap();
-        } else {
-            let number_str = attribute_item.value.unwrap_or_default().clone();
-            let number_str = number_str.as_str();
-            number = FromStr::from_str(number_str).unwrap();
-        }
-        let number = round::floor(number, significance);
+        // let is_reference = attribute_item.is_reference;
+        // let number: f64;
+        // if is_reference {
+        //     let reference_value = reference_value_wrap.unwrap();
+        //     let function_attr = FunctionAttribute::defaults(
+        //         &reference_value, Some(true), Some(true)
+        //     );
+        //     let replaced_string = function_attr.replace(data_map).item_processed.unwrap();
+        //     number = FromStr::from_str(replaced_string.as_str()).unwrap();
+        // } else {
+        //     let number_str = attribute_item.value.unwrap_or_default().clone();
+        //     let number_str = number_str.as_str();
+        //     number = FromStr::from_str(number_str).unwrap();
+        // }
+        number = round::floor(number, significance);
         return Ok(number.to_string())
     }
 }
@@ -241,9 +252,11 @@ impl Count {
 impl NumberFunction for Count {
     fn handle(&mut self) -> Result<FunctionParse, PlanetError> {
         // COUNT(value1, value2, ...))
+        // I need to pass to execute a list of attributes!!! not a single attribute
         let function_parse = &self.function.clone().unwrap();
         let data_map = self.data_map.clone();
         let expr = &RE_COUNT;
+        let expr_attrs = &RE_NUMBER_ATTRS;
         let mut function = function_parse.clone();
         let data_map_wrap = data_map.clone();
         let (
@@ -256,14 +269,22 @@ impl NumberFunction for Count {
         if function_text_wrap.is_some() {
             function.validate = Some(expr.is_match(function_text.as_str()));
             if function.validate.unwrap() {
-                let matches = &expr.captures(function_text.as_str()).unwrap();
-                let attrs = matches.name("attrs");
-                if attrs.is_some() {
-                    let attrs = attrs.unwrap().as_str().to_string();
-                    let mut attributes_: Vec<String> = Vec::new();
-                    attributes_.push(attrs);
-                    function.attributes = Some(attributes_);
+                let mut attributes_: Vec<String> = Vec::new();
+                let matches_iter = expr_attrs.captures_iter(function_text.as_str());
+                for match_ in matches_iter {
+                    let match_str = match_.get(0).unwrap().as_str();
+                    let match_string = match_str.to_string();
+                    attributes_.push(match_string);
                 }
+                // let matches = &expr.captures(function_text.as_str()).unwrap();
+                // let attrs = matches.name("attrs");
+                // if attrs.is_some() {
+                //     let attrs = attrs.unwrap().as_str().to_string();
+                //     let mut attributes_: Vec<String> = Vec::new();
+                //     attributes_.push(attrs);
+                //     function.attributes = Some(attributes_);
+                // }
+                function.attributes = Some(attributes_);
             }
         }
         if data_map_wrap.is_some() {
@@ -277,36 +298,40 @@ impl NumberFunction for Count {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
-        let attribute_item = attributes[0].clone();
-        let attrs = attribute_item.value.unwrap_or_default();
-        let items: Vec<&str> = attrs.split(",").collect();
-        let mut number_items: Vec<String> = Vec::new();
-        for mut item in items {
-            item = item.trim();
-            let is_string = item.to_string().find("\"");
-            let is_ref = item.to_string().find("{");
-            if is_ref.is_some() {
-                let item_ = &item.trim().to_string();
-                let function_attr = FunctionAttribute::defaults(
-                    item_, 
-                    Some(true),
-                    Some(true)
-                );
-                let result = function_attr.replace(data_map);
-                let result = result.item_processed.clone();
-                let result = result.unwrap();
-                let result = result.as_str();
-                let is_string = result.to_string().find("\"");
-                if is_string.is_none() {
-                    number_items.push(result.to_string());
-                }
-            } else {
-                if is_string.is_none() {
-                    number_items.push(item.to_string());
-                }
-            }
+        // let attribute_item = attributes[0].clone();
+        // let attrs = attribute_item.get_value(data_map)?;
+        // let attrs = attribute_item.value.unwrap_or_default();
+        let mut items: Vec<String> = Vec::new();
+        for attribute in attributes {
+            let attribute_value = attribute.get_value(data_map)?;
+            items.push(attribute_value);
         }
-        let count = number_items.len();
+        // for mut item in items {
+        //     item = item.trim();
+        //     let is_string = item.to_string().find("\"");
+        //     let is_ref = item.to_string().find("{");
+        //     if is_ref.is_some() {
+        //         let item_ = &item.trim().to_string();
+        //         let function_attr = FunctionAttribute::defaults(
+        //             item_, 
+        //             Some(true),
+        //             Some(true)
+        //         );
+        //         let result = function_attr.replace(data_map);
+        //         let result = result.item_processed.clone();
+        //         let result = result.unwrap();
+        //         let result = result.as_str();
+        //         let is_string = result.to_string().find("\"");
+        //         if is_string.is_none() {
+        //             number_items.push(result.to_string());
+        //         }
+        //     } else {
+        //         if is_string.is_none() {
+        //             number_items.push(item.to_string());
+        //         }
+        //     }
+        // }
+        let count = items.len();
         return Ok(count.to_string())
     }
 }
@@ -331,11 +356,12 @@ impl NumberFunction for CountA {
         let function_parse = &self.function.clone().unwrap();
         let data_map = self.data_map.clone();
         let expr = &RE_COUNTA;
+        let expr_attrs = &RE_NUMBER_ATTRS;
         let mut function = function_parse.clone();
         let data_map_wrap = data_map.clone();
         let (
-            function_text_wrap, 
-            function_text, 
+            function_text_wrap,
+            function_text,
             compiled_attributes,
             mut function_result,
             data_map,
@@ -343,14 +369,22 @@ impl NumberFunction for CountA {
         if function_text_wrap.is_some() {
             function.validate = Some(expr.is_match(function_text.as_str()));
             if function.validate.unwrap() {
-                let matches = &expr.captures(function_text.as_str()).unwrap();
-                let attrs = matches.name("attrs");
-                if attrs.is_some() {
-                    let attrs = attrs.unwrap().as_str().to_string();
-                    let mut attributes_: Vec<String> = Vec::new();
-                    attributes_.push(attrs);
-                    function.attributes = Some(attributes_);
+                let mut attributes_: Vec<String> = Vec::new();
+                let matches_iter = expr_attrs.captures_iter(function_text.as_str());
+                for match_ in matches_iter {
+                    let match_str = match_.get(0).unwrap().as_str();
+                    let match_string = match_str.to_string();
+                    attributes_.push(match_string);
                 }
+                // let matches = &expr.captures(function_text.as_str()).unwrap();
+                // let attrs = matches.name("attrs");
+                // if attrs.is_some() {
+                //     let attrs = attrs.unwrap().as_str().to_string();
+                //     let mut attributes_: Vec<String> = Vec::new();
+                //     attributes_.push(attrs);
+                //     function.attributes = Some(attributes_);
+                // }
+                function.attributes = Some(attributes_);
             }
         }
         if data_map_wrap.is_some() {
@@ -364,49 +398,61 @@ impl NumberFunction for CountA {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
-        let attribute_item = attributes[0].clone();
-        let attrs = attribute_item.value.unwrap_or_default();
-        let items: Vec<&str> = attrs.split(",").collect();
-        let mut number_items: Vec<String> = Vec::new();
-        for mut item in items {
-            item = item.trim();
-            let is_string = item.to_string().find("\"");
-            let is_null = item.to_lowercase() == "null";
-            let is_ref = item.to_string().find("{");
-            if is_ref.is_some() {
-                let item_ = &item.trim().to_string();
-                let function_attr = FunctionAttribute::defaults(
-                    item_, 
-                    Some(true),
-                    Some(true)
-                );
-                let result = function_attr.replace(data_map);
-                let result = result.item_processed.clone();
-                let result = result.unwrap();
-                let result = result.as_str();
-                let is_string = result.to_string().find("\"");
-                if is_string.is_some() {
-                    if item != "\"\"" {
-                        number_items.push(result.to_string());
-                    }
-                } else {
-                    if is_null == false {
-                        number_items.push(item.to_string());
-                    }
-                }
-            } else {
-                if is_string.is_some() {
-                    if item != "\"\"" {
-                        number_items.push(item.to_string());
-                    }
-                } else {
-                    if is_null == false {
-                        number_items.push(item.to_string());
-                    }
+        let mut items: Vec<String> = Vec::new();
+        for attribute in attributes {
+            let attribute_value = attribute.get_value(data_map)?;
+            let attr_type = attribute.attr_type;
+            match attr_type {
+                AttributeType::Text => {
+                    items.push(attribute_value)
+                },
+                _ => {
                 }
             }
         }
-        let count = number_items.len();
+        // let attribute_item = attributes[0].clone();
+        // let attrs = attribute_item.value.unwrap_or_default();
+        // let items: Vec<&str> = attrs.split(",").collect();
+        // let mut number_items: Vec<String> = Vec::new();
+        // for mut item in items {
+        //     item = item.trim();
+        //     let is_string = item.to_string().find("\"");
+        //     let is_null = item.to_lowercase() == "null";
+        //     let is_ref = item.to_string().find("{");
+        //     if is_ref.is_some() {
+        //         let item_ = &item.trim().to_string();
+        //         let function_attr = FunctionAttribute::defaults(
+        //             item_, 
+        //             Some(true),
+        //             Some(true)
+        //         );
+        //         let result = function_attr.replace(data_map);
+        //         let result = result.item_processed.clone();
+        //         let result = result.unwrap();
+        //         let result = result.as_str();
+        //         let is_string = result.to_string().find("\"");
+        //         if is_string.is_some() {
+        //             if item != "\"\"" {
+        //                 number_items.push(result.to_string());
+        //             }
+        //         } else {
+        //             if is_null == false {
+        //                 number_items.push(item.to_string());
+        //             }
+        //         }
+        //     } else {
+        //         if is_string.is_some() {
+        //             if item != "\"\"" {
+        //                 number_items.push(item.to_string());
+        //             }
+        //         } else {
+        //             if is_null == false {
+        //                 number_items.push(item.to_string());
+        //             }
+        //         }
+        //     }
+        // }
+        let count = items.len();
         return Ok(count.to_string())
     }
 }
@@ -427,10 +473,11 @@ impl CountAll {
 }
 impl NumberFunction for CountAll {
     fn handle(&mut self) -> Result<FunctionParse, PlanetError> {
-        // COUNT(value1, value2, ...))
+        // COUNTALL(value1, value2, ...))
         let function_parse = &self.function.clone().unwrap();
         let data_map = self.data_map.clone();
         let expr = &RE_COUNTALL;
+        let expr_attrs = &RE_NUMBER_ATTRS;
         let mut function = function_parse.clone();
         let data_map_wrap = data_map.clone();
         let (
@@ -443,14 +490,22 @@ impl NumberFunction for CountAll {
         if function_text_wrap.is_some() {
             function.validate = Some(expr.is_match(function_text.as_str()));
             if function.validate.unwrap() {
-                let matches = &expr.captures(function_text.as_str()).unwrap();
-                let attrs = matches.name("attrs");
-                if attrs.is_some() {
-                    let attrs = attrs.unwrap().as_str().to_string();
-                    let mut attributes_: Vec<String> = Vec::new();
-                    attributes_.push(attrs);
-                    function.attributes = Some(attributes_);
+                let mut attributes_: Vec<String> = Vec::new();
+                let matches_iter = expr_attrs.captures_iter(function_text.as_str());
+                for match_ in matches_iter {
+                    let match_str = match_.get(0).unwrap().as_str();
+                    let match_string = match_str.to_string();
+                    attributes_.push(match_string);
                 }
+                // let matches = &expr.captures(function_text.as_str()).unwrap();
+                // let attrs = matches.name("attrs");
+                // if attrs.is_some() {
+                //     let attrs = attrs.unwrap().as_str().to_string();
+                //     let mut attributes_: Vec<String> = Vec::new();
+                //     attributes_.push(attrs);
+                //     function.attributes = Some(attributes_);
+                // }
+                function.attributes = Some(attributes_);
             }
         }
         if data_map_wrap.is_some() {
@@ -463,16 +518,7 @@ impl NumberFunction for CountAll {
     }
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
-        // let data_map = &self.data_map.clone().unwrap();
-        let attribute_item = attributes[0].clone();
-        let attrs = attribute_item.value.unwrap_or_default();
-        let items: Vec<&str> = attrs.split(",").collect();
-        let mut number_items: Vec<String> = Vec::new();
-        for mut item in items {
-            item = item.trim();
-            number_items.push(item.to_string());
-        }
-        let count = number_items.len();
+        let count = attributes.len();
         return Ok(count.to_string())
     }
 }
@@ -540,23 +586,26 @@ impl NumberFunction for Even {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
         let attribute_item = attributes[0].clone();
-        let is_reference = attribute_item.is_reference;
-        let number: f64;
+        let attribute_value = attribute_item.get_value(data_map)?;
+        let number: f64 = FromStr::from_str(attribute_value.as_str()).unwrap();
         let mut rounded_int: i32;
-        if is_reference {
-            let number_ref = attribute_item.reference_value.unwrap_or_default();
-            let function_attr = FunctionAttribute::defaults(
-                &number_ref, 
-                Some(true),
-                Some(true)
-            );
-            let result = function_attr.replace(data_map);
-            let result = result.item_processed.clone();
-            number = FromStr::from_str(result.unwrap().as_str()).unwrap();
-        } else {
-            let number_string = attribute_item.value.unwrap_or_default();
-            number = FromStr::from_str(number_string.as_str()).unwrap();
-        }
+        // let is_reference = attribute_item.is_reference;
+        // let number: f64;
+        // let mut rounded_int: i32;
+        // if is_reference {
+        //     let number_ref = attribute_item.reference_value.unwrap_or_default();
+        //     let function_attr = FunctionAttribute::defaults(
+        //         &number_ref, 
+        //         Some(true),
+        //         Some(true)
+        //     );
+        //     let result = function_attr.replace(data_map);
+        //     let result = result.item_processed.clone();
+        //     number = FromStr::from_str(result.unwrap().as_str()).unwrap();
+        // } else {
+        //     let number_string = attribute_item.value.unwrap_or_default();
+        //     number = FromStr::from_str(number_string.as_str()).unwrap();
+        // }
         let rounded = number.round();
         rounded_int = FromStr::from_str(rounded.to_string().as_str()).unwrap();
         let is_even = rounded_int%2 == 0;
@@ -629,23 +678,26 @@ impl NumberFunction for Exp {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
         let attribute_item = attributes[0].clone();
-        let is_reference = attribute_item.is_reference;
-        let number: f64;
+        let attribute_value = attribute_item.get_value(data_map)?;
+        let number: f64 = FromStr::from_str(attribute_value.as_str()).unwrap();
         let number_result: f64;
-        if is_reference {
-            let number_ref = attribute_item.reference_value.unwrap_or_default();
-            let function_attr = FunctionAttribute::defaults(
-                &number_ref, 
-                Some(true),
-                Some(true)
-            );
-            let result = function_attr.replace(data_map);
-            let result_string = result.item_processed.clone().unwrap_or_default();
-            number = FromStr::from_str(result_string.as_str()).unwrap();
-        } else {
-            let number_string = attribute_item.value.unwrap_or_default();
-            number = FromStr::from_str(number_string.as_str()).unwrap();
-        }
+        // let is_reference = attribute_item.is_reference;
+        // let number: f64;
+        // let number_result: f64;
+        // if is_reference {
+        //     let number_ref = attribute_item.reference_value.unwrap_or_default();
+        //     let function_attr = FunctionAttribute::defaults(
+        //         &number_ref, 
+        //         Some(true),
+        //         Some(true)
+        //     );
+        //     let result = function_attr.replace(data_map);
+        //     let result_string = result.item_processed.clone().unwrap_or_default();
+        //     number = FromStr::from_str(result_string.as_str()).unwrap();
+        // } else {
+        //     let number_string = attribute_item.value.unwrap_or_default();
+        //     number = FromStr::from_str(number_string.as_str()).unwrap();
+        // }
         number_result = number.exp();
         return Ok(number_result.to_string())
     }
@@ -710,22 +762,24 @@ impl NumberFunction for Int {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
         let attribute_item = attributes[0].clone();
-        let is_reference = attribute_item.is_reference;
-        let mut number: f64;
-        if is_reference {
-            let number_ref = attribute_item.reference_value.unwrap_or_default();
-            let function_attr = FunctionAttribute::defaults(
-                &number_ref, 
-                Some(true),
-                Some(true)
-            );
-            let result = function_attr.replace(data_map);
-            let result_string = result.item_processed.clone().unwrap_or_default();
-            number = FromStr::from_str(result_string.as_str()).unwrap();
-        } else {
-            let number_string = attribute_item.value.unwrap_or_default();
-            number = FromStr::from_str(number_string.as_str()).unwrap();
-        }
+        let attribute_value = attribute_item.get_value(data_map)?;
+        let mut number: f64 = FromStr::from_str(attribute_value.as_str()).unwrap();
+        // let is_reference = attribute_item.is_reference;
+        // let mut number: f64;
+        // if is_reference {
+        //     let number_ref = attribute_item.reference_value.unwrap_or_default();
+        //     let function_attr = FunctionAttribute::defaults(
+        //         &number_ref, 
+        //         Some(true),
+        //         Some(true)
+        //     );
+        //     let result = function_attr.replace(data_map);
+        //     let result_string = result.item_processed.clone().unwrap_or_default();
+        //     number = FromStr::from_str(result_string.as_str()).unwrap();
+        // } else {
+        //     let number_string = attribute_item.value.unwrap_or_default();
+        //     number = FromStr::from_str(number_string.as_str()).unwrap();
+        // }
         number = number.trunc();
         let number_str = number.to_string();
         let number_str = number_str.as_str();
@@ -808,41 +862,48 @@ impl NumberFunction for Log {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
         let attribute_item = attributes[0].clone();
-        let base_item = attributes[1].clone();
-        let is_reference = attribute_item.is_reference;
-        let is_base_reference = base_item.is_reference;
-        let mut number: f64;
+        let attribute_value = attribute_item.get_value(data_map)?;
+        let mut number: f64 = FromStr::from_str(attribute_value.as_str()).unwrap();
         let mut base: f64 = 10.0;
-        if is_reference {
-            let number_ref = attribute_item.reference_value.unwrap();
-            let function_attr = FunctionAttribute::defaults(
-                &number_ref, 
-                Some(true),
-                Some(true)
-            );
-            let result = function_attr.replace(data_map);
-            let result = result.item_processed.clone();
-            number = FromStr::from_str(result.unwrap().as_str()).unwrap();
-        } else {
-            let number_string = attribute_item.value.unwrap_or_default();
-            number = FromStr::from_str(number_string.as_str()).unwrap();
+        if attributes.len() == 2 {
+            let base_item = attributes[1].clone();
+            let base_value = base_item.get_value(data_map)?;
+            base = FromStr::from_str(base_value.as_str()).unwrap();
         }
-        if is_base_reference {
-            let base_ref = base_item.reference_value.unwrap();
-            let function_attr = FunctionAttribute::defaults(
-                &base_ref, 
-                Some(true),
-                Some(true)
-            );
-            let result = function_attr.replace(data_map);
-            let result = result.item_processed.clone();
-            base = FromStr::from_str(result.unwrap().as_str()).unwrap();
-        } else {
-            if base_item.value.is_some() {
-                let base_string = base_item.value.unwrap();
-                base = FromStr::from_str(base_string.as_str()).unwrap();
-            }
-        }
+        // let is_reference = attribute_item.is_reference;
+        // let is_base_reference = base_item.is_reference;
+        // let mut number: f64;
+        // let mut base: f64 = 10.0;
+        // if is_reference {
+        //     let number_ref = attribute_item.reference_value.unwrap();
+        //     let function_attr = FunctionAttribute::defaults(
+        //         &number_ref, 
+        //         Some(true),
+        //         Some(true)
+        //     );
+        //     let result = function_attr.replace(data_map);
+        //     let result = result.item_processed.clone();
+        //     number = FromStr::from_str(result.unwrap().as_str()).unwrap();
+        // } else {
+        //     let number_string = attribute_item.value.unwrap_or_default();
+        //     number = FromStr::from_str(number_string.as_str()).unwrap();
+        // }
+        // if is_base_reference {
+        //     let base_ref = base_item.reference_value.unwrap();
+        //     let function_attr = FunctionAttribute::defaults(
+        //         &base_ref, 
+        //         Some(true),
+        //         Some(true)
+        //     );
+        //     let result = function_attr.replace(data_map);
+        //     let result = result.item_processed.clone();
+        //     base = FromStr::from_str(result.unwrap().as_str()).unwrap();
+        // } else {
+        //     if base_item.value.is_some() {
+        //         let base_string = base_item.value.unwrap();
+        //         base = FromStr::from_str(base_string.as_str()).unwrap();
+        //     }
+        // }
         number = number.log(base);
         let number_str = number.to_string();
         let number_str = number_str.as_str();
@@ -919,41 +980,48 @@ impl NumberFunction for Mod {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
         let attribute_item = attributes[0].clone();
-        let divisor_item = attributes[1].clone();
-        let is_reference = attribute_item.is_reference;
-        let is_divisor_reference = divisor_item.is_reference;
-        let mut number: f64;
+        let attribute_value = attribute_item.get_value(data_map)?;
+        let mut number: f64 = FromStr::from_str(attribute_value.as_str()).unwrap();
         let mut divisor: f64 = 10.0;
-        if is_reference {
-            let number_ref = attribute_item.reference_value.unwrap_or_default();
-            let function_attr = FunctionAttribute::defaults(
-                &number_ref, 
-                Some(true),
-                Some(true)
-            );
-            let result = function_attr.replace(data_map);
-            let result = result.item_processed.clone();
-            number = FromStr::from_str(result.unwrap().as_str()).unwrap();
-        } else {
-            let number_string = attribute_item.value.unwrap_or_default();
-            number = FromStr::from_str(number_string.as_str()).unwrap();
+        if attributes.len() == 2 {
+            let divisor_item = attributes[1].clone();
+            let divisor_value = divisor_item.get_value(data_map)?;
+            divisor = FromStr::from_str(divisor_value.as_str()).unwrap();
         }
-        if is_divisor_reference {
-            let divisor_ref = divisor_item.reference_value.unwrap_or_default();
-            let function_attr = FunctionAttribute::defaults(
-                &divisor_ref, 
-                Some(true),
-                Some(true)
-            );
-            let result = function_attr.replace(data_map);
-            let result = result.item_processed.clone();
-            divisor = FromStr::from_str(result.unwrap().as_str()).unwrap();
-        } else {
-            if divisor_item.reference_value.is_some() {
-                let divisor_string = divisor_item.reference_value.unwrap();
-                divisor = FromStr::from_str(divisor_string.as_str()).unwrap();
-            }
-        }
+        // let is_reference = attribute_item.is_reference;
+        // let is_divisor_reference = divisor_item.is_reference;
+        // let mut number: f64;
+        // let mut divisor: f64 = 10.0;
+        // if is_reference {
+        //     let number_ref = attribute_item.reference_value.unwrap_or_default();
+        //     let function_attr = FunctionAttribute::defaults(
+        //         &number_ref, 
+        //         Some(true),
+        //         Some(true)
+        //     );
+        //     let result = function_attr.replace(data_map);
+        //     let result = result.item_processed.clone();
+        //     number = FromStr::from_str(result.unwrap().as_str()).unwrap();
+        // } else {
+        //     let number_string = attribute_item.value.unwrap_or_default();
+        //     number = FromStr::from_str(number_string.as_str()).unwrap();
+        // }
+        // if is_divisor_reference {
+        //     let divisor_ref = divisor_item.reference_value.unwrap_or_default();
+        //     let function_attr = FunctionAttribute::defaults(
+        //         &divisor_ref, 
+        //         Some(true),
+        //         Some(true)
+        //     );
+        //     let result = function_attr.replace(data_map);
+        //     let result = result.item_processed.clone();
+        //     divisor = FromStr::from_str(result.unwrap().as_str()).unwrap();
+        // } else {
+        //     if divisor_item.reference_value.is_some() {
+        //         let divisor_string = divisor_item.reference_value.unwrap();
+        //         divisor = FromStr::from_str(divisor_string.as_str()).unwrap();
+        //     }
+        // }
         number = number%divisor;
         let number_str = number.to_string();
         let number_str = number_str.as_str();
@@ -1030,41 +1098,46 @@ impl NumberFunction for Power {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
         let attribute_item = attributes[0].clone();
-        let is_reference = attribute_item.is_reference;
-        let power_item = attributes[1].clone();
-        let is_power_reference = power_item.is_reference;
-        let mut number: f64;
+        let attribute_value = attribute_item.get_value(data_map)?;
+        // let is_reference = attribute_item.is_reference;
+        // let is_power_reference = power_item.is_reference;
+        let mut number: f64 = FromStr::from_str(attribute_value.as_str()).unwrap();
         let mut power: f64 = 10.0;
-        if is_reference {
-            let number_ref = attribute_item.reference_value.unwrap();
-            let function_attr = FunctionAttribute::defaults(
-                &number_ref, 
-                Some(true),
-                Some(true)
-            );
-            let result = function_attr.replace(data_map);
-            let result = result.item_processed.clone();
-            number = FromStr::from_str(result.unwrap().as_str()).unwrap();
-        } else {
-            let number_string = attribute_item.value.unwrap_or_default();
-            number = FromStr::from_str(number_string.as_str()).unwrap();
+        if attributes.len() == 2 {
+            let power_item = attributes[1].clone();
+            let power_value = power_item.get_value(data_map)?;
+            power = FromStr::from_str(power_value.as_str()).unwrap();
         }
-        if is_power_reference {
-            let power_ref = power_item.reference_value.unwrap();
-            let function_attr = FunctionAttribute::defaults(
-                &power_ref, 
-                Some(true),
-                Some(true)
-            );
-            let result = function_attr.replace(data_map);
-            let result = result.item_processed.clone();
-            power = FromStr::from_str(result.unwrap().as_str()).unwrap();
-        } else {
-            if power_item.value.is_some() {
-                let power_string = power_item.value.unwrap();
-                power = FromStr::from_str(power_string.as_str()).unwrap();
-            }
-        }
+        // if is_reference {
+        //     let number_ref = attribute_item.reference_value.unwrap();
+        //     let function_attr = FunctionAttribute::defaults(
+        //         &number_ref, 
+        //         Some(true),
+        //         Some(true)
+        //     );
+        //     let result = function_attr.replace(data_map);
+        //     let result = result.item_processed.clone();
+        //     number = FromStr::from_str(result.unwrap().as_str()).unwrap();
+        // } else {
+        //     let number_string = attribute_item.value.unwrap_or_default();
+        //     number = FromStr::from_str(number_string.as_str()).unwrap();
+        // }
+        // if is_power_reference {
+        //     let power_ref = power_item.reference_value.unwrap();
+        //     let function_attr = FunctionAttribute::defaults(
+        //         &power_ref, 
+        //         Some(true),
+        //         Some(true)
+        //     );
+        //     let result = function_attr.replace(data_map);
+        //     let result = result.item_processed.clone();
+        //     power = FromStr::from_str(result.unwrap().as_str()).unwrap();
+        // } else {
+        //     if power_item.value.is_some() {
+        //         let power_string = power_item.value.unwrap();
+        //         power = FromStr::from_str(power_string.as_str()).unwrap();
+        //     }
+        // }
         number = number.powf(power);
         let number_str = number.to_string();
         let number_str = number_str.as_str();
@@ -1164,41 +1237,46 @@ impl RoundNumberFunction for Round {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
         let attribute_item = attributes[0].clone();
-        let is_reference = attribute_item.is_reference;
-        let digits_item = attributes[1].clone();
-        let is_digits_reference = digits_item.is_reference;
-        let mut number: f64;
+        let attribute_value = attribute_item.get_value(data_map)?;
+        // let is_reference = attribute_item.is_reference;
+        // let is_digits_reference = digits_item.is_reference;
+        let mut number: f64 = FromStr::from_str(attribute_value.as_str()).unwrap();
         let mut digits: i8 = 2;
-        if is_reference {
-            let number_ref = attribute_item.reference_value.unwrap();
-            let function_attr = FunctionAttribute::defaults(
-                &number_ref, 
-                Some(true),
-                Some(true)
-            );
-            let result = function_attr.replace(data_map);
-            let result = result.item_processed.clone();
-            number = FromStr::from_str(result.unwrap().as_str()).unwrap();
-        } else {
-            let number_string = attribute_item.value.unwrap();
-            number = FromStr::from_str(number_string.as_str()).unwrap();
+        if attributes.len() == 2 {
+            let digits_item = attributes[1].clone();
+            let digits_value = digits_item.get_value(data_map)?;
+            digits = FromStr::from_str(digits_value.as_str()).unwrap();
         }
-        if is_digits_reference {
-            let number_ref = digits_item.reference_value.unwrap();
-            let function_attr = FunctionAttribute::defaults(
-                &number_ref, 
-                Some(true),
-                Some(true)
-            );
-            let result = function_attr.replace(data_map);
-            let result = result.item_processed.clone();
-            digits = FromStr::from_str(result.unwrap().as_str()).unwrap();
-        } else {
-            if digits_item.value.is_some() {
-                let digits_string = digits_item.value.unwrap();
-                digits = FromStr::from_str(digits_string.as_str()).unwrap();
-            }
-        }
+        // if is_reference {
+        //     let number_ref = attribute_item.reference_value.unwrap();
+        //     let function_attr = FunctionAttribute::defaults(
+        //         &number_ref, 
+        //         Some(true),
+        //         Some(true)
+        //     );
+        //     let result = function_attr.replace(data_map);
+        //     let result = result.item_processed.clone();
+        //     number = FromStr::from_str(result.unwrap().as_str()).unwrap();
+        // } else {
+        //     let number_string = attribute_item.value.unwrap();
+        //     number = FromStr::from_str(number_string.as_str()).unwrap();
+        // }
+        // if is_digits_reference {
+        //     let number_ref = digits_item.reference_value.unwrap();
+        //     let function_attr = FunctionAttribute::defaults(
+        //         &number_ref, 
+        //         Some(true),
+        //         Some(true)
+        //     );
+        //     let result = function_attr.replace(data_map);
+        //     let result = result.item_processed.clone();
+        //     digits = FromStr::from_str(result.unwrap().as_str()).unwrap();
+        // } else {
+        //     if digits_item.value.is_some() {
+        //         let digits_string = digits_item.value.unwrap();
+        //         digits = FromStr::from_str(digits_string.as_str()).unwrap();
+        //     }
+        // }
         match option {
             RoundOption::Basic => {
                 number = round::half_away_from_zero(number, digits);
@@ -1275,22 +1353,24 @@ impl NumberFunction for Sqrt {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
         let attribute_item = attributes[0].clone();
-        let is_reference = attribute_item.is_reference;
-        let mut number: f64;
-        if is_reference {
-            let number_ref = attribute_item.reference_value.unwrap();
-            let function_attr = FunctionAttribute::defaults(
-                &number_ref, 
-                Some(true),
-                Some(true)
-            );
-            let result = function_attr.replace(data_map);
-            let result = result.item_processed.clone();
-            number = FromStr::from_str(result.unwrap().as_str()).unwrap();
-        } else {
-            let number_string = attribute_item.value.unwrap();
-            number = FromStr::from_str(number_string.as_str()).unwrap();
-        }
+        let attribute_value = attribute_item.get_value(data_map)?;
+        let mut number: f64 = FromStr::from_str(attribute_value.as_str()).unwrap();
+        // let is_reference = attribute_item.is_reference;
+        // let mut number: f64;
+        // if is_reference {
+        //     let number_ref = attribute_item.reference_value.unwrap();
+        //     let function_attr = FunctionAttribute::defaults(
+        //         &number_ref, 
+        //         Some(true),
+        //         Some(true)
+        //     );
+        //     let result = function_attr.replace(data_map);
+        //     let result = result.item_processed.clone();
+        //     number = FromStr::from_str(result.unwrap().as_str()).unwrap();
+        // } else {
+        //     let number_string = attribute_item.value.unwrap();
+        //     number = FromStr::from_str(number_string.as_str()).unwrap();
+        // }
         number = number.sqrt();
         let number_str = number.to_string();
         let number_str = number_str.as_str();
@@ -1357,21 +1437,22 @@ impl NumberFunction for Value {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
         let attribute_item = attributes[0].clone();
-        let is_reference = attribute_item.is_reference;
-        let mut text: String;
-        if is_reference {
-            let text_ref = attribute_item.reference_value.unwrap();
-            let function_attr = FunctionAttribute::defaults(
-                &text_ref, 
-                Some(true),
-                Some(true)
-            );
-            let result = function_attr.replace(data_map);
-            let result = result.item_processed.clone();
-            text = result.unwrap().as_str().to_string();
-        } else {
-            text = attribute_item.value.unwrap();
-        }
+        let mut text = attribute_item.get_value(data_map)?;
+        // let is_reference = attribute_item.is_reference;
+        // let mut text: String;
+        // if is_reference {
+        //     let text_ref = attribute_item.reference_value.unwrap();
+        //     let function_attr = FunctionAttribute::defaults(
+        //         &text_ref, 
+        //         Some(true),
+        //         Some(true)
+        //     );
+        //     let result = function_attr.replace(data_map);
+        //     let result = result.item_processed.clone();
+        //     text = result.unwrap().as_str().to_string();
+        // } else {
+        //     text = attribute_item.value.unwrap();
+        // }
         let number: f64;
         text = text.replace("$", "").replace("€", "");
         text = text.replace("\"", "");

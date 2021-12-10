@@ -904,7 +904,6 @@ pub fn process_function(
         FUNCTION_XOR => {
             function = Xor::defaults(Some(function), data_map_wrap.clone()).handle()?;
         },
-
         _ => {
             return Err(
                 PlanetError::new(
