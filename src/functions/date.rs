@@ -134,26 +134,30 @@ impl DateFunction for Date {
     }
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
+        let data_map = &self.data_map.clone().unwrap();
         let year_item = attributes[0].clone();
+        let year_value = year_item.get_value(data_map)?;
         let month_item = attributes[1].clone();
+        let month_value = month_item.get_value(data_map)?;
         let day_item = attributes[2].clone();
-        let year = year_item.value.unwrap_or_default();
-        let day = day_item.value.unwrap_or_default();
+        let day_value = day_item.get_value(data_map)?;
+        // let year = year_item.value.unwrap_or_default();
+        // let day = day_item.value.unwrap_or_default();
         let date_only = NaiveDate::parse_from_str(
             format!(
                 "{year}-{month}-{day}",
-                year=&year,
-                month=&month_item.value.unwrap_or_default(),
-                day=&day,
+                year=&year_value,
+                month=&month_value,
+                day=&day_value,
             ).as_str(), 
             "%Y-%m-%d"
         ).unwrap();
         let month_short = date_only.format("%b").to_string();
         let replacement_string: String = format!(
             "{day}-{month_short}-{year}",
-            day=&day,
+            day=&day_value,
             month_short=month_short,
-            year=&year,
+            year=&year_value,
         );
         return Ok(replacement_string)
     }
@@ -266,19 +270,20 @@ impl DateTimeFunction for DateTimeParse {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
         let date_item = attributes[0].clone();
+        let mut date = date_item.get_value(data_map)?;
         let mode_item = attributes[1].clone();
-        let is_reference = date_item.is_reference;
-        let mode = mode_item.value.unwrap_or_default();
+        // let is_reference = date_item.is_reference;
+        let mode = mode_item.get_value(data_map)?;
         let mode = mode.as_str();
         let mut replacement_string = String::from("");
-        let mut date: String;
-        if is_reference {
-            let date_ = date_item.reference_value.unwrap_or_default();
-            let function_attr = FunctionAttribute::defaults(&date_, Some(true), Some(true));
-            date = function_attr.replace(data_map).item_processed.unwrap();
-        } else {
-            date = date_item.value.unwrap_or_default();
-        }
+        // let mut date: String;
+        // if is_reference {
+        //     let date_ = date_item.reference_value.unwrap_or_default();
+        //     let function_attr = FunctionAttribute::defaults(&date_, Some(true), Some(true));
+        //     date = function_attr.replace(data_map).item_processed.unwrap();
+        // } else {
+        //     date = date_item.value.unwrap_or_default();
+        // }
         date = date.replace("\"", "");
         if mode == "iso" {
             let date_obj_wrap = get_date_object_iso(&date);
@@ -453,19 +458,20 @@ impl DateParseFunction for DateParse {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
         let date_item = attributes[0].clone();
+        let mut date = date_item.get_value(data_map)?;
         let mode_item = attributes[1].clone();
-        let is_reference = date_item.is_reference;
+        // let is_reference = date_item.is_reference;
         let mode = mode_item.value.unwrap_or_default();
         let mode = mode.as_str();
         let mut replacement_string = String::from("");
-        let mut date: String;
-        if is_reference {
-            let date_ = date_item.reference_value.unwrap_or_default();
-            let function_attr = FunctionAttribute::defaults(&date_, Some(true), Some(true));
-            date = function_attr.replace(data_map).item_processed.unwrap();
-        } else {
-            date = date_item.value.unwrap_or_default();
-        }
+        // let mut date: String;
+        // if is_reference {
+        //     let date_ = date_item.reference_value.unwrap_or_default();
+        //     let function_attr = FunctionAttribute::defaults(&date_, Some(true), Some(true));
+        //     date = function_attr.replace(data_map).item_processed.unwrap();
+        // } else {
+        //     date = date_item.value.unwrap_or_default();
+        // }
         date = date.replace("\"", "");
         let mut is_string_output = false;
         if mode == "iso" {
@@ -739,44 +745,56 @@ impl DateFunction for Days {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
         let start_date_item = attributes[0].clone();
-        let end_date_item = attributes[0].clone();
-        let is_reference = start_date_item.is_reference;
+        let start_date_value = start_date_item.get_value(data_map)?;
+        let end_date_item = attributes[1].clone();
+        let end_date_value = end_date_item.get_value(data_map)?;
+        // let is_reference = start_date_item.is_reference;
         let number_days: i64;
-        if is_reference {
-            let start_date_ref = start_date_item.reference_value.unwrap_or_default();
-            let end_date_ref = end_date_item.reference_value.unwrap_or_default();
-            let function_attr = FunctionAttribute::defaults(&start_date_ref, 
-                Some(true), Some(true));
-            let start_date_ref_processed = function_attr.replace(data_map).item_processed.unwrap();
-            let function_attr = FunctionAttribute::defaults(&end_date_ref, 
-                Some(true), Some(true));
-            let end_date_ref_processed = function_attr.replace(data_map).item_processed.unwrap();
-            let start_date_obj = NaiveDate::parse_from_str(
-                start_date_ref_processed.as_str(), 
-                "%d-%b-%Y"
-            ).unwrap();
-            let end_date_obj = NaiveDate::parse_from_str(
-                end_date_ref_processed.as_str(), 
-                "%d-%b-%Y"
-            ).unwrap();
-            let duration = end_date_obj.signed_duration_since(start_date_obj);
-            number_days = duration.num_days();
-        } else {
-            let start_date = start_date_item.value.unwrap_or_default();
-            let end_date = end_date_item.value.unwrap_or_default();
-            let start_date = start_date.replace("\"", "");
-            let end_date = end_date.replace("\"", "");
-            let start_date_obj = NaiveDate::parse_from_str(
-                start_date.as_str(), 
-                "%d-%b-%Y"
-            ).unwrap();
-            let end_date_obj = NaiveDate::parse_from_str(
-                end_date.as_str(), 
-                "%d-%b-%Y"
-            ).unwrap();
-            let duration = end_date_obj.signed_duration_since(start_date_obj);
-            number_days = duration.num_days();
-        }
+        let start_date_obj = NaiveDate::parse_from_str(
+            start_date_value.as_str(), 
+            "%d-%b-%Y"
+        ).unwrap();
+        let end_date_obj = NaiveDate::parse_from_str(
+            end_date_value.as_str(), 
+            "%d-%b-%Y"
+        ).unwrap();
+        let duration = end_date_obj.signed_duration_since(start_date_obj);
+        number_days = duration.num_days();
+        // if is_reference {
+        //     let start_date_ref = start_date_item.reference_value.unwrap_or_default();
+        //     let end_date_ref = end_date_item.reference_value.unwrap_or_default();
+        //     let function_attr = FunctionAttribute::defaults(&start_date_ref, 
+        //         Some(true), Some(true));
+        //     let start_date_ref_processed = function_attr.replace(data_map).item_processed.unwrap();
+        //     let function_attr = FunctionAttribute::defaults(&end_date_ref, 
+        //         Some(true), Some(true));
+        //     let end_date_ref_processed = function_attr.replace(data_map).item_processed.unwrap();
+        //     let start_date_obj = NaiveDate::parse_from_str(
+        //         start_date_ref_processed.as_str(), 
+        //         "%d-%b-%Y"
+        //     ).unwrap();
+        //     let end_date_obj = NaiveDate::parse_from_str(
+        //         end_date_ref_processed.as_str(), 
+        //         "%d-%b-%Y"
+        //     ).unwrap();
+        //     let duration = end_date_obj.signed_duration_since(start_date_obj);
+        //     number_days = duration.num_days();
+        // } else {
+        //     let start_date = start_date_item.value.unwrap_or_default();
+        //     let end_date = end_date_item.value.unwrap_or_default();
+        //     let start_date = start_date.replace("\"", "");
+        //     let end_date = end_date.replace("\"", "");
+        //     let start_date_obj = NaiveDate::parse_from_str(
+        //         start_date.as_str(), 
+        //         "%d-%b-%Y"
+        //     ).unwrap();
+        //     let end_date_obj = NaiveDate::parse_from_str(
+        //         end_date.as_str(), 
+        //         "%d-%b-%Y"
+        //     ).unwrap();
+        //     let duration = end_date_obj.signed_duration_since(start_date_obj);
+        //     number_days = duration.num_days();
+        // }
         let replacement_string = number_days.to_string();
         return Ok(replacement_string)
     }
@@ -896,18 +914,21 @@ impl DateAddDiffFunction for DateAddDiff {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
         let date_item = attributes[0].clone();
+        let date_value = date_item.get_value(data_map)?;
         let number_item = attributes[1].clone();
+        let number_value = number_item.get_value(data_map)?;
         let units_item = attributes[2].clone();
-        let is_reference = date_item.is_reference;
+        let units_value = units_item.get_value(data_map)?;
+        // let is_reference = date_item.is_reference;
         let replacement_string: String;
         let new_date: DateTime<FixedOffset>;
         let date_obj: DateTime<FixedOffset>;
         let has_time: bool;
-        let number_string = number_item.value.unwrap_or_default();
-        let units_string = units_item.value.unwrap_or_default();
-        let number: i64 = FromStr::from_str(number_string.as_str()).unwrap();
-        let units_string = units_string.replace("\"", "");
-        let units_str = units_string.as_str();
+        // let number_string = number_item.value.unwrap_or_default();
+        // let units_string = units_item.value.unwrap_or_default();
+        let number: i64 = FromStr::from_str(number_value.as_str()).unwrap();
+        // let units_string = units_string.replace("\"", "");
+        let units_str = units_value.as_str();
         let units = match units_str {
             "milliseconds" => DateUnits::Milliseconds,
             "seconds" => DateUnits::Seconds,
@@ -920,30 +941,36 @@ impl DateAddDiffFunction for DateAddDiff {
             "years" => DateUnits::Years,
             _ => DateUnits::Days,
         };
-        if is_reference {
-            let date_ref = date_item.reference_value.unwrap_or_default();
-            // I need to get from data_map the date string
-            let function_attr = FunctionAttribute::defaults(
-                &date_ref, 
-                Some(true),
-                Some(true)
-            );
-            let date = function_attr.replace(data_map).item_processed.unwrap();
-            has_time = *&date.find(" ").is_some();
-            if has_time == true {
-                date_obj = get_date_object_human_time(&date).unwrap();
-            } else {
-                date_obj = get_date_object_only_date(&date).unwrap();
-            }
+        has_time = *&date_value.find(" ").is_some();
+        if has_time == true {
+            date_obj = get_date_object_human_time(&date_value).unwrap();
         } else {
-            let date = date_item.value.unwrap_or_default();
-            has_time = *&date.find(" ").is_some();
-            if has_time == true {
-                date_obj = get_date_object_human_time(&date).unwrap();
-            } else {
-                date_obj = get_date_object_only_date(&date).unwrap();
-            }
+            date_obj = get_date_object_only_date(&date_value).unwrap();
         }
+        // if is_reference {
+        //     let date_ref = date_item.reference_value.unwrap_or_default();
+        //     // I need to get from data_map the date string
+        //     let function_attr = FunctionAttribute::defaults(
+        //         &date_ref, 
+        //         Some(true),
+        //         Some(true)
+        //     );
+        //     let date = function_attr.replace(data_map).item_processed.unwrap();
+        //     has_time = *&date.find(" ").is_some();
+        //     if has_time == true {
+        //         date_obj = get_date_object_human_time(&date).unwrap();
+        //     } else {
+        //         date_obj = get_date_object_only_date(&date).unwrap();
+        //     }
+        // } else {
+        //     let date = date_item.value.unwrap_or_default();
+        //     has_time = *&date.find(" ").is_some();
+        //     if has_time == true {
+        //         date_obj = get_date_object_human_time(&date).unwrap();
+        //     } else {
+        //         date_obj = get_date_object_only_date(&date).unwrap();
+        //     }
+        // }
         // I could use operation to get date_obj????
         match units {
             DateUnits::Milliseconds => {
@@ -1138,26 +1165,34 @@ impl DateFunction for DateFormat {
     }
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
-        // let data_map = &self.data_map.clone().unwrap();
+        let data_map = &self.data_map.clone().unwrap();
         let date_item = attributes[0].clone();
+        let date_value = date_item.get_value(data_map)?;
         let mode_item = attributes[1].clone();
+        let mode_value = mode_item.get_value(data_map)?;
         let format_item = attributes[2].clone();
-        let date_string = date_item.value.unwrap_or_default();
-        let format = format_item.value.unwrap_or_default();
-        let mode = mode_item.value.unwrap_or_default();
-        let is_reference = date_item.is_reference;
-        let mut date_obj_wrap: Option<DateTime<FixedOffset>> = None;
-        if is_reference {
-            // TODO: Do when we have the date fields
+        let format_value = format_item.get_value(data_map)?;
+        // let date_string = date_item.value.unwrap_or_default();
+        // let format = format_item.value.unwrap_or_default();
+        // let mode = mode_item.value.unwrap_or_default();
+        // let is_reference = date_item.is_reference;
+        let date_obj_wrap: Option<DateTime<FixedOffset>>;
+        if mode_value == String::from("date") {
+            date_obj_wrap = Some(get_date_object_only_date(&date_value).unwrap());
         } else {
-            if mode == String::from("date") {
-                date_obj_wrap = Some(get_date_object_only_date(&date_string).unwrap());
-            } else {
-                date_obj_wrap = Some(get_date_object_human_time(&date_string).unwrap());
-            }
+            date_obj_wrap = Some(get_date_object_human_time(&date_value).unwrap());
         }
+        // if is_reference {
+        //     // TODO: Do when we have the date fields
+        // } else {
+        //     if mode == String::from("date") {
+        //         date_obj_wrap = Some(get_date_object_only_date(&date_string).unwrap());
+        //     } else {
+        //         date_obj_wrap = Some(get_date_object_human_time(&date_string).unwrap());
+        //     }
+        // }
         let date_obj = date_obj_wrap.unwrap();
-        let format = get_rust_date_format(date_obj, format);
+        let format = get_rust_date_format(date_obj, format_value);
         let date_string = date_obj.format(format.as_str()).to_string();
         return Ok(date_string)
     }
