@@ -94,6 +94,7 @@ impl StructureFunction for If {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
         let condition_item = attributes[0].clone();
+        let condition_value = condition_item.get_value(data_map)?;
         let expr_true_item = attributes[1].clone();
         let expr_false_item = attributes[2].clone();
         let is_assignment = condition_item.assignment.is_some();
@@ -103,8 +104,7 @@ impl StructureFunction for If {
             check = condition_item.check_assignment(data_map);
         } else {
             // Execute formula
-            let result = condition_item.get_value(data_map)?;
-            if result == String::from("1") {
+            if condition_value == String::from("1") {
                 check = true;
             }
         }
