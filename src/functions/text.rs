@@ -576,16 +576,16 @@ impl TextFunction for Replace {
         let data_map = &self.data_map.clone().unwrap();
         let attributes = attributes.clone();
         let old_text = attributes[0].clone();
+        let old_text_value = old_text.get_value(data_map)?;
         let start_num = attributes[1].clone();
-        let start_num_value = start_num.value.unwrap();
+        let start_num_value = start_num.get_value(data_map)?;
         let start_num_value: u32 = FromStr::from_str(start_num_value.as_str()).unwrap();
         let num_chars = attributes[2].clone();
-        let num_chars_value = num_chars.value.unwrap();
+        let num_chars_value = num_chars.get_value(data_map)?;
         let num_chars_value: u32 = FromStr::from_str(num_chars_value.as_str()).unwrap();
         let new_text = attributes[3].clone();
-        let new_text_value = new_text.value.unwrap();
+        let new_text_value = new_text.get_value(data_map)?;
         let replacement_string: String;
-        let old_text_value = old_text.get_value(data_map)?;
         let mut piece: String = String::from("");
         for (i, item) in old_text_value.chars().enumerate() {
             let i = i as u32;
@@ -663,13 +663,14 @@ impl TextFunction for Mid {
         let data_map = &self.data_map.clone().unwrap();
         let attributes = attributes.clone();
         let text = attributes[0].clone();
+        let text_value = text.get_value(data_map)?;
         let start_num = attributes[1].clone();
-        let start_num_value = start_num.value.unwrap();
+        let start_num_value = start_num.get_value(data_map)?;
         let start_num_value: usize = FromStr::from_str(start_num_value.as_str()).unwrap();
         let num_chars = attributes[2].clone();
-        let num_chars_value = num_chars.value.unwrap();
+        let num_chars_value = num_chars.get_value(data_map)?;
         let num_chars_value: usize = FromStr::from_str(num_chars_value.as_str()).unwrap();
-        let text_value = text.get_value(data_map)?;
+        
         let mut text_new = String::from("");
         for (i, char) in text_value.chars().enumerate() {
             let count = i+1;
@@ -743,10 +744,10 @@ impl TextFunction for Rept {
         let data_map = &self.data_map.clone().unwrap();
         let attributes = attributes.clone();
         let text = attributes[0].clone();
-        let number_times = attributes[1].clone();
-        let number_times_value = number_times.value.unwrap();
-        let number_times_value: usize = FromStr::from_str(number_times_value.as_str()).unwrap();
         let text_value = text.get_value(data_map)?;
+        let number_times = attributes[1].clone();
+        let number_times_value = number_times.get_value(data_map)?;
+        let number_times_value: usize = FromStr::from_str(number_times_value.as_str()).unwrap();
         let text_value_str = text_value.as_str();
         let text_value_str = text_value_str.repeat(number_times_value);
         return Ok(text_value_str)
@@ -816,13 +817,14 @@ impl TextFunction for Substitute {
         let data_map = &self.data_map.clone().unwrap();
         let attributes = attributes.clone();
         let text = attributes[0].clone();
+        let mut text_value = text.get_value(data_map)?;
         let old_text = attributes[1].clone();
-        let old_text_value = old_text.value.unwrap();
+        let old_text_value = old_text.get_value(data_map)?;
         let old_text_value = old_text_value.as_str();
         let new_text = attributes[2].clone();
-        let new_text_value = new_text.value.unwrap();
+        let new_text_value = new_text.get_value(data_map)?;
         let new_text_value = new_text_value.as_str();
-        let mut text_value = text.get_value(data_map)?;
+
         text_value = text_value.replace(old_text_value, new_text_value);
         return Ok(text_value)
     }
