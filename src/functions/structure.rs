@@ -66,6 +66,7 @@ impl StructureFunction for If {
                 let mut attributes_: Vec<String> = Vec::new();
                 if condition.is_some() {
                     let condition = condition.unwrap().as_str().to_string();
+                    // I need to compile assignment
                     let expr_true = expr_true.unwrap().as_str().to_string();
                     let expr_false = expr_false.unwrap().as_str().to_string();
                     attributes_.push(condition);

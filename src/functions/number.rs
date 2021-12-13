@@ -1564,6 +1564,11 @@ pub fn check_float_compare(value: &f64, compare_to: &f64, op: FormulaOperator) -
                 check = true;
             }
         },
+        FormulaOperator::Eq => {
+            if value == compare_to {
+                check = true;
+            }
+        },
         _ => {
             return Err(
                 PlanetError::new(

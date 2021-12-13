@@ -84,8 +84,24 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                 // I need a way to get list of instance FieldConfig (fields)
                 let config_fields = FieldConfig::parse_from_db(&table);
                 // eprintln!("InsertIntoTable.run :: config_fields: {:#?}", &config_fields);
-                
+
                 let insert_data_map: HashMap<String, String> = self.config.data.clone().unwrap();
+                // I need to have {id} -> Value
+                let mut insert_id_data_map: HashMap<String, String> = HashMap::new();
+                // eprintln!("InsertIntoTable.run :: table: {:#?}", &table);
+                // table.data_objects
+                let table_data = table.clone().data_objects.unwrap();
+                for (name, value) in insert_data_map.clone() {
+                    let id_map = table_data.get(&name);
+                    if id_map.is_some() {
+                        let id_map = id_map.unwrap();
+                        let id = id_map.get(ID);
+                        if id.is_some() {
+                            let id = id.unwrap().clone();
+                            insert_id_data_map.insert(id, value);
+                        }
+                    }
+                }
                 
                 // let insert_data_collections_map = self.config.data_collections.clone().unwrap();
                 // eprintln!("InsertIntoTable.run :: insert_data__collections_map: {:#?}", &insert_data_collections_map);
@@ -146,22 +162,24 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                     eprintln!("InsertIntoTable.run :: field_type: {}", &field_type);
                     match field_type {
                         "Small Text" => {
-                            db_data = SmallTextField::init_do(&field_config, insert_data_map.clone(), db_data)?
+                            db_data = SmallTextField::init_do(&field_config, insert_id_data_map.clone(), db_data)?
                         },
                         "Long Text" => {
-                            db_data = LongTextField::init_do(&field_config, insert_data_map.clone(), db_data)?
+                            db_data = LongTextField::init_do(&field_config, insert_id_data_map.clone(), db_data)?
                         },
                         "Checkbox" => {
-                            db_data = CheckBoxField::init_do(&field_config, insert_data_map.clone(), db_data)?
+                            db_data = CheckBoxField::init_do(&field_config, insert_id_data_map.clone(), db_data)?
                         },
                         "Number" => {
-                            db_data = NumberField::init_do(&field_config, insert_data_map.clone(), db_data)?
+                            db_data = NumberField::init_do(&field_config, insert_id_data_map.clone(), db_data)?
                         },
                         "Select" => {
-                            db_data = SelectField::init_do(&field_config, &table, insert_data_map.clone(), db_data)?
+                            db_data = SelectField::init_do(
+                                &field_config, &table, insert_id_data_map.clone(), db_data)?
                         },
                         "Formula" => {
-                            db_data = FormulaField::init_do(&field_config, &table, insert_data_map.clone(), db_data)?
+                            db_data = FormulaField::init_do(
+                                &field_config, &table, insert_id_data_map.clone(), db_data)?
                         },
                         _ => {
                             return Ok(db_data);

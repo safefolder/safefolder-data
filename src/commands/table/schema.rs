@@ -13,7 +13,6 @@ use crate::commands::table::config::{CreateTableConfig};
 use crate::commands::table::{Command};
 use crate::commands::{CommandRunner};
 use crate::commands::table::constants::*;
-use crate::planet::constants::ID;
 use crate::storage::{ConfigStorageField};
 use crate::storage::table::{DbTable, Schema, DbData, RoutingData};
 use crate::planet::{
@@ -22,6 +21,7 @@ use crate::planet::{
     Context, 
     validation::PlanetValidationError,
 };
+use crate::planet::constants::*;
 
 pub struct CreateTable<'gb> {
     pub planet_context: &'gb PlanetContext<'gb>,
@@ -65,7 +65,6 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                 let name_field_config = config.name.unwrap();
                 fields.insert(0, name_field_config);
                 let mut field_name_map: HashMap<String, String> = HashMap::new();
-
                 // populate field_type_map and field_name_map
                 let mut field_type_map: HashMap<String, String> = HashMap::new();
                 for field in fields.iter() {
@@ -73,28 +72,26 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                     let field_name = field.name.clone().unwrap();
                     let field_type = field.field_type.clone();
                     let mut field_id_map: HashMap<String, String> = HashMap::new();
-                    let field_id = String::from(ID);
-                    field_id_map.insert(field_id.clone(), field_attrs.id.unwrap());
+                    let field_id = field_attrs.id.unwrap_or_default();
+                    field_id_map.insert(String::from(ID), field_id.clone());
                     &field_ids.push(field_id_map);
                     if field_type.is_some() {
                         let field_type = field_type.unwrap();
-                        field_type_map.insert(field_name, field_type);
+                        field_type_map.insert(field_name.clone(), field_type);
                     }
-                    let field_name = field_attrs.name.unwrap_or_default().clone();
-                    let field_name_str = &field_name.as_str();
+                    let field_name_str = field_name.as_str();
                     if field_name_map.has_element(field_name_str) == false {
                         // id => name
-                        field_name_map.insert(field_id.clone(), field_name.clone());
+                        field_name_map.insert(field_name.clone(), field_id.clone());
                     } else {
                         return Err(
                             PlanetError::new(
                                 500, 
                                 Some(tr!("There is already a field with name \"{}\"", &field_name)),
                             )
-                        );                        
+                        );
                     }
                 }
-
                 for field in fields.iter() {
                     // field simple attributes
                     let field_attrs = field.clone();

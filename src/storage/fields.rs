@@ -246,7 +246,7 @@ impl ProcessField for SmallTextField {
         let field_config = self.field_config.clone();
         let field_id = field_config.id.unwrap_or_default();
         let field_name = field_config.name.unwrap_or_default();
-        let value_entry = insert_data_map.get(&field_name);
+        let value_entry = insert_data_map.get(&field_id);
         // Name Small Text would not be included into insert data (from YAML file data object, since has name attr)
         if value_entry.is_some() {
             let value_entry = value_entry.unwrap().clone();
@@ -374,7 +374,7 @@ impl ProcessField for LongTextField {
         let field_config = self.field_config.clone();
         let field_name = field_config.name.unwrap_or_default();
         let field_id = field_config.id.unwrap_or_default();
-        let value_entry = insert_data_map.get(&field_name).unwrap().clone();
+        let value_entry = insert_data_map.get(&field_id).unwrap().clone();
         let value_db = value_entry.clone();
         let field = Self{
             field_config: self.field_config.clone()
@@ -505,7 +505,7 @@ impl ProcessField for CheckBoxField {
         let field_config = self.field_config.clone();
         let field_name = field_config.name.unwrap_or_default();
         let field_id = field_config.id.unwrap_or_default();
-        let value_entry = insert_data_map.get(&field_name).unwrap().clone();
+        let value_entry = insert_data_map.get(&field_id).unwrap().clone();
         let value_db = value_entry.clone();
         let field = Self{
             field_config: self.field_config.clone()
@@ -642,7 +642,7 @@ impl ProcessField for NumberField {
         let field_config = self.field_config.clone();
         let field_name = field_config.name.unwrap_or_default();
         let field_id = field_config.id.unwrap_or_default();
-        let value_entry = insert_data_map.get(&field_name).unwrap().clone();
+        let value_entry = insert_data_map.get(&field_id).unwrap().clone();
         let value_db = value_entry.clone();
         let field = Self{
             field_config: self.field_config.clone()
@@ -907,13 +907,13 @@ impl ProcessField for SelectField {
         let field_config = self.field_config.clone();
         let field_name = field_config.name.unwrap_or_default();
         let field_id = field_config.id.unwrap_or_default();
-        let value_entry = insert_data_map.get(&field_name).unwrap().clone();
+        let value_entry = insert_data_map.get(&field_id).unwrap().clone();
         let value_db = value_entry.clone();
         let mut data: HashMap<String, String> = HashMap::new();
         if db_data.data.is_some() {
             data = db_data.data.unwrap();
         }
-        let value_string_ = insert_data_map.get(&field_name).unwrap().clone();
+        let value_string_ = insert_data_map.get(&field_id).unwrap().clone();
         let is_valid = self.is_valid(Some(&value_string_))?;
         if is_valid == true {
             &data.insert(field_id, value_db);
