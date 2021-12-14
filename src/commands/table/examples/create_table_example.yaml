@@ -28,112 +28,112 @@ fields:
       - Madrid
       - Barcelona
       - Valencia
-  # - name: Concat
-  #   field_type: Formula
-  #   formula: "CONCAT(
-  #     \"this-is-some-slug\", \" \", {My Field}, TRIM(\" hola \")
-  #     )"
-  #   formula_format: Text
-  # - name: Format
-  #   field_type: Formula
-  #   formula: "FORMAT(
-  #     \"this-is-my-{My Field}\"
-  #     )"
-  #   formula_format: Text
-  # - name: Join List
-  #   field_type: Formula
-  #   formula: "JOINLIST(
-  #     {1, 2, 3}, \";\"
-  #     )"
-  #   formula_format: Text
-  # - name: Length
-  #   field_type: Formula
-  #   formula: "LEN(
-  #     \"This is my string\"
-  #     )"
-  #   formula_format: Number
-  # - name: Lower
-  #   field_type: Formula
-  #   formula: "LOWER(
-  #     \"This Is My String\"
-  #     )"
-  #   formula_format: Text
-  # - name: Upper
-  #   field_type: Formula
-  #   formula: "UPPER(
-  #     \"This Is My String\"
-  #     )"
-  #   formula_format: Text
-  # - name: Replace
-  #   field_type: Formula
-  #   formula: "REPLACE(
-  #     \"This is my place\", 0, 4, \"That\"
-  #     )"
-  #   formula_format: Text
-  # - name: MID Text
-  #   field_type: Formula
-  #   formula: "MID(
-  #     \"Fluid Flow\", 
-  #     1, 
-  #     5
-  #     )"
-  #   formula_format: Text
-  # - name: MID Text Ref
-  #   field_type: Formula
-  #   formula: "MID(
-  #     {My Field}, 
-  #     1, 
-  #     3
-  #     )"
-  #   formula_format: Text
-  # - name: REPT text
-  #   field_type: Formula
-  #   formula: "REPT(
-  #     \"-\", 
-  #     10
-  #     )"
-  #   formula_format: Text
-  # - name: REPT text ref
-  #   field_type: Formula
-  #   formula: "REPT(
-  #     {My Field}, 
-  #     3
-  #     )"
-  #   formula_format: Text
-  # - name: Subs String
-  #   field_type: Formula
-  #   formula: "SUBSTITUTE(
-  #     \"This is some text\", 
-  #     \"some\", 
-  #     \"some good\"
-  #     )"
-  #   formula_format: Text
-  # - name: Subs Ref
-  #   field_type: Formula
-  #   formula: "SUBSTITUTE(
-  #     {Description}, 
-  #     \"some\", 
-  #     \"some good\"
-  #     )"
-  #   formula_format: Text
-  # - name: Trim String
-  #   field_type: Formula
-  #   formula: "TRIM(
-  #     \"This is something great     \"
-  #     )"
-  #   formula_format: Text
-  # - name: Trim String Chained
-  #   field_type: Formula
-  #   formula: "TRIM(
-  #     TRIM(\"This is something great     \")
-  #     )"
-  #   formula_format: Text
-  # - name: Trim Ref
-  #   field_type: Formula
-  #   formula: "TRIM(
-  #     {My Field}
-  #     )"
-  #   formula_format: Text
+  - name: Concat
+    field_type: Formula
+    formula: "CONCAT(
+      \"this-is-some-slug\", \" \", {My Field}, TRIM(\" hola \")
+      )"
+    formula_format: Text
+  - name: Format
+    field_type: Formula
+    formula: "FORMAT(
+      \"this-is-my-{My Field}\"
+      )"
+    formula_format: Text
+  - name: Join List
+    field_type: Formula
+    formula: "JOINLIST(
+      {1, 2, 3}, \";\"
+      )"
+    formula_format: Text
+  - name: Length
+    field_type: Formula
+    formula: "LEN(
+      \"This is my string\"
+      )"
+    formula_format: Number
+  - name: Lower
+    field_type: Formula
+    formula: "LOWER(
+      \"This Is My String\"
+      )"
+    formula_format: Text
+  - name: Upper
+    field_type: Formula
+    formula: "UPPER(
+      \"This Is My String\"
+      )"
+    formula_format: Text
+  - name: Replace
+    field_type: Formula
+    formula: "REPLACE(
+      \"This is my place\", 0, 4, \"That\"
+      )"
+    formula_format: Text
+  - name: MID Text
+    field_type: Formula
+    formula: "MID(
+      \"Fluid Flow\", 
+      1, 
+      5
+      )"
+    formula_format: Text
+  - name: MID Text Ref
+    field_type: Formula
+    formula: "MID(
+      {My Field}, 
+      1, 
+      3
+      )"
+    formula_format: Text
+  - name: REPT text
+    field_type: Formula
+    formula: "REPT(
+      \"-\", 
+      10
+      )"
+    formula_format: Text
+  - name: REPT text ref
+    field_type: Formula
+    formula: "REPT(
+      {My Field}, 
+      3
+      )"
+    formula_format: Text
+  - name: Subs String
+    field_type: Formula
+    formula: "SUBSTITUTE(
+      \"This is some text\", 
+      \"some\", 
+      \"some good\"
+      )"
+    formula_format: Text
+  - name: Subs Ref
+    field_type: Formula
+    formula: "SUBSTITUTE(
+      {Description}, 
+      \"some\", 
+      \"some good\"
+      )"
+    formula_format: Text
+  - name: Trim String
+    field_type: Formula
+    formula: "TRIM(
+      \"This is something great     \"
+      )"
+    formula_format: Text
+  - name: Trim String Chained
+    field_type: Formula
+    formula: "TRIM(
+      TRIM(\"This is something great     \")
+      )"
+    formula_format: Text
+  - name: Trim Ref
+    field_type: Formula
+    formula: "TRIM(
+      {My Field}
+      )"
+    formula_format: Text
   # - name: Ceil Number
   #   field_type: Formula
   #   formula: "CEILING(
@@ -345,14 +345,14 @@ fields:
   #     \"minutes\"
   #     )"
   #   formula_format: Date
-  - name: Date format
-    field_type: Formula
-    formula: "DATEFMT(
-      \"21-Aug-2021 13:45:22\", 
-      \"{DD} was the day, {YYYY} the year. I love {Do} of months\"
-      )"
-    formula_format: Text
-  # - name: MIN
+  # - name: Date format
+  #   field_type: Formula
+  #   formula: "DATEFMT(
+  #     \"21-Aug-2021 13:45:22\", 
+  #     \"{DD} was the day, {YYYY} the year. I love {Do} of months\"
+  #     )"
+  #   formula_format: Text
+  # # - name: MIN
   #   field_type: Formula
   #   formula: "MIN(
   #     -4, 

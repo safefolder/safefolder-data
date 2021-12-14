@@ -11,13 +11,15 @@ lazy_static! {
     pub static ref RE_CONCAT_ATTRS: Regex = Regex::new(r#"("[\w\s-]+")|(\d+)|(\{[\w\s]+\})|([A-Z]+\(["\w\s-]+\))"#).unwrap();
     pub static ref RE_FORMAT_ATTR: Regex = Regex::new(r#"FORMAT\([\s]{0,}((?P<attr>"[\{\}\w\s-]+")|(?P<func>[A-Z]+\(["{}\w\s-]+\)))[\s]{0,}\)"#).unwrap();
     pub static ref RE_FORMAT_COLUMNS: Regex = Regex::new(r"(\{[\w\s-]+\})").unwrap();
-    pub static ref RE_JOINLIST_ATTRS: Regex = Regex::new(r#"(?P<array>\{[\w\s\d,"-]+\}),[\s+]{0,}(?P<sep>\\{0,1}"[\W]\\{0,1}")"#).unwrap();
-    pub static ref RE_LEN_ATTR: Regex = Regex::new(r#"("[\w\s-]+")|(\{[\w\s]+\})"#).unwrap();
+    pub static ref RE_JOINLIST_ATTRS: Regex = Regex::new(r#"(?P<array>\{[\w\s\d,"-]+\}),[\s]*(?P<sep>(".[^)]+)|([A-Z]+\(.[^()]+\)))"#).unwrap();
+    pub static ref RE_LEN: Regex = Regex::new(r#"^LEN\([\s]*((?P<string>"[\w\s-]+")|(?P<ref>\{[\w\s]+\})|(?P<func>[A-Z]+\(.[^)]+\)))[\s]*\)"#).unwrap();
+    pub static ref RE_LOWER: Regex = Regex::new(r#"^LOWER\([\s]*((?P<string>"[\w\s-]+")|(?P<ref>\{[\w\s]+\})|(?P<func>[A-Z]+\(.[^)]+\)))[\s]*\)"#).unwrap();
+    pub static ref RE_UPPER: Regex = Regex::new(r#"^UPPER\([\s]*((?P<string>"[\w\s-]+")|(?P<ref>\{[\w\s]+\})|(?P<func>[A-Z]+\(.[^)]+\)))[\s]*\)"#).unwrap();
     pub static ref RE_SINGLE_ATTR: Regex = Regex::new(r#"("[\w\s-]+")|(\{[\w\s]+\})"#).unwrap();
-    pub static ref RE_REPLACE: Regex = Regex::new(r#"REPLACE\([\n\s\t]{0,}"(?P<old_text>[\w\s]+)"[\n\s\t]{0,},[\n\s\t]{0,}(?P<start_num>\d)[\n\s\t]{0,},[\n\s\t]{0,}(?P<num_chars>\d)[\n\s\t]{0,},[\n\s\t]{0,}"(?P<new_text>[\w\s]+)"[\s\n\t]{0,}\)"#).unwrap();
-    pub static ref RE_MID: Regex = Regex::new(r#"MID\([\s\n\t]{0,}((?P<text>"[\w\s]+")|(?P<text_ref>\{[\w\s]+\}))[\s\n\t]{0,},[\s\n\t]{0,}(?P<start_num>\d+)[\s\n\t]{0,},[\s\n\t]{0,}(?P<num_chars>\d+)[\s\n\t]{0,}\)"#).unwrap();
-    pub static ref RE_REPT: Regex = Regex::new(r#"REPT\([\s\n\t]{0,}((?P<text>"[\w\s\W]+")|(?P<text_ref>\{[\w\s]+\}))[\s\n\t]{0,},[\s\n\t]{0,}(?P<number_times>\d+)[\s\t\n]{0,}\)"#).unwrap();
-    pub static ref RE_SUBSTITUTE: Regex = Regex::new(r#"SUBSTITUTE\([\s\n\t]{0,}((?P<text>("[\w\s]+"))|(?P<text_ref>(\{[\w\s]+\})))[\s\n\t]{0,},[\s\n\t]{0,}(?P<old_text>"[\w\s]+")[\s\n\t]{0,},[\s\n\t]{0,}(?P<new_text>"[\w\s]+")[\s\t\n]{0,}\)"#).unwrap();
+    pub static ref RE_REPLACE: Regex = Regex::new(r#"^REPLACE\([\n\s\t]{0,}(?P<old_text>(("*[{}\w\s]+"*)|([A-Z]+\(.[^()]+\))))[\n\s\t]{0,},[\n\s\t]{0,}(?P<start_num>\d)[\n\s\t]{0,},[\n\s\t]{0,}(?P<num_chars>\d)[\n\s\t]{0,},[\n\s\t]{0,}(?P<new_text>(("*[{}\w\s]+"*)|([A-Z]+\(.[^()]+\))))[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_MID: Regex = Regex::new(r#"^MID\([\s\n\t]{0,}((?P<text>(("*[\w\s]+"*)|([A-Z]+\(.[^)]+\))))|(?P<text_ref>\{[\w\s]+\}))[\s\n\t]{0,},[\s\n\t]{0,}(?P<start_num>\d+)[\s\n\t]{0,},[\s\n\t]{0,}(?P<num_chars>\d+)[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_REPT: Regex = Regex::new(r#"^REPT\([\s\n\t]{0,}((?P<text>(("[\w\s\W]+")|([A-Z]+\(.[^)]+\))))|(?P<text_ref>\{[\w\s]+\}))[\s\n\t]{0,},[\s\n\t]{0,}(?P<number_times>\d+)[\s\t\n]{0,}\)"#).unwrap();
+    pub static ref RE_SUBSTITUTE: Regex = Regex::new(r#"^SUBSTITUTE\([\s\n\t]{0,}((?P<text>(("[\w\s]+")|([A-Z]+\(.[^)]+\))))|(?P<text_ref>(\{[\w\s]+\})))[\s\n\t]{0,},[\s\n\t]{0,}(?P<old_text>(("[\w\s]+")[\s\n\t]{0,})|([A-Z]+\(.[^)]+\))),[\s\n\t]{0,}(?P<new_text>(("[\w\s]+")|([A-Z]+\(.[^)]+\))))[\s\t\n]{0,}\)"#).unwrap();
     pub static ref RE_TRIM: Regex = Regex::new(r#"^TRIM\([\s\n\t]{0,}((?P<text>"[\w\s]+")|(?P<text_ref>\{[\w\s]+\})|(?P<func>[A-Z]+\(.[^()]+\)))[\s\n\t]{0,}\)"#).unwrap();
 }
 
@@ -365,7 +367,7 @@ impl TextFunction for Length {
         // LEN(TRIM(" hello world "))
         let function_parse = &self.function.clone().unwrap();
         let data_map = self.data_map.clone();
-        let expr = &RE_LEN_ATTR;
+        let expr = &RE_LEN;
         let mut function = function_parse.clone();
         let data_map_wrap = data_map.clone();
         let (
@@ -378,9 +380,22 @@ impl TextFunction for Length {
         if function_text_wrap.is_some() {
             function.validate = Some(expr.is_match(function_text.as_str()));
             if function.validate.unwrap() {
-                function.attributes = Some(get_vector_regex_attributes(
-                    expr.captures_iter(function_text.as_str()))
-                );    
+                let matches = expr.captures(function_text.as_str()).unwrap();
+                let attr_string = matches.name("string");
+                let attr_ref = matches.name("ref");
+                let attr_func = matches.name("func");
+                let mut attributes_: Vec<String> = Vec::new();
+                if attr_string.is_some() {
+                    let attr_string = attr_string.unwrap().as_str().to_string();
+                    attributes_.push(attr_string);
+                } else if attr_ref.is_some() {
+                    let attr_ref = attr_ref.unwrap().as_str().to_string();
+                    attributes_.push(attr_ref);
+                } else if attr_func.is_some() {
+                    let attr_func = attr_func.unwrap().as_str().to_string();
+                    attributes_.push(attr_func);
+                }
+                function.attributes = Some(attributes_);
             }
         }
         if data_map_wrap.is_some() {
@@ -423,7 +438,7 @@ impl TextFunction for Lower {
         // LOWER(TRIM(" HELLO WORLD "))
         let function_parse = &self.function.clone().unwrap();
         let data_map = self.data_map.clone();
-        let expr = &RE_SINGLE_ATTR;
+        let expr = &RE_LOWER;
         let mut function = function_parse.clone();
         let data_map_wrap = data_map.clone();
         let (
@@ -436,9 +451,22 @@ impl TextFunction for Lower {
         if function_text_wrap.is_some() {
             function.validate = Some(expr.is_match(function_text.as_str()));
             if function.validate.unwrap() {
-                function.attributes = Some(get_vector_regex_attributes(
-                    expr.captures_iter(function_text.as_str()))
-                );    
+                let matches = expr.captures(function_text.as_str()).unwrap();
+                let attr_string = matches.name("string");
+                let attr_ref = matches.name("ref");
+                let attr_func = matches.name("func");
+                let mut attributes_: Vec<String> = Vec::new();
+                if attr_string.is_some() {
+                    let attr_string = attr_string.unwrap().as_str().to_string();
+                    attributes_.push(attr_string);
+                } else if attr_ref.is_some() {
+                    let attr_ref = attr_ref.unwrap().as_str().to_string();
+                    attributes_.push(attr_ref);
+                } else if attr_func.is_some() {
+                    let attr_func = attr_func.unwrap().as_str().to_string();
+                    attributes_.push(attr_func);
+                }
+                function.attributes = Some(attributes_);
             }
         }
         if data_map_wrap.is_some() {
@@ -481,7 +509,7 @@ impl TextFunction for Upper {
         // UPPER(TRIM(" HELLO WORLD "))
         let function_parse = &self.function.clone().unwrap();
         let data_map = self.data_map.clone();
-        let expr = &RE_SINGLE_ATTR;
+        let expr = &RE_UPPER;
         let mut function = function_parse.clone();
         let data_map_wrap = data_map.clone();
         let (
@@ -494,9 +522,22 @@ impl TextFunction for Upper {
         if function_text_wrap.is_some() {
             function.validate = Some(expr.is_match(function_text.as_str()));
             if function.validate.unwrap() {
-                function.attributes = Some(get_vector_regex_attributes(
-                    expr.captures_iter(function_text.as_str()))
-                );
+                let matches = expr.captures(function_text.as_str()).unwrap();
+                let attr_string = matches.name("string");
+                let attr_ref = matches.name("ref");
+                let attr_func = matches.name("func");
+                let mut attributes_: Vec<String> = Vec::new();
+                if attr_string.is_some() {
+                    let attr_string = attr_string.unwrap().as_str().to_string();
+                    attributes_.push(attr_string);
+                } else if attr_ref.is_some() {
+                    let attr_ref = attr_ref.unwrap().as_str().to_string();
+                    attributes_.push(attr_ref);
+                } else if attr_func.is_some() {
+                    let attr_func = attr_func.unwrap().as_str().to_string();
+                    attributes_.push(attr_func);
+                }
+                function.attributes = Some(attributes_);
             }
         }
         if data_map_wrap.is_some() {
@@ -562,10 +603,10 @@ impl TextFunction for Replace {
                 let num_chars = matches.name("num_chars").unwrap().as_str().to_string();
                 let new_text = matches.name("new_text").unwrap().as_str().to_string();
                 let mut attributes_: Vec<String> = Vec::new();
-                attributes_.push(prepare_string_attribute(old_text));
+                attributes_.push(old_text);
                 attributes_.push(start_num);
                 attributes_.push(num_chars);
-                attributes_.push(prepare_string_attribute(new_text));
+                attributes_.push(new_text);
                 function.attributes = Some(attributes_);
             }
         }
