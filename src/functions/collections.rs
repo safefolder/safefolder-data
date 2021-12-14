@@ -8,8 +8,8 @@ use crate::functions::*;
 
 
 lazy_static! {
-    static ref RE_MIN: Regex = Regex::new(r#"MIN\((?P<sequence>[\d\s,.-]+)\)|MIN\((?P<sequence_ref>\{[\w\s]+\})\)"#).unwrap();
-    static ref RE_MAX: Regex = Regex::new(r#"MAX\((?P<sequence>[\d\s,.-]+)\)|MAX\((?P<sequence_ref>\{[\w\s]+\})\)"#).unwrap();
+    static ref RE_MIN: Regex = Regex::new(r#"^MIN\((?P<sequence>[\d\s,.-]+)\)|MIN\((?P<sequence_ref>\{[\w\s]+\})\)"#).unwrap();
+    static ref RE_MAX: Regex = Regex::new(r#"^MAX\((?P<sequence>[\d\s,.-]+)\)|MAX\((?P<sequence_ref>\{[\w\s]+\})\)"#).unwrap();
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

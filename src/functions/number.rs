@@ -8,22 +8,22 @@ use crate::functions::*;
 
 lazy_static! {
     pub static ref RE_NUMBER_ATTRS: Regex = Regex::new(r#"("[\w\s-]*")|([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|(\{[\w\s]+\})|([A-Z]+\(["\w\s-]+\))|(null)"#).unwrap();
-    pub static ref RE_CEILING: Regex = Regex::new(r#"^CEILING\([\s\n\t]{0,}((?P<number>(([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|([A-Z]+\(.[^(]+\))))|(?P<number_ref>\{[\w\s]+\}))[\s\n\t]{0,},[\s\n\t]{0,}(?P<significance>(([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|({[\w\s]+})|([A-Z]+\(.+\))))[\s\n\t]{0,}\)"#).unwrap();
-    pub static ref RE_FLOOR: Regex = Regex::new(r#"^FLOOR\([\s\n\t]{0,}((?P<number>(([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|([A-Z]+\(.[^)]*\))))|(?P<number_ref>\{[\w\s]+\}))[\s\n\t]{0,},[\s\n\t]{0,}(?P<significance>(([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|({[\w\s]+})|([A-Z]+\(.*\))))[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_CEILING: Regex = Regex::new(r#"^CEILING\([\s\n\t]{0,}((?P<number>(([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|([A-Z]+\(.[^(]+\))))|(?P<number_ref>\{[\w\s]+\}))[\s\n\t]{0,},[\s\n\t]{0,}(?P<significance>(([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|(\{[\w\s]+\})|([A-Z]+\(.+\))))[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_FLOOR: Regex = Regex::new(r#"^FLOOR\([\s\n\t]{0,}((?P<number>(([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|([A-Z]+\(.[^)]*\))))|(?P<number_ref>\{[\w\s]+\}))[\s\n\t]{0,},[\s\n\t]{0,}(?P<significance>(([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|(\{[\w\s]+\})|([A-Z]+\(.*\))))[\s\n\t]{0,}\)"#).unwrap();
     pub static ref RE_COUNT: Regex = Regex::new(r#"^COUNT\([\s\n\t]{0,}(?P<attrs>[\w\W\s\n\t]{0,})[\s\n\t]{0,}\)"#).unwrap();
     pub static ref RE_COUNTA: Regex = Regex::new(r#"^COUNTA\([\s\n\t]{0,}(?P<attrs>[\w\W\s\n\t]{0,})[\s\n\t]{0,}\)"#).unwrap();
     pub static ref RE_COUNTALL: Regex = Regex::new(r#"^COUNTALL\([\s\n\t]{0,}(?P<attrs>[\w\W\s\n\t]{0,})[\s\n\t]{0,}\)"#).unwrap();
     pub static ref RE_EVEN: Regex = Regex::new(r#"^EVEN\([\s\n\t]{0,}(?P<number>(([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|([A-Z]+\(.[^)]*\))))[\s\n\t]{0,}\)|EVEN\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\s\n\t]{0,}\)"#).unwrap();
     pub static ref RE_EXP: Regex = Regex::new(r#"^EXP\([\s\n\t]{0,}(?P<number>(([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|([A-Z]+\(.[^)]*\))))[\s\n\t]{0,}\)|^EXP\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\s\n\t]{0,}\)"#).unwrap();
     pub static ref RE_INT: Regex = Regex::new(r#"^INT\([\s\n\t]{0,}(?P<number>(([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|([A-Z]+\(.[^)]*\))))[\s\n\t]{0,}\)|^INT\([\s\n\t]{0,}(?P<number_ref>\{[\w\s]+\})[\s\n\t]{0,}\)"#).unwrap();
-    pub static ref RE_LOG: Regex = Regex::new(r#"^LOG\([\s\n\t]{0,}(?P<number>(([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|({[\w\s]*})|([A-Z]+\(.[^)]*\))))[\n\s\t]{0,},{0,}[\n\s\t]{0,}(?P<base>((\d+)|({[\w\s]+})|([A-Z]+\(.[^)]*\)))){0,}[\s\n\t]{0,}\)"#).unwrap();
-    pub static ref RE_MOD: Regex = Regex::new(r#"^MOD\([\s\n\t]{0,}(?P<number>(([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|({[\w\s]+})|([A-Z]+\(.[^(]*\))))[\n\s\t]{0,},[\n\s\t]{0,}(?P<divisor>((\d+)|({[\w\s]+})|([A-Z]+\(.[^(]*\)))){0,}[\s\n\t]{0,}\)"#).unwrap();
-    pub static ref RE_POWER: Regex = Regex::new(r#"^POWER\([\s\n\t]{0,}(?P<number>(([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|({[\w\s]+})|([A-Z]+\(.[^)]*\))))[\n\s\t]{0,},[\n\s\t]{0,}(?P<power>(([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|({[\w\s]+})|([A-Z]+\(.[^)]*\)))){0,}[\s\n\t]{0,}\)"#).unwrap();
-    pub static ref RE_ROUND: Regex = Regex::new(r#"^ROUND\([\s\n\t]{0,}(?P<number>(([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|({[\w\s]+})|([A-Z]+\(.[^(]*\))))[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits>((\d+)|({[\w\s]+})|([A-Z]+\(.[^(]*\)))){0,}[\s\n\t]{0,}\)"#).unwrap();
-    pub static ref RE_ROUND_UP: Regex = Regex::new(r#"^ROUNDUP\([\s\n\t]{0,}(?P<number>(([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|({[\w\s]+})|([A-Z]+\(.[^(]*\))))[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits>((\d+)|({[\w\s]+})|([A-Z]+\(.[^(]*\)))){0,}[\s\n\t]{0,}\)"#).unwrap();
-    pub static ref RE_ROUND_DOWN: Regex = Regex::new(r#"^ROUNDDOWN\([\s\n\t]{0,}(?P<number>(([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|({[\w\s]+})|([A-Z]+\(.[^(]*\))))[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits>((\d+)|({[\w\s]+})|([A-Z]+\(.[^(]*\)))){0,}[\s\n\t]{0,}\)"#).unwrap();
-    pub static ref RE_SQRT: Regex = Regex::new(r#"^SQRT\([\s\n\t]{0,}(?P<number>(([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|({[\w\s]+})|([A-Z]+\(.[^)]*\))))[\s\n\t]{0,}\)"#).unwrap();
-    pub static ref RE_VALUE: Regex = Regex::new(r#"^VALUE\([\s\n\t]{0,}(?P<text>(("[\w\d,.{0,}\$€{0,}]+")|({[\w\s]+})|([A-Z]+\(.[^)]*\))))[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_LOG: Regex = Regex::new(r#"^LOG\([\s\n\t]{0,}(?P<number>(([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|(\{[\w\s]*\})|([A-Z]+\(.[^)]*\))))[\n\s\t]{0,},{0,}[\n\s\t]{0,}(?P<base>((\d+)|(\{[\w\s]+\})|([A-Z]+\(.[^)]*\)))){0,}[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_MOD: Regex = Regex::new(r#"^MOD\([\s\n\t]{0,}(?P<number>(([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|(\{[\w\s]+\})|([A-Z]+\(.[^(]*\))))[\n\s\t]{0,},[\n\s\t]{0,}(?P<divisor>((\d+)|(\{[\w\s]+\})|([A-Z]+\(.[^(]*\)))){0,}[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_POWER: Regex = Regex::new(r#"^POWER\([\s\n\t]{0,}(?P<number>(([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|(\{[\w\s]+\})|([A-Z]+\(.[^)]*\))))[\n\s\t]{0,},[\n\s\t]{0,}(?P<power>(([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|(\{[\w\s]+\})|([A-Z]+\(.[^)]*\)))){0,}[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_ROUND: Regex = Regex::new(r#"^ROUND\([\s\n\t]{0,}(?P<number>(([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|(\{[\w\s]+\})|([A-Z]+\(.[^(]*\))))[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits>((\d+)|(\{[\w\s]+\})|([A-Z]+\(.[^(]*\)))){0,}[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_ROUND_UP: Regex = Regex::new(r#"^ROUNDUP\([\s\n\t]{0,}(?P<number>(([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|(\{[\w\s]+\})|([A-Z]+\(.[^(]*\))))[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits>((\d+)|(\{[\w\s]+\})|([A-Z]+\(.[^(]*\)))){0,}[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_ROUND_DOWN: Regex = Regex::new(r#"^ROUNDDOWN\([\s\n\t]{0,}(?P<number>(([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|(\{[\w\s]+\})|([A-Z]+\(.[^(]*\))))[\n\s\t]{0,},[\n\s\t]{0,}(?P<digits>((\d+)|(\{[\w\s]+\})|([A-Z]+\(.[^(]*\)))){0,}[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_SQRT: Regex = Regex::new(r#"^SQRT\([\s\n\t]{0,}(?P<number>(([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)|(\{[\w\s]+\})|([A-Z]+\(.[^)]*\))))[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_VALUE: Regex = Regex::new(r#"^VALUE\([\s\n\t]{0,}(?P<text>(("[\w\d,.{0,}\$€{0,}]+")|(\{[\w\s]+\})|([A-Z]+\(.[^)]*\))))[\s\n\t]{0,}\)"#).unwrap();
     pub static ref RE_BOOLEAN: Regex = Regex::new(r#"^TRUE\(\)|^FALSE\(\)|TRUE|FALSE"#).unwrap();
 }
 
