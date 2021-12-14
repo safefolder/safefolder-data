@@ -266,9 +266,10 @@ impl Formula {
         let mut compiled_functions_map: HashMap<String, CompiledFunction> = HashMap::new();
         let mut compiled_functions: Vec<CompiledFunction> = Vec::new();
         let expr = &RE_FORMULA_FUNCTION_VARIABLES;
+        // let expr_chained = &RE_FORMULA_FUNCTION_PIECES;
         for (function_placeholder, function_text) in formula_map {
             let function_text = function_text.as_str();
-            let function_list_ = expr.captures(function_text);
+            let function_list_ = expr.captures(function_text.clone());
             if function_list_.is_none() {
                 // eprintln!("Formula :: function_text: {}", function_text);
                 // eprintln!("Formula :: function_placeholder: {}", function_placeholder);
@@ -339,8 +340,10 @@ impl Formula {
                 db_table_i.clone(),
                 table_name_i.clone(),
             )?;
-            let function_attribute = assignment.unwrap();
-            formula_compiled.assignment = function_attribute.assignment;
+            if assignment.is_some() {
+                let function_attribute = assignment.unwrap();
+                formula_compiled.assignment = function_attribute.assignment;
+            }
         }
         eprintln!("Formula :: formula_compiled: {:#?}", &formula_compiled);
         return Ok(formula_compiled)
@@ -501,6 +504,7 @@ pub fn formula_attr_collection(
             }
         }
     }
+    eprintln!("formula_attr_collection :: [2] formula_map_: {:#?}", &formula_map_);
     // Clean function_map for keys not final in the final formula
     let expr = &RE_FORMULA_VARIABLES;
     let final_attrs_ = final_attrs.clone();
@@ -567,6 +571,7 @@ pub fn compile_formula(
             break
         }
     }
+    eprintln!("compile_formula :: function_map_: {:#?}", &function_map_);
     // I return the final formula text and the function text map????
     // {"$func_1": "TRIM(\" hola \")", "$func_3": "TRIM(\" comino \")", "$func_4": "CONCAT( \"this-is-some-slug\", \" \", {My Field}, $func_1 )", "$func_5": "TRIM($func_2)", "$func_2": "MINE(\" hola 02 \")"}
     // post process function map
@@ -617,7 +622,7 @@ pub fn compile_function_text(
     db_table: Option<DbTable>,
     table_name: Option<String>,
 ) -> Result<CompiledFunction, PlanetError> {
-    // eprintln!("compile_function_text :: function_text: {}", &function_text);
+    eprintln!("compile_function_text :: function_text: {}", &function_text);
     let formula_format = formula_format.clone();
     let field_type_map = field_type_map.clone();
     // eprintln!("compile_function_text :: field_type_map: {:#?}", &field_type_map);
@@ -625,7 +630,7 @@ pub fn compile_function_text(
     let parts: Vec<&str> = function_text.split("(").collect();
     let function_name = parts[0];
     // eprintln!("compile_function_text :: parts: {:?}", &parts);
-    // eprintln!("compile_function_text :: function_name: {}", function_name);
+    eprintln!("compile_function_text :: function_name: {}", function_name);
     let mut function_parse = FunctionParse::defaults(&function_name.to_string());
     function_parse.text = Some(function_text.to_string());
     let function_parse = process_function(&function_parse, None)?;
@@ -658,7 +663,7 @@ pub fn compile_function_text(
     for attr_ in function_attributes {
         let mut attr = attr_.as_str();
         attr = attr.trim();
-        // eprintln!("compile_function_text :: attr: {}", &attr);
+        eprintln!("compile_function_text :: attr: {}", &attr);
         let mut attribute_type: AttributeType = AttributeType::Text;
         let mut function_attribute = FunctionAttributeItem::defaults(
             None,
@@ -678,7 +683,7 @@ pub fn compile_function_text(
             );
         }
         let attr_type_resolve = attr_type_resolve.unwrap();
-        // eprintln!("compile_function_text :: attr_type_resolve: {:?}", &attr_type_resolve);
+        eprintln!("compile_function_text :: attr_type_resolve: {:?}", &attr_type_resolve);
         let attr_type_ref = attr_type_resolve.name("ref");
         let attr_type_formula = attr_type_resolve.name("formula");
         let attr_type_bool = attr_type_resolve.name("bool");
@@ -713,6 +718,7 @@ pub fn compile_function_text(
             }
         } else if attr_type_formula.is_some() {
             // formula
+            eprintln!("compile_function_text :: [{}] is a formula", &attr);
             let function_attribute_string = attr.to_string();
             let formula_compiled = Formula::defaults(
                 &function_attribute_string.clone(),
@@ -785,12 +791,14 @@ pub fn compile_function_text(
                 db_table.clone(),
                 table_name.clone(),
             )?;
-            function_attribute = assignment.clone().unwrap();
-            eprintln!("compile_function_text :: assignment: {:#?}", &assignment);
+            let function_attribute_ = assignment.clone().unwrap();
+            function_attribute.assignment = function_attribute_.assignment;
+            function_attribute.attr_type = function_attribute_.attr_type;
+            function_attribute.value = Some(attr.to_string());
+            eprintln!("compile_function_text :: function attribute & assignment: {:#?}", &function_attribute);
             // function_attribute.attr_type = AttributeType::Assign;
             // How I do attr_type?
             // function_attribute.assignment = assignment;
-            function_attribute.value = Some(attr.to_string());
         }
         main_function_attrs.push(function_attribute);
     }

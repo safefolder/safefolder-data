@@ -18,7 +18,7 @@ lazy_static! {
     pub static ref RE_MID: Regex = Regex::new(r#"MID\([\s\n\t]{0,}((?P<text>"[\w\s]+")|(?P<text_ref>\{[\w\s]+\}))[\s\n\t]{0,},[\s\n\t]{0,}(?P<start_num>\d+)[\s\n\t]{0,},[\s\n\t]{0,}(?P<num_chars>\d+)[\s\n\t]{0,}\)"#).unwrap();
     pub static ref RE_REPT: Regex = Regex::new(r#"REPT\([\s\n\t]{0,}((?P<text>"[\w\s\W]+")|(?P<text_ref>\{[\w\s]+\}))[\s\n\t]{0,},[\s\n\t]{0,}(?P<number_times>\d+)[\s\t\n]{0,}\)"#).unwrap();
     pub static ref RE_SUBSTITUTE: Regex = Regex::new(r#"SUBSTITUTE\([\s\n\t]{0,}((?P<text>("[\w\s]+"))|(?P<text_ref>(\{[\w\s]+\})))[\s\n\t]{0,},[\s\n\t]{0,}(?P<old_text>"[\w\s]+")[\s\n\t]{0,},[\s\n\t]{0,}(?P<new_text>"[\w\s]+")[\s\t\n]{0,}\)"#).unwrap();
-    pub static ref RE_TRIM: Regex = Regex::new(r#"TRIM\([\s\n\t]{0,}((?P<text>"[\w\s]+")|(?P<text_ref>\{[\w\s]+\}))[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_TRIM: Regex = Regex::new(r#"^TRIM\([\s\n\t]{0,}((?P<text>"[\w\s]+")|(?P<text_ref>\{[\w\s]+\})|(?P<func>[A-Z]+\(.[^()]+\)))[\s\n\t]{0,}\)"#).unwrap();
 }
 
 pub trait TextFunction {
@@ -120,13 +120,19 @@ impl TextFunction for Trim {
                 let matches = expr.captures(function_text.as_str()).unwrap();
                 let attr_text = matches.name("text");
                 let attr_text_ref = matches.name("text_ref");
+                let attr_text_func = matches.name("func");
                 let mut attributes_: Vec<String> = Vec::new();
                 if attr_text.is_some() {
                     let attr_text = attr_text.unwrap().as_str().to_string();
                     attributes_.push(prepare_string_attribute(attr_text));
-                } else {
+                } else if attr_text_ref.is_some() {
+                    // reference
                     let attr_text_ref = attr_text_ref.unwrap().as_str().to_string();
                     attributes_.push(attr_text_ref);
+                } else {
+                    // function
+                    let attr_text_func = attr_text_func.unwrap().as_str().to_string();
+                    attributes_.push(attr_text_func);
                 }
                 function.attributes = Some(attributes_);    
             }
