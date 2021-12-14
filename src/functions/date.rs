@@ -1123,7 +1123,7 @@ impl DateFunction for DateFormat {
                 let dt_fmt = matches.name("dt_format");
                 let ref_fmt = matches.name("ref_format");
         
-                let mut mode: String = String::from("\"date\"");
+                let mut mode: String = String::from("date");
                 if date.is_some() && fmt.is_some() {
                     let date_string = date.unwrap().as_str().to_string();
                     let format_string = fmt.unwrap().as_str().to_string();
@@ -1141,7 +1141,7 @@ impl DateFunction for DateFormat {
                     if date_obj_wrap_.is_err() {
                         function.validate = Some(false);
                     }        
-                    mode = String::from("\"datetime\"");
+                    mode = String::from("datetime");
                     attributes_.push(date_string.clone());
                     attributes_.push(format_string);
                     attributes_.push(mode);
