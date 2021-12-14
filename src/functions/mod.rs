@@ -365,7 +365,7 @@ pub fn compile_assignment(
     let formula_string = formula.to_string();
     let expr = &RE_FORMULA_ASSIGN;
     let capture_assignment = expr.captures(&formula);
-    let mut assignment: Option<AttributeAssign> = None;
+    let assignment: Option<AttributeAssign>;
     if functions_map.is_none() {
         let formula_map= compile_formula(formula_string.clone()).unwrap();
         let mut compiled_functions_map: HashMap<String, CompiledFunction> = HashMap::new();
