@@ -103,21 +103,7 @@ impl CollectionStatsFunction for Stats {
         let data_map = &self.data_map.clone().unwrap();
         let sequence_item = attributes[0].clone();
         let mut sequence = sequence_item.get_value(data_map)?;
-        // let is_reference = sequence_item.is_reference;
-        // let mut sequence: String;
         let replacement_string: String;
-        // if is_reference {
-        //     let sequence_ref = sequence_item.reference_value.unwrap();
-        //     let function_attr = FunctionAttribute::defaults(
-        //         &sequence_ref, 
-        //         Some(true),
-        //         Some(true)
-        //     );
-        //     sequence = function_attr.replace(data_map).item_processed.unwrap();
-        //     // To do when I have Set field, since design can change
-        // } else {
-        //     sequence = sequence_item.value.unwrap_or_default();
-        // }
         sequence = sequence.replace("\"", "");
         let mut sequence_list: Vec<f64> = Vec::new();
         let sequence_str_list: Vec<&str> = sequence.split(",").collect();
