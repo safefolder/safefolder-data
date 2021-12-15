@@ -27,7 +27,9 @@ use crate::planet::{
     Context,
     validation::PlanetValidationError,
 };
-use crate::storage::fields::*;
+use crate::storage::fields::text::*;
+use crate::storage::fields::number::*;
+use crate::storage::fields::formula::*;
 
 pub struct InsertIntoTable<'gb> {
     pub planet_context: &'gb PlanetContext<'gb>,

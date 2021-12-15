@@ -1,8 +1,9 @@
 extern crate xid;
 
-pub mod fields;
+// pub mod fields_old;
 pub mod table;
 pub mod constants;
+pub mod fields;
 
 use std::collections::HashMap;
 
