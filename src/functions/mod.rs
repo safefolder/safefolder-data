@@ -33,7 +33,7 @@ lazy_static! {
     static ref RE_FORMULA_FIELD_FUNCTIONS: Regex = Regex::new(r#"(?P<func>[A-Z]+[("\d,-.;_:+$€\s\w{})]+)"#).unwrap();
     static ref RE_FUNCTION_ATTRS_OLD: Regex = Regex::new(r#"("[\w\s-]+")|(\{[\w\s]+\})|([A-Z]+\(["\w\s]+\))|([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)"#).unwrap();
     static ref RE_FUNCTION_ATTRS: Regex = Regex::new(r#"[A-Z]+\((?P<attrs>.+)\)"#).unwrap();
-    static ref RE_ATTR_TYPE_RESOLVE: Regex = Regex::new(r#"(?P<ref>\{[\w\s]+\}$)|(?P<formula>[A-Z]+\(.+\).*)|(?P<bool>TRUE|FALSE)|(?P<number>^[+-]?[0-9]+\.?[0-9]*|^\.[0-9]+)|(?P<null>null)|(?P<string>\\{0,}"*[,;_.\\$€:\-\+\{\}\w\s-]*\\{0,}"*)|(?P<assign>\{[\w\s]+\}[\s]*[=<>]+[\s]*((\d+)|("*[\w\s]+"*)))"#).unwrap();
+    static ref RE_ATTR_TYPE_RESOLVE: Regex = Regex::new(r#"(?P<ref>\{[\w\s]+\}$)|(?P<formula>[A-Z]+\(.+\).*)|(?P<bool>TRUE|FALSE)|(?P<number>^[+-]?[0-9]+\.?[0-9]*|^\.[0-9]+)|(?P<null>null)|(?P<assign>\{[\w\s]+\}[\s]*[=<>]+[\s]*((\d+)|("*[\w\s]+"*)))|(?P<string>\\{0,}"*[,;_.\\$€:\-\+\{\}\w\s-]*\\{0,}"*)"#).unwrap();
     static ref RE_FORMULA_FUNCTION_PIECES: Regex = Regex::new(r#"[A-Z]+\(((.[^()]*)|())\)"#).unwrap();
     static ref RE_FORMULA_FUNCTION_VARIABLES: Regex = Regex::new(r#"(?P<func>\$func_\d)"#).unwrap();
     static ref RE_FORMULA_VARIABLES: Regex = Regex::new(r#"(?P<formula>\$formula_\d)"#).unwrap();
@@ -230,7 +230,7 @@ impl Formula {
         table_name: Option<String>,
         is_assign_function: bool,
     ) -> Result<Self, PlanetError> {
-        eprintln!("Formula...");
+        //eprintln!("Formula...");
         // If I have an error in compilation, then does not validate. Compilation uses validate of functions.
         // This function is the one does compilation from string formula to FormulaFieldCompiled
         let formula_origin = formula.clone();
@@ -240,7 +240,7 @@ impl Formula {
         // eprintln!("Formula :: formula_origin: {:?}", &formula_origin);
         // eprintln!("Formula :: formula_format: {:?}", &formula_format);
         let formula_map= compile_formula(formula_origin.clone()).unwrap();
-        eprintln!("Formula :: formula_map: {:?}", &formula_map);
+        //eprintln!("Formula :: formula_map: {:?}", &formula_map);
         // let expr = &RE_FORMULA_FIELD_FUNCTIONS;
         let mut formula_processed = formula_origin.clone();
         let formula_format = formula_format.clone();
@@ -269,10 +269,11 @@ impl Formula {
         // let expr_chained = &RE_FORMULA_FUNCTION_PIECES;
         for (function_placeholder, function_text) in formula_map {
             let function_text = function_text.as_str();
+            //eprintln!("Formula :: function_text: {}", function_text);
+            //eprintln!("Formula :: function_placeholder: {}", function_placeholder);
             let function_list_ = expr.captures(function_text.clone());
             if function_list_.is_none() {
-                // eprintln!("Formula :: function_text: {}", function_text);
-                // eprintln!("Formula :: function_placeholder: {}", function_placeholder);
+                //eprintln!("Formula :: have function list, compile function text");
                 let mut main_function = compile_function_text(
                     function_text, 
                     &formula_format,
@@ -327,8 +328,8 @@ impl Formula {
                 _ => {}
             }
         }
-        eprintln!("Formula :: formula_processed_str: {}", formula_processed_str);
-        eprintln!("Formula :: do_compile_assignment: {}", &do_compile_assignment);
+        //eprintln!("Formula :: formula_processed_str: {}", formula_processed_str);
+        //eprintln!("Formula :: do_compile_assignment: {}", &do_compile_assignment);
         if do_compile_assignment {
             // Since I have no functions, reference will be an assignment
             let assignment = compile_assignment(
@@ -359,8 +360,8 @@ pub fn compile_assignment(
     db_table: Option<DbTable>,
     table_name: Option<String>,
 ) -> Result<Option<FunctionAttributeItem>, PlanetError> {
-    eprintln!("compile_assignment...");
-    eprintln!("compile_assignment :: formula: {}", &formula);
+    //eprintln!("compile_assignment...");
+    //eprintln!("compile_assignment :: formula: {}", &formula);
     let formula = formula.clone();
     let formula_string = formula.to_string();
     let expr = &RE_FORMULA_ASSIGN;
@@ -392,7 +393,7 @@ pub fn compile_assignment(
     }
     if capture_assignment.is_some() {
         let mut formula_assign = formula_string.clone();
-        eprintln!("compile_assignment: formula_assign: {}", &formula_assign);
+        //eprintln!("compile_assignment: formula_assign: {}", &formula_assign);
         let capture_assignment = capture_assignment.unwrap();
         let assign = capture_assignment.name("assign").unwrap().as_str().to_string();
         // let name = capture_assignment.name("name").unwrap().as_str().to_string();
@@ -408,25 +409,25 @@ pub fn compile_assignment(
                 }    
             }
         }
-        eprintln!("compile_assignment: assign: {} formula_assign: {}", &assign, &formula_assign);
+        //eprintln!("compile_assignment: assign: {} formula_assign: {}", &assign, &formula_assign);
         let (items, attribute_operator) = parse_assign_operator(
             &assign, &formula_assign
         )?;
-        eprintln!("compile_assignment: items: {:?} op: {:?}", &items, &attribute_operator);
+        //eprintln!("compile_assignment: items: {:?} op: {:?}", &items, &attribute_operator);
         let (reference_name, items_new) = get_assignment_reference(
             &items, 
             field_name_map
         )?;
-        eprintln!("compile_assignment: reference_name: {} items_new: {:?}", &reference_name, &items_new);
+        //eprintln!("compile_assignment: reference_name: {} items_new: {:?}", &reference_name, &items_new);
         let field_type = field_type_map.get(&reference_name);
-        eprintln!("compile_assignment: field_type: {:?}", &field_type);
+        //eprintln!("compile_assignment: field_type: {:?}", &field_type);
         let mut attribute_type: AttributeType = AttributeType::Text;
         if field_type.is_some() {
-            eprintln!("compile_assignment: I have field_type...");
+            //eprintln!("compile_assignment: I have field_type...");
             let field_type = field_type.unwrap();
-            eprintln!("compile_assignment: field_type: {}", field_type);
+            //eprintln!("compile_assignment: field_type: {}", field_type);
             attribute_type = get_attribute_type(field_type, None);
-            eprintln!("compile_assignment: attribute_type: {:?}", &attribute_type);
+            //eprintln!("compile_assignment: attribute_type: {:?}", &attribute_type);
         }
         let mut function_attribute = FunctionAttributeItem::defaults(
             None,
@@ -452,7 +453,7 @@ pub fn compile_assignment(
 pub fn formula_attr_collection(
     attrs_string: String
 ) -> Result<Vec<String>, PlanetError> {
-    eprintln!("formula_attr_collection :: attrs_string: {}", &attrs_string);
+    //eprintln!("formula_attr_collection :: attrs_string: {}", &attrs_string);
     let mut attributes: Vec<String> = Vec::new();
     let expr = &RE_FORMULA_FUNCTION_PIECES;
     let tries = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
@@ -468,21 +469,21 @@ pub fn formula_attr_collection(
         for attribute in attributes {
             have_formulas = true;
             let function_text = attribute.get(0).unwrap().as_str();
-            eprintln!("formula_attr_collection :: function_text: {}", function_text);
+            //eprintln!("formula_attr_collection :: function_text: {}", function_text);
             let function_text_string = function_text.to_string();
             let function_placeholder = format!("$formula_{}", &count);
             final_attrs = final_attrs.replace(function_text, &function_placeholder);
             formula_map_.insert(function_placeholder.clone(), function_text_string);
-            eprintln!("formula_attr_collection :: [{}] formula_map: {:#?}", &count, &formula_map_);
+            //eprintln!("formula_attr_collection :: [{}] formula_map: {:#?}", &count, &formula_map_);
             count += 1;
         }
         if !have_formulas {
             // I should have all function placeholders with $formula_XX, no functions left to process
-            eprintln!("formula_attr_collection :: I break");
+            //eprintln!("formula_attr_collection :: I break");
             break
         }
     }
-    eprintln!("formula_attr_collection :: formula_map_: {:#?}", &formula_map_);
+    //eprintln!("formula_attr_collection :: formula_map_: {:#?}", &formula_map_);
     let expr = &RE_FORMULA_VARIABLES;
     for (k, v) in formula_map_.clone() {
         let has_formula = v.clone().find("$formula_").is_some();
@@ -504,7 +505,7 @@ pub fn formula_attr_collection(
             }
         }
     }
-    eprintln!("formula_attr_collection :: [2] formula_map_: {:#?}", &formula_map_);
+    //eprintln!("formula_attr_collection :: [2] formula_map_: {:#?}", &formula_map_);
     // Clean function_map for keys not final in the final formula
     let expr = &RE_FORMULA_VARIABLES;
     let final_attrs_ = final_attrs.clone();
@@ -519,7 +520,7 @@ pub fn formula_attr_collection(
             formula_map.insert(formula_item_text, formula_item_text_value);
         }
     }
-    eprintln!("formula_attr_collection :: formula_map: {:#?}", &formula_map);
+    //eprintln!("formula_attr_collection :: formula_map: {:#?}", &formula_map);
     let final_attrs_items: Vec<&str> = final_attrs_.split(",").collect();
     for mut item in final_attrs_items {
         item = item.trim();
@@ -536,7 +537,7 @@ pub fn formula_attr_collection(
         }
         attributes.push(replaced_item);
     }
-    eprintln!("formula_attr_collection :: attributes: {:#?}", &attributes);
+    //eprintln!("formula_attr_collection :: attributes: {:#?}", &attributes);
     return Ok(attributes)
 }
 
@@ -548,7 +549,6 @@ pub fn compile_formula(
     let tries = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
     let mut count = 1;
     let mut function_map_: HashMap<String, String> = HashMap::new();
-    let mut function_map: HashMap<String, String> = HashMap::new();
     let mut final_formula = formula.clone();
     for _ in tries {
         let final_formula_ = final_formula.clone();
@@ -571,7 +571,7 @@ pub fn compile_formula(
             break
         }
     }
-    eprintln!("compile_formula :: function_map_: {:#?}", &function_map_);
+    //eprintln!("compile_formula :: function_map_: {:#?}", &function_map_);
     // I return the final formula text and the function text map????
     // {"$func_1": "TRIM(\" hola \")", "$func_3": "TRIM(\" comino \")", "$func_4": "CONCAT( \"this-is-some-slug\", \" \", {My Field}, $func_1 )", "$func_5": "TRIM($func_2)", "$func_2": "MINE(\" hola 02 \")"}
     // post process function map
@@ -597,16 +597,35 @@ pub fn compile_formula(
         }
     }
     // Clean function_map for keys not final in the final formula
+    let mut function_map: HashMap<String, String> = HashMap::new();
     let expr = &RE_FORMULA_FUNCTION_VARIABLES;
     let final_formula_ = final_formula.clone();
     let final_formula_ = final_formula_.as_str();
+    // eprintln!("compile_formula :: final_formula_: {}", final_formula);
     let function_list_ = expr.captures_iter(final_formula_);
     for function_item in function_list_ {
         let function_item_text = function_item.get(0).unwrap().as_str();
         let function_item_text = function_item_text.to_string();
         let function_item_text_value = function_map_.get(&function_item_text);
         if function_item_text_value.is_some() {
-            let function_item_text_value = function_item_text_value.unwrap().clone();
+            let mut function_item_text_value = function_item_text_value.unwrap().clone();
+            let function_item_text_value_str = function_item_text_value.clone();
+            let function_item_text_value_str = function_item_text_value_str.as_str();
+            // This string might have placeholders still
+            // eprintln!("compile_formula :: function_item_text_value: {}", &function_item_text_value);
+            let function_list_ = expr.captures_iter(function_item_text_value_str);
+            for function_item in function_list_ {
+                let function_item_text = function_item.get(0).unwrap().as_str();
+                // eprintln!("compile_formula :: function_item_text: {}", function_item_text);
+                let function_item_text_value_ = function_map_.get(function_item_text);
+                if function_item_text_value_.is_some() {
+                    let function_item_text_value_ = function_item_text_value_.unwrap().clone();
+                    function_item_text_value = function_item_text_value.replace(
+                        function_item_text, 
+                        &function_item_text_value_
+                    );
+                }
+            }
             function_map.insert(function_item_text, function_item_text_value);
         }
     }
@@ -622,7 +641,7 @@ pub fn compile_function_text(
     db_table: Option<DbTable>,
     table_name: Option<String>,
 ) -> Result<CompiledFunction, PlanetError> {
-    eprintln!("compile_function_text :: function_text: {}", &function_text);
+    //eprintln!("compile_function_text :: function_text: {}", &function_text);
     let formula_format = formula_format.clone();
     let field_type_map = field_type_map.clone();
     // eprintln!("compile_function_text :: field_type_map: {:#?}", &field_type_map);
@@ -630,7 +649,7 @@ pub fn compile_function_text(
     let parts: Vec<&str> = function_text.split("(").collect();
     let function_name = parts[0];
     // eprintln!("compile_function_text :: parts: {:?}", &parts);
-    eprintln!("compile_function_text :: function_name: {}", function_name);
+    //eprintln!("compile_function_text :: function_name: {}", function_name);
     let mut function_parse = FunctionParse::defaults(&function_name.to_string());
     function_parse.text = Some(function_text.to_string());
     let function_parse = process_function(&function_parse, None)?;
@@ -659,11 +678,11 @@ pub fn compile_function_text(
         );
     }
     let function_attributes = function_attributes.unwrap();
-    // eprintln!("compile_function_text :: captured_attrs: {:?}", &captured_attrs);
+    // //eprintln!("compile_function_text :: captured_attrs: {:?}", &captured_attrs);
     for attr_ in function_attributes {
         let mut attr = attr_.as_str();
         attr = attr.trim();
-        eprintln!("compile_function_text :: attr: {}", &attr);
+        //eprintln!("compile_function_text :: attr: {}", &attr);
         let mut attribute_type: AttributeType = AttributeType::Text;
         let mut function_attribute = FunctionAttributeItem::defaults(
             None,
@@ -683,7 +702,7 @@ pub fn compile_function_text(
             );
         }
         let attr_type_resolve = attr_type_resolve.unwrap();
-        eprintln!("compile_function_text :: attr_type_resolve: {:?}", &attr_type_resolve);
+        //eprintln!("compile_function_text :: attr_type_resolve: {:?}", &attr_type_resolve);
         let attr_type_ref = attr_type_resolve.name("ref");
         let attr_type_formula = attr_type_resolve.name("formula");
         let attr_type_bool = attr_type_resolve.name("bool");
@@ -718,7 +737,7 @@ pub fn compile_function_text(
             }
         } else if attr_type_formula.is_some() {
             // formula
-            eprintln!("compile_function_text :: [{}] is a formula", &attr);
+            //eprintln!("compile_function_text :: [{}] is a formula", &attr);
             let function_attribute_string = attr.to_string();
             let formula_compiled = Formula::defaults(
                 &function_attribute_string.clone(),
@@ -750,21 +769,21 @@ pub fn compile_function_text(
             function_attribute.value = Some(attr.to_string());
         } else if attr_type_assign.is_some() {
             // Process assign
-            eprintln!("compile_function_text :: assignment...");
+            //eprintln!("compile_function_text :: assignment...");
             // In case I have assign into a formula, I need to parse it.
             let expr = &RE_FORMULA_FUNCTIONS;
             let have_assign_functions = expr.is_match(attr);
             let mut assign_attr = attr.clone().to_string();
-            eprintln!("compile_function_text :: have_assign_functions: {}", &have_assign_functions);
+            //eprintln!("compile_function_text :: have_assign_functions: {}", &have_assign_functions);
             // let mut formula_map: HashMap<String, String> = HashMap::new();
             if have_assign_functions {
                 let captures = expr.captures_iter(attr);
                 let capture = captures.last();
                 if capture.is_some() {
                     let formula = capture.unwrap().get(0).unwrap().as_str().to_string();
-                    eprintln!("compile_function_text :: formula: {}", &formula);
+                    //eprintln!("compile_function_text :: formula: {}", &formula);
                     assign_attr = assign_attr.replace(formula.clone().as_str(), "$formula");
-                    eprintln!("compile_function_text :: assign_attr: {}", &assign_attr);
+                    //eprintln!("compile_function_text :: assign_attr: {}", &assign_attr);
                     let formula_obj = Formula::defaults(
                         &formula, 
                         &formula_format, 
@@ -776,10 +795,10 @@ pub fn compile_function_text(
                         true,
                     )?;
                     function_attribute.formula = Some(formula_obj.clone());
-                    eprintln!("compile_function_text :: formula_obj: {:#?}", &formula_obj);
+                    //eprintln!("compile_function_text :: formula_obj: {:#?}", &formula_obj);
                 }
             }
-            eprintln!("compile_function_text :: assign_attr: {}", &assign_attr);
+            //eprintln!("compile_function_text :: assign_attr: {}", &assign_attr);
             // eprintln!("compile_function_text :: formula_map: {:#?}", &formula_map);
             // compile all formulas linked in assignment
             let assignment = compile_assignment(
@@ -795,7 +814,7 @@ pub fn compile_function_text(
             function_attribute.assignment = function_attribute_.assignment;
             function_attribute.attr_type = function_attribute_.attr_type;
             function_attribute.value = Some(attr.to_string());
-            eprintln!("compile_function_text :: function attribute & assignment: {:#?}", &function_attribute);
+            //eprintln!("compile_function_text :: function attribute & assignment: {:#?}", &function_attribute);
             // function_attribute.attr_type = AttributeType::Assign;
             // How I do attr_type?
             // function_attribute.assignment = assignment;
@@ -1157,24 +1176,24 @@ impl FunctionAttributeItem {
         let attribute_id = self.id.clone().unwrap_or_default();
         let attribute_value = self.value.clone().unwrap_or_default();
         let has_assignment = self.assignment.is_some();
-        eprintln!("FunctionAttributeItem.get_value :: id: {}", &attribute_id);
-        eprintln!("FunctionAttributeItem: {:#?}", &self);
+        //eprintln!("FunctionAttributeItem.get_value :: id: {}", &attribute_id);
+        //eprintln!("FunctionAttributeItem: {:#?}", &self);
         let mut value: String;
         if is_reference && !has_assignment {
-            eprintln!("FunctionAttributeItem.get_value :: is_reference");
+            //eprintln!("FunctionAttributeItem.get_value :: is_reference");
             // FUNC({Column}) : I get value from data_map, key Column
             let function_attr = FunctionAttribute::defaults(
                 &attribute_id, Some(true), Some(true)
             );
             value = function_attr.replace(&data_map).item_processed.unwrap();
-            eprintln!("FunctionAttributeItem.get_value :: {}={}", &attribute_id, &value);
+            //eprintln!("FunctionAttributeItem.get_value :: {}={}", &attribute_id, &value);
         } else if formula.is_some() {
-            eprintln!("FunctionAttributeItem.get_value :: formula");
+            //eprintln!("FunctionAttributeItem.get_value :: formula");
             // I execute the formula and return value
             // execute_formula(formula: &Formula, data_map: &HashMap<String, String>)
             let formula = formula.unwrap();
             value = execute_formula(&formula, &data_map)?;
-            eprintln!("FunctionAttributeItem.get_value :: {}={}", &attribute_id, &value);
+            //eprintln!("FunctionAttributeItem.get_value :: {}={}", &attribute_id, &value);
         } else if has_assignment {
             let check = self.check_assignment(&data_map);
             value = String::from("0");
@@ -1182,10 +1201,10 @@ impl FunctionAttributeItem {
                 value = String::from("1");
             }
         } else {
-            eprintln!("FunctionAttributeItem.get_value :: normal");
+            //eprintln!("FunctionAttributeItem.get_value :: normal");
             // I get value and return it
             value = attribute_value;
-            eprintln!("FunctionAttributeItem.get_value :: {}={}", &attribute_id, &value);
+            //eprintln!("FunctionAttributeItem.get_value :: {}={}", &attribute_id, &value);
         }
         return Ok(value)
     }
@@ -1206,7 +1225,7 @@ pub fn execute_formula_query(
     data_map: &HashMap<String, String>
 ) -> Result<bool, PlanetError> {
     let mut check: bool = true;
-    // eprint!("execute_formula :: formula: {:#?}", formula);
+    // eprintln!!("execute_formula :: formula: {:#?}", formula);
     // In case we have function, like AND, OR, NOT, XOR and other references and functions inside
     let function = formula.function.clone();
     if function.is_some() {
@@ -1588,10 +1607,10 @@ pub fn check_assignment(
     attr_type: AttributeType,
     db_data_map: &HashMap<String, String>,
 ) -> Result<bool, PlanetError> {
-    eprintln!("check_assignment...");
-    eprintln!("check_assignment :: db_data_map: {:#?}", db_data_map);
-    eprintln!("check_assignment :: attr_assignment: {:#?}", &attr_assignment);
-    eprintln!("check_assignment :: attr_type: {:#?}", &attr_type);
+    //eprintln!("check_assignment...");
+    //eprintln!("check_assignment :: db_data_map: {:#?}", db_data_map);
+    //eprintln!("check_assignment :: attr_assignment: {:#?}", &attr_assignment);
+    //eprintln!("check_assignment :: attr_type: {:#?}", &attr_type);
     let column_id = attr_assignment.0;
     let column_id = column_id.as_str();
     let db_value = db_data_map.get(column_id).unwrap();
@@ -1622,9 +1641,9 @@ pub fn check_assignment(
             let value = value.as_str();
             let value: f64 = FromStr::from_str(value).unwrap();
             let db_value: f64 = FromStr::from_str(db_value).unwrap();
-            eprintln!("check_assignment :: db_value: {}", &db_value);
-            eprintln!("check_assignment :: op: {:?}", &op);
-            eprintln!("check_assignment :: value: {:?}", &value);
+            //eprintln!("check_assignment :: db_value: {}", &db_value);
+            //eprintln!("check_assignment :: op: {:?}", &op);
+            //eprintln!("check_assignment :: value: {:?}", &value);
             check = check_float_compare(&value, &db_value, op)?;
         },
         _ => {

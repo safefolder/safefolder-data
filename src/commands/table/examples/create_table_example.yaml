@@ -384,48 +384,48 @@ fields:
       ) + 
       SQRT(16)"
     formula_format: Number
-  # - name: If function string
-  #   field_type: Formula
-  #   formula: "IF(
-  #     {Counter} = 34, 
-  #     \"Counter is 34\", 
-  #     \"Counter is not 34\"
-  #     )"
-  #   formula_format: Text
-  # - name: If function
-  #   field_type: Formula
-  #   formula: "IF(
-  #     {Counter} = 34, 
-  #     51, 
-  #     54
-  #     )"
-  #   formula_format: Number
-  # - name: If AND
-  #   field_type: Formula
-  #   formula: "IF(
-  #     AND(
-  #       {Counter} = 34, 
-  #       {My Field} = \"pepito\"
-  #     ), 
-  #     \"AND is true\", 
-  #     \"AND is not true\"
-  #     )"
-  #   formula_format: Text
-  # - name: And
-  #   field_type: Formula
-  #   formula: "AND(
-  #     {Counter} = 34, 
-  #     {Status} = \"mine\"
-  #     )"
-  #   formula_format: Bool
-  # - name: And Complex
-  #   field_type: Formula
-  #   formula: "AND(
-  #     {Counter} = 34, 
-  #     {Status} = TRIM(TRIM(\" mine \")),
-  #     OR(
-  #       {Counter} > 100, 
-  #       {Status} = TRIM(TRIM(\" published \"))
-  #       )
-  #     )"
-  #   formula_format: Bool
+  - name: If function string
+    field_type: Formula
+    formula: "IF(
+      {Counter} = 34, 
+      \"Counter is 34\", 
+      \"Counter is not 34\"
+      )"
+    formula_format: Text
+  - name: If function
+    field_type: Formula
+    formula: "IF(
+      {Counter} = 34, 
+      51, 
+      54
+      )"
+    formula_format: Number
+  - name: If AND
+    field_type: Formula
+    formula: "IF(
+      AND(
+        {Counter} = 34, 
+        {My Field} = \"pepito\"
+      ), 
+      \"AND is true\", 
+      \"AND is not true\"
+      )"
+    formula_format: Text
+  - name: And
+    field_type: Formula
+    formula: "AND(
+      {Counter} = 34, 
+      {Status} = \"mine\"
+      )"
+    formula_format: Bool
+  - name: And Complex
+    field_type: Formula
+    formula: "AND(
+      {Counter} = 34, 
+      {Status} = TRIM(\" mine \"),
+      OR(
+        {Counter} > 100, 
+        {Status} = TRIM(\" published \")
+        )
+      )"
+    formula_format: Bool

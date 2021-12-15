@@ -159,7 +159,7 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                     let field_config = field.clone();
                     let field_type = field.field_type.unwrap_or_default();
                     let field_type = field_type.as_str();
-                    eprintln!("InsertIntoTable.run :: field_type: {}", &field_type);
+                    // eprintln!("InsertIntoTable.run :: field_type: {}", &field_type);
                     match field_type {
                         "Small Text" => {
                             db_data = SmallTextField::init_do(&field_config, insert_id_data_map.clone(), db_data)?

@@ -347,7 +347,7 @@ impl ConfigStorageField for FieldConfig {
             let data_collections_2 = data_collections_2.unwrap().clone();
             let field_ids = data_collections_2.get(FIELD_IDS).unwrap();
             for field_id_data in field_ids.iter() {
-                eprintln!("parse_from_db :: field_id_data: {:#?}", &field_id_data);
+                // eprintln!("parse_from_db :: field_id_data: {:#?}", &field_id_data);
                 let field_id = &field_id_data.get(ID).unwrap().clone();
                 let field_config = map_fields_by_id.get(field_id).unwrap().clone();
                 &fields.push(field_config);
