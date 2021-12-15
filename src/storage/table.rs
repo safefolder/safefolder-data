@@ -685,8 +685,6 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
         let t_1 = Instant::now();
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let iter = self.db.iter();
-        // let ctx_account_id = self.context.account_id.unwrap_or_default();
-        // let ctx_space_id = self.context.space_id.unwrap_or_default();
         let db_table = self.db_table.clone();
         let table = db_table.get_by_name(table_name)?.unwrap();
         // eprintln!("DbRow.select :: table: {:#?}", &table);
@@ -707,12 +705,7 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
         let number_items_page = number_items_page.unwrap();
         let where_formula = r#where.clone();
         let where_formula = where_formula.unwrap_or_default();
-        // let where_formula_str = where_formula.as_str();
         let mut count = 1;
-        // let field_id_map= DbTable::get_field_id_map(
-        //     &self.db_table,
-        //     table_name
-        // )?;
         // Think way to return total
         let mut select_result = SelectResult{
             total: total,
@@ -725,15 +718,21 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
         eprintln!("DbRow.select :: t_header: {} µs", &t_header);
 
         let t_f_1 = Instant::now();
-        let formula_query = compile_formula_query(
+        // Check where_formula is assign or not
+        let expr = &RE_FORMULA_ASSIGN;
+        let is_assign_function = expr.is_match(&where_formula);
+        eprintln!("DbRow.select :: is_assign_function: {}", &is_assign_function);
+        let formula_query = Formula::defaults(
             &where_formula, 
-            &db_table, 
-            table_name, 
-            Some(table),
-            None,
-            None,
+            &String::from("bool"), 
+            Some(table), 
+            None, 
+            None, 
+            Some(db_table), 
+            Some(table_name.clone()), 
+            is_assign_function
         )?;
-        eprintln!("DbRow.select :: original formula_query: {:#?}", &formula_query);
+        // eprintln!("DbRow.select :: original formula_query: {:#?}", &formula_query);
         let t_f_2 = &t_f_1.elapsed().as_micros();
         eprintln!("select :: Time compile formula: {} µs", &t_f_2);
 
@@ -758,39 +757,17 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
                 }
             }
 
-            // Execute where as a formula if where is not empty
-            // let mut formula_matches: bool = true;
-            // let item_data_id = item.clone().data;
-            // let item_data = DbTable::get_item_data_by_field_names(
-            //     item_data_id.clone(), field_id_map.clone()
-            // );
-            // eprintln!("DbRow.select :: [{}] Get field names for item: {}", &count, &t_item_2.elapsed().as_micros());
-            // let t_item_3 = Instant::now();
-            // if where_formula_str != "" {
-            //     // TODO: When I have Link, and Link (many) fields implemented, I would need to apply
-            //     //    formula filter to objects and collections of objects
-            //     let formula_obj = Formula::defaults(
-            //         Some(item_data), 
-            //         Some(table.clone()),
-            //     );
-            //     let mut formula = where_formula_str.to_string();
-            //     formula = formula_obj.execute(&formula)?;
-            //     if formula == String::from("TRUE") {
-            //         formula_matches = true;
-            //     } else {
-            //         formula_matches = false;
-            //     }
-            // }
-            // eprintln!("DbRow.select :: [{}] formula exec: {}", &count, &t_item_3.elapsed().as_micros());
-
-            // Debug compile formula
-            // let mine = compile_formula_query(&where_formula, &db_table, table_name);
-
             let formula_matches: bool;
+            let formula_result: String;
             let t_item_3 = Instant::now();
             let data_map = item.clone().data.unwrap();
 
-            formula_matches = execute_formula_query(&formula_query, &data_map)?;
+            formula_result = execute_formula(&formula_query, &data_map)?;
+            if formula_result == String::from("1") {
+                formula_matches = true;
+            } else {
+                formula_matches = false;
+            }
             eprintln!("select :: formula_matches: {}", &formula_matches);
             eprintln!("DbRow.select :: [{}] formula exec: {} µs", &count, &t_item_3.elapsed().as_micros());
 
