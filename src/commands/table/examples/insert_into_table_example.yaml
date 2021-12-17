@@ -1,10 +1,12 @@
 ---
 command: INSERT INTO TABLE "Super Table"
-name: Pepito Data 2
+name: Pepito Data 19
 data:
   My Field: pepito
   Description: This is some description I want to include
   Is Published: true
   Counter: 34
-  Status: c6soea5mmud8kiff7t6g
-  Locations: c6soea5mmud8kiff7t7g,c6soea5mmud8kiff7t8g
+  Status: c6u378tmmud19i2cv9n0
+  Locations: c6u378tmmud19i2cv9o0,c6u378tmmud19i2cv9p0
+  My Birthday: 25-Nov-1968 10:05:07+0000
+  My Birthday Only Date: 25-Nov-1968

@@ -13,11 +13,10 @@ use std::str::FromStr;
 
 
 use crate::commands::table::config::*;
-use crate::commands::table::constants::{FIELD_IDS, TABLE_NAME};
+use crate::storage::constants::*;
 use crate::commands::table::{Command};
 use crate::commands::{CommandRunner};
 use crate::planet::constants::{ID, NAME};
-use crate::storage::constants::*;
 use crate::storage::table::{DbTable, DbRow, Row, Schema, DbData, GetItemOption};
 use crate::storage::table::*;
 use crate::storage::ConfigStorageField;
@@ -27,8 +26,9 @@ use crate::planet::{
     Context,
     validation::PlanetValidationError,
 };
-use crate::storage::fields::text::*;
+use crate::storage::fields::{text::*, StorageField};
 use crate::storage::fields::number::*;
+use crate::storage::fields::date::*;
 use crate::storage::fields::formula::*;
 
 pub struct InsertIntoTable<'gb> {
@@ -84,7 +84,7 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                 // eprintln!("InsertIntoTable.run :: table: {:#?}", &table);
 
                 // I need a way to get list of instance FieldConfig (fields)
-                let config_fields = FieldConfig::parse_from_db(&table);
+                let config_fields = FieldConfig::parse_from_db(&table)?;
                 // eprintln!("InsertIntoTable.run :: config_fields: {:#?}", &config_fields);
 
                 let insert_data_map: HashMap<String, String> = self.config.data.clone().unwrap();
@@ -122,7 +122,7 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                 let name_field_type = name_field.field_type.unwrap().clone();
                 let insert_name = self.config.name.clone();
                 // Only support so far Small Text and needs to be informed in YAML with name
-                if name_field_type != FIELD_SMALL_TEXT.to_string() || insert_name.is_none() {
+                if name_field_type != FIELD_TYPE_SMALL_TEXT.to_string() || insert_name.is_none() {
                     return Err(
                         PlanetError::new(
                             500, 
@@ -133,7 +133,7 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                 }
                 let name = insert_name.unwrap();
                 // Check name does not exist
-                // eprintln!("InsertIntoTable.run :: name: {}", &name);
+                eprintln!("InsertIntoTable.run :: name: {}", &name);
                 let name_exists = self.check_name_exists(&table_name, &name, &db_row);
                 // eprintln!("InsertIntoTable.run :: name_exists: {}", &name_exists);
                 if name_exists {
@@ -157,37 +157,53 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                     routing_wrap,
                     None,
                 )?;
+                let mut data: HashMap<String, String> = HashMap::new();
                 for field in config_fields {
                     let field_config = field.clone();
                     let field_type = field.field_type.unwrap_or_default();
                     let field_type = field_type.as_str();
-                    // eprintln!("InsertIntoTable.run :: field_type: {}", &field_type);
+                    let field_id = field.id.unwrap_or_default();
+                    let field_data = insert_id_data_map.get(&field_id);
+                    if field_data.is_none() {
+                        continue
+                    }
+                    let field_data = field_data.unwrap().clone();
+                    eprintln!("InsertIntoTable.run :: field_type: {}", &field_type);
                     match field_type {
                         "Small Text" => {
-                            db_data = SmallTextField::init_do(&field_config, insert_id_data_map.clone(), db_data)?
+                            db_data = SmallTextField::init_do(&field_config, insert_id_data_map.clone(), db_data)?;
                         },
                         "Long Text" => {
-                            db_data = LongTextField::init_do(&field_config, insert_id_data_map.clone(), db_data)?
+                            db_data = LongTextField::init_do(&field_config, insert_id_data_map.clone(), db_data)?;
                         },
                         "Checkbox" => {
-                            db_data = CheckBoxField::init_do(&field_config, insert_id_data_map.clone(), db_data)?
+                            db_data = CheckBoxField::init_do(&field_config, insert_id_data_map.clone(), db_data)?;
                         },
                         "Number" => {
-                            db_data = NumberField::init_do(&field_config, insert_id_data_map.clone(), db_data)?
+                            db_data = NumberField::init_do(&field_config, insert_id_data_map.clone(), db_data)?;
                         },
                         "Select" => {
-                            db_data = SelectField::init_do(
-                                &field_config, &table, insert_id_data_map.clone(), db_data)?
+                            // db_data = SelectField::init_do(
+                            //     &field_config, &table, insert_id_data_map.clone(), db_data)?;
+                            eprintln!("InsertIntoTable.run :: did select");
                         },
                         "Formula" => {
                             db_data = FormulaField::init_do(
-                                &field_config, &table, insert_id_data_map.clone(), db_data)?
+                                &field_config, &table, insert_id_data_map.clone(), db_data)?;
                         },
+                        "Date" => {
+                            let obj = DateField::defaults(&field_config);
+                            data.insert(
+                                field_id, 
+                                obj.validate(&field_data)?
+                            );
+                        }
                         _ => {
                             return Ok(db_data);
                         }
                     };
                 }
+                db_data.data = Some(data);
                 eprintln!("InsertIntoTable.run :: I will write: {:#?}", &db_data);
                 let response: DbData = db_row.insert(&table_name, &db_data)?;
                 eprintln!("InsertIntoTable.run :: time: {} µs", &t_1.elapsed().as_micros());
@@ -320,8 +336,8 @@ impl<'gb> Command<String> for GetFromTable<'gb> {
                 let table = table.unwrap();
                 let data_collections = table.clone().data_collections;
                 let field_ids = data_collections.unwrap().get(FIELD_IDS).unwrap().clone();
-                let config_fields = FieldConfig::parse_from_db(&table);
-                let field_id_map: HashMap<String, FieldConfig> = FieldConfig::get_field_id_map(&config_fields);
+                let config_fields = FieldConfig::parse_from_db(&table)?;
+                let field_id_map: HashMap<String, FieldConfig> = FieldConfig::get_field_id_map(&config_fields)?;
                 let fields = self.config.data.clone().unwrap().fields;
                 eprintln!("GetFromTable.run :: fields: {:?}", &fields);
                 let item_id = self.config.data.clone().unwrap().id.unwrap();

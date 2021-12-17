@@ -1,6 +1,7 @@
 pub mod text;
 pub mod number;
 pub mod formula;
+pub mod date;
 
 use std::collections::HashMap;
 use tr::tr;
@@ -9,6 +10,62 @@ use serde::{Deserialize, Serialize};
 
 use crate::planet::{PlanetError};
 use crate::storage::table::{DbData};
+use crate::commands::table::config::*;
+
+/*
+These are the core fields implemented so we can tackle the security and permissions system
+
+* 01. SmallTextField                [impl] - text
+* 02. LongTextField                 [impl] - text : This is the text field.
+* 03. CheckBoxField                 [impl] - number
+* 05. SelectField                   [impl] - text
+* 06. DateField                     [doing] - date
+* 06A Duration                      [to do] - date
+* 07. NumberField                   [impl] - number
+* 08. AuditTimeField                - date
+* 09. AuditByField                  - text
+* 10. LinkField (This probably later once I have more ops from DbRow to get items, etc...)
+* 11. CurrencyField                 - number
+* 12. PercentField                  - number
+* 13. CountField (This is parameters of COUNT() query when we go seq in table, defines query) - agg
+* 14. GenerateIdField               - text : Random ids
+* 15. GeneratedNumberField : Sequential number - number : Sequence number.
+* 16. LanguageField                 - text
+* 17. NumberCollectionField : Is this like SetField???
+* 18. SmallTextCollectionField : ????
+* 19. FormulaField                  [impl] - formula
+* 20. SetField: List of items in a field, strings, numbers, etc... All same type, which goes into the definition on the schema table
+* 21. ObjectField: Object embedded with additional information, to group data into objects.
+
+Above fields gives us what we need as EXCEL functions into the formula field. Formula can provide a combination of
+these function fields, which are not needed.
+
+**xlformula_engine**
+let formula = parse_formula::parse_string_to_formula(&"=1+2", None::<NoCustomFunction>);
+let result = calculate::calculate_formula(formula, None::<NoReference>);
+println!("Result is {}", calculate::result_to_string(result));
+
+I can have some excel functions plus my custom functions.
+
+For seq data queries, we use a formula AND, XOR, OR, etc... in a yaml we can do multi line and looks fine with
+indents.
+
+Then on the app, we have a visual way to add functions, helper content, etc...
+
+*/
+
+pub trait StorageField {
+    fn update_config_map(
+        &mut self, 
+        field_config_map: &HashMap<String, String>,
+    ) -> Result<HashMap<String, String>, PlanetError>;
+    fn build_config(
+        &mut self, 
+        field_config_map: &HashMap<String, String>,
+    ) -> Result<FieldConfig, PlanetError>;
+    fn validate(&self, data: &String) -> Result<String, PlanetError>;
+    fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String;
+}
 
 pub trait ValidateField {
     fn is_valid(&self, value: Option<&String>) -> Result<bool, PlanetError>;

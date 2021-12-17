@@ -3,12 +3,12 @@ use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use tr::tr;
 
-use crate::commands::table::constants::{FIELD_IDS, KEY, SELECT_OPTIONS, VALUE};
 use crate::planet::constants::ID;
 use crate::planet::{PlanetError};
 use crate::storage::table::{DbData};
 use crate::commands::table::config::FieldConfig;
 use crate::storage::constants::*;
+use crate::planet::constants::*;
 use crate::storage::fields::*;
 
 pub trait DbDumpString {
@@ -430,6 +430,8 @@ impl ValidateField for SelectField {
     fn is_valid(&self, value: Option<&String>) -> Result<bool, PlanetError> {
         // value represents the id for the option selected, like id->name
         let field_config = self.field_config.clone();
+        eprintln!("SelectField.is_valid :: field_config: {:#?}", &field_config);
+        eprintln!("SelectField.is_valid :: value: {:?}", &value);
         let required = field_config.required.unwrap();
         let name = field_config.name.unwrap();
         // let field_name = self.field.name.clone().unwrap_or_default();

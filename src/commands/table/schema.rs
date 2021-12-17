@@ -12,7 +12,6 @@ use validator::Contains;
 use crate::commands::table::config::{CreateTableConfig};
 use crate::commands::table::{Command};
 use crate::commands::{CommandRunner};
-use crate::commands::table::constants::*;
 use crate::storage::{ConfigStorageField};
 use crate::storage::table::{DbTable, Schema, DbData, RoutingData};
 use crate::planet::{
@@ -21,6 +20,7 @@ use crate::planet::{
     Context, 
     validation::PlanetValidationError,
 };
+use crate::storage::constants::*;
 use crate::planet::constants::*;
 
 pub struct CreateTable<'gb> {
@@ -104,7 +104,7 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                     )?;
                     data_objects.insert(String::from(field_name.clone()), map.clone());
                     // field complex attributes like select_data
-                    let map_list = &field.map_collections_db();
+                    let map_list = &field.map_collections_db()?;
                     let map_list = map_list.clone();
                     // data_collections = map_list.clone();
                     data_collections.extend(map_list);
@@ -143,7 +143,7 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                 let mut mine = db_data.clone().data_collections.unwrap();
                 mine.remove("field_ids");
                 eprintln!("CreateTable.run :: db_data: {:#?}", mine);
-                // eprintln!("CreateTable.run :: db_data all: {:#?}", db_data.clone());
+                eprintln!("CreateTable.run :: db_data all: {:#?}", db_data.clone());
 
                 let response: DbData = db_table.create(&db_data)?;
                 let response_src = response.clone();

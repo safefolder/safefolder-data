@@ -237,6 +237,7 @@ pub struct Formula {
     pub functions: Option<HashMap<String, CompiledFunction>>,
     pub assignment: Option<AttributeAssign>,
     pub formula: String,
+    pub data: Option<HashMap<String, String>>,
 }
 impl Formula {
     pub fn defaults(
@@ -283,6 +284,7 @@ impl Formula {
             functions: None,
             assignment: None,
             formula: String::from(""),
+            data: None,
         };
         let mut compiled_functions_map: HashMap<String, CompiledFunction> = HashMap::new();
         let mut compiled_functions: Vec<CompiledFunction> = Vec::new();
@@ -1133,6 +1135,7 @@ pub struct CompiledFunction {
     pub text: Option<String>,
     pub function_type: FunctionType,
     pub attributes: Option<Vec<FunctionAttributeItem>>,
+    pub data: Option<HashMap<String, String>>,
 }
 impl CompiledFunction {
     pub fn defaults(name: &String) -> Self {
@@ -1141,7 +1144,8 @@ impl CompiledFunction {
             name: name,
             attributes: None,
             text: None,
-            function_type: FunctionType::Attribute
+            function_type: FunctionType::Attribute,
+            data: None,
         };
         return obj;
     }
@@ -1170,6 +1174,7 @@ pub struct FunctionAttributeItem {
     pub value: Option<String>,
     pub attr_type: AttributeType,
     pub formula: Option<Formula>,
+    pub data: Option<HashMap<String, String>>,
 }
 impl FunctionAttributeItem {
     pub fn defaults(id: Option<String>, name: Option<String>, attr_type: AttributeType) -> Self {
@@ -1183,6 +1188,7 @@ impl FunctionAttributeItem {
             value: None,
             attr_type: attr_type,
             formula: None,
+            data: None,
         };
         return obj
     }
@@ -1236,52 +1242,6 @@ impl FunctionAttributeItem {
         return check
     }
 }
-
-// pub fn execute_formula_query(
-//     formula: &Formula, 
-//     data_map: &HashMap<String, String>
-// ) -> Result<bool, PlanetError> {
-//     let mut check: bool = true;
-//     // eprintln!!("execute_formula :: formula: {:#?}", formula);
-//     // In case we have function, like AND, OR, NOT, XOR and other references and functions inside
-//     // let functions = formula.functions;
-//     // if functions.is_some() {
-//     //     let functions = functions.unwrap();
-//     //     let function: CompiledFunction;
-//     //     for (k, v) in functions {
-//     //         function = v;
-//     //         break;
-//     //     }
-//     //     let function_parse = FunctionParse::defaults(&function.name);
-//     //     let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
-//     //     let result = function_parse.result.unwrap();
-//     //     if result.check.unwrap() == false {
-//     //         check = false;
-//     //     }
-//     // }
-//     // let function = formula.function.clone();
-//     // if function.is_some() {
-//     //     let function = function.unwrap();
-//     //     let function_parse = FunctionParse::defaults(&function.name);
-//     //     let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
-//     //     let result = function_parse.result.unwrap();
-//     //     if result.check.unwrap() == false {
-//     //         check = false;
-//     //     }
-//     // }
-//     // In case we have 1 direct assignment, like {Column A} = "mine" or {Column B} > 67.8
-//     // let assignment = formula.assignment.clone();
-//     // if assignment.is_some() {
-//     //     let assignment = assignment.unwrap();
-//     //     check = check_assignment(assignment, assignment.attr_type, data_map)?;
-//     //     // let is_reference = assignment.is_reference;
-//     //     // if is_reference == true {
-//     //     //     let attr_assignment = assignment.assignment.unwrap();
-//     //     //     check = check_assignment(attr_assignment, assignment.attr_type, data_map)?;
-//     //     // }
-//     // }
-//     return Ok(check)
-// }
 
 pub fn execute_formula(
     formula: &Formula, 
@@ -1358,159 +1318,6 @@ pub fn execute_formula(
     let result = result.trim().to_string();
     return Ok(result)
 }
-
-// pub fn compile_formula_query(
-//     formula: &String, 
-//     db_table: &DbTable,
-//     table_name: &String,
-//     table: Option<DbData>,
-//     field_type_map: Option<HashMap<String, String>>,
-//     field_name_map: Option<HashMap<String, String>>,
-// ) -> Result<FormulaQueryCompiled, PlanetError> {
-//     // eprintln!("compile_formula_query...");
-//     let db_table = db_table.clone();
-//     let expr = &RE_FORMULA_QUERY;
-//     let formula_str = formula.as_str();
-//     let formula_str = formula_str.replace("\n", "");
-//     let expr_map = expr.captures(&formula_str);
-//     let mut formula_compiled = FormulaQueryCompiled::defaults(
-//         None, None
-//     );
-//     let field_name_map_: HashMap<String, String>;
-//     let field_type_map_: HashMap<String, String>;
-//     if table.is_some() {
-//         let table = table.unwrap();
-//         field_type_map_ = DbTable::get_field_type_map(&table)?;
-//         field_name_map_ = DbTable::get_field_name_map(&db_table, table_name)?;
-//     } else if field_type_map.is_some() && field_name_map.is_some() {
-//         let field_type_map = field_type_map.unwrap();
-//         field_type_map_ = field_type_map;
-//         let field_name_map = field_name_map.unwrap();
-//         field_name_map_ = field_name_map
-//     } else {
-//         // This means that table is None, field_type_map as well, we raise error letting know about problem
-//         return Err(
-//             PlanetError::new(
-//                 500, 
-//                 Some(tr!("Either the db table instance needs to be informed or the 
-//                 map for the field types")),
-//             )
-//         );
-//     }
-    
-//     // "Status": "Select",
-//     // My Field": "Small Text",
-//     // If I could field name => field id, then could get id for the field names
-//     // eprintln!("compile_formula_query :: field_name_map: {:#?}", &field_name_map);
-//     // eprintln!("compile_formula_query :: field_type_map: {:#?}", &field_type_map);
-
-//     if expr_map.is_some() {
-//         let expr_map = expr_map.unwrap();
-//         let has_assign = *&expr_map.name("assign").is_some();
-//         // eprintln!("compile_formula_query :: has_assign: {}", &has_assign);
-//         if has_assign {
-//             let assign = *&expr_map.name("assign").unwrap().as_str();
-//             let assign = assign.to_string();
-//             // capture log_op which is =, <, >, etc...
-//             // I need to process these possible cases:
-//             // {My Column} = "pepito"
-//             // {My Column} = 98.89
-//             // {My Column} = TRIM(" pepito ")
-//             // {My Column} > 98
-//             let (items, attribute_operator) = parse_assign_operator(
-//                 &assign, &formula
-//             )?;
-//             let (reference_name, items_new) = get_assignment_reference(
-//                 &items, 
-//                 field_name_map_
-//             )?;
-//             let field_type = field_type_map_.get(&reference_name);
-//             let mut attribute_type: AttributeType = AttributeType::Text;
-//             if field_type.is_some() {
-//                 let field_type = field_type.unwrap();
-//                 attribute_type = get_attribute_type(field_type, None);
-//             }
-//             let mut function_attribute = FunctionAttributeItem::defaults(
-//                 None,
-//                 Some(reference_name), 
-//                 attribute_type.clone()
-//             );
-//             function_attribute.is_reference = true;
-//             function_attribute.assignment = Some(
-//                 AttributeAssign::defaults(
-//                     &items_new[0].clone(), 
-//                     &attribute_operator, 
-//                     &items_new[1].clone(),
-//                     &attribute_type.clone()
-//                 )
-//             );
-//             formula_compiled.assignment = Some(function_attribute);
-//         } else {
-//             let op = *&expr_map.name("op").unwrap().as_str();
-//             // attrs: {My Field}   =   "pepito"  , {Status}  =   "c4vhm0gsmpv7omu4aqg0"  ,   {Mine}  =    98.3
-//             let attributes_str = *&expr_map.name("attrs").unwrap().as_str();
-//             let op_string = String::from(op);
-//             // eprintln!("compile_formula_query :: op: {} attributes: {}", &op_string, &attributes_str);
-//             let mut main_function: CompiledFunction = CompiledFunction::defaults(&op_string);
-//             let mut main_function_attrs: Vec<FunctionAttributeItem> = Vec::new();
-//             let attributes_source: Vec<&str> = attributes_str.split(",").collect();
-//             // let mut item_replaced: String;
-//             for attr_source in attributes_source {
-//                 //|  {Status}  =   "c4vhm0gsmpv7omu4aqg0"  |
-//                 // Operators can be "=", "<", ">", ">=", "<="
-                
-//                 // eprintln!("compile_formula_query :: attr_source: *{}*", attr_source);
-//                 let (items, attribute_operator) = parse_assign_operator(
-//                     attr_source, &formula
-//                 )?;
-
-//                 let (reference_name, items_new) = get_assignment_reference(
-//                     &items, 
-//                     field_name_map_.clone()
-//                 )?;
-//                 // ["$id", "my value"]
-//                 // eprintln!("compile_formula_query :: reference_name: {}", &reference_name);
-//                 // eprintln!("compile_formula_query :: items_new: {:?}", &items_new);
-//                 let field_type = field_type_map_.get(&reference_name);
-//                 let mut attribute_type: AttributeType = AttributeType::Text;
-//                 if field_type.is_some() {
-//                     let field_type = field_type.unwrap();
-//                     // eprintln!("compile_formula_query :: field_type: {}", &field_type);
-//                     attribute_type = get_attribute_type(field_type, None);
-//                     // eprintln!("compile_formula_query :: attribute_type: {:?}", &attribute_type);
-//                 }
-//                 let mut function_attribute = FunctionAttributeItem::defaults(
-//                     None,
-//                     Some(reference_name), 
-//                     attribute_type.clone()
-//                 );
-//                 function_attribute.is_reference = true;
-//                 function_attribute.assignment = Some(
-//                     AttributeAssign::defaults(
-//                         &items_new[0].clone(), 
-//                         &attribute_operator, 
-//                         &items_new[1].clone(),
-//                         &attribute_type
-//                     )
-//                 );    
-//                 // eprintln!("compile_formula_query :: function_attribute: {:#?}", &function_attribute);
-//                 main_function_attrs.push(function_attribute);
-//             }
-//             main_function.attributes = Some(main_function_attrs);
-//             // formula_function = main_function;
-//             formula_compiled.function = Some(main_function);
-//         }
-//         // eprintln!("compile_formula_query :: formula_compiled: {:#?}", &formula_compiled);
-//         return Ok(formula_compiled)
-//     } else {
-//         return Err(
-//             PlanetError::new(
-//                 500, 
-//                 Some(tr!("Could not validate formula. Formula: {}", &formula)),
-//             )
-//         );
-//     }
-// }
 
 pub fn fetch_logical_op(attribute: &str) -> &str {
     let mut log_op: &str = "";
