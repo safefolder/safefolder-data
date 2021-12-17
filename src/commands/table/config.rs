@@ -270,10 +270,11 @@ impl ConfigStorageField for FieldConfig {
                 let indexed = make_bool_str(field_config_map.get(INDEXED).unwrap().clone());
                 let many = make_bool_str(field_config_map.get(MANY).unwrap().clone());
                 let field_id = field_config_map.get(ID).unwrap().clone();
+                let field_name = field_config_map.get(NAME).unwrap().clone();
                 let field_type_str = field_config_map.get(FIELD_TYPE).unwrap().as_str();
                 let mut field_config = FieldConfig::defaults(None);
                 field_config.id = Some(field_id.clone());
-                field_config.name = Some(field_type_str.to_string());
+                field_config.name = Some(field_name.clone());
                 field_config.field_type = Some(field_config_map.get(FIELD_TYPE).unwrap().clone());
                 field_config.default = Some(field_config_map.get(DEFAULT).unwrap().clone());
                 field_config.version = Some(field_config_map.get(VERSION).unwrap().clone());
@@ -313,19 +314,12 @@ impl ConfigStorageField for FieldConfig {
                         field_config.formula_compiled = formula_compiled_wrap;
                     },
                     FIELD_TYPE_SELECT => {
-                        let options_str = field_config_map.get(OPTIONS);
-                        let options_wrap: Option<Vec<String>>;
-                        if options_str.is_some() {
-                            let options_str = field_config_map.get(OPTIONS).unwrap().clone();
-                            let options_str = options_str.as_str();
-                            let options: Vec<String> = serde_yaml::from_str(options_str).unwrap();
-                            options_wrap = Some(options);
-                            field_config.options = options_wrap;
-                        }
+                        let mut obj = SelectField::defaults(&field_config, None);
+                        field_config = obj.build_config(field_config_map)?;
                     },
                     _ => {}
                 }
-                
+
                 &map_fields_by_id.insert(field_id, field_config.clone());
                 &map_fields_by_name.insert(field_name.clone(), field_config.clone());
             }
@@ -410,6 +404,7 @@ impl ConfigStorageField for FieldConfig {
         let field_type = field_config.field_type.unwrap_or_default();
         let field_id = field_config.id.unwrap_or_default();
         let field_type_str = field_type.as_str();
+        eprintln!("map_object_db :: field_name: {}", &field_name);
         map.insert(String::from(ID), field_id.clone());
         map.insert(String::from(NAME), field_name.clone());
         map.insert(String::from(FIELD_TYPE), field_type.clone());
@@ -420,11 +415,16 @@ impl ConfigStorageField for FieldConfig {
         map.insert(String::from(INDEXED), indexed.to_string());
         map.insert(String::from(MANY), many.to_string());
 
-        eprintln!("map_object_db :: DateField...");
         match field_type_str {
             FIELD_TYPE_SMALL_TEXT => {
                 map = SmallTextField::defaults(&field_config_).update_config_map(&map)?;
             },
+            FIELD_TYPE_LONG_TEXT => {
+                map = LongTextField::defaults(&field_config_).update_config_map(&map)?;
+            },
+            FIELD_TYPE_SELECT => {
+                map = SelectField::defaults(&field_config_, None).update_config_map(&map)?;
+            },            
             FIELD_TYPE_DATE => {
                 map = DateField::defaults(&field_config_).update_config_map(&map)?;
             },
@@ -457,16 +457,16 @@ impl ConfigStorageField for FieldConfig {
             map.insert(String::from(FORMULA_COMPILED), formula_serialized);
         }
         // Here we encode as string the options as string using yaml encoding
-        eprintln!("map_object_db :: select and options...");
-        let options = field_config.options;
-        if options.is_some() {
-            let options_yaml = serde_yaml::to_string(&options);
-            if options_yaml.is_ok() {
-                map.insert(String::from(OPTIONS), options_yaml.unwrap());
-            } else {
-                panic!("Could not parse options for field \"{}\"", &field_name);
-            }
-        }
+        // eprintln!("map_object_db :: select and options...");
+        // let options = field_config.options;
+        // if options.is_some() {
+        //     let options_yaml = serde_yaml::to_string(&options);
+        //     if options_yaml.is_ok() {
+        //         map.insert(String::from(OPTIONS), options_yaml.unwrap());
+        //     } else {
+        //         panic!("Could not parse options for field \"{}\"", &field_name);
+        //     }
+        // }
         eprintln!("map_object_db :: finished!!!");
         return Ok(map);
     }
