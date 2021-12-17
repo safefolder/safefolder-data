@@ -27,6 +27,11 @@ pub trait Command<T> {
     fn runner(runner: &CommandRunner, path_yaml: &String) -> ();
 }
 
+pub trait CommandErrors<T> {
+    fn run(&self) -> Result<T, Vec<PlanetError>>;
+    fn runner(runner: &CommandRunner, path_yaml: &String) -> ();
+}
+
 pub trait CommandConfig {
     fn is_valid(&self) -> Result<(), ValidationErrors>;
     fn import(&self, yaml_config: String);

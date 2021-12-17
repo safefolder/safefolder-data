@@ -29,7 +29,7 @@ use crate::planet::{
 use crate::storage::fields::{text::*, StorageField};
 use crate::storage::fields::number::*;
 use crate::storage::fields::date::*;
-use crate::storage::fields::formula::*;
+// use crate::storage::fields::formula::*;
 
 pub struct InsertIntoTable<'gb> {
     pub planet_context: &'gb PlanetContext<'gb>,
@@ -38,9 +38,9 @@ pub struct InsertIntoTable<'gb> {
     pub config: InsertIntoTableConfig,
 }
 
-impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
+impl<'gb> InsertIntoTable<'gb> {
 
-    fn run(&self) -> Result<DbData, PlanetError> {
+    pub fn run(&self) -> Result<DbData, Vec<PlanetError>> {
         let t_1 = Instant::now();
         let command = self.config.command.clone().unwrap_or_default();
         let expr = Regex::new(r#"(INSERT INTO TABLE) "(?P<table_name>[a-zA-Z0-9_ ]+)"#).unwrap();
@@ -55,20 +55,18 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
             self.planet_context,
             self.context,
         );
+        let mut errors: Vec<PlanetError> = Vec::new();
         match result {
             Ok(_) => {
                 // let data_config = self.config.data.clone();
                 let db_row: DbRow<'gb> = result.unwrap();
                 // I need to get SchemaData and schema for the table
                 // I go through fields in order to build RowData
-                let table = self.db_table.get_by_name(table_name)?;
-                if *&table.is_none() {
-                    return Err(
-                        PlanetError::new(
-                            500, 
-                            Some(tr!("Could not find table {}", &table_name)),
-                        )
-                    );
+                let table = self.db_table.get_by_name(table_name);
+                if table.is_err() {
+                    let error = table.unwrap_err();
+                    errors.push(error);
+                    return Err(errors);
                 }
 
                 // routing
@@ -80,11 +78,28 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                     None
                 );
                 let table = table.unwrap();
+                if *&table.is_none() {
+                    errors.push(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!("Could not find table {}", &table_name)),
+                        )
+                    );
+                    return Err(errors);
+                }    
+
+                let table = table.unwrap();
                 let table_name = &table.clone().name.unwrap();
                 // eprintln!("InsertIntoTable.run :: table: {:#?}", &table);
 
                 // I need a way to get list of instance FieldConfig (fields)
-                let config_fields = FieldConfig::parse_from_db(&table)?;
+                let config_fields = FieldConfig::parse_from_db(&table);
+                if config_fields.is_err() {
+                    let error = config_fields.unwrap_err();
+                    errors.push(error);
+                    return Err(errors);
+                }
+                let config_fields = config_fields.unwrap();
                 // eprintln!("InsertIntoTable.run :: config_fields: {:#?}", &config_fields);
 
                 let insert_data_map: HashMap<String, String> = self.config.data.clone().unwrap();
@@ -123,7 +138,7 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                 let insert_name = self.config.name.clone();
                 // Only support so far Small Text and needs to be informed in YAML with name
                 if name_field_type != FIELD_TYPE_SMALL_TEXT.to_string() || insert_name.is_none() {
-                    return Err(
+                    errors.push(
                         PlanetError::new(
                             500, 
                             Some(tr!("You need to include name field when inserting data into database.
@@ -137,7 +152,7 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                 let name_exists = self.check_name_exists(&table_name, &name, &db_row);
                 // eprintln!("InsertIntoTable.run :: name_exists: {}", &name_exists);
                 if name_exists {
-                    return Err(
+                    errors.push(
                         PlanetError::new(
                             500, 
                             Some(tr!("A record with name \"{}\" already exists in database", &name)),
@@ -148,7 +163,7 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                 // Instantiate DbData and validate
                 let mut db_context: HashMap<String, String> = HashMap::new();
                 db_context.insert(TABLE_NAME.to_string(), table_name.clone());
-                let mut db_data = DbData::defaults(
+                let db_data = DbData::defaults(
                     &name,
                     None,
                     None,
@@ -156,7 +171,13 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                     None,
                     routing_wrap,
                     None,
-                )?;
+                );
+                if db_data.is_err() {
+                    let error = db_data.unwrap_err();
+                    errors.push(error);
+                    return Err(errors)
+                }
+                let mut db_data = db_data.unwrap();
                 let mut data: HashMap<String, String> = HashMap::new();
                 for field in config_fields {
                     let field_config = field.clone();
@@ -169,38 +190,29 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                         continue
                     }
                     let field_data = field_data.unwrap().clone();
+                    let mut field_data_wrap: Result<String, PlanetError> = Ok(String::from(""));
                     eprintln!("InsertIntoTable.run :: field_type: {}", &field_type);
                     eprintln!("InsertIntoTable.run :: field_name: {}", &field_name);
                     match field_type {
                         "Small Text" => {
                             let obj = SmallTextField::defaults(&field_config);
-                            data.insert(
-                                field_id, 
-                                obj.validate(&field_data)?
-                            );
+                            field_data_wrap = obj.validate(&field_data);
                         },
                         "Long Text" => {
                             let obj = LongTextField::defaults(&field_config);
-                            data.insert(
-                                field_id, 
-                                obj.validate(&field_data)?
-                            );
+                            field_data_wrap = obj.validate(&field_data);
                         },
                         "Checkbox" => {
-                            db_data = CheckBoxField::init_do(&field_config, insert_id_data_map.clone(), db_data)?;
+                            let obj = CheckBoxField::defaults(&field_config);
+                            field_data_wrap = obj.validate(&field_data);
                         },
                         "Number" => {
-                            db_data = NumberField::init_do(&field_config, insert_id_data_map.clone(), db_data)?;
+                            let obj = NumberField::defaults(&field_config);
+                            field_data_wrap = obj.validate(&field_data);
                         },
                         "Select" => {
-                            // db_data = SelectField::init_do(
-                            //     &field_config, &table, insert_id_data_map.clone(), db_data)?;
                             let obj = SelectField::defaults(&field_config, Some(&table));
-                            data.insert(
-                                field_id, 
-                                obj.validate(&field_data)?
-                            );
-                            eprintln!("InsertIntoTable.run :: did select");
+                            field_data_wrap = obj.validate(&field_data);
                         },
                         "Formula" => {
                             // db_data = FormulaField::init_do(
@@ -208,30 +220,41 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                         },
                         "Date" => {
                             let obj = DateField::defaults(&field_config);
-                            data.insert(
-                                field_id, 
-                                obj.validate(&field_data)?
-                            );        
+                            field_data_wrap = obj.validate(&field_data);
                         }
                         _ => {
                             // return Ok(db_data);
                         }
                     };
-
+                    let tuple = handle_field_response(
+                        &field_data_wrap, &errors, &field_id, &data
+                    );
+                    data = tuple.0;
+                    errors = tuple.1;
+                }
+                if errors.len() > 0 {
+                    return Err(errors)
                 }
                 db_data.data = Some(data);
                 eprintln!("InsertIntoTable.run :: I will write: {:#?}", &db_data);
-                let response: DbData = db_row.insert(&table_name, &db_data)?;
+                let response= db_row.insert(&table_name, &db_data);
+                if response.is_err() {
+                    let error = response.unwrap_err();
+                    errors.push(error);
+                    return Err(errors)
+                }
+                let response = response.unwrap();
                 eprintln!("InsertIntoTable.run :: time: {} µs", &t_1.elapsed().as_micros());
                 return Ok(response);
             },
             Err(error) => {
-                return Err(error);
+                errors.push(error);
+                return Err(errors);
             }
         }
     }
 
-    fn runner(runner: &CommandRunner, path_yaml: &String) -> () {
+    pub fn runner(runner: &CommandRunner, path_yaml: &String) -> () {
         let t_1 = Instant::now();
         let config_ = InsertIntoTableConfig::defaults(None);
         let config: Result<InsertIntoTableConfig, Vec<PlanetValidationError>> = config_.import(
@@ -251,25 +274,27 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                     config: config.unwrap(),
                     db_table: &db_table,
                 };
-                let result: Result<_, PlanetError> = insert_into_table.run();
+                let result: Result<_, Vec<PlanetError>> = insert_into_table.run();
                 match result {
                     Ok(_) => {
                         println!();
                         println!("{}", String::from("[OK]").green());
                         eprint!("Time: {} ms", &t_1.elapsed().as_millis());
                     },
-                    Err(error) => {
+                    Err(errors) => {
                         let count = 1;
                         println!();
                         println!("{}", tr!("I found these errors").red().bold());
                         println!("{}", "--------------------".red());
                         println!();
-                        println!(
-                            "{}{} {}", 
-                            count.to_string().blue(),
-                            String::from('.').blue(),
-                            error.message
-                        );
+                        for error in errors {
+                            println!(
+                                "{}{} {}", 
+                                count.to_string().blue(),
+                                String::from('.').blue(),
+                                error.message
+                            );
+                        }
                     }
                 }
             },
@@ -415,10 +440,11 @@ impl<'gb> Command<String> for GetFromTable<'gb> {
                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },
                             "Checkbox" => {
-                                yaml_out_str = CheckBoxField::init_get(&field_config_, Some(&data), &yaml_out_str)?;
+                                let obj = CheckBoxField::defaults(&field_config_);
+                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },
                             "Number" => {
-                                yaml_out_str = NumberField::init_get(&field_config_, Some(&data), &yaml_out_str)?;
+                                // yaml_out_str = NumberField::init_get(&field_config_, Some(&data), &yaml_out_str)?;
                             },
                             "Select" => {
                                 let obj = SelectField::defaults(&field_config_, Some(&table));
@@ -628,4 +654,24 @@ impl<'gb> Command<String> for SelectFromTable<'gb> {
             }
         }
     }
+}
+
+fn handle_field_response(
+    field_data: &Result<String, PlanetError>, 
+    errors: &Vec<PlanetError>, 
+    field_id: &String,
+    data: &HashMap<String, String>
+) -> (HashMap<String, String>, Vec<PlanetError>) {
+    let field_data = field_data.clone();
+    let mut errors = errors.clone();
+    let mut data = data.clone();
+    let field_id = field_id.clone();
+    if field_data.is_err() {
+        let err = field_data.unwrap_err();
+        errors.push(err);
+    } else {
+        let field_data = field_data.unwrap();
+        data.insert(field_id, field_data);
+    }
+    return (data, errors)
 }
