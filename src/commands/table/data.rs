@@ -203,8 +203,8 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                             eprintln!("InsertIntoTable.run :: did select");
                         },
                         "Formula" => {
-                            db_data = FormulaField::init_do(
-                                &field_config, &table, insert_id_data_map.clone(), db_data)?;
+                            // db_data = FormulaField::init_do(
+                            //     &field_config, &table, insert_id_data_map.clone(), db_data)?;
                         },
                         "Date" => {
                             let obj = DateField::defaults(&field_config);
@@ -426,7 +426,7 @@ impl<'gb> Command<String> for GetFromTable<'gb> {
                                 // yaml_out_str = SelectField::init_get(&field_config_, &table, Some(&data), &yaml_out_str)?
                             },
                             "Formula" => {
-                                yaml_out_str = FormulaField::init_get(&field_config_, &table, Some(&data), &yaml_out_str)?
+                                // yaml_out_str = FormulaField::init_get(&field_config_, &table, Some(&data), &yaml_out_str)?
                             },
                             _ => {
                                 yaml_out_str = yaml_out_str;
