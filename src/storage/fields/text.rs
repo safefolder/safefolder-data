@@ -30,46 +30,54 @@ pub trait StringVectorValueField {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SmallTextField {
-    pub field_config: FieldConfig
+    pub config: FieldConfig
 }
-
 impl SmallTextField {
     pub fn defaults(field_config: &FieldConfig) -> Self {
         let field_config = field_config.clone();
         let field_obj = Self{
-            field_config: field_config
+            config: field_config
         };
         return field_obj
     }
-    pub fn init_do(field_config: &FieldConfig, data_map: HashMap<String, String>, mut db_data: DbData) -> Result<DbData, PlanetError> {
-        let field_object = Self::defaults(field_config);
-        db_data = field_object.process(data_map.clone(), db_data)?;
-        return Ok(db_data)
-    }
-    pub fn init_get(
-        field_config: &FieldConfig, 
-        data: Option<&HashMap<String, String>>, 
-        yaml_out_str: &String
-    ) -> Result<String, PlanetError> {
-        let field_config_ = field_config.clone();
-        let field_id = field_config_.id.unwrap();
-        let data = data.unwrap().clone();
-        let field_obj = Self::defaults(&field_config);
-        let value_db = data.get(&field_id);
-        if value_db.is_some() {
-            let value_db = value_db.unwrap().clone();
-            let value = field_obj.get_value(Some(&value_db)).unwrap();
-            let yaml_out_str = field_obj.get_yaml_out(yaml_out_str, &value);    
-            return Ok(yaml_out_str)
-        }
-        let yaml_out_str = yaml_out_str.clone();
-        return Ok(yaml_out_str)
-    }
 }
-
-impl DbDumpString for SmallTextField {
+impl StorageField for SmallTextField {
+    fn update_config_map(
+        &mut self, 
+        field_config_map: &HashMap<String, String>,
+    ) -> Result<HashMap<String, String>, PlanetError> {
+        let field_config_map = field_config_map.clone();
+        // No special attributes so far for small text field
+        return Ok(field_config_map)
+    }
+    fn build_config(
+        &mut self, 
+        _: &HashMap<String, String>,
+    ) -> Result<FieldConfig, PlanetError> {
+        let config = self.config.clone();
+        // No special attributes so far for small text field
+        return Ok(config)
+    }
+    fn validate(&self, data: &String) -> Result<String, PlanetError> {
+        let data = data.clone();
+        let config = self.config.clone();
+        let required = config.required.unwrap();
+        let name = config.name.unwrap();
+        if data == String::from("") && required == true {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!(
+                        "Field {}{}{} is required", 
+                        String::from("\"").blue(), name.blue(), String::from("\"").blue()
+                    )),
+                )
+            );
+        }
+        return Ok(data)
+    }
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
-        let field_config = self.field_config.clone();
+        let field_config = self.config.clone();
         let field_name = field_config.name.unwrap();
         let mut yaml_string = yaml_string.clone();
         let field = &field_name.truecolor(
@@ -83,80 +91,7 @@ impl DbDumpString for SmallTextField {
     }
 }
 
-impl ValidateField for SmallTextField {
-    fn is_valid(&self, value: Option<&String>) -> Result<bool, PlanetError> {
-        let field_config = self.field_config.clone();
-        let required = field_config.required.unwrap();
-        let name = field_config.name.unwrap();
-        if value.is_none() && required == true {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!(
-                        "Field {}{}{} is required", 
-                        String::from("\"").blue(), name.blue(), String::from("\"").blue()
-                    )),
-                )
-            );
-        } else {
-            return Ok(true)
-        }
-    }
-}
-impl ProcessField for SmallTextField {
-    fn process(
-        &self,
-        insert_data_map: HashMap<String, String>,
-        mut db_data: DbData
-    ) -> Result<DbData, PlanetError> {
-        let field_config = self.field_config.clone();
-        let field_id = field_config.id.unwrap_or_default();
-        let field_name = field_config.name.unwrap_or_default();
-        let value_entry = insert_data_map.get(&field_id);
-        // Name Small Text would not be included into insert data (from YAML file data object, since has name attr)
-        if value_entry.is_some() {
-            let value_entry = value_entry.unwrap().clone();
-            let value_db = value_entry.clone();
-            let field = Self{
-                field_config: self.field_config.clone()
-            };
-            let mut data: HashMap<String, String> = HashMap::new();
-            if db_data.data.is_some() {
-                data = db_data.data.unwrap();
-            }
-            let is_valid = field.is_valid(Some(&value_db))?;
-            if is_valid == true {
-                &data.insert(field_id, value_db);
-                db_data.data = Some(data);
-                return Ok(db_data);
-            } else {
-                return Err(error_validate_process("Small Text", &field_name))
-            }    
-        } else {
-            // We skip processing since we have name field
-            return Ok(db_data);
-        }
-    }
-}
-impl StringValueField for SmallTextField {
-    fn get_value(&self, value_db: Option<&String>) -> Option<String> {
-        if value_db.is_none() {
-            return None
-        } else {
-            let value_final = value_db.unwrap().clone();
-            return Some(value_final);
-        }
-    }
-    fn get_value_db(&self, value: Option<&String>) -> Option<String> {
-        if *&value.is_some() {
-            let value = value.unwrap().clone();
-            return Some(value);
-        }
-        return None
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
+ #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LongTextField {
     pub field_config: FieldConfig
 }

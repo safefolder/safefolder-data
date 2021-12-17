@@ -171,7 +171,11 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                     eprintln!("InsertIntoTable.run :: field_type: {}", &field_type);
                     match field_type {
                         "Small Text" => {
-                            db_data = SmallTextField::init_do(&field_config, insert_id_data_map.clone(), db_data)?;
+                            let obj = SmallTextField::defaults(&field_config);
+                            data.insert(
+                                field_id, 
+                                obj.validate(&field_data)?
+                            );        
                         },
                         "Long Text" => {
                             db_data = LongTextField::init_do(&field_config, insert_id_data_map.clone(), db_data)?;
@@ -196,12 +200,13 @@ impl<'gb> Command<DbData> for InsertIntoTable<'gb> {
                             data.insert(
                                 field_id, 
                                 obj.validate(&field_data)?
-                            );
+                            );        
                         }
                         _ => {
-                            return Ok(db_data);
+                            // return Ok(db_data);
                         }
                     };
+
                 }
                 db_data.data = Some(data);
                 eprintln!("InsertIntoTable.run :: I will write: {:#?}", &db_data);
@@ -383,10 +388,16 @@ impl<'gb> Command<String> for GetFromTable<'gb> {
                         let field_config_ = field_config.clone();
                         let field_type = field_config.field_type.unwrap();
                         let field_type =field_type.as_str();
+                        let value = data.get(field_id);
+                        if value.is_none() {
+                            continue
+                        }
+                        let value = value.unwrap();
                         // Get will return YAML document for the data
                         match field_type {
                             "Small Text" => {
-                                yaml_out_str = SmallTextField::init_get(&field_config_, Some(&data), &yaml_out_str)?;
+                                let obj = SmallTextField::defaults(&field_config_);
+                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },
                             "Long Text" => {
                                 yaml_out_str = LongTextField::init_get(&field_config_, Some(&data), &yaml_out_str)?;

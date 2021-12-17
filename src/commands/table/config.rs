@@ -16,7 +16,11 @@ use crate::storage::*;
 use crate::storage::table::{DbData, DbTable};
 use crate::planet::make_bool_str;
 use crate::functions::{Formula};
-use crate::storage::fields::{date::*, StorageField};
+use crate::storage::fields::{
+    text::*,
+    date::*, 
+    StorageField
+};
 use crate::planet::constants::*;
 
 use super::fetch_yaml_config;
@@ -280,6 +284,10 @@ impl ConfigStorageField for FieldConfig {
                 // eprintln!("parse_from_db :: field_type_str: {}", field_type_str);
                 
                 match field_type_str {
+                    FIELD_TYPE_SMALL_TEXT => {
+                        let mut obj = SmallTextField::defaults(&field_config);
+                        field_config = obj.build_config(field_config_map)?;
+                    },
                     FIELD_TYPE_DATE => {
                         let mut obj = DateField::defaults(&field_config);
                         field_config = obj.build_config(field_config_map)?;
@@ -414,6 +422,9 @@ impl ConfigStorageField for FieldConfig {
 
         eprintln!("map_object_db :: DateField...");
         match field_type_str {
+            FIELD_TYPE_SMALL_TEXT => {
+                map = SmallTextField::defaults(&field_config_).update_config_map(&map)?;
+            },
             FIELD_TYPE_DATE => {
                 map = DateField::defaults(&field_config_).update_config_map(&map)?;
             },
