@@ -148,32 +148,33 @@ impl StorageField for DateField {
                 },
             }
         }
-        if time_format.is_some() {
-            is_time = true;
-            let time_format = time_format.unwrap();
-            if time_format == 12 {
-                fmt_string = format!("{} %H:%M:%S%P%z", fmt);
-                fmt = fmt_string.as_str();
-                is_am = true;
-            } else {
-                // date and time with 24 hours
-                fmt_string = format!("{} %H:%M:%S%z", fmt);
-                fmt = fmt_string.as_str();
-            }
-        }
-        // Check date_string with fmt
         let mut sep = " ";
         if is_iso {
             sep = "T";
         }
+        if time_format.is_some() {
+            is_time = true;
+            let time_format = time_format.unwrap();
+            if time_format == 12 {
+                fmt_string = format!("{}{}%I:%M:%S%P%z", fmt, sep);
+                fmt = fmt_string.as_str();
+                is_am = true;
+            } else {
+                // date and time with 24 hours
+                fmt_string = format!("{}{}%H:%M:%S%z", fmt, sep);
+                fmt = fmt_string.as_str();
+            }
+        }
+        // Check date_string with fmt
         if !is_time {
             if is_am {
+                // TODO: Check hours is 0-12 format
                 date_string = format!("{}{}00:00:00am+0000", &date_string, sep);
-                fmt_string = format!("{}{}%H:%M:%S%P%z", sep, fmt);
+                fmt_string = format!("{}{}%I:%M:%S%P%z", fmt, sep);
                 fmt = fmt_string.as_str();
             } else {
                 date_string = format!("{}{}00:00:00+0000", &date_string, sep);
-                fmt_string = format!("{}{}%H:%M:%S%z", sep, fmt);
+                fmt_string = format!("{}{}%H:%M:%S%z", fmt, sep);
                 fmt = fmt_string.as_str();
             }
         }

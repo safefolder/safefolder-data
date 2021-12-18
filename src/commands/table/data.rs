@@ -148,7 +148,7 @@ impl<'gb> InsertIntoTable<'gb> {
                 }
                 let name = insert_name.unwrap();
                 // Check name does not exist
-                eprintln!("InsertIntoTable.run :: name: {}", &name);
+                // eprintln!("InsertIntoTable.run :: name: {}", &name);
                 let name_exists = self.check_name_exists(&table_name, &name, &db_row);
                 // eprintln!("InsertIntoTable.run :: name_exists: {}", &name_exists);
                 if name_exists {
@@ -182,7 +182,6 @@ impl<'gb> InsertIntoTable<'gb> {
                 for field in config_fields {
                     let field_config = field.clone();
                     let field_type = field.field_type.unwrap_or_default();
-                    let field_name = field.name.unwrap_or_default();
                     let field_type = field_type.as_str();
                     let field_id = field.id.unwrap_or_default();
                     let field_data = insert_id_data_map.get(&field_id);
@@ -199,8 +198,8 @@ impl<'gb> InsertIntoTable<'gb> {
                     // let field_data = field_data.unwrap().clone();
                     // let field_data: String;
                     let mut field_data_wrap: Result<String, PlanetError> = Ok(String::from(""));
-                    eprintln!("InsertIntoTable.run :: field_type: {}", &field_type);
-                    eprintln!("InsertIntoTable.run :: field_name: {}", &field_name);
+                    // eprintln!("InsertIntoTable.run :: field_type: {}", &field_type);
+                    // eprintln!("InsertIntoTable.run :: field_name: {}", &field_name);
                     match field_type {
                         FIELD_TYPE_SMALL_TEXT => {
                             let obj = SmallTextField::defaults(&field_config);

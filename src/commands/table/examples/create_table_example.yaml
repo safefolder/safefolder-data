@@ -28,16 +28,37 @@ fields:
       - Madrid
       - Barcelona
       - Valencia
-  - name: My Birthday
-    field_type: Date
-    date_format: Friendly
-    time_format: 24
-  - name: My Birthday Only Date
-    field_type: Date
-    date_format: Friendly
   - name: Concat
     field_type: Formula
     formula: "CONCAT(
       \"this-is-some-slug\", \" \", {My Field}, TRIM(\" hola \")
       )"
     formula_format: Text
+  - name: Date Friendly Time
+    field_type: Date
+    date_format: Friendly
+    time_format: 24
+  - name: Date Friendly No Time
+    field_type: Date
+    date_format: Friendly
+  - name: Date US No Time
+    field_type: Date
+    date_format: US
+  - name: Date European No Time
+    field_type: Date
+    date_format: European
+  - name: Date ISO Time
+    field_type: Date
+    date_format: ISO
+    time_format: 24
+  - name: Date ISO No Time
+    field_type: Date
+    date_format: ISO
+  - name: Date US Time AM
+    field_type: Date
+    date_format: US
+    time_format: 12
+  - name: Date ISO Time AM
+    field_type: Date
+    date_format: ISO
+    time_format: 12
