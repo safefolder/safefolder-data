@@ -62,3 +62,5 @@ fields:
     field_type: Date
     date_format: ISO
     time_format: 12
+  - name: Duration
+    field_type: Duration

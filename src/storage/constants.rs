@@ -54,6 +54,7 @@ pub const FIELD_TYPE_SELECT: &str = "Select";
 pub const FIELD_TYPE_NUMBER: &str = "Number";
 pub const FIELD_TYPE_DATE: &str = "Date";
 pub const FIELD_TYPE_FORMULA: &str = "Formula";
+pub const FIELD_TYPE_DURATION: &str = "Duration";
 
 // Date Format
 pub const DATE_FORMAT_FRIENDLY: &str = "Friendly";

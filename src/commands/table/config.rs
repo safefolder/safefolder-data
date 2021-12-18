@@ -303,6 +303,10 @@ impl ConfigStorageField for FieldConfig {
                         let mut obj = SelectField::defaults(&field_config, None);
                         field_config = obj.build_config(field_config_map)?;
                     },
+                    FIELD_TYPE_DURATION => {
+                        let mut obj = DurationField::defaults(&field_config);
+                        field_config = obj.build_config(field_config_map)?;
+                    },
                     _ => {}
                 }
 
@@ -422,6 +426,9 @@ impl ConfigStorageField for FieldConfig {
                     &db_table,
                     &table_name
                 )?;
+            },
+            FIELD_TYPE_DURATION => {
+                map = DurationField::defaults(&field_config_).update_config_map(&map)?;
             },
             _ => {}
         }

@@ -222,15 +222,17 @@ impl<'gb> InsertIntoTable<'gb> {
                             field_data_wrap = obj.validate(&field_data);
                         },
                         FIELD_TYPE_FORMULA => {
-                            // db_data = FormulaField::init_do(
-                            //     &field_config, &table, insert_id_data_map.clone(), db_data)?;
                             let obj = FormulaField::defaults(&field_config);
                             field_data_wrap = obj.validate(&data);
                         },
                         FIELD_TYPE_DATE => {
                             let obj = DateField::defaults(&field_config);
                             field_data_wrap = obj.validate(&field_data);
-                        }
+                        },
+                        FIELD_TYPE_DURATION => {
+                            let obj = DurationField::defaults(&field_config);
+                            field_data_wrap = obj.validate(&field_data);
+                        },
                         _ => {
                             errors.push(
                                 PlanetError::new(
@@ -469,6 +471,14 @@ impl<'gb> Command<String> for GetFromTable<'gb> {
                                 let obj = FormulaField::defaults(&field_config_);
                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },
+                            FIELD_TYPE_DATE => {
+                                let obj = DateField::defaults(&field_config_);
+                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+                            },
+                            FIELD_TYPE_DURATION => {
+                                let obj = DurationField::defaults(&field_config_);
+                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+                            },                            
                             _ => {
                                 yaml_out_str = yaml_out_str;
                             }
