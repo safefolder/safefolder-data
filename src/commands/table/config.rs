@@ -15,10 +15,11 @@ use crate::storage::constants::*;
 use crate::storage::*;
 use crate::storage::table::{DbData, DbTable};
 use crate::planet::make_bool_str;
-use crate::functions::{Formula};
+// use crate::functions::{Formula};
 use crate::storage::fields::{
     text::*,
     date::*, 
+    formula::*,
     StorageField
 };
 use crate::planet::constants::*;
@@ -294,24 +295,9 @@ impl ConfigStorageField for FieldConfig {
                         field_config = obj.build_config(field_config_map)?;
                     },
                     FIELD_TYPE_FORMULA => {
-                        // TODO: Place this into FormulaField as we do in DateField
-                        let formula = field_config_map.get(FORMULA);
-                        let formula_compiled = field_config_map.get(FORMULA_COMPILED);
-                        let formula_format = field_config_map.get(FORMULA_FORMAT);
-                        let mut formula_wrap: Option<String> = None;
-                        let mut formula_compiled_wrap: Option<String> = None;
-                        let mut formula_format_wrap: Option<String> = None;
-                        if formula_compiled.is_some() {
-                            let formula_compiled = formula_compiled.unwrap().clone();
-                            let formula = formula.unwrap().clone();
-                            formula_compiled_wrap = Some(formula_compiled);
-                            formula_wrap = Some(formula);
-                            let formula_format = formula_format.unwrap().clone();
-                            formula_format_wrap = Some(formula_format);
-                        }
-                        field_config.formula = formula_wrap;
-                        field_config.formula_format = formula_format_wrap;
-                        field_config.formula_compiled = formula_compiled_wrap;
+                        let mut obj = FormulaField::defaults(&field_config);
+                        field_config = obj.build_config(field_config_map)?;
+                        eprintln!("parse_from_db :: I did formula");
                     },
                     FIELD_TYPE_SELECT => {
                         let mut obj = SelectField::defaults(&field_config, None);
@@ -424,48 +410,45 @@ impl ConfigStorageField for FieldConfig {
             },
             FIELD_TYPE_SELECT => {
                 map = SelectField::defaults(&field_config_, None).update_config_map(&map)?;
-            },            
+            },
             FIELD_TYPE_DATE => {
                 map = DateField::defaults(&field_config_).update_config_map(&map)?;
             },
+            FIELD_TYPE_FORMULA => {
+                map = FormulaField::defaults(&field_config_).update_config_map(
+                    &map,
+                    &field_name_map,
+                    &field_type_map,
+                    &db_table,
+                    &table_name
+                )?;
+            },
             _ => {}
         }
-
         // formula and functions
-        eprintln!("map_object_db :: formula...");
-        let formula = field_config.formula;
-        if formula.is_some() {
-            let formula = formula.unwrap();
-            let formula_format = field_config.formula_format.unwrap();
-            let field_type_map = field_type_map.clone();
-            let field_name_map = field_name_map.clone();
-            let db_table = db_table.clone();
-            let table_name = table_name.clone();
-            let formula_compiled = Formula::defaults(
-                &formula,
-                &formula_format,
-                None,
-                Some(field_type_map),
-                Some(field_name_map),
-                Some(db_table),
-                Some(table_name),
-                false,
-            )?;
-            map.insert(String::from(FORMULA), formula);
-            map.insert(String::from(FORMULA_FORMAT), formula_format);
-            let formula_serialized = serde_yaml::to_string(&formula_compiled).unwrap();
-            map.insert(String::from(FORMULA_COMPILED), formula_serialized);
-        }
-        // Here we encode as string the options as string using yaml encoding
-        // eprintln!("map_object_db :: select and options...");
-        // let options = field_config.options;
-        // if options.is_some() {
-        //     let options_yaml = serde_yaml::to_string(&options);
-        //     if options_yaml.is_ok() {
-        //         map.insert(String::from(OPTIONS), options_yaml.unwrap());
-        //     } else {
-        //         panic!("Could not parse options for field \"{}\"", &field_name);
-        //     }
+        // eprintln!("map_object_db :: formula...");
+        // let formula = field_config.formula;
+        // if formula.is_some() {
+        //     let formula = formula.unwrap();
+        //     let formula_format = field_config.formula_format.unwrap();
+        //     let field_type_map = field_type_map.clone();
+        //     let field_name_map = field_name_map.clone();
+        //     let db_table = db_table.clone();
+        //     let table_name = table_name.clone();
+        //     let formula_compiled = Formula::defaults(
+        //         &formula,
+        //         &formula_format,
+        //         None,
+        //         Some(field_type_map),
+        //         Some(field_name_map),
+        //         Some(db_table),
+        //         Some(table_name),
+        //         false,
+        //     )?;
+        //     map.insert(String::from(FORMULA), formula);
+        //     map.insert(String::from(FORMULA_FORMAT), formula_format);
+        //     let formula_serialized = serde_yaml::to_string(&formula_compiled).unwrap();
+        //     map.insert(String::from(FORMULA_COMPILED), formula_serialized);
         // }
         eprintln!("map_object_db :: finished!!!");
         return Ok(map);

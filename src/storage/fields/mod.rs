@@ -9,7 +9,7 @@ use colored::Colorize;
 use serde::{Deserialize, Serialize};
 
 use crate::planet::{PlanetError};
-use crate::storage::table::{DbData};
+use crate::storage::table::{DbData, DbTable};
 use crate::commands::table::config::*;
 
 /*
@@ -66,6 +66,24 @@ pub trait StorageField {
     fn validate(&self, data: &String) -> Result<String, PlanetError>;
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String;
 }
+
+pub trait FormulaStorageField {
+    fn update_config_map(
+        &mut self, 
+        field_config_map: &HashMap<String, String>,
+        field_name_map: &HashMap<String, String>,
+        field_type_map: &HashMap<String, String>,
+        db_table: &DbTable,
+        table_name: &String,
+    ) -> Result<HashMap<String, String>, PlanetError>;
+    fn build_config(
+        &mut self, 
+        field_config_map: &HashMap<String, String>,
+    ) -> Result<FieldConfig, PlanetError>;
+    fn validate(&self, data: &String) -> Result<String, PlanetError>;
+    fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String;
+}
+
 
 pub trait ValidateField {
     fn is_valid(&self, value: Option<&String>) -> Result<bool, PlanetError>;

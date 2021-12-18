@@ -29,7 +29,7 @@ use crate::planet::{
 use crate::storage::fields::{text::*, StorageField};
 use crate::storage::fields::number::*;
 use crate::storage::fields::date::*;
-// use crate::storage::fields::formula::*;
+use crate::storage::fields::formula::*;
 
 pub struct InsertIntoTable<'gb> {
     pub planet_context: &'gb PlanetContext<'gb>,
@@ -186,44 +186,59 @@ impl<'gb> InsertIntoTable<'gb> {
                     let field_type = field_type.as_str();
                     let field_id = field.id.unwrap_or_default();
                     let field_data = insert_id_data_map.get(&field_id);
-                    if field_data.is_none() {
+                    if field_data.is_none() && field_type != FIELD_TYPE_FORMULA {
                         continue
                     }
-                    let field_data = field_data.unwrap().clone();
+                    let field_data_: String;
+                    if field_data.is_some() {
+                        field_data_ = field_data.unwrap().clone();
+                    } else {
+                        field_data_ = String::from("");
+                    }
+                    let field_data = field_data_;
+                    // let field_data = field_data.unwrap().clone();
+                    // let field_data: String;
                     let mut field_data_wrap: Result<String, PlanetError> = Ok(String::from(""));
                     eprintln!("InsertIntoTable.run :: field_type: {}", &field_type);
                     eprintln!("InsertIntoTable.run :: field_name: {}", &field_name);
                     match field_type {
-                        "Small Text" => {
+                        FIELD_TYPE_SMALL_TEXT => {
                             let obj = SmallTextField::defaults(&field_config);
                             field_data_wrap = obj.validate(&field_data);
                         },
-                        "Long Text" => {
+                        FIELD_TYPE_LONG_TEXT => {
                             let obj = LongTextField::defaults(&field_config);
                             field_data_wrap = obj.validate(&field_data);
                         },
-                        "Checkbox" => {
+                        FIELD_TYPE_CHECKBOX => {
                             let obj = CheckBoxField::defaults(&field_config);
                             field_data_wrap = obj.validate(&field_data);
                         },
-                        "Number" => {
+                        FIELD_TYPE_NUMBER => {
                             let obj = NumberField::defaults(&field_config);
                             field_data_wrap = obj.validate(&field_data);
                         },
-                        "Select" => {
+                        FIELD_TYPE_SELECT => {
                             let obj = SelectField::defaults(&field_config, Some(&table));
                             field_data_wrap = obj.validate(&field_data);
                         },
-                        "Formula" => {
+                        FIELD_TYPE_FORMULA => {
                             // db_data = FormulaField::init_do(
                             //     &field_config, &table, insert_id_data_map.clone(), db_data)?;
+                            let obj = FormulaField::defaults(&field_config);
+                            field_data_wrap = obj.validate(&data);
                         },
-                        "Date" => {
+                        FIELD_TYPE_DATE => {
                             let obj = DateField::defaults(&field_config);
                             field_data_wrap = obj.validate(&field_data);
                         }
                         _ => {
-                            // return Ok(db_data);
+                            errors.push(
+                                PlanetError::new(
+                                    500, 
+                                    Some(tr!("Field \"{}\" not supported.", &field_type)),
+                                )
+                            );        
                         }
                     };
                     let tuple = handle_field_response(
@@ -431,28 +446,29 @@ impl<'gb> Command<String> for GetFromTable<'gb> {
                         let value = value.unwrap();
                         // Get will return YAML document for the data
                         match field_type {
-                            "Small Text" => {
+                            FIELD_TYPE_SMALL_TEXT => {
                                 let obj = SmallTextField::defaults(&field_config_);
                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },
-                            "Long Text" => {
+                            FIELD_TYPE_LONG_TEXT => {
                                 let obj = LongTextField::defaults(&field_config_);
                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },
-                            "Checkbox" => {
+                            FIELD_TYPE_CHECKBOX => {
                                 let obj = CheckBoxField::defaults(&field_config_);
                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },
-                            "Number" => {
-                                // yaml_out_str = NumberField::init_get(&field_config_, Some(&data), &yaml_out_str)?;
+                            FIELD_TYPE_NUMBER => {
+                                let obj = NumberField::defaults(&field_config_);
+                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },
-                            "Select" => {
+                            FIELD_TYPE_SELECT => {
                                 let obj = SelectField::defaults(&field_config_, Some(&table));
                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
-                                // yaml_out_str = SelectField::init_get(&field_config_, &table, Some(&data), &yaml_out_str)?
                             },
-                            "Formula" => {
-                                // yaml_out_str = FormulaField::init_get(&field_config_, &table, Some(&data), &yaml_out_str)?
+                            FIELD_TYPE_FORMULA => {
+                                let obj = FormulaField::defaults(&field_config_);
+                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },
                             _ => {
                                 yaml_out_str = yaml_out_str;

@@ -51,6 +51,7 @@ pub const FIELD_TYPE_SMALL_TEXT: &str = "Small Text";
 pub const FIELD_TYPE_LONG_TEXT: &str = "Long Text";
 pub const FIELD_TYPE_CHECKBOX: &str = "Checkbox";
 pub const FIELD_TYPE_SELECT: &str = "Select";
+pub const FIELD_TYPE_NUMBER: &str = "Number";
 pub const FIELD_TYPE_DATE: &str = "Date";
 pub const FIELD_TYPE_FORMULA: &str = "Formula";
 

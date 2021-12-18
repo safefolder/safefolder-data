@@ -35,3 +35,9 @@ fields:
   - name: My Birthday Only Date
     field_type: Date
     date_format: Friendly
+  - name: Concat
+    field_type: Formula
+    formula: "CONCAT(
+      \"this-is-some-slug\", \" \", {My Field}, TRIM(\" hola \")
+      )"
+    formula_format: Text
