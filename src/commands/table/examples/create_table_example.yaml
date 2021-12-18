@@ -64,3 +64,7 @@ fields:
     time_format: 12
   - name: Duration
     field_type: Duration
+  - name: Created Time
+    field_type: Created Time
+  - name: Last Modified Time
+    field_type: Last Modified Time

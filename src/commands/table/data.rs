@@ -183,9 +183,15 @@ impl<'gb> InsertIntoTable<'gb> {
                     let field_config = field.clone();
                     let field_type = field.field_type.unwrap_or_default();
                     let field_type = field_type.as_str();
+                    // eprintln!("InsertIntoTable.run :: field_type: {}", field_type);
                     let field_id = field.id.unwrap_or_default();
                     let field_data = insert_id_data_map.get(&field_id);
-                    if field_data.is_none() && field_type != FIELD_TYPE_FORMULA {
+                    if field_data.is_none() && 
+                        (
+                            field_type != FIELD_TYPE_FORMULA && 
+                            field_type != FIELD_TYPE_CREATED_TIME && 
+                            field_type != FIELD_TYPE_LAST_MODIFIED_TIME
+                        ) {
                         continue
                     }
                     let field_data_: String;
@@ -198,7 +204,6 @@ impl<'gb> InsertIntoTable<'gb> {
                     // let field_data = field_data.unwrap().clone();
                     // let field_data: String;
                     let mut field_data_wrap: Result<String, PlanetError> = Ok(String::from(""));
-                    // eprintln!("InsertIntoTable.run :: field_type: {}", &field_type);
                     // eprintln!("InsertIntoTable.run :: field_name: {}", &field_name);
                     match field_type {
                         FIELD_TYPE_SMALL_TEXT => {
@@ -231,6 +236,14 @@ impl<'gb> InsertIntoTable<'gb> {
                         },
                         FIELD_TYPE_DURATION => {
                             let obj = DurationField::defaults(&field_config);
+                            field_data_wrap = obj.validate(&field_data);
+                        },
+                        FIELD_TYPE_CREATED_TIME => {
+                            let obj = AuditDateField::defaults(&field_config);
+                            field_data_wrap = obj.validate(&field_data);
+                        },
+                        FIELD_TYPE_LAST_MODIFIED_TIME => {
+                            let obj = AuditDateField::defaults(&field_config);
                             field_data_wrap = obj.validate(&field_data);
                         },
                         _ => {

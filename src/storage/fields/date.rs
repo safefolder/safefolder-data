@@ -2,7 +2,7 @@ use std::str::FromStr;
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use colored::Colorize;
-use chrono::DateTime;
+use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use regex::{Regex};
 
@@ -245,11 +245,9 @@ impl StorageField for DurationField {
     }
     fn validate(&self, data: &String) -> Result<String, PlanetError> {
         let data = data.clone();
-        eprintln!("DurationField.validate :: data: {}", &data);
         // validate HH:MM[:SS.SSS]
         let expr = &RE_DURATION;
         let is_valid = expr.is_match(&data);
-        eprintln!("DurationField.validate :: is_valid: {}", &is_valid);
         if !is_valid {
             return Err(
                 PlanetError::new(
@@ -268,8 +266,6 @@ impl StorageField for DurationField {
         let mut second_str: &str;
         let micro_str: &str;
         let minute: i8 = FromStr::from_str(minute_str).unwrap();
-        eprintln!("DurationField.validate :: hour: {}", &hour_str);
-        eprintln!("DurationField.validate :: minute: {}", &minute_str);
         if minute > 60 {
             return Err(
                 PlanetError::new(
@@ -280,7 +276,6 @@ impl StorageField for DurationField {
         }
         if second.is_some() {
             second_str = second.unwrap().as_str();
-            eprintln!("DurationField.validate :: second: {}", &second_str);
             let second: i8 = FromStr::from_str(second_str).unwrap();
             if second > 60 {
                 return Err(
@@ -298,10 +293,58 @@ impl StorageField for DurationField {
         }
         if micro.is_some() {
             micro_str = micro.unwrap().as_str();
-            eprintln!("DurationField.validate :: micro: {}", &micro_str);
             data_final = format!("{}.{}", &data_final, micro_str);
         }
         return Ok(data_final)
+    }
+    fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
+        let field_config = self.config.clone();
+        let field_name = field_config.name.unwrap();
+        let mut yaml_string = yaml_string.clone();
+        let field = &field_name.truecolor(
+            YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
+        );
+        let value = format!("{}",
+            value.truecolor(YAML_COLOR_ORANGE[0], YAML_COLOR_ORANGE[1], YAML_COLOR_ORANGE[2]), 
+        );
+        yaml_string.push_str(format!("  {field}: {value}\n", field=field, value=value).as_str());
+        return yaml_string;
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AuditDateField {
+    pub config: FieldConfig,
+}
+impl AuditDateField {
+    pub fn defaults(config: &FieldConfig) -> Self {
+        let field_config = config.clone();
+        let field_obj = Self{
+            config: field_config,
+        };
+        return field_obj
+    }
+}
+impl StorageField for AuditDateField {
+    fn update_config_map(
+        &mut self, 
+        field_config_map: &HashMap<String, String>,
+    ) -> Result<HashMap<String, String>, PlanetError> {
+        let field_config_map = field_config_map.clone();
+        return Ok(field_config_map)
+    }
+    fn build_config(
+        &mut self, 
+        _: &HashMap<String, String>,
+    ) -> Result<FieldConfig, PlanetError> {
+        let config = self.config.clone();
+        return Ok(config)
+    }
+    fn validate(&self, _: &String) -> Result<String, PlanetError> {
+        let now = Utc::now();
+        // 2021-12-18T12:14:15.528276533+00:00
+        let now_str = now.to_rfc3339();
+        return Ok(now_str)
     }
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
         let field_config = self.config.clone();

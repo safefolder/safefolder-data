@@ -19,10 +19,10 @@ These are the core fields implemented so we can tackle the security and permissi
 * 02. LongTextField                 [impl] - text : This is the text field.
 * 03. CheckBoxField                 [impl] - number
 * 05. SelectField                   [impl] - text
-* 06. DateField                     [doing] - date
-* 06A Duration                      [to do] - date
+* 06. DateField                     [impl] - date
+* 06A Duration                      [impl] - date
 * 07. NumberField                   [impl] - number
-* 08. AuditTimeField                - date
+* 08. AuditTimeField                [impl] - date
 * 09. AuditByField                  - text
 * 10. LinkField (This probably later once I have more ops from DbRow to get items, etc...)
 * 11. CurrencyField                 - number

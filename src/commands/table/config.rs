@@ -19,6 +19,7 @@ use crate::planet::make_bool_str;
 use crate::storage::fields::{
     text::*,
     date::*, 
+    number::*,
     formula::*,
     StorageField
 };
@@ -290,6 +291,18 @@ impl ConfigStorageField for FieldConfig {
                         let mut obj = SmallTextField::defaults(&field_config);
                         field_config = obj.build_config(field_config_map)?;
                     },
+                    FIELD_TYPE_LONG_TEXT => {
+                        let mut obj = LongTextField::defaults(&field_config);
+                        field_config = obj.build_config(field_config_map)?;
+                    },
+                    FIELD_TYPE_NUMBER => {
+                        let mut obj = NumberField::defaults(&field_config);
+                        field_config = obj.build_config(field_config_map)?;
+                    },
+                    FIELD_TYPE_CHECKBOX => {
+                        let mut obj = CheckBoxField::defaults(&field_config);
+                        field_config = obj.build_config(field_config_map)?;
+                    },
                     FIELD_TYPE_DATE => {
                         let mut obj = DateField::defaults(&field_config);
                         field_config = obj.build_config(field_config_map)?;
@@ -297,7 +310,6 @@ impl ConfigStorageField for FieldConfig {
                     FIELD_TYPE_FORMULA => {
                         let mut obj = FormulaField::defaults(&field_config);
                         field_config = obj.build_config(field_config_map)?;
-                        eprintln!("parse_from_db :: I did formula");
                     },
                     FIELD_TYPE_SELECT => {
                         let mut obj = SelectField::defaults(&field_config, None);
@@ -305,6 +317,14 @@ impl ConfigStorageField for FieldConfig {
                     },
                     FIELD_TYPE_DURATION => {
                         let mut obj = DurationField::defaults(&field_config);
+                        field_config = obj.build_config(field_config_map)?;
+                    },
+                    FIELD_TYPE_CREATED_TIME => {
+                        let mut obj = AuditDateField::defaults(&field_config);
+                        field_config = obj.build_config(field_config_map)?;
+                    },
+                    FIELD_TYPE_LAST_MODIFIED_TIME => {
+                        let mut obj = AuditDateField::defaults(&field_config);
                         field_config = obj.build_config(field_config_map)?;
                     },
                     _ => {}
@@ -430,33 +450,14 @@ impl ConfigStorageField for FieldConfig {
             FIELD_TYPE_DURATION => {
                 map = DurationField::defaults(&field_config_).update_config_map(&map)?;
             },
+            FIELD_TYPE_CREATED_TIME => {
+                map = AuditDateField::defaults(&field_config_).update_config_map(&map)?;
+            },
+            FIELD_TYPE_LAST_MODIFIED_TIME => {
+                map = AuditDateField::defaults(&field_config_).update_config_map(&map)?;
+            },            
             _ => {}
         }
-        // formula and functions
-        // eprintln!("map_object_db :: formula...");
-        // let formula = field_config.formula;
-        // if formula.is_some() {
-        //     let formula = formula.unwrap();
-        //     let formula_format = field_config.formula_format.unwrap();
-        //     let field_type_map = field_type_map.clone();
-        //     let field_name_map = field_name_map.clone();
-        //     let db_table = db_table.clone();
-        //     let table_name = table_name.clone();
-        //     let formula_compiled = Formula::defaults(
-        //         &formula,
-        //         &formula_format,
-        //         None,
-        //         Some(field_type_map),
-        //         Some(field_name_map),
-        //         Some(db_table),
-        //         Some(table_name),
-        //         false,
-        //     )?;
-        //     map.insert(String::from(FORMULA), formula);
-        //     map.insert(String::from(FORMULA_FORMAT), formula_format);
-        //     let formula_serialized = serde_yaml::to_string(&formula_compiled).unwrap();
-        //     map.insert(String::from(FORMULA_COMPILED), formula_serialized);
-        // }
         eprintln!("map_object_db :: finished!!!");
         return Ok(map);
     }

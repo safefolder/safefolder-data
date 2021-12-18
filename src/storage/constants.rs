@@ -55,6 +55,8 @@ pub const FIELD_TYPE_NUMBER: &str = "Number";
 pub const FIELD_TYPE_DATE: &str = "Date";
 pub const FIELD_TYPE_FORMULA: &str = "Formula";
 pub const FIELD_TYPE_DURATION: &str = "Duration";
+pub const FIELD_TYPE_CREATED_TIME: &str = "Created Time";
+pub const FIELD_TYPE_LAST_MODIFIED_TIME: &str = "Last Modified Time";
 
 // Date Format
 pub const DATE_FORMAT_FRIENDLY: &str = "Friendly";
