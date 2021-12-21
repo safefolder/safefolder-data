@@ -1107,7 +1107,7 @@ pub fn process_function(
                 DateDeltaOperation::Diff)?;
         },
         FUNCTION_DATEFMT => {
-            func = DateFormat::defaults(Some(func), data.clone(), &conf).handle()?;
+            func = DateFormatFunc::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_MIN => {
             func = Stats::defaults(Some(func), data.clone(), &conf).handle(

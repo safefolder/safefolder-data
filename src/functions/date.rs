@@ -7,6 +7,7 @@ use chrono::{DateTime, Datelike, FixedOffset, NaiveDate, Utc, Duration, Timelike
 use tr::tr;
 use ordinal::Ordinal;
 use crate::functions::*;
+use crate::commands::table::config::DateFormat;
 
 lazy_static! {
     pub static ref RE_DATE: Regex = Regex::new(r#"^DATE\([\s\n\t]{0,}(?P<year>(([\s\d+-/*]*)|(\{[\w\s]+\})|([A-Z]+\(.[^)]*\))))[\s\n\t]{0,},[\s\n\t]{0,}(?P<month>(([\s\d+-/*]+)|(\{[\w\s]+\})|([A-Z]+\(.[^)]*\))))[\s\n\t]{0,},[\s\n\t]{0,}(?P<day>(([\s\d+-/*]+)|(\{[\w\s]+\})|([A-Z]+\(.[^)]*\))))[\s\n\t]{0,}\)"#).unwrap();
@@ -288,21 +289,10 @@ impl DateTimeFunction for DateTimeParse {
         let data_map = &self.data_map.clone().unwrap();
         let date_item = attributes[0].clone();
         let field_config_map = self.field_config_map.clone();
-        eprintln!("DateTimeParse.execute :: field_config_map: {:#?}", &field_config_map);
         let mut date = date_item.get_value(data_map, &field_config_map)?;
         let mode_item = attributes[1].clone();
         let mode = mode_item.get_value(data_map, &field_config_map)?;
         let mode = mode.as_str();
-        if mode_item.is_reference {
-            let field_name = mode_item.name.unwrap();
-            eprintln!("DateTimeParse.execute :: field name: {}", &field_name);
-            let field_config = field_config_map.get(&field_name);
-            if field_config.is_some() {
-                let field_config = field_config.unwrap().clone();
-                eprintln!("DateTimeParse.execute :: field_config: {:#?}", &field_config);
-            }
-        }
-        
         let mut replacement_string = String::from("");
         date = date.replace("\"", "");
         // In case using reference, I need to check the date_format of the column: friendly, us, european, iso
@@ -347,6 +337,33 @@ impl DateTimeFunction for DateTimeParse {
                     }, 
                 }
             }
+        } else {
+            // Reference and I use date_format and time_format from the reference config field
+            if date_item.is_reference {
+                let field_name = date_item.name.unwrap();
+                let fmt = get_date_format(&field_name, &field_config_map);
+                let fmt = fmt.as_str();
+
+                let date_obj = DateTime::parse_from_str(
+                    &date, 
+                    fmt
+                );
+                let date_obj = date_obj.unwrap();
+                match date_parse_option {
+                    DateTimeParseOption::Hour => {
+                        let hour = date_obj.hour();
+                        replacement_string = hour.to_string();
+                    },
+                    DateTimeParseOption::Minute => {
+                        let minute = date_obj.minute();
+                        replacement_string = minute.to_string();
+                    },
+                    DateTimeParseOption::Second => {
+                        let second = date_obj.second();
+                        replacement_string = second.to_string();
+                    },
+                }
+            }    
         }
         return Ok(replacement_string)
     }
@@ -499,10 +516,11 @@ impl DateParseFunction for DateParse {
         let mode_item = attributes[1].clone();
         let mode = mode_item.value.unwrap_or_default();
         let mode = mode.as_str();
+        let field_config_map = self.field_config_map.clone();
         let mut replacement_string = String::from("");
         date = date.replace("\"", "");
         let mut is_string_output = false;
-        if mode == "iso" {
+        if mode == DATE_MODE_ISO {
             let date_obj_wrap = get_date_object_iso(&date);
             if date_obj_wrap.is_ok() {
                 let date_obj = date_obj_wrap.unwrap();
@@ -530,7 +548,7 @@ impl DateParseFunction for DateParse {
                     }, 
                 }
             }
-        } else if mode == "human_time" {
+        } else if mode == DATE_MODE_HUMAN_TIME {
             let date_obj_wrap = get_date_object_human_time(&date);
             if date_obj_wrap.is_ok() {
                 let date_obj = date_obj_wrap.unwrap();
@@ -558,11 +576,45 @@ impl DateParseFunction for DateParse {
                     }, 
                 }
             }
-        } else if mode == "only_date" {
+        } else if mode == DATE_MODE_ONLY_DATE {
             let date_obj_wrap = get_date_object_only_date(&date);
             if date_obj_wrap.is_ok() {
                 let date_obj = date_obj_wrap.unwrap();
                 // eprintln!("DateParseFunction.replace :: date_obj: {:?}", &date_obj);
+                match date_parse_option {
+                    DateParseOption::Day => {
+                        let day = date_obj.day();
+                        replacement_string = day.to_string();
+                    },
+                    DateParseOption::Week => {
+                        let week = date_obj.iso_week().week();
+                        replacement_string = week.to_string();
+                    },
+                    DateParseOption::WeekDay => {
+                        let weekday = date_obj.weekday();
+                        replacement_string = weekday.to_string();
+                        is_string_output = true;
+                    }, 
+                    DateParseOption::Month => {
+                        let month = date_obj.month();
+                        replacement_string = month.to_string();
+                    },
+                    DateParseOption::Year => {
+                        let year = date_obj.year();
+                        replacement_string = year.to_string();
+                    }, 
+                }
+            }
+        } else {
+            if date_item.is_reference {
+                let field_name = date_item.name.unwrap();
+                let fmt = get_date_format(&field_name, &field_config_map);
+                let fmt = fmt.as_str();
+                let date_obj = DateTime::parse_from_str(
+                    &date, 
+                    fmt
+                );
+                let date_obj = date_obj.unwrap();
                 match date_parse_option {
                     DateParseOption::Day => {
                         let day = date_obj.day();
@@ -738,7 +790,6 @@ impl Days {
             data_map: data_map, 
             attributes: None,
             field_config_map: field_config_map
-
         };
     }
 }
@@ -797,23 +848,41 @@ impl DateFunction for Days {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
-        let field_config_map = self.field_config_map.clone();
         let start_date_item = attributes[0].clone();
+        let field_config_map = self.field_config_map.clone();
         let start_date_value = start_date_item.get_value(data_map, &field_config_map)?;
         let end_date_item = attributes[1].clone();
         let end_date_value = end_date_item.get_value(data_map, &field_config_map)?;
         let number_days: i64;
-        let start_date_obj = NaiveDate::parse_from_str(
-            start_date_value.as_str(), 
-            "%d-%b-%Y"
-        ).unwrap();
-        let end_date_obj = NaiveDate::parse_from_str(
-            end_date_value.as_str(), 
-            "%d-%b-%Y"
-        ).unwrap();
-        let duration = end_date_obj.signed_duration_since(start_date_obj);
-        number_days = duration.num_days();
-        let replacement_string = number_days.to_string();
+        let replacement_string: String;
+        if start_date_item.is_reference {
+            let field_name = start_date_item.name.unwrap();
+            let fmt = get_date_format(&field_name, &field_config_map);
+            let fmt = fmt.as_str();
+            let start_date_obj = NaiveDate::parse_from_str(
+                start_date_value.as_str(), 
+                fmt
+            ).unwrap();
+            let end_date_obj = NaiveDate::parse_from_str(
+                end_date_value.as_str(), 
+                fmt
+            ).unwrap();
+            let duration = end_date_obj.signed_duration_since(start_date_obj);
+            number_days = duration.num_days();
+            replacement_string = number_days.to_string();
+        } else {
+            let start_date_obj = NaiveDate::parse_from_str(
+                start_date_value.as_str(), 
+                "%d-%b-%Y"
+            ).unwrap();
+            let end_date_obj = NaiveDate::parse_from_str(
+                end_date_value.as_str(), 
+                "%d-%b-%Y"
+            ).unwrap();
+            let duration = end_date_obj.signed_duration_since(start_date_obj);
+            number_days = duration.num_days();
+            replacement_string = number_days.to_string();
+        }
         return Ok(replacement_string)
     }
 }
@@ -944,7 +1013,7 @@ impl DateAddDiffFunction for DateAddDiff {
         let replacement_string: String;
         let new_date: DateTime<FixedOffset>;
         let date_obj: DateTime<FixedOffset>;
-        let has_time: bool;
+        let mut has_time: bool;
         let number: i64 = FromStr::from_str(number_value.as_str()).unwrap();
         let units_str = units_value.as_str();
         let units = match units_str {
@@ -959,13 +1028,29 @@ impl DateAddDiffFunction for DateAddDiff {
             "years" => DateUnits::Years,
             _ => DateUnits::Days,
         };
-        has_time = *&date_value.find(" ").is_some();
-        if has_time == true {
-            date_obj = get_date_object_human_time(&date_value).unwrap();
+        if date_item.is_reference {
+            let field_name = date_item.name.unwrap();
+            let fmt = get_date_format(&field_name, &field_config_map);
+            let fmt = fmt.as_str();
+            let field_config = field_config_map.get(&field_name);
+            has_time = false;
+            if field_config.is_some() {
+                let field_config = field_config.unwrap().clone();
+                let time_format = field_config.time_format;
+                has_time = time_format.is_some();
+            }
+            date_obj = DateTime::parse_from_str(
+                &date_value, 
+                fmt
+            ).unwrap();
         } else {
-            date_obj = get_date_object_only_date(&date_value).unwrap();
+            has_time = *&date_value.find(" ").is_some();
+            if has_time == true {
+                date_obj = get_date_object_human_time(&date_value).unwrap();
+            } else {
+                date_obj = get_date_object_only_date(&date_value).unwrap();
+            }
         }
-        // I could use operation to get date_obj????
         match units {
             DateUnits::Milliseconds => {
                 match operation {
@@ -1075,13 +1160,13 @@ impl DateAddDiffFunction for DateAddDiff {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct DateFormat {
+pub struct DateFormatFunc {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: HashMap<String, FieldConfig>,
 }
-impl DateFormat {
+impl DateFormatFunc {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<HashMap<String, String>>,
@@ -1096,7 +1181,7 @@ impl DateFormat {
         };
     }
 }
-impl DateFunction for DateFormat {
+impl DateFunction for DateFormatFunc {
     fn handle(&mut self) -> Result<FunctionParse, PlanetError> {
         let function_parse = &self.function.clone().unwrap();
         let data_map = self.data_map.clone();
@@ -1176,14 +1261,27 @@ impl DateFunction for DateFormat {
         let mode_item = attributes[2].clone();
         let mode_value = mode_item.get_value(data_map, &field_config_map)?;
         let date_obj_wrap: Option<DateTime<FixedOffset>>;
-        if mode_value == String::from("date") {
-            date_obj_wrap = Some(get_date_object_only_date(&date_value).unwrap());
+        let date_string: String;
+        if date_item.is_reference {
+            let field_name = date_item.name.unwrap();
+            let fmt = get_date_format(&field_name, &field_config_map);
+            let fmt = fmt.as_str();
+            let date_obj = DateTime::parse_from_str(
+                &date_value, 
+                fmt
+            ).unwrap();
+            let format = get_rust_date_format(date_obj, format_value);
+            date_string = date_obj.format(format.as_str()).to_string();
         } else {
-            date_obj_wrap = Some(get_date_object_human_time(&date_value).unwrap());
+            if mode_value == String::from("date") {
+                date_obj_wrap = Some(get_date_object_only_date(&date_value).unwrap());
+            } else {
+                date_obj_wrap = Some(get_date_object_human_time(&date_value).unwrap());
+            }
+            let date_obj = date_obj_wrap.unwrap();
+            let format = get_rust_date_format(date_obj, format_value);
+            date_string = date_obj.format(format.as_str()).to_string();
         }
-        let date_obj = date_obj_wrap.unwrap();
-        let format = get_rust_date_format(date_obj, format_value);
-        let date_string = date_obj.format(format.as_str()).to_string();
         return Ok(date_string)
     }
 }
@@ -1397,4 +1495,64 @@ fn get_rust_date_format(date_obj: DateTime<FixedOffset>, mut format: String) -> 
         }
     }
     return format;
+}
+
+fn get_date_format(field_name: &String, field_config_map: &HashMap<String, FieldConfig>) -> String {
+    let field_name = field_name.clone();
+    let field_config_map = field_config_map.clone();
+    let field_config = field_config_map.get(&field_name);
+    let fmt_string: String;
+    let mut fmt = "";
+    if field_config.is_some() {
+        let field_config = field_config.unwrap().clone();
+        let date_format = field_config.date_format;
+        let time_format = field_config.time_format;
+        let mut is_am = false;
+        let mut is_time = false;
+        if time_format.is_some() {
+            is_time = true;
+            let time_format = time_format.unwrap();
+            if time_format == 12 {
+                // I have am/pm
+                is_am = true;
+            }
+        }
+        if date_format.is_some() {
+            let date_format = date_format.unwrap();
+            let mut is_iso = false;
+            match date_format {
+                DateFormat::Friendly => {
+                    // 06-Dec-2021
+                    fmt = "%d-%b-%Y";
+                },
+                DateFormat::US =>  {
+                    // 12/06/2021
+                    fmt = "%m/%d/%Y";
+                },
+                DateFormat::European => {
+                    // 06/12/2021
+                    fmt = "%d/%m/%Y";
+                },
+                DateFormat::ISO => {
+                    // 2021-12-06
+                    fmt = "%Y-%m-%d";
+                    is_iso = true;
+                },
+            }
+            let mut sep = " ";
+            if is_iso {
+                sep = "T";
+            }
+            if is_time {
+                if is_am {
+                    fmt_string = format!("{}{}%I:%M:%S%P%z", fmt, sep);
+                    fmt = fmt_string.as_str();
+                } else {
+                    fmt_string = format!("{}{}%H:%M:%S%z", fmt, sep);
+                    fmt = fmt_string.as_str();
+                }
+            }
+        }
+    }
+    return fmt.to_string()
 }
