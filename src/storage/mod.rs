@@ -29,6 +29,7 @@ pub trait ConfigStorageField {
         db_table: &DbTable,
         table_name: &String
     ) -> Result<HashMap<String, String>, PlanetError>;
+    fn get_field_config_map(table: &DbData) -> Result<HashMap<String, FieldConfig>, PlanetError>;
     fn map_collections_db(&self) -> Result<HashMap<String, Vec<HashMap<String, String>>>, PlanetError>;
     fn parse_from_db(db_data: &DbData) -> Result<Vec<FieldConfig>, PlanetError>;
     fn map_objects_db(&self) -> Result<HashMap<String, Vec<HashMap<String, String>>>, PlanetError>;

@@ -14,6 +14,7 @@ use tr::tr;
 use xlformula_engine::{calculate, parse_formula, NoReference, NoCustomFunction};
 
 use crate::storage::table::{DbData, DbTable};
+use crate::commands::table::config::FieldConfig;
 use crate::functions::constants::*;
 use crate::functions::text::*;
 use crate::functions::date::*;
@@ -249,11 +250,17 @@ impl Formula {
         db_table: Option<DbTable>,
         table_name: Option<String>,
         is_assign_function: bool,
+        field_config_map: Option<HashMap<String, FieldConfig>>,
     ) -> Result<Self, PlanetError> {
         //eprintln!("Formula...");
         // If I have an error in compilation, then does not validate. Compilation uses validate of functions.
         // This function is the one does compilation from string formula to FormulaFieldCompiled
         let formula_origin = formula.clone();
+        let field_config_map_ = field_config_map.clone();
+        let mut field_config_map: HashMap<String, FieldConfig> = HashMap::new();
+        if field_config_map_.is_some() {
+            field_config_map = field_config_map_.unwrap();
+        }
         // let field_name_map_i = field_name_map.clone();
         let db_table_i = db_table.clone();
         let table_name_i = table_name.clone();
@@ -304,6 +311,7 @@ impl Formula {
                     Some(field_name_map_.clone()),
                     db_table_i.clone(),
                     table_name_i.clone(),
+                    Some(field_config_map.clone())
                 )?;
                 if is_assign_function {
                     main_function.function_type = FunctionType::Assign;
@@ -324,7 +332,11 @@ impl Formula {
             let function_name = function.name;
             let mut function_parse = FunctionParse::defaults(&function_name);
             function_parse.text = Some(function_text.clone());
-            let function_parse = process_function(&function_parse, None)?;
+            let function_parse = process_function(
+                &function_parse, 
+                None,
+                Some(field_config_map.clone())
+            )?;
             let validate = function_parse.validate;
             // eprintln!("Formula :: validate: {}", &validate);
             if validate.unwrap() == false {
@@ -363,6 +375,7 @@ impl Formula {
                 field_type_map_,
                 db_table_i.clone(),
                 table_name_i.clone(),
+                &field_config_map
             )?;
             if assignment.is_some() {
                 let assignment = assignment.unwrap();
@@ -382,9 +395,12 @@ pub fn compile_assignment(
     field_type_map: HashMap<String, String>,
     db_table: Option<DbTable>,
     table_name: Option<String>,
+    field_config_map: &HashMap<String, FieldConfig>
 ) -> Result<Option<AttributeAssign>, PlanetError> {
     //eprintln!("compile_assignment...");
     //eprintln!("compile_assignment :: formula: {}", &formula);
+    let field_config_map = field_config_map.clone();
+    let field_config_map_wrap = Some(field_config_map);
     let formula = formula.clone();
     let formula_string = formula.to_string();
     let expr = &RE_FORMULA_ASSIGN;
@@ -406,6 +422,7 @@ pub fn compile_assignment(
                     Some(field_name_map.clone()),
                     db_table.clone(),
                     table_name.clone(),
+                    field_config_map_wrap.clone()
                 )?;
                 // compiled_functions.push(main_function.clone());
                 compiled_functions_map.insert(function_placeholder.clone(), main_function.clone());
@@ -658,8 +675,11 @@ pub fn compile_function_text(
     field_name_map: Option<HashMap<String, String>>,
     db_table: Option<DbTable>,
     table_name: Option<String>,
+    field_config_map: Option<HashMap<String, FieldConfig>>,
 ) -> Result<CompiledFunction, PlanetError> {
     //eprintln!("compile_function_text :: function_text: {}", &function_text);
+    let field_config_map_wrap = field_config_map.clone();
+    let field_config_map: HashMap<String, FieldConfig> = HashMap::new();
     let formula_format = formula_format.clone();
     let field_type_map = field_type_map.clone();
     // eprintln!("compile_function_text :: field_type_map: {:#?}", &field_type_map);
@@ -670,7 +690,11 @@ pub fn compile_function_text(
     //eprintln!("compile_function_text :: function_name: {}", function_name);
     let mut function_parse = FunctionParse::defaults(&function_name.to_string());
     function_parse.text = Some(function_text.to_string());
-    let function_parse = process_function(&function_parse, None)?;
+    let function_parse = process_function(
+        &function_parse, 
+        None,
+        field_config_map_wrap.clone(),
+    )?;
     // eprintln!("compile_function_text :: function_parse from coded function: {:#?}", &function_parse);
     let validate = function_parse.validate.unwrap();
     if validate == false {
@@ -766,6 +790,7 @@ pub fn compile_function_text(
                 db_table.clone(),
                 table_name.clone(),
                 false,
+                field_config_map_wrap.clone(),
             )?;
             function_attribute.formula = Some(formula_compiled);
             function_attribute.name = Some(function_attribute_string);
@@ -811,6 +836,7 @@ pub fn compile_function_text(
                         db_table.clone(), 
                         table_name.clone(),
                         true,
+                        field_config_map_wrap.clone()
                     )?;
                     function_attribute.formula = Some(formula_obj.clone());
                     //eprintln!("compile_function_text :: formula_obj: {:#?}", &formula_obj);
@@ -827,6 +853,7 @@ pub fn compile_function_text(
                 field_type_map.clone(),
                 db_table.clone(),
                 table_name.clone(),
+                &field_config_map
             )?;
             // let function_attrib = assignment.clone().unwrap();
             function_attribute.assignment = assignment.clone();
@@ -871,9 +898,11 @@ pub struct FunctionParse {
     attributes: Option<Vec<String>>,
     compiled_attributes: Option<Vec<FunctionAttributeItem>>,
     result: Option<FunctionResult>,
+    field_config_map: HashMap<String, FieldConfig>,
 }
 impl FunctionParse {
     pub fn defaults(name: &String) -> Self {
+        let field_config_map: HashMap<String, FieldConfig> = HashMap::new();
         let obj = FunctionParse{
             name: name.clone(),
             text: None,
@@ -881,6 +910,7 @@ impl FunctionParse {
             attributes: None,
             compiled_attributes: None,
             result: None,
+            field_config_map: field_config_map,
         };
         return obj;
     }
@@ -920,177 +950,187 @@ pub fn prepare_function_parse(
 pub fn process_function(
     function_parse: &FunctionParse, 
     data_map: Option<HashMap<String, String>>,
+    field_config_map: Option<HashMap<String, FieldConfig>>,
 ) -> Result<FunctionParse, PlanetError> {
     // let list_items = Some(expr.captures_iter(function_text));
     // I need either check or list of attributes, so I have only one function to deal with Regex expr.
-    let mut function = function_parse.clone();
+    let function = function_parse.clone();
     // eprintln!("process_function :: function: {:#?}", &function);
     let data_map_wrap = data_map;
     let function_name = function.name.as_str();
+    let field_config_map = field_config_map.clone();
+    let mut func = function.clone();
+    let data = data_map_wrap.clone();
+    let conf: HashMap<String, FieldConfig>;
+    if field_config_map.is_some() {
+        conf = field_config_map.unwrap();
+    } else {
+        conf = HashMap::new();
+    }
     match function_name {
         FUNCTION_CONCAT => {
-            function = Concat::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Concat::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_TRIM => {
-            function = Trim::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Trim::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_FORMAT => {
-            function = Format::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Format::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_JOINLIST => {
-            function = JoinList::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = JoinList::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_LENGTH => {
-            function = Length::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Length::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_LOWER => {
-            function = Lower::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Lower::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_UPPER => {
-            function = Upper::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Upper::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_REPLACE => {
-            function = Replace::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Replace::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_MID => {
-            function = Mid::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Mid::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_REPT => {
-            function = Rept::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Rept::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_SUBSTITUTE => {
-            function = Substitute::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Substitute::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_CEILING => {
-            function = Ceiling::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Ceiling::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_FLOOR => {
-            function = Floor::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Floor::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_COUNT => {
-            function = Count::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Count::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_COUNTA => {
-            function = CountA::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = CountA::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_COUNTALL => {
-            function = CountAll::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = CountAll::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_EVEN => {
-            function = Even::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Even::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_EXP => {
-            function = Exp::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Exp::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_INT => {
-            function = Int::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Int::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_LOG => {
-            function = Log::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Log::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_MOD => {
-            function = Mod::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Mod::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_POWER => {
-            function = Power::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Power::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_ROUND => {
-            function = Round::defaults(Some(function), data_map_wrap.clone()).handle(
+            func = Round::defaults(Some(func), data.clone(), &conf).handle(
                 RoundOption::Basic)?;
         },
         FUNCTION_ROUNDUP => {
-            function = Round::defaults(Some(function), data_map_wrap.clone()).handle(
+            func = Round::defaults(Some(func), data.clone(), &conf).handle(
                 RoundOption::Up)?;
         },
         FUNCTION_ROUNDDOWN => {
-            function = Round::defaults(Some(function), data_map_wrap.clone()).handle(
+            func = Round::defaults(Some(func), data.clone(), &conf).handle(
                 RoundOption::Down)?;
         },
         FUNCTION_SQRT => {
-            function = Sqrt::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Sqrt::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_VALUE => {
-            function = Value::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Value::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_TRUE => {
-            function = Boolean::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Boolean::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_FALSE => {
-            function = Boolean::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Boolean::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_DATE => {
-            function = Date::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Date::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_SECOND => {
-            function = DateTimeParse::defaults(Some(function), data_map_wrap.clone()).handle(
+            func = DateTimeParse::defaults(Some(func), data.clone(), &conf).handle(
                 DateTimeParseOption::Second)?;
         },
         FUNCTION_MINUTE => {
-            function = DateTimeParse::defaults(Some(function), data_map_wrap.clone()).handle(
-                DateTimeParseOption::Minute)?;
+            func = DateTimeParse::defaults(Some(func), data.clone(), &conf).handle(
+                    DateTimeParseOption::Minute)?;
         },
         FUNCTION_HOUR => {
-            function = DateTimeParse::defaults(Some(function), data_map_wrap.clone()).handle(
+            func = DateTimeParse::defaults(Some(func), data.clone(), &conf).handle(
                 DateTimeParseOption::Hour)?;
         },
         FUNCTION_DAY => {
-            function = DateParse::defaults(Some(function), data_map_wrap.clone()).handle(
+            func = DateParse::defaults(Some(func), data.clone(), &conf).handle(
                 DateParseOption::Day)?;
         },
         FUNCTION_WEEK => {
-            function = DateParse::defaults(Some(function), data_map_wrap.clone()).handle(
+            func = DateParse::defaults(Some(func), data.clone(), &conf).handle(
                 DateParseOption::Week)?;
         },
         FUNCTION_WEEKDAY => {
-            function = DateParse::defaults(Some(function), data_map_wrap.clone()).handle(
+            func = DateParse::defaults(Some(func), data.clone(), &conf).handle(
                 DateParseOption::WeekDay)?;
         },
         FUNCTION_MONTH => {
-            function = DateParse::defaults(Some(function), data_map_wrap.clone()).handle(
+            func = DateParse::defaults(Some(func), data.clone(), &conf).handle(
                 DateParseOption::Month)?;
         },
         FUNCTION_NOW => {
-            function = Now::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Now::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_TODAY => {
-            function = Today::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Today::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_DAYS => {
-            function = Days::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Days::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_DATEADD => {
-            function = DateAddDiff::defaults(Some(function), data_map_wrap.clone()).handle(
+            func = DateAddDiff::defaults(Some(func), data.clone(), &conf).handle(
                 DateDeltaOperation::Add)?;
         },
         FUNCTION_DATEDIF => {
-            function = DateAddDiff::defaults(Some(function), data_map_wrap.clone()).handle(
+            func = DateAddDiff::defaults(Some(func), data.clone(), &conf).handle(
                 DateDeltaOperation::Diff)?;
         },
         FUNCTION_DATEFMT => {
-            function = DateFormat::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = DateFormat::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_MIN => {
-            function = Stats::defaults(Some(function), data_map_wrap.clone()).handle(
+            func = Stats::defaults(Some(func), data.clone(), &conf).handle(
                 StatOption::Min)?;
         },
         FUNCTION_MAX => {
-            function = Stats::defaults(Some(function), data_map_wrap.clone()).handle(
+            func = Stats::defaults(Some(func), data.clone(), &conf).handle(
                 StatOption::Max)?;
         },
         FUNCTION_IF => {
-            function = If::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = If::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_AND => {
-            function = And::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = And::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_OR => {
-            function = Or::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Or::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_NOT => {
-            function = Not::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Not::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         FUNCTION_XOR => {
-            function = Xor::defaults(Some(function), data_map_wrap.clone()).handle()?;
+            func = Xor::defaults(Some(func), data.clone(), &conf).handle()?;
         },
         _ => {
             return Err(
@@ -1101,7 +1141,7 @@ pub fn process_function(
             );
         }
     }
-    return Ok(function)
+    return Ok(func)
 }
 
 // Score for this is validate all functions in a text formula, but design  might change with compilation
@@ -1192,8 +1232,13 @@ impl FunctionAttributeItem {
         };
         return obj
     }
-    pub fn get_value(&self, data_map: &HashMap<String, String>) -> Result<String, PlanetError> {
+    pub fn get_value(
+        &self, 
+        data_map: &HashMap<String, String>,
+        field_config_map: &HashMap<String, FieldConfig>
+    ) -> Result<String, PlanetError> {
         let data_map = data_map.clone();
+        let field_config_map = field_config_map.clone();
         let is_reference = self.is_reference;
         let formula = self.formula.clone();
         let attribute_id = self.id.clone().unwrap_or_default();
@@ -1215,7 +1260,11 @@ impl FunctionAttributeItem {
             // I execute the formula and return value
             // execute_formula(formula: &Formula, data_map: &HashMap<String, String>)
             let formula = formula.unwrap();
-            value = execute_formula(&formula, &data_map)?;
+            value = execute_formula(
+                &formula, 
+                &data_map,
+                &field_config_map
+            )?;
             //eprintln!("FunctionAttributeItem.get_value :: {}={}", &attribute_id, &value);
         } else if has_assignment {
             let check = self.check_assignment(&data_map);
@@ -1245,7 +1294,8 @@ impl FunctionAttributeItem {
 
 pub fn execute_formula(
     formula: &Formula, 
-    data_map: &HashMap<String, String>
+    data_map: &HashMap<String, String>,
+    field_config_map: &HashMap<String, FieldConfig>,
 ) -> Result<String, PlanetError> {
     // 23 + LOG(34)
     // FUNC(attr1, attr2, ...)
@@ -1253,6 +1303,8 @@ pub fn execute_formula(
     // This needs to execute the formula for a field
     // The type will depend on the formula_format on what we return
     // 1. I execute the functions in the formula and substitute result by placeholder and call LIB
+    let field_config_map = field_config_map.clone();
+    let field_config_map_wrap = Some(field_config_map);
     let functions = formula.functions.clone();
     let mut formula_str = formula.formula.clone();
     if functions.is_some() {
@@ -1264,7 +1316,11 @@ pub fn execute_formula(
             let mut function_parse = FunctionParse::defaults(&function.name);
             function_parse.text = function.text;
             function_parse.compiled_attributes = function.attributes;
-            let function_parse = process_function(&function_parse, Some(data_map.clone()))?;
+            let function_parse = process_function(
+                &function_parse, 
+                Some(data_map.clone()),
+                field_config_map_wrap.clone()
+            )?;
             // eprintln!("execute_formula_field :: function_parse: {:#?}", &function_parse);
             // eprintln!("execute_formula_field :: function: {:#?}", function.clone());
             let function_result = function_parse.result.unwrap();

@@ -54,3 +54,7 @@ pub const FUNCTION_AND: &str = "AND";
 pub const FUNCTION_OR: &str = "OR";
 pub const FUNCTION_NOT: &str = "NOT";
 pub const FUNCTION_XOR: &str = "XOR";
+
+pub const DATE_MODE_HUMAN_TIME: &str = "human_time";
+pub const DATE_MODE_ISO: &str = "iso";
+pub const DATE_MODE_ONLY_DATE: &str = "only_date";

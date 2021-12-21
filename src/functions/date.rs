@@ -85,14 +85,22 @@ pub enum DateDeltaOperation {
 pub struct Date {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>,
 }
 impl Date {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>,
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map
+        };
     }
 }
 impl DateFunction for Date {
@@ -135,12 +143,13 @@ impl DateFunction for Date {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
         let year_item = attributes[0].clone();
-        let year_value = year_item.get_value(data_map)?;
+        let year_value = year_item.get_value(data_map, &field_config_map)?;
         let month_item = attributes[1].clone();
-        let month_value = month_item.get_value(data_map)?;
+        let month_value = month_item.get_value(data_map, &field_config_map)?;
         let day_item = attributes[2].clone();
-        let day_value = day_item.get_value(data_map)?;
+        let day_value = day_item.get_value(data_map, &field_config_map)?;
         let date_only = NaiveDate::parse_from_str(
             format!(
                 "{year}-{month}-{day}",
@@ -165,18 +174,28 @@ impl DateFunction for Date {
 pub struct DateTimeParse {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>,
 }
 impl DateTimeParse {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>,
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map,
+        };
     }
 }
 impl DateTimeFunction for DateTimeParse {
-    fn handle(&mut self, date_parse_option: DateTimeParseOption) -> Result<FunctionParse, PlanetError> {
+    fn handle(&mut self, 
+        date_parse_option: DateTimeParseOption,
+    ) -> Result<FunctionParse, PlanetError> {
         // SECOND($date_str)
         // MINUTE($date_str)
         // HOUR($date_str)
@@ -268,13 +287,29 @@ impl DateTimeFunction for DateTimeParse {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
         let date_item = attributes[0].clone();
-        let mut date = date_item.get_value(data_map)?;
+        let field_config_map = self.field_config_map.clone();
+        eprintln!("DateTimeParse.execute :: field_config_map: {:#?}", &field_config_map);
+        let mut date = date_item.get_value(data_map, &field_config_map)?;
         let mode_item = attributes[1].clone();
-        let mode = mode_item.get_value(data_map)?;
+        let mode = mode_item.get_value(data_map, &field_config_map)?;
         let mode = mode.as_str();
+        if mode_item.is_reference {
+            let field_name = mode_item.name.unwrap();
+            eprintln!("DateTimeParse.execute :: field name: {}", &field_name);
+            let field_config = field_config_map.get(&field_name);
+            if field_config.is_some() {
+                let field_config = field_config.unwrap().clone();
+                eprintln!("DateTimeParse.execute :: field_config: {:#?}", &field_config);
+            }
+        }
+        
         let mut replacement_string = String::from("");
         date = date.replace("\"", "");
-        if mode == "iso" {
+        // In case using reference, I need to check the date_format of the column: friendly, us, european, iso
+        // About am/pm I can check this through regex on the handle.
+        // us, european, have no way to check unless I have date_format
+        // mode: iso, human time
+        if mode == DATE_MODE_ISO {
             let date_obj_wrap = get_date_object_iso(&date);
             if date_obj_wrap.is_ok() {
                 let date_obj = date_obj_wrap.unwrap();
@@ -293,8 +328,8 @@ impl DateTimeFunction for DateTimeParse {
                     }, 
                 }
             }
-        } else if mode == "human_time" {
-            let date_obj_wrap = get_date_object_human_time(&date);            
+        } else if mode == DATE_MODE_HUMAN_TIME {
+            let date_obj_wrap = get_date_object_human_time(&date);
             if date_obj_wrap.is_ok() {
                 let date_obj = date_obj_wrap.unwrap();
                 match date_parse_option {
@@ -321,14 +356,22 @@ impl DateTimeFunction for DateTimeParse {
 pub struct DateParse {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>,
 }
 impl DateParse {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>,
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map
+        };
     }
 }
 impl DateParseFunction for DateParse {
@@ -409,22 +452,26 @@ impl DateParseFunction for DateParse {
                 }
                 attributes_.push(date);
                 let mut mode: &str = "";
+                let mode_: String;
                 if date_string_wrap.is_some() {
                     let date_string = date_string_wrap.unwrap();
                     if date_string.find("T").is_some() {
-                        mode = "\"iso\"";
+                        mode_ = format!("\"{}\"", DATE_MODE_ISO);
+                        mode = mode_.as_str();
                         let date_object = get_date_object_iso(&date_string);
                         if date_object.is_err() {
                             function.validate = Some(false);
                         }
                     } else if date_string.find(" ").is_some() {
-                        mode = "\"human_time\"";
+                        mode_ = format!("\"{}\"", DATE_MODE_HUMAN_TIME);
+                        mode = mode_.as_str();
                         let date_object = get_date_object_human_time(&date_string);
                         if date_object.is_err() {
                             function.validate = Some(false);
                         }
                     } else {
-                        mode = "\"only_date\"";
+                        mode_ = format!("\"{}\"", DATE_MODE_ONLY_DATE);
+                        mode = mode_.as_str();
                         let date_object = get_date_object_only_date(&date_string);
                         if date_object.is_err() {
                             function.validate = Some(false);
@@ -446,8 +493,9 @@ impl DateParseFunction for DateParse {
     fn execute(&self, date_parse_option: DateParseOption) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
         let date_item = attributes[0].clone();
-        let mut date = date_item.get_value(data_map)?;
+        let mut date = date_item.get_value(data_map, &field_config_map)?;
         let mode_item = attributes[1].clone();
         let mode = mode_item.value.unwrap_or_default();
         let mode = mode.as_str();
@@ -551,14 +599,22 @@ impl DateParseFunction for DateParse {
 pub struct Now {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>,
 }
 impl Now {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map
+        };
     }
 }
 impl DateFunction for Now {
@@ -601,14 +657,22 @@ impl DateFunction for Now {
 pub struct Today {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>,
 }
 impl Today {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>,
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map
+        };
     }
 }
 impl DateFunction for Today {
@@ -659,14 +723,23 @@ impl DateFunction for Today {
 pub struct Days {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>,
 }
 impl Days {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map
+
+        };
     }
 }
 impl DateFunction for Days {
@@ -724,10 +797,11 @@ impl DateFunction for Days {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
         let start_date_item = attributes[0].clone();
-        let start_date_value = start_date_item.get_value(data_map)?;
+        let start_date_value = start_date_item.get_value(data_map, &field_config_map)?;
         let end_date_item = attributes[1].clone();
-        let end_date_value = end_date_item.get_value(data_map)?;
+        let end_date_value = end_date_item.get_value(data_map, &field_config_map)?;
         let number_days: i64;
         let start_date_obj = NaiveDate::parse_from_str(
             start_date_value.as_str(), 
@@ -748,14 +822,22 @@ impl DateFunction for Days {
 pub struct DateAddDiff {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>,
 }
 impl DateAddDiff {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map
+        };
     }
 }
 impl DateAddDiffFunction for DateAddDiff {
@@ -852,12 +934,13 @@ impl DateAddDiffFunction for DateAddDiff {
     fn execute(&self, operation: DateDeltaOperation) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
         let date_item = attributes[0].clone();
-        let date_value = date_item.get_value(data_map)?;
+        let date_value = date_item.get_value(data_map, &field_config_map)?;
         let number_item = attributes[1].clone();
-        let number_value = number_item.get_value(data_map)?;
+        let number_value = number_item.get_value(data_map, &field_config_map)?;
         let units_item = attributes[2].clone();
-        let units_value = units_item.get_value(data_map)?;
+        let units_value = units_item.get_value(data_map, &field_config_map)?;
         let replacement_string: String;
         let new_date: DateTime<FixedOffset>;
         let date_obj: DateTime<FixedOffset>;
@@ -995,14 +1078,22 @@ impl DateAddDiffFunction for DateAddDiff {
 pub struct DateFormat {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>,
 }
 impl DateFormat {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map
+        };
     }
 }
 impl DateFunction for DateFormat {
@@ -1077,12 +1168,13 @@ impl DateFunction for DateFormat {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
         let date_item = attributes[0].clone();
-        let date_value = date_item.get_value(data_map)?;
+        let date_value = date_item.get_value(data_map, &field_config_map)?;
         let format_item = attributes[1].clone();
-        let format_value = format_item.get_value(data_map)?;
+        let format_value = format_item.get_value(data_map, &field_config_map)?;
         let mode_item = attributes[2].clone();
-        let mode_value = mode_item.get_value(data_map)?;
+        let mode_value = mode_item.get_value(data_map, &field_config_map)?;
         let date_obj_wrap: Option<DateTime<FixedOffset>>;
         if mode_value == String::from("date") {
             date_obj_wrap = Some(get_date_object_only_date(&date_value).unwrap());

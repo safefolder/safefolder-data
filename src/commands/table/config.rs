@@ -245,6 +245,24 @@ impl ConfigStorageField for FieldConfig {
         }
         return None
     }
+    fn get_field_config_map(table: &DbData) -> Result<HashMap<String, FieldConfig>, PlanetError> {
+        let fields = FieldConfig::parse_from_db(table);
+        if fields.is_ok() {
+            let fields = fields.unwrap().clone();
+            let mut map: HashMap<String, FieldConfig> = HashMap::new();
+            for field in fields {
+                let field_name = field.name.clone().unwrap_or_default();
+                map.insert(field_name, field.clone());
+            }
+            return Ok(map)
+        }
+        return Err(
+            PlanetError::new(
+                500, 
+                Some(tr!("Could not get field config map")),
+            )
+        )
+    }
     fn parse_from_db(db_data: &DbData) -> Result<Vec<FieldConfig>, PlanetError> {
         // let select_data: Option<Vec<(String, String)>> = None;
         let db_data = db_data.clone();

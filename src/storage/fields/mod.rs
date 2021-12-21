@@ -16,7 +16,7 @@ use crate::commands::table::config::*;
 These are the core fields implemented so we can tackle the security and permissions system
 
 * 01. SmallTextField                [impl] - text
-* 02. LongTextField                 [impl] - text : This is the text field.
+* 02. LongTextField                 [impl] - text : This is the text field, needs to be updated based on full text search.
 * 03. CheckBoxField                 [impl] - number
 * 05. SelectField                   [impl] - text
 * 06. DateField                     [impl] - date

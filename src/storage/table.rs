@@ -15,9 +15,9 @@ use serde_encrypt::{
 use slug::slugify;
 
 use crate::planet::constants::*;
-use crate::storage::{generate_id};
+use crate::storage::{generate_id, ConfigStorageField};
 use crate::planet::{PlanetError, PlanetContext, Context};
-use crate::commands::table::config::DbTableConfig;
+use crate::commands::table::config::{DbTableConfig, FieldConfig};
 use crate::storage::constants::*;
 use crate::storage::fields::*;
 use crate::functions::*;
@@ -687,6 +687,8 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
         let iter = self.db.iter();
         let db_table = self.db_table.clone();
         let table = db_table.get_by_name(table_name)?.unwrap();
+        let field_config_map = FieldConfig::get_field_config_map(&table).unwrap();
+        let field_config_map_wrap = Some(field_config_map.clone());
         // eprintln!("DbRow.select :: table: {:#?}", &table);
         let fields_wrap = fields.clone();
         let has_fields = fields_wrap.is_some();
@@ -730,7 +732,8 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
             None, 
             Some(db_table), 
             Some(table_name.clone()), 
-            is_assign_function
+            is_assign_function,
+            field_config_map_wrap.clone()
         )?;
         // eprintln!("DbRow.select :: original formula_query: {:#?}", &formula_query);
         let t_f_2 = &t_f_1.elapsed().as_micros();
@@ -762,7 +765,7 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
             let t_item_3 = Instant::now();
             let data_map = item.clone().data.unwrap();
 
-            formula_result = execute_formula(&formula_query, &data_map)?;
+            formula_result = execute_formula(&formula_query, &data_map, &field_config_map)?;
             if formula_result == String::from("1") {
                 formula_matches = true;
             } else {

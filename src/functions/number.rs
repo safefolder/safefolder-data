@@ -53,14 +53,22 @@ pub trait RoundNumberFunction {
 pub struct Ceiling {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>,
 }
 impl Ceiling {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map
+        };
     }
 }
 impl NumberFunction for Ceiling {
@@ -112,12 +120,13 @@ impl NumberFunction for Ceiling {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
         let attribute_item = attributes[0].clone();
-        let number_string = attribute_item.get_value(data_map)?;
+        let number_string = attribute_item.get_value(data_map, &field_config_map)?;
         let number_str = number_string.as_str();
         let mut number: f64 = FromStr::from_str(number_str).unwrap();
         let significance_item = attributes[1].clone();
-        let significance_string = significance_item.get_value(data_map)?;
+        let significance_string = significance_item.get_value(data_map, &field_config_map)?;
         let mut significance: i8 = FromStr::from_str(&significance_string.as_str()).unwrap();
         significance = significance - 1;
         number = round::ceil(number, significance);
@@ -130,14 +139,22 @@ impl NumberFunction for Ceiling {
 pub struct Floor {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>
 }
 impl Floor {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map
+        };
     }
 }
 impl NumberFunction for Floor {
@@ -190,12 +207,13 @@ impl NumberFunction for Floor {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
         let attribute_item = attributes[0].clone();
-        let number_string = attribute_item.get_value(data_map)?;
+        let number_string = attribute_item.get_value(data_map, &field_config_map)?;
         let number_str = number_string.as_str();
         let mut number: f64 = FromStr::from_str(number_str).unwrap();
         let significance_item = attributes[1].clone();
-        let significance_string = significance_item.get_value(data_map)?;
+        let significance_string = significance_item.get_value(data_map, &field_config_map)?;
         let mut significance: i8 = FromStr::from_str(&significance_string.as_str()).unwrap();
         significance = significance - 1;
         number = round::floor(number, significance);
@@ -207,14 +225,22 @@ impl NumberFunction for Floor {
 pub struct Count {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>
 }
 impl Count {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map
+        };
     }
 }
 impl NumberFunction for Count {
@@ -258,9 +284,10 @@ impl NumberFunction for Count {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
         let mut items: Vec<String> = Vec::new();
         for attribute in attributes {
-            let attribute_value = attribute.get_value(data_map)?;
+            let attribute_value = attribute.get_value(data_map, &field_config_map)?;
             items.push(attribute_value);
         }
         let count = items.len();
@@ -272,14 +299,22 @@ impl NumberFunction for Count {
 pub struct CountA {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>
 }
 impl CountA {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map
+        };
     }
 }
 impl NumberFunction for CountA {
@@ -322,9 +357,10 @@ impl NumberFunction for CountA {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
         let mut items: Vec<String> = Vec::new();
         for attribute in attributes {
-            let attribute_value = attribute.get_value(data_map)?;
+            let attribute_value = attribute.get_value(data_map, &field_config_map)?;
             let attr_type = attribute.attr_type;
             match attr_type {
                 AttributeType::Text => {
@@ -343,14 +379,22 @@ impl NumberFunction for CountA {
 pub struct CountAll {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>,
 }
 impl CountAll {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>,
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map
+        };
     }
 }
 impl NumberFunction for CountAll {
@@ -401,14 +445,22 @@ impl NumberFunction for CountAll {
 pub struct Even {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>
 }
 impl Even {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map
+        };
     }
 }
 impl NumberFunction for Even {
@@ -459,8 +511,9 @@ impl NumberFunction for Even {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
         let attribute_item = attributes[0].clone();
-        let attribute_value = attribute_item.get_value(data_map)?;
+        let attribute_value = attribute_item.get_value(data_map, &field_config_map)?;
         let number: f64 = FromStr::from_str(attribute_value.as_str()).unwrap();
         let mut rounded_int: i32;
         let rounded = number.round();
@@ -480,14 +533,22 @@ impl NumberFunction for Even {
 pub struct Exp {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>,
 }
 impl Exp {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map
+        };
     }
 }
 impl NumberFunction for Exp {
@@ -534,8 +595,9 @@ impl NumberFunction for Exp {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
         let attribute_item = attributes[0].clone();
-        let attribute_value = attribute_item.get_value(data_map)?;
+        let attribute_value = attribute_item.get_value(data_map, &field_config_map)?;
         let number: f64 = FromStr::from_str(attribute_value.as_str()).unwrap();
         let number_result: f64;
         number_result = number.exp();
@@ -547,14 +609,22 @@ impl NumberFunction for Exp {
 pub struct Int {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>
 }
 impl Int {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>,
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map
+        };
     }
 }
 impl NumberFunction for Int {
@@ -601,8 +671,9 @@ impl NumberFunction for Int {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
         let attribute_item = attributes[0].clone();
-        let attribute_value = attribute_item.get_value(data_map)?;
+        let attribute_value = attribute_item.get_value(data_map, &field_config_map)?;
         let mut number: f64 = FromStr::from_str(attribute_value.as_str()).unwrap();
         number = number.trunc();
         let number_str = number.to_string();
@@ -616,14 +687,22 @@ impl NumberFunction for Int {
 pub struct Log {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>
 }
 impl Log {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map
+        };
     }
 }
 impl NumberFunction for Log {
@@ -685,13 +764,14 @@ impl NumberFunction for Log {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
         let attribute_item = attributes[0].clone();
-        let attribute_value = attribute_item.get_value(data_map)?;
+        let attribute_value = attribute_item.get_value(data_map, &field_config_map)?;
         let mut number: f64 = FromStr::from_str(attribute_value.as_str()).unwrap();
         let mut base: f64 = 10.0;
         if attributes.len() == 2 {
             let base_item = attributes[1].clone();
-            let base_value = base_item.get_value(data_map)?;
+            let base_value = base_item.get_value(data_map, &field_config_map)?;
             base = FromStr::from_str(base_value.as_str()).unwrap();
         }
         number = number.log(base);
@@ -706,14 +786,22 @@ impl NumberFunction for Log {
 pub struct Mod {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>,
 }
 impl Mod {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map
+        };
     }
 }
 impl NumberFunction for Mod {
@@ -769,13 +857,14 @@ impl NumberFunction for Mod {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
         let attribute_item = attributes[0].clone();
-        let attribute_value = attribute_item.get_value(data_map)?;
+        let attribute_value = attribute_item.get_value(data_map, &field_config_map)?;
         let mut number: f64 = FromStr::from_str(attribute_value.as_str()).unwrap();
         let mut divisor: f64 = 10.0;
         if attributes.len() == 2 {
             let divisor_item = attributes[1].clone();
-            let divisor_value = divisor_item.get_value(data_map)?;
+            let divisor_value = divisor_item.get_value(data_map, &field_config_map)?;
             divisor = FromStr::from_str(divisor_value.as_str()).unwrap();
         }
         number = number%divisor;
@@ -790,14 +879,22 @@ impl NumberFunction for Mod {
 pub struct Power {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>
 }
 impl Power {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map
+        };
     }
 }
 impl NumberFunction for Power {
@@ -853,15 +950,16 @@ impl NumberFunction for Power {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
         let attribute_item = attributes[0].clone();
-        let attribute_value = attribute_item.get_value(data_map)?;
+        let attribute_value = attribute_item.get_value(data_map, &field_config_map)?;
         // let is_reference = attribute_item.is_reference;
         // let is_power_reference = power_item.is_reference;
         let mut number: f64 = FromStr::from_str(attribute_value.as_str()).unwrap();
         let mut power: f64 = 10.0;
         if attributes.len() == 2 {
             let power_item = attributes[1].clone();
-            let power_value = power_item.get_value(data_map)?;
+            let power_value = power_item.get_value(data_map, &field_config_map)?;
             power = FromStr::from_str(power_value.as_str()).unwrap();
         }
         number = number.powf(power);
@@ -876,14 +974,22 @@ impl NumberFunction for Power {
 pub struct Round {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>
 }
 impl Round {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map
+        };
     }
 }
 impl RoundNumberFunction for Round {
@@ -962,15 +1068,16 @@ impl RoundNumberFunction for Round {
     fn execute(&self, option: RoundOption) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
         let attribute_item = attributes[0].clone();
-        let attribute_value = attribute_item.get_value(data_map)?;
+        let attribute_value = attribute_item.get_value(data_map, &field_config_map)?;
         // let is_reference = attribute_item.is_reference;
         // let is_digits_reference = digits_item.is_reference;
         let mut number: f64 = FromStr::from_str(attribute_value.as_str()).unwrap();
         let mut digits: i8 = 2;
         if attributes.len() == 2 {
             let digits_item = attributes[1].clone();
-            let digits_value = digits_item.get_value(data_map)?;
+            let digits_value = digits_item.get_value(data_map, &field_config_map)?;
             digits = FromStr::from_str(digits_value.as_str()).unwrap();
         }
         match option {
@@ -995,14 +1102,22 @@ impl RoundNumberFunction for Round {
 pub struct Sqrt {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>,
 }
 impl Sqrt {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map
+        };
     }
 }
 impl NumberFunction for Sqrt {
@@ -1048,8 +1163,9 @@ impl NumberFunction for Sqrt {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
         let attribute_item = attributes[0].clone();
-        let attribute_value = attribute_item.get_value(data_map)?;
+        let attribute_value = attribute_item.get_value(data_map, &field_config_map)?;
         let mut number: f64 = FromStr::from_str(attribute_value.as_str()).unwrap();
         number = number.sqrt();
         let number_str = number.to_string();
@@ -1063,14 +1179,22 @@ impl NumberFunction for Sqrt {
 pub struct Value {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>,
 }
 impl Value {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>,
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map,
+        };
     }
 }
 impl NumberFunction for Value {
@@ -1116,8 +1240,9 @@ impl NumberFunction for Value {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
         let attribute_item = attributes[0].clone();
-        let mut text = attribute_item.get_value(data_map)?;
+        let mut text = attribute_item.get_value(data_map, &field_config_map)?;
         let number: f64;
         text = text.replace("$", "").replace("€", "");
         text = text.replace("\"", "");
@@ -1154,14 +1279,22 @@ impl NumberFunction for Value {
 pub struct Boolean {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>,
 }
 impl Boolean {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>,
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map
+        };
     }
 }
 impl NumberFunction for Boolean {

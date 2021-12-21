@@ -179,6 +179,11 @@ impl<'gb> InsertIntoTable<'gb> {
                 }
                 let mut db_data = db_data.unwrap();
                 let mut data: HashMap<String, String> = HashMap::new();
+                let mut field_config_map: HashMap<String, FieldConfig> = HashMap::new();
+                for field in config_fields.clone() {
+                    let field_name = field.name.clone().unwrap();
+                    field_config_map.insert(field_name, field.clone());
+                }
                 for field in config_fields {
                     let field_config = field.clone();
                     let field_type = field.field_type.unwrap_or_default();
@@ -228,7 +233,7 @@ impl<'gb> InsertIntoTable<'gb> {
                         },
                         FIELD_TYPE_FORMULA => {
                             let obj = FormulaField::defaults(&field_config);
-                            field_data_wrap = obj.validate(&data);
+                            field_data_wrap = obj.validate(&data, &field_config_map);
                         },
                         FIELD_TYPE_DATE => {
                             let obj = DateField::defaults(&field_config);

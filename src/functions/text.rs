@@ -32,14 +32,22 @@ pub trait TextFunction {
 pub struct Concat {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>,
 }
 impl Concat {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map,
+        };
     }
 }
 impl TextFunction for Concat {
@@ -75,12 +83,13 @@ impl TextFunction for Concat {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
         let mut attributes_processed: Vec<String> = Vec::new();
         // Case 1: In a formula field, no ref, CONCAT("My ", "places")
         // Case 2: In a formula field, ref, CONCAT("My "", {Column})
         // Case 3: I have function as attribute: CONCAT("My "", TRIM({Column}))
         for attribute_item in attributes {
-            let attribute = attribute_item.get_value(data_map)?;
+            let attribute = attribute_item.get_value(data_map, &field_config_map)?;
             attributes_processed.push(attribute);
         }
         let result = attributes_processed.join("");
@@ -92,14 +101,22 @@ impl TextFunction for Concat {
 pub struct Trim {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>,
 }
 impl Trim {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>,
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map
+        };
     }
 }
 impl TextFunction for Trim {
@@ -150,9 +167,10 @@ impl TextFunction for Trim {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
         let attributes = attributes.clone();
         let attribute_item = attributes[0].clone();
-        let attribute = attribute_item.get_value(data_map)?;
+        let attribute = attribute_item.get_value(data_map, &field_config_map)?;
         let result = attribute.trim().to_string();
         return Ok(result);
     
@@ -163,14 +181,22 @@ impl TextFunction for Trim {
 pub struct Format {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>,
 }
 impl Format {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>,
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map,
+        };
     }
 }
 impl TextFunction for Format {
@@ -246,14 +272,22 @@ impl TextFunction for Format {
 pub struct JoinList {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>,
 }
 impl JoinList {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>,
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map,
+        };
     }
 }
 impl TextFunction for JoinList {
@@ -350,14 +384,22 @@ impl TextFunction for JoinList {
 pub struct Length {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>,
 }
 impl Length {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>,
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map
+        };
     }
 }
 impl TextFunction for Length {
@@ -409,9 +451,10 @@ impl TextFunction for Length {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
         let attributes = attributes.clone();
         let attribute_item = attributes[0].clone();
-        let attribute = attribute_item.get_value(data_map)?;
+        let attribute = attribute_item.get_value(data_map, &field_config_map)?;
         let length = attribute.len().to_string();
         return Ok(length)
     }
@@ -421,14 +464,22 @@ impl TextFunction for Length {
 pub struct Lower {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>,
 }
 impl Lower {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>,
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map,
+        };
     }
 }
 impl TextFunction for Lower {
@@ -480,9 +531,10 @@ impl TextFunction for Lower {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
         let attributes = attributes.clone();
         let attribute_item = attributes[0].clone();
-        let attribute = attribute_item.get_value(data_map)?;
+        let attribute = attribute_item.get_value(data_map, &field_config_map)?;
         let result_lower = attribute.to_lowercase();
         return Ok(result_lower)
     }
@@ -492,14 +544,22 @@ impl TextFunction for Lower {
 pub struct Upper {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>,
 }
 impl Upper {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>,
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map,
+        };
     }
 }
 impl TextFunction for Upper {
@@ -551,9 +611,10 @@ impl TextFunction for Upper {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
         let attributes = attributes.clone();
         let attribute_item = attributes[0].clone();
-        let attribute = attribute_item.get_value(data_map)?;
+        let attribute = attribute_item.get_value(data_map, &field_config_map)?;
         let result_upper = attribute.to_uppercase();
         return Ok(result_upper)
     }
@@ -563,14 +624,22 @@ impl TextFunction for Upper {
 pub struct Replace {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>,
 }
 impl Replace {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>,
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map,
+        };
     }
 }
 impl TextFunction for Replace {
@@ -621,17 +690,18 @@ impl TextFunction for Replace {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
         let attributes = attributes.clone();
         let old_text = attributes[0].clone();
-        let old_text_value = old_text.get_value(data_map)?;
+        let old_text_value = old_text.get_value(data_map, &field_config_map)?;
         let start_num = attributes[1].clone();
-        let start_num_value = start_num.get_value(data_map)?;
+        let start_num_value = start_num.get_value(data_map, &field_config_map)?;
         let start_num_value: u32 = FromStr::from_str(start_num_value.as_str()).unwrap();
         let num_chars = attributes[2].clone();
-        let num_chars_value = num_chars.get_value(data_map)?;
+        let num_chars_value = num_chars.get_value(data_map, &field_config_map)?;
         let num_chars_value: u32 = FromStr::from_str(num_chars_value.as_str()).unwrap();
         let new_text = attributes[3].clone();
-        let new_text_value = new_text.get_value(data_map)?;
+        let new_text_value = new_text.get_value(data_map, &field_config_map)?;
         let replacement_string: String;
         let mut piece: String = String::from("");
         for (i, item) in old_text_value.chars().enumerate() {
@@ -651,14 +721,22 @@ impl TextFunction for Replace {
 pub struct Mid {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>,
 }
 impl Mid {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>,
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map,
+        };
     }
 }
 impl TextFunction for Mid {
@@ -708,14 +786,15 @@ impl TextFunction for Mid {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
         let attributes = attributes.clone();
         let text = attributes[0].clone();
-        let text_value = text.get_value(data_map)?;
+        let text_value = text.get_value(data_map, &field_config_map)?;
         let start_num = attributes[1].clone();
-        let start_num_value = start_num.get_value(data_map)?;
+        let start_num_value = start_num.get_value(data_map, &field_config_map)?;
         let start_num_value: usize = FromStr::from_str(start_num_value.as_str()).unwrap();
         let num_chars = attributes[2].clone();
-        let num_chars_value = num_chars.get_value(data_map)?;
+        let num_chars_value = num_chars.get_value(data_map, &field_config_map)?;
         let num_chars_value: usize = FromStr::from_str(num_chars_value.as_str()).unwrap();
         
         let mut text_new = String::from("");
@@ -734,14 +813,22 @@ impl TextFunction for Mid {
 pub struct Rept {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>,
 }
 impl Rept {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>,
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map
+        };
     }
 }
 impl TextFunction for Rept {
@@ -789,11 +876,12 @@ impl TextFunction for Rept {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
         let attributes = attributes.clone();
         let text = attributes[0].clone();
-        let text_value = text.get_value(data_map)?;
+        let text_value = text.get_value(data_map, &field_config_map)?;
         let number_times = attributes[1].clone();
-        let number_times_value = number_times.get_value(data_map)?;
+        let number_times_value = number_times.get_value(data_map, &field_config_map)?;
         let number_times_value: usize = FromStr::from_str(number_times_value.as_str()).unwrap();
         let text_value_str = text_value.as_str();
         let text_value_str = text_value_str.repeat(number_times_value);
@@ -805,14 +893,22 @@ impl TextFunction for Rept {
 pub struct Substitute {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>,
 }
 impl Substitute {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>,
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map,
+        };
     }
 }
 impl TextFunction for Substitute {
@@ -862,14 +958,15 @@ impl TextFunction for Substitute {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
         let attributes = attributes.clone();
         let text = attributes[0].clone();
-        let mut text_value = text.get_value(data_map)?;
+        let mut text_value = text.get_value(data_map, &field_config_map)?;
         let old_text = attributes[1].clone();
-        let old_text_value = old_text.get_value(data_map)?;
+        let old_text_value = old_text.get_value(data_map, &field_config_map)?;
         let old_text_value = old_text_value.as_str();
         let new_text = attributes[2].clone();
-        let new_text_value = new_text.get_value(data_map)?;
+        let new_text_value = new_text.get_value(data_map, &field_config_map)?;
         let new_text_value = new_text_value.as_str();
 
         text_value = text_value.replace(old_text_value, new_text_value);

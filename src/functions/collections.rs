@@ -27,14 +27,22 @@ pub trait CollectionStatsFunction {
 pub struct Stats {
     function: Option<FunctionParse>,
     data_map: Option<HashMap<String, String>>,
-    attributes: Option<Vec<FunctionAttributeItem>>
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    field_config_map: HashMap<String, FieldConfig>
 }
 impl Stats {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>
+        data_map: Option<HashMap<String, String>>,
+        field_config_map: &HashMap<String, FieldConfig>
     ) -> Self {
-        return Self{function: function, data_map: data_map, attributes: None};
+        let field_config_map = field_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            attributes: None,
+            field_config_map: field_config_map
+        };
     }
 }
 impl CollectionStatsFunction for Stats {
@@ -101,8 +109,9 @@ impl CollectionStatsFunction for Stats {
     fn execute(&self, option: StatOption) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
         let sequence_item = attributes[0].clone();
-        let mut sequence = sequence_item.get_value(data_map)?;
+        let mut sequence = sequence_item.get_value(data_map, &field_config_map)?;
         let replacement_string: String;
         sequence = sequence.replace("\"", "");
         let mut sequence_list: Vec<f64> = Vec::new();
