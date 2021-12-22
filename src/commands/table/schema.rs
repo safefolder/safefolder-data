@@ -7,9 +7,8 @@ use std::time::Instant;
 use tr::tr;
 use colored::*;
 use regex::Regex;
-use validator::Contains;
 
-use crate::commands::table::config::{CreateTableConfig, FieldConfig};
+use crate::commands::table::config::{CreateTableConfig};
 use crate::commands::table::{Command};
 use crate::commands::{CommandRunner};
 use crate::storage::{ConfigStorageField};
