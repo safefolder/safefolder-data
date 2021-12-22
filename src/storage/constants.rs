@@ -57,6 +57,8 @@ pub const FIELD_TYPE_FORMULA: &str = "Formula";
 pub const FIELD_TYPE_DURATION: &str = "Duration";
 pub const FIELD_TYPE_CREATED_TIME: &str = "Created Time";
 pub const FIELD_TYPE_LAST_MODIFIED_TIME: &str = "Last Modified Time";
+pub const FIELD_TYPE_CREATED_BY: &str = "Created By";
+pub const FIELD_TYPE_LAST_MODIFIED_BY: &str = "Last Modified By";
 
 // Date Format
 pub const DATE_FORMAT_FRIENDLY: &str = "Friendly";

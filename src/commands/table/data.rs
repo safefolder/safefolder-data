@@ -19,7 +19,7 @@ use crate::commands::{CommandRunner};
 use crate::planet::constants::{ID, NAME};
 use crate::storage::table::{DbTable, DbRow, Row, Schema, DbData, GetItemOption};
 use crate::storage::table::*;
-use crate::storage::ConfigStorageField;
+use crate::storage::{ConfigStorageField, generate_id};
 use crate::planet::{
     PlanetContext, 
     PlanetError,
@@ -119,6 +119,10 @@ impl<'gb> InsertIntoTable<'gb> {
                         }
                     }
                 }
+
+                // User authentication
+                // TODO: Complete when implement the permission system exchange token by user_id
+                let user_id = generate_id().unwrap();
                 
                 // let insert_data_collections_map = self.config.data_collections.clone().unwrap();
                 // eprintln!("InsertIntoTable.run :: insert_data__collections_map: {:#?}", &insert_data_collections_map);
@@ -250,6 +254,14 @@ impl<'gb> InsertIntoTable<'gb> {
                         FIELD_TYPE_LAST_MODIFIED_TIME => {
                             let obj = AuditDateField::defaults(&field_config);
                             field_data_wrap = obj.validate(&field_data);
+                        },
+                        FIELD_TYPE_CREATED_BY => {
+                            let obj = AuditByField::defaults(&field_config);
+                            field_data_wrap = obj.validate(&user_id);
+                        },
+                        FIELD_TYPE_LAST_MODIFIED_BY => {
+                            let obj = AuditByField::defaults(&field_config);
+                            field_data_wrap = obj.validate(&user_id);
                         },
                         _ => {
                             errors.push(

@@ -355,3 +355,55 @@ impl StorageField for SelectField {
         return yaml_string;
     }
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AuditByField {
+    pub config: FieldConfig
+}
+impl AuditByField {
+    pub fn defaults(field_config: &FieldConfig) -> Self {
+        let field_config = field_config.clone();
+        let field_obj = Self{
+            config: field_config
+        };
+        return field_obj
+    }
+}
+impl StorageField for AuditByField {
+    fn update_config_map(
+        &mut self, 
+        field_config_map: &BTreeMap<String, String>,
+    ) -> Result<BTreeMap<String, String>, PlanetError> {
+        let field_config_map = field_config_map.clone();
+        return Ok(field_config_map)
+    }
+    fn build_config(
+        &mut self, 
+        _: &BTreeMap<String, String>,
+    ) -> Result<FieldConfig, PlanetError> {
+        let config = self.config.clone();
+        return Ok(config)
+    }
+    fn validate(&self, data: &String) -> Result<String, PlanetError> {
+        // CreatedBy: I map into insert
+        // LastModifiedBy: I map into insert and update
+        // I save the user id
+        // The user id should not come from the payload, but from the auth system
+        // TODO: Check user_id exists on table of users, or any other mean of storage
+        let user_id = data.clone();
+        return Ok(user_id)
+    }
+    fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
+        let field_config = self.config.clone();
+        let field_name = field_config.name.unwrap();
+        let mut yaml_string = yaml_string.clone();
+        let field = &field_name.truecolor(
+            YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
+        );
+        let value = format!("{}", 
+            value.truecolor(YAML_COLOR_ORANGE[0], YAML_COLOR_ORANGE[1], YAML_COLOR_ORANGE[2]), 
+        );
+        yaml_string.push_str(format!("  {field}: {value}\n", field=field, value=value).as_str());
+        return yaml_string;
+    }
+}
