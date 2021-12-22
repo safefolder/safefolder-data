@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use colored::Colorize;
 use chrono::{DateTime, Utc};
@@ -32,8 +32,8 @@ impl DateField {
 impl StorageField for DateField {
     fn update_config_map(
         &mut self, 
-        field_config_map: &HashMap<String, String>,
-    ) -> Result<HashMap<String, String>, PlanetError> {
+        field_config_map: &BTreeMap<String, String>,
+    ) -> Result<BTreeMap<String, String>, PlanetError> {
         let mut field_config_map = field_config_map.clone();
         let date_format = self.config.date_format.clone();
         let time_format = self.config.time_format.clone();
@@ -72,7 +72,7 @@ impl StorageField for DateField {
     }
     fn build_config(
         &mut self, 
-        field_config_map: &HashMap<String, String>,
+        field_config_map: &BTreeMap<String, String>,
     ) -> Result<FieldConfig, PlanetError> {
         let field_config_map = field_config_map.clone();
         let date_format = field_config_map.get(DATE_FORMAT);
@@ -231,14 +231,14 @@ impl DurationField {
 impl StorageField for DurationField {
     fn update_config_map(
         &mut self, 
-        field_config_map: &HashMap<String, String>,
-    ) -> Result<HashMap<String, String>, PlanetError> {
+        field_config_map: &BTreeMap<String, String>,
+    ) -> Result<BTreeMap<String, String>, PlanetError> {
         let field_config_map = field_config_map.clone();
         return Ok(field_config_map)
     }
     fn build_config(
         &mut self, 
-        _: &HashMap<String, String>,
+        _: &BTreeMap<String, String>,
     ) -> Result<FieldConfig, PlanetError> {
         let config = self.config.clone();
         return Ok(config)
@@ -328,14 +328,14 @@ impl AuditDateField {
 impl StorageField for AuditDateField {
     fn update_config_map(
         &mut self, 
-        field_config_map: &HashMap<String, String>,
-    ) -> Result<HashMap<String, String>, PlanetError> {
+        field_config_map: &BTreeMap<String, String>,
+    ) -> Result<BTreeMap<String, String>, PlanetError> {
         let field_config_map = field_config_map.clone();
         return Ok(field_config_map)
     }
     fn build_config(
         &mut self, 
-        _: &HashMap<String, String>,
+        _: &BTreeMap<String, String>,
     ) -> Result<FieldConfig, PlanetError> {
         let config = self.config.clone();
         return Ok(config)

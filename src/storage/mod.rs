@@ -5,7 +5,7 @@ pub mod table;
 pub mod constants;
 pub mod fields;
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use validator::{ValidationErrors};
 use crate::commands::table::config::FieldConfig;
@@ -24,16 +24,16 @@ pub trait ConfigStorageField {
     }
     fn map_object_db(
         &self, 
-        field_type_map: &HashMap<String, String>,
-        field_name_map: &HashMap<String, String>,
+        field_type_map: &BTreeMap<String, String>,
+        field_name_map: &BTreeMap<String, String>,
         db_table: &DbTable,
         table_name: &String
-    ) -> Result<HashMap<String, String>, PlanetError>;
-    fn get_field_config_map(table: &DbData) -> Result<HashMap<String, FieldConfig>, PlanetError>;
-    fn map_collections_db(&self) -> Result<HashMap<String, Vec<HashMap<String, String>>>, PlanetError>;
+    ) -> Result<BTreeMap<String, String>, PlanetError>;
+    fn get_field_config_map(table: &DbData) -> Result<BTreeMap<String, FieldConfig>, PlanetError>;
+    fn map_collections_db(&self) -> Result<BTreeMap<String, Vec<BTreeMap<String, String>>>, PlanetError>;
     fn parse_from_db(db_data: &DbData) -> Result<Vec<FieldConfig>, PlanetError>;
-    fn map_objects_db(&self) -> Result<HashMap<String, Vec<HashMap<String, String>>>, PlanetError>;
-    fn get_field_id_map(fields: &Vec<FieldConfig>) -> Result<HashMap<String, FieldConfig>, PlanetError>;
+    fn map_objects_db(&self) -> Result<BTreeMap<String, Vec<BTreeMap<String, String>>>, PlanetError>;
+    fn get_field_id_map(fields: &Vec<FieldConfig>) -> Result<BTreeMap<String, FieldConfig>, PlanetError>;
     fn get_name_field(db_data: &DbData) -> Option<FieldConfig>;
 }
 

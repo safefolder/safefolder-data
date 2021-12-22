@@ -3,7 +3,7 @@ extern crate slug;
 
 use std::str::FromStr;
 use std::time::Instant;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use colored::Colorize;
 use validator::{Validate, ValidationErrors};
 use serde::{Deserialize, Serialize};
@@ -98,27 +98,27 @@ pub struct DbData {
     pub slug: Option<String>,
     #[validate(required)]
     pub name: Option<String>,
-    pub routing: Option<HashMap<String, String>>,
-    pub options: Option<HashMap<String, String>>,
-    pub context: Option<HashMap<String, String>>,
-    pub data: Option<HashMap<String, String>>,
-    pub data_collections: Option<HashMap<String, Vec<HashMap<String, String>>>>,
-    pub data_objects: Option<HashMap<String, HashMap<String, String>>>,
+    pub routing: Option<BTreeMap<String, String>>,
+    pub options: Option<BTreeMap<String, String>>,
+    pub context: Option<BTreeMap<String, String>>,
+    pub data: Option<BTreeMap<String, String>>,
+    pub data_collections: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
+    pub data_objects: Option<BTreeMap<String, BTreeMap<String, String>>>,
 }
 impl DbData {
     pub fn defaults(
         name: &String, 
-        data: Option<HashMap<String, String>>, 
-        data_collections: Option<HashMap<String, Vec<HashMap<String, String>>>>, 
-        data_objects: Option<HashMap<String, HashMap<String, String>>>, 
-        options: Option<HashMap<String, String>>, 
+        data: Option<BTreeMap<String, String>>, 
+        data_collections: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>, 
+        data_objects: Option<BTreeMap<String, BTreeMap<String, String>>>, 
+        options: Option<BTreeMap<String, String>>, 
         routing: Option<RoutingData>, 
-        context: Option<HashMap<String, String>>
+        context: Option<BTreeMap<String, String>>
     ) -> Result<DbData, PlanetError> {
         let slug = slugify(name);
-        let mut routing_map_: Option<HashMap<String, String>> = None;
+        let mut routing_map_: Option<BTreeMap<String, String>> = None;
         if routing.is_some() {
-            let mut routing_map: HashMap<String, String> = HashMap::new();
+            let mut routing_map: BTreeMap<String, String> = BTreeMap::new();
             let routing = routing.unwrap();
             let account_id = routing.account_id.clone().unwrap_or_default();
             let space_id = routing.space_id.clone().unwrap_or_default();
@@ -352,10 +352,10 @@ impl<'gb> DbTable<'gb> {
     pub fn get_field_id_map(
         db_table: &DbTable,
         table_name: &String
-    ) -> Result<HashMap<String, String>, PlanetError> {
+    ) -> Result<BTreeMap<String, String>, PlanetError> {
         let table = db_table.get_by_name(table_name).unwrap().unwrap();
         let db_fields = table.data_objects.unwrap();
-        let mut field_id_map: HashMap<String, String> = HashMap::new();
+        let mut field_id_map: BTreeMap<String, String> = BTreeMap::new();
         for db_field in db_fields.keys() {
             let field_config = db_fields.get(db_field).unwrap();
             let field_id = field_config.get(ID).unwrap().clone();
@@ -367,12 +367,12 @@ impl<'gb> DbTable<'gb> {
     pub fn get_field_name_map(
         db_table: &DbTable,
         table_name: &String
-    ) -> Result<HashMap<String, String>, PlanetError> {
+    ) -> Result<BTreeMap<String, String>, PlanetError> {
         let table = db_table.get_by_name(table_name)?;
         if table.is_some() {
             let table = table.unwrap();
             let db_fields = table.data_objects.unwrap();
-            let mut field_id_map: HashMap<String, String> = HashMap::new();
+            let mut field_id_map: BTreeMap<String, String> = BTreeMap::new();
             for db_field in db_fields.keys() {
                 let field_config = db_fields.get(db_field).unwrap();
                 let field_id = field_config.get(ID).unwrap().clone();
@@ -390,9 +390,9 @@ impl<'gb> DbTable<'gb> {
     // Get field_name -> field_type map
     pub fn get_field_type_map(
         table: &DbData,
-    ) -> Result<HashMap<String, String>, PlanetError> {
+    ) -> Result<BTreeMap<String, String>, PlanetError> {
         let db_fields = table.data_objects.clone().unwrap();
-        let mut field_type_map: HashMap<String, String> = HashMap::new();
+        let mut field_type_map: BTreeMap<String, String> = BTreeMap::new();
         for db_field in db_fields.keys() {
             let field_name = db_field.clone();
             let field_map = db_fields.get(&field_name);
@@ -407,10 +407,10 @@ impl<'gb> DbTable<'gb> {
         Ok(field_type_map)
     }
     pub fn get_item_data_by_field_names(
-        item_data_id: Option<HashMap<String, String>>,
-        field_id_map: HashMap<String, String>
-    ) -> HashMap<String, String> {
-        let mut item_data: HashMap<String, String> = HashMap::new();
+        item_data_id: Option<BTreeMap<String, String>>,
+        field_id_map: BTreeMap<String, String>
+    ) -> BTreeMap<String, String> {
+        let mut item_data: BTreeMap<String, String> = BTreeMap::new();
         if item_data_id.is_some() {
             let item_data_id = item_data_id.unwrap();
             for field_id in item_data_id.keys() {
@@ -433,7 +433,7 @@ pub struct RowItem(pub FieldType);
 pub struct RowData {
     pub id: Option<String>,
     pub routing: RoutingData,
-    pub data: Option<HashMap<String, RowItem>>,
+    pub data: Option<BTreeMap<String, RowItem>>,
 }
 impl RowData {
     pub fn defaults(account_id: &String, space_id: &String) -> Self {
@@ -829,7 +829,7 @@ impl<'gb> DbRow<'gb> {
             table_name
         )?;
         // data
-        let mut data_new: HashMap<String, String> = HashMap::new();
+        let mut data_new: BTreeMap<String, String> = BTreeMap::new();
         let db_data = item.data;
         if db_data.is_some() {
             for (field_db_id, field_value) in db_data.unwrap() {
@@ -845,7 +845,7 @@ impl<'gb> DbRow<'gb> {
             item.data = None;
         }
         // data_collections
-        let mut data_collections_new: HashMap<String, Vec<HashMap<String, String>>> = HashMap::new();
+        let mut data_collections_new: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
         let db_data_collections = item.data_collections;
         if db_data_collections.is_some() {
             for (field_db_id, items) in db_data_collections.unwrap() {
@@ -861,7 +861,7 @@ impl<'gb> DbRow<'gb> {
             item.data_collections = None;
         }
         // data_objects
-        let mut data_objects_new: HashMap<String, HashMap<String, String>> = HashMap::new();
+        let mut data_objects_new: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
         let db_data_objects = item.data_objects;
         if db_data_objects.is_some() {
             for (field_db_id, map) in db_data_objects.unwrap() {

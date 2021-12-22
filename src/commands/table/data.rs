@@ -2,7 +2,7 @@ extern crate tr;
 extern crate colored;
 extern crate slug;
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::time::Instant;
 
 use tr::tr;
@@ -102,9 +102,9 @@ impl<'gb> InsertIntoTable<'gb> {
                 let config_fields = config_fields.unwrap();
                 // eprintln!("InsertIntoTable.run :: config_fields: {:#?}", &config_fields);
 
-                let insert_data_map: HashMap<String, String> = self.config.data.clone().unwrap();
+                let insert_data_map: BTreeMap<String, String> = self.config.data.clone().unwrap();
                 // I need to have {id} -> Value
-                let mut insert_id_data_map: HashMap<String, String> = HashMap::new();
+                let mut insert_id_data_map: BTreeMap<String, String> = BTreeMap::new();
                 // eprintln!("InsertIntoTable.run :: table: {:#?}", &table);
                 // table.data_objects
                 let table_data = table.clone().data_objects.unwrap();
@@ -161,7 +161,7 @@ impl<'gb> InsertIntoTable<'gb> {
                 }
 
                 // Instantiate DbData and validate
-                let mut db_context: HashMap<String, String> = HashMap::new();
+                let mut db_context: BTreeMap<String, String> = BTreeMap::new();
                 db_context.insert(TABLE_NAME.to_string(), table_name.clone());
                 let db_data = DbData::defaults(
                     &name,
@@ -178,8 +178,8 @@ impl<'gb> InsertIntoTable<'gb> {
                     return Err(errors)
                 }
                 let mut db_data = db_data.unwrap();
-                let mut data: HashMap<String, String> = HashMap::new();
-                let mut field_config_map: HashMap<String, FieldConfig> = HashMap::new();
+                let mut data: BTreeMap<String, String> = BTreeMap::new();
+                let mut field_config_map: BTreeMap<String, FieldConfig> = BTreeMap::new();
                 for field in config_fields.clone() {
                     let field_name = field.name.clone().unwrap();
                     field_config_map.insert(field_name, field.clone());
@@ -412,7 +412,7 @@ impl<'gb> Command<String> for GetFromTable<'gb> {
                 let data_collections = table.clone().data_collections;
                 let field_ids = data_collections.unwrap().get(FIELD_IDS).unwrap().clone();
                 let config_fields = FieldConfig::parse_from_db(&table)?;
-                let field_id_map: HashMap<String, FieldConfig> = FieldConfig::get_field_id_map(&config_fields)?;
+                let field_id_map: BTreeMap<String, FieldConfig> = FieldConfig::get_field_id_map(&config_fields)?;
                 let fields = self.config.data.clone().unwrap().fields;
                 eprintln!("GetFromTable.run :: fields: {:?}", &fields);
                 let item_id = self.config.data.clone().unwrap().id.unwrap();
@@ -703,8 +703,8 @@ fn handle_field_response(
     field_data: &Result<String, PlanetError>, 
     errors: &Vec<PlanetError>, 
     field_id: &String,
-    data: &HashMap<String, String>
-) -> (HashMap<String, String>, Vec<PlanetError>) {
+    data: &BTreeMap<String, String>
+) -> (BTreeMap<String, String>, Vec<PlanetError>) {
     let field_data = field_data.clone();
     let mut errors = errors.clone();
     let mut data = data.clone();

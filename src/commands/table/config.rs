@@ -1,6 +1,6 @@
 extern crate xid;
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use serde_yaml;
 use validator::{Validate, ValidationErrors, ValidationError};
@@ -28,8 +28,8 @@ use crate::planet::constants::*;
 use super::fetch_yaml_config;
 
 pub struct DbTableConfig02 {
-    pub language: HashMap<String, String>,
-    pub fields: Option<Vec<HashMap<String, String>>>,
+    pub language: BTreeMap<String, String>,
+    pub fields: Option<Vec<BTreeMap<String, String>>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -245,11 +245,11 @@ impl ConfigStorageField for FieldConfig {
         }
         return None
     }
-    fn get_field_config_map(table: &DbData) -> Result<HashMap<String, FieldConfig>, PlanetError> {
+    fn get_field_config_map(table: &DbData) -> Result<BTreeMap<String, FieldConfig>, PlanetError> {
         let fields = FieldConfig::parse_from_db(table);
         if fields.is_ok() {
             let fields = fields.unwrap().clone();
-            let mut map: HashMap<String, FieldConfig> = HashMap::new();
+            let mut map: BTreeMap<String, FieldConfig> = BTreeMap::new();
             for field in fields {
                 let field_name = field.name.clone().unwrap_or_default();
                 map.insert(field_name, field.clone());
@@ -277,8 +277,8 @@ impl ConfigStorageField for FieldConfig {
 
         // 1. Go through data_objects and make map field names field_name -> FieldConfig. Also
         //   vector for order in 
-        let mut map_fields_by_id: HashMap<String, FieldConfig> = HashMap::new();
-        let mut map_fields_by_name: HashMap<String, FieldConfig> = HashMap::new();
+        let mut map_fields_by_id: BTreeMap<String, FieldConfig> = BTreeMap::new();
+        let mut map_fields_by_name: BTreeMap<String, FieldConfig> = BTreeMap::new();
         if data_objects.is_some() {
             let data_objects = data_objects.unwrap();
 
@@ -417,14 +417,14 @@ impl ConfigStorageField for FieldConfig {
     }
     fn map_object_db(
         &self, 
-        field_type_map: &HashMap<String, String>,
-        field_name_map: &HashMap<String, String>,
+        field_type_map: &BTreeMap<String, String>,
+        field_name_map: &BTreeMap<String, String>,
         db_table: &DbTable,
         table_name: &String
-    ) -> Result<HashMap<String, String>, PlanetError> {
+    ) -> Result<BTreeMap<String, String>, PlanetError> {
         let field_config = self.clone();
         let field_config_ = self.clone();
-        let mut map: HashMap<String, String> = HashMap::new();
+        let mut map: BTreeMap<String, String> = BTreeMap::new();
         let required = field_config.required.unwrap_or_default();
         let indexed = field_config.indexed.unwrap_or_default();
         let many = field_config.many.unwrap_or_default();
@@ -432,7 +432,7 @@ impl ConfigStorageField for FieldConfig {
         let field_type = field_config.field_type.unwrap_or_default();
         let field_id = field_config.id.unwrap_or_default();
         let field_type_str = field_type.as_str();
-        eprintln!("map_object_db :: field_name: {}", &field_name);
+        // eprintln!("map_object_db :: field_name: {}", &field_name);
         map.insert(String::from(ID), field_id.clone());
         map.insert(String::from(NAME), field_name.clone());
         map.insert(String::from(FIELD_TYPE), field_type.clone());
@@ -476,22 +476,22 @@ impl ConfigStorageField for FieldConfig {
             },            
             _ => {}
         }
-        eprintln!("map_object_db :: finished!!!");
+        // eprintln!("map_object_db :: finished!!!");
         return Ok(map);
     }
 
-    fn map_collections_db(&self) -> Result<HashMap<String, Vec<HashMap<String, String>>>, PlanetError> {
+    fn map_collections_db(&self) -> Result<BTreeMap<String, Vec<BTreeMap<String, String>>>, PlanetError> {
         // 08/11/2021 We remove options from here, since is many structure often swapped
         let field_config = self.clone();
         // let field_type = &field_config.field_type.unwrap();
-        // let map: HashMap<String, Vec<HashMap<String, String>>> = HashMap::new();
+        // let map: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
         // select_options and multi_select_options
         let options = field_config.options.unwrap_or_default();
-        let mut map: HashMap<String, Vec<HashMap<String, String>>> = HashMap::new();
-        let mut select_options: Vec<HashMap<String, String>> = Vec::new();
+        let mut map: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
+        let mut select_options: Vec<BTreeMap<String, String>> = Vec::new();
         for select_value in options {
             let select_id = generate_id().unwrap();
-            let mut map: HashMap<String, String> = HashMap::new();
+            let mut map: BTreeMap<String, String> = BTreeMap::new();
             map.insert(String::from("key"), select_id);
             map.insert(String::from("value"), select_value);
             select_options.push(map);
@@ -504,15 +504,15 @@ impl ConfigStorageField for FieldConfig {
         return Ok(map)
     }
    
-    fn map_objects_db(&self) -> Result<HashMap<String, Vec<HashMap<String, String>>>, PlanetError> {
+    fn map_objects_db(&self) -> Result<BTreeMap<String, Vec<BTreeMap<String, String>>>, PlanetError> {
         // let field = self.clone();
-        let map: HashMap<String, Vec<HashMap<String, String>>> = HashMap::new();
+        let map: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
         // Include here items where you need field -> object in field configuration
         return Ok(map)
     }
 
-    fn get_field_id_map(fields: &Vec<FieldConfig>) -> Result<HashMap<String, FieldConfig>, PlanetError> {
-        let mut map: HashMap<String, FieldConfig> = HashMap::new();
+    fn get_field_id_map(fields: &Vec<FieldConfig>) -> Result<BTreeMap<String, FieldConfig>, PlanetError> {
+        let mut map: BTreeMap<String, FieldConfig> = BTreeMap::new();
         for field in fields {
             let field_ = field.clone();
             let field_id = field.id.clone().unwrap_or_default();
@@ -558,8 +558,8 @@ pub struct InsertIntoTableConfig {
     #[validate(required)]
     pub name: Option<String>,
     #[validate(required)]
-    pub data: Option<HashMap<String, String>>,
-    pub data_collections: Option<HashMap<String, Vec<String>>>,
+    pub data: Option<BTreeMap<String, String>>,
+    pub data_collections: Option<BTreeMap<String, Vec<String>>>,
 }
 
 impl InsertIntoTableConfig {
@@ -568,7 +568,7 @@ impl InsertIntoTableConfig {
         let config: InsertIntoTableConfig = InsertIntoTableConfig{
             command: None,
             name: name,
-            data: Some(HashMap::new()),
+            data: Some(BTreeMap::new()),
             data_collections: None
         };
         return config

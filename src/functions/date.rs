@@ -1,6 +1,6 @@
 use std::{str::FromStr};
 use regex::{Regex, Captures};
-use std::{collections::HashMap};
+use std::{collections::BTreeMap};
 use serde::{Deserialize, Serialize};
 use lazy_static::lazy_static;
 use chrono::{DateTime, Datelike, FixedOffset, NaiveDate, Utc, Duration, Timelike};
@@ -85,15 +85,15 @@ pub enum DateDeltaOperation {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Date {
     function: Option<FunctionParse>,
-    data_map: Option<HashMap<String, String>>,
+    data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: HashMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, FieldConfig>,
 }
 impl Date {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>,
-        field_config_map: &HashMap<String, FieldConfig>,
+        data_map: Option<BTreeMap<String, String>>,
+        field_config_map: &BTreeMap<String, FieldConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -174,15 +174,15 @@ impl DateFunction for Date {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DateTimeParse {
     function: Option<FunctionParse>,
-    data_map: Option<HashMap<String, String>>,
+    data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: HashMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, FieldConfig>,
 }
 impl DateTimeParse {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>,
-        field_config_map: &HashMap<String, FieldConfig>,
+        data_map: Option<BTreeMap<String, String>>,
+        field_config_map: &BTreeMap<String, FieldConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -372,15 +372,15 @@ impl DateTimeFunction for DateTimeParse {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DateParse {
     function: Option<FunctionParse>,
-    data_map: Option<HashMap<String, String>>,
+    data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: HashMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, FieldConfig>,
 }
 impl DateParse {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>,
-        field_config_map: &HashMap<String, FieldConfig>,
+        data_map: Option<BTreeMap<String, String>>,
+        field_config_map: &BTreeMap<String, FieldConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -650,15 +650,15 @@ impl DateParseFunction for DateParse {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Now {
     function: Option<FunctionParse>,
-    data_map: Option<HashMap<String, String>>,
+    data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: HashMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, FieldConfig>,
 }
 impl Now {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>,
-        field_config_map: &HashMap<String, FieldConfig>
+        data_map: Option<BTreeMap<String, String>>,
+        field_config_map: &BTreeMap<String, FieldConfig>
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -708,15 +708,15 @@ impl DateFunction for Now {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Today {
     function: Option<FunctionParse>,
-    data_map: Option<HashMap<String, String>>,
+    data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: HashMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, FieldConfig>,
 }
 impl Today {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>,
-        field_config_map: &HashMap<String, FieldConfig>,
+        data_map: Option<BTreeMap<String, String>>,
+        field_config_map: &BTreeMap<String, FieldConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -774,15 +774,15 @@ impl DateFunction for Today {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Days {
     function: Option<FunctionParse>,
-    data_map: Option<HashMap<String, String>>,
+    data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: HashMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, FieldConfig>,
 }
 impl Days {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>,
-        field_config_map: &HashMap<String, FieldConfig>
+        data_map: Option<BTreeMap<String, String>>,
+        field_config_map: &BTreeMap<String, FieldConfig>
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -890,15 +890,15 @@ impl DateFunction for Days {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DateAddDiff {
     function: Option<FunctionParse>,
-    data_map: Option<HashMap<String, String>>,
+    data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: HashMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, FieldConfig>,
 }
 impl DateAddDiff {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>,
-        field_config_map: &HashMap<String, FieldConfig>
+        data_map: Option<BTreeMap<String, String>>,
+        field_config_map: &BTreeMap<String, FieldConfig>
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -1162,15 +1162,15 @@ impl DateAddDiffFunction for DateAddDiff {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DateFormatFunc {
     function: Option<FunctionParse>,
-    data_map: Option<HashMap<String, String>>,
+    data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: HashMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, FieldConfig>,
 }
 impl DateFormatFunc {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>,
-        field_config_map: &HashMap<String, FieldConfig>
+        data_map: Option<BTreeMap<String, String>>,
+        field_config_map: &BTreeMap<String, FieldConfig>
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -1317,7 +1317,7 @@ pub fn get_standard_date_short_month(date_str: &String) -> String {
     let mut date_str = date_str.clone();
     // 12-AUG-2021 12:00:00 => 12-Aug-2021 12:00:00
     // 12-AUG-2021 => 12-Aug-2021
-    let mut map: HashMap<&str, &str> = HashMap::new();
+    let mut map: BTreeMap<&str, &str> = BTreeMap::new();
     map.insert("JAN", "Jan");
     map.insert("FEB", "Feb");
     map.insert("MAR", "Mar");
@@ -1419,7 +1419,7 @@ pub fn get_date_object_iso(date_string: &String) -> Result<DateTime<FixedOffset>
 }
 
 fn get_rust_date_format(date_obj: DateTime<FixedOffset>, mut format: String) -> String {
-    let mut fmt_map: HashMap<&str, &str> = HashMap::new();
+    let mut fmt_map: BTreeMap<&str, &str> = BTreeMap::new();
     fmt_map.insert("M", "%_m");
     fmt_map.insert("Mo", "");
     fmt_map.insert("MM", "%m");
@@ -1497,7 +1497,7 @@ fn get_rust_date_format(date_obj: DateTime<FixedOffset>, mut format: String) -> 
     return format;
 }
 
-fn get_date_format(field_name: &String, field_config_map: &HashMap<String, FieldConfig>) -> String {
+fn get_date_format(field_name: &String, field_config_map: &BTreeMap<String, FieldConfig>) -> String {
     let field_name = field_name.clone();
     let field_config_map = field_config_map.clone();
     let field_config = field_config_map.get(&field_name);

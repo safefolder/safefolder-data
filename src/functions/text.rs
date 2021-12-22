@@ -1,6 +1,6 @@
 use std::str::FromStr;
 use regex::Regex;
-use std::{collections::HashMap};
+use std::{collections::BTreeMap};
 use lazy_static::lazy_static;
 
 use crate::planet::PlanetError;
@@ -31,15 +31,15 @@ pub trait TextFunction {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Concat {
     function: Option<FunctionParse>,
-    data_map: Option<HashMap<String, String>>,
+    data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: HashMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, FieldConfig>,
 }
 impl Concat {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>,
-        field_config_map: &HashMap<String, FieldConfig>
+        data_map: Option<BTreeMap<String, String>>,
+        field_config_map: &BTreeMap<String, FieldConfig>
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -100,15 +100,15 @@ impl TextFunction for Concat {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Trim {
     function: Option<FunctionParse>,
-    data_map: Option<HashMap<String, String>>,
+    data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: HashMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, FieldConfig>,
 }
 impl Trim {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>,
-        field_config_map: &HashMap<String, FieldConfig>,
+        data_map: Option<BTreeMap<String, String>>,
+        field_config_map: &BTreeMap<String, FieldConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -180,15 +180,15 @@ impl TextFunction for Trim {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Format {
     function: Option<FunctionParse>,
-    data_map: Option<HashMap<String, String>>,
+    data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: HashMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, FieldConfig>,
 }
 impl Format {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>,
-        field_config_map: &HashMap<String, FieldConfig>,
+        data_map: Option<BTreeMap<String, String>>,
+        field_config_map: &BTreeMap<String, FieldConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -271,15 +271,15 @@ impl TextFunction for Format {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct JoinList {
     function: Option<FunctionParse>,
-    data_map: Option<HashMap<String, String>>,
+    data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: HashMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, FieldConfig>,
 }
 impl JoinList {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>,
-        field_config_map: &HashMap<String, FieldConfig>,
+        data_map: Option<BTreeMap<String, String>>,
+        field_config_map: &BTreeMap<String, FieldConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -383,15 +383,15 @@ impl TextFunction for JoinList {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Length {
     function: Option<FunctionParse>,
-    data_map: Option<HashMap<String, String>>,
+    data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: HashMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, FieldConfig>,
 }
 impl Length {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>,
-        field_config_map: &HashMap<String, FieldConfig>,
+        data_map: Option<BTreeMap<String, String>>,
+        field_config_map: &BTreeMap<String, FieldConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -463,15 +463,15 @@ impl TextFunction for Length {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Lower {
     function: Option<FunctionParse>,
-    data_map: Option<HashMap<String, String>>,
+    data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: HashMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, FieldConfig>,
 }
 impl Lower {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>,
-        field_config_map: &HashMap<String, FieldConfig>,
+        data_map: Option<BTreeMap<String, String>>,
+        field_config_map: &BTreeMap<String, FieldConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -543,15 +543,15 @@ impl TextFunction for Lower {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Upper {
     function: Option<FunctionParse>,
-    data_map: Option<HashMap<String, String>>,
+    data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: HashMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, FieldConfig>,
 }
 impl Upper {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>,
-        field_config_map: &HashMap<String, FieldConfig>,
+        data_map: Option<BTreeMap<String, String>>,
+        field_config_map: &BTreeMap<String, FieldConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -623,15 +623,15 @@ impl TextFunction for Upper {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Replace {
     function: Option<FunctionParse>,
-    data_map: Option<HashMap<String, String>>,
+    data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: HashMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, FieldConfig>,
 }
 impl Replace {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>,
-        field_config_map: &HashMap<String, FieldConfig>,
+        data_map: Option<BTreeMap<String, String>>,
+        field_config_map: &BTreeMap<String, FieldConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -720,15 +720,15 @@ impl TextFunction for Replace {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Mid {
     function: Option<FunctionParse>,
-    data_map: Option<HashMap<String, String>>,
+    data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: HashMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, FieldConfig>,
 }
 impl Mid {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>,
-        field_config_map: &HashMap<String, FieldConfig>,
+        data_map: Option<BTreeMap<String, String>>,
+        field_config_map: &BTreeMap<String, FieldConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -812,15 +812,15 @@ impl TextFunction for Mid {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Rept {
     function: Option<FunctionParse>,
-    data_map: Option<HashMap<String, String>>,
+    data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: HashMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, FieldConfig>,
 }
 impl Rept {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>,
-        field_config_map: &HashMap<String, FieldConfig>,
+        data_map: Option<BTreeMap<String, String>>,
+        field_config_map: &BTreeMap<String, FieldConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -892,15 +892,15 @@ impl TextFunction for Rept {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Substitute {
     function: Option<FunctionParse>,
-    data_map: Option<HashMap<String, String>>,
+    data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: HashMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, FieldConfig>,
 }
 impl Substitute {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>,
-        field_config_map: &HashMap<String, FieldConfig>,
+        data_map: Option<BTreeMap<String, String>>,
+        field_config_map: &BTreeMap<String, FieldConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{

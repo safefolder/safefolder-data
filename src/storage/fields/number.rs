@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use tr::tr;
@@ -26,15 +26,15 @@ impl CheckBoxField {
 impl StorageField for CheckBoxField {
     fn update_config_map(
         &mut self, 
-        field_config_map: &HashMap<String, String>,
-    ) -> Result<HashMap<String, String>, PlanetError> {
+        field_config_map: &BTreeMap<String, String>,
+    ) -> Result<BTreeMap<String, String>, PlanetError> {
         let field_config_map = field_config_map.clone();
         // No special attributes so far for small text field
         return Ok(field_config_map)
     }
     fn build_config(
         &mut self, 
-        _: &HashMap<String, String>,
+        _: &BTreeMap<String, String>,
     ) -> Result<FieldConfig, PlanetError> {
         let config = self.config.clone();
         // No special attributes so far for small text field
@@ -106,15 +106,15 @@ impl NumberField {
 impl StorageField for NumberField {
     fn update_config_map(
         &mut self, 
-        field_config_map: &HashMap<String, String>,
-    ) -> Result<HashMap<String, String>, PlanetError> {
+        field_config_map: &BTreeMap<String, String>,
+    ) -> Result<BTreeMap<String, String>, PlanetError> {
         let field_config_map = field_config_map.clone();
         // No special attributes so far for small text field
         return Ok(field_config_map)
     }
     fn build_config(
         &mut self, 
-        _: &HashMap<String, String>,
+        _: &BTreeMap<String, String>,
     ) -> Result<FieldConfig, PlanetError> {
         let config = self.config.clone();
         // No special attributes so far for small text field
@@ -180,14 +180,14 @@ impl NumberField {
         };
         return field_obj
     }
-    pub fn init_do(field_config: &FieldConfig, data_map: HashMap<String, String>, mut db_data: DbData) -> Result<DbData, PlanetError> {
+    pub fn init_do(field_config: &FieldConfig, data_map: BTreeMap<String, String>, mut db_data: DbData) -> Result<DbData, PlanetError> {
         let field_object = Self::defaults(field_config);
         db_data = field_object.process(data_map.clone(), db_data)?;
         return Ok(db_data)
     }
     pub fn init_get(
         field_config: &FieldConfig, 
-        data: Option<&HashMap<String, String>>, 
+        data: Option<&BTreeMap<String, String>>, 
         yaml_out_str: &String
     ) -> Result<String, PlanetError> {
         let field_config_ = field_config.clone();
@@ -253,7 +253,7 @@ impl ValidateField for NumberField {
 impl ProcessField for NumberField {
     fn process(
         &self,
-        insert_data_map: HashMap<String, String>,
+        insert_data_map: BTreeMap<String, String>,
         mut db_data: DbData
     ) -> Result<DbData, PlanetError> {
         let field_config = self.field_config.clone();
@@ -264,7 +264,7 @@ impl ProcessField for NumberField {
         let field = Self{
             field_config: self.field_config.clone()
         };
-        let mut data: HashMap<String, String> = HashMap::new();
+        let mut data: BTreeMap<String, String> = BTreeMap::new();
         if db_data.data.is_some() {
             data = db_data.data.unwrap();
         }

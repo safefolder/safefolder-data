@@ -1,7 +1,7 @@
 extern crate tr;
 extern crate colored;
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::time::Instant;
 
 use tr::tr;
@@ -9,7 +9,7 @@ use colored::*;
 use regex::Regex;
 use validator::Contains;
 
-use crate::commands::table::config::{CreateTableConfig};
+use crate::commands::table::config::{CreateTableConfig, FieldConfig};
 use crate::commands::table::{Command};
 use crate::commands::{CommandRunner};
 use crate::storage::{ConfigStorageField};
@@ -47,7 +47,7 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
 
                 // db table options with language data
                 let db_table: DbTable = result.unwrap();
-                let mut data: HashMap<String, String> = HashMap::new();
+                let mut data: BTreeMap<String, String> = BTreeMap::new();
                 let language = config.language.unwrap();
                 let language_codes_list = language.codes.unwrap();
                 let language_codes_str = language_codes_list.join(",");
@@ -56,22 +56,38 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                 data.insert(String::from(LANGUAGE_DEFAULT), language_default);
 
                 // config data
-                let mut data_objects: HashMap<String, HashMap<String, String>> = HashMap::new();
-                let mut data_collections: HashMap<String, Vec<HashMap<String, String>>> = HashMap::new();
+                let mut data_objects: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
+                let mut data_collections: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
                 let mut fields = config.fields.unwrap().clone();
-                let mut field_ids: Vec<HashMap<String, String>> = Vec::new();
+                let mut field_ids: Vec<BTreeMap<String, String>> = Vec::new();
 
                 // name field
                 let name_field_config = config.name.unwrap();
                 fields.insert(0, name_field_config);
-                let mut field_name_map: HashMap<String, String> = HashMap::new();
+                let mut field_name_map: BTreeMap<String, String> = BTreeMap::new();
                 // populate field_type_map and field_name_map
-                let mut field_type_map: HashMap<String, String> = HashMap::new();
+                let mut field_type_map: BTreeMap<String, String> = BTreeMap::new();
+                // TODO: order fields allphabetically
+                // TODO: order attributes alphabetically inside fields
+                // let mut field_list: Vec<String> = Vec::new();
+                // let mut field_config_map_by_name: BTreeMap<String, FieldConfig> = BTreeMap::new();
+                // for field in fields.iter() {
+                //     let field_name = field.name.clone().unwrap();
+                //     field_list.push(field_name.clone());
+                //     field_config_map_by_name.insert(field_name.clone(), field.clone());
+                // }
+                // field_list.sort();
+                // eprintln!("CreateTable :: field_list: {:?}", &field_list);
+                // let mut field_config_list: Vec<FieldConfig> = Vec::new();
+                // for field_name in field_list {
+                //     let field_config = field_config_map_by_name.get(&field_name).unwrap();
+                //     field_config_list.push(field_config.clone());
+                // }                
                 for field in fields.iter() {
                     let field_attrs = field.clone();
                     let field_name = field.name.clone().unwrap();
                     let field_type = field.field_type.clone();
-                    let mut field_id_map: HashMap<String, String> = HashMap::new();
+                    let mut field_id_map: BTreeMap<String, String> = BTreeMap::new();
                     let field_id = field_attrs.id.unwrap_or_default();
                     field_id_map.insert(String::from(ID), field_id.clone());
                     &field_ids.push(field_id_map);
@@ -80,7 +96,7 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                         field_type_map.insert(field_name.clone(), field_type);
                     }
                     let field_name_str = field_name.as_str();
-                    if field_name_map.has_element(field_name_str) == false {
+                    if field_name_map.get(field_name_str).is_some() == false {
                         // id => name
                         field_name_map.insert(field_name.clone(), field_id.clone());
                     } else {
@@ -109,6 +125,15 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                     // data_collections = map_list.clone();
                     data_collections.extend(map_list);
                 }
+                // let mut data_objects_new: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
+                // for (k, v) in data_objects.clone() {
+                //     let mut data_objects_new_: BTreeMap<String, String> = BTreeMap::new();
+                //     for (k, v) in v {
+                //         data_objects_new_.insert(k, v);
+                //     }
+                //     data_objects_new.insert(k, data_objects_new_);
+                // }
+                // eprintln!("CreateTable.run :: data_objects_new: {:#?}", &data_objects_new);
                 data_collections.insert(String::from(FIELD_IDS), field_ids);
                 // routing
                 let account_id = Some(self.context.account_id.unwrap_or_default().to_string());
@@ -118,9 +143,9 @@ impl<'gb> Command<DbData> for CreateTable<'gb> {
                     space_id, 
                     None
                 );
-                let mut data_wrap: Option<HashMap<String, String>> = None;
-                let mut data_collections_wrap: Option<HashMap<String, Vec<HashMap<String, String>>>> = None;
-                let mut data_objects_wrap: Option<HashMap<String, HashMap<String, String>>> = None;
+                let mut data_wrap: Option<BTreeMap<String, String>> = None;
+                let mut data_collections_wrap: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>> = None;
+                let mut data_objects_wrap: Option<BTreeMap<String, BTreeMap<String, String>>> = None;
                 if data.len() > 0 {
                     data_wrap = Some(data);
                 }

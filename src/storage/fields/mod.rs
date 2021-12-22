@@ -3,7 +3,7 @@ pub mod number;
 pub mod formula;
 pub mod date;
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use tr::tr;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
@@ -57,11 +57,11 @@ Then on the app, we have a visual way to add functions, helper content, etc...
 pub trait StorageField {
     fn update_config_map(
         &mut self, 
-        field_config_map: &HashMap<String, String>,
-    ) -> Result<HashMap<String, String>, PlanetError>;
+        field_config_map: &BTreeMap<String, String>,
+    ) -> Result<BTreeMap<String, String>, PlanetError>;
     fn build_config(
         &mut self, 
-        field_config_map: &HashMap<String, String>,
+        field_config_map: &BTreeMap<String, String>,
     ) -> Result<FieldConfig, PlanetError>;
     fn validate(&self, data: &String) -> Result<String, PlanetError>;
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String;
@@ -70,15 +70,15 @@ pub trait StorageField {
 pub trait FormulaStorageField {
     fn update_config_map(
         &mut self, 
-        field_config_map: &HashMap<String, String>,
-        field_name_map: &HashMap<String, String>,
-        field_type_map: &HashMap<String, String>,
+        field_config_map: &BTreeMap<String, String>,
+        field_name_map: &BTreeMap<String, String>,
+        field_type_map: &BTreeMap<String, String>,
         db_table: &DbTable,
         table_name: &String,
-    ) -> Result<HashMap<String, String>, PlanetError>;
+    ) -> Result<BTreeMap<String, String>, PlanetError>;
     fn build_config(
         &mut self, 
-        field_config_map: &HashMap<String, String>,
+        field_config_map: &BTreeMap<String, String>,
     ) -> Result<FieldConfig, PlanetError>;
     fn validate(&self, data: &String) -> Result<String, PlanetError>;
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String;
@@ -98,14 +98,14 @@ pub trait ValidateFormulaField {
 pub trait ProcessField {
     fn process(
         &self,
-        insert_data_map: HashMap<String, String>,
+        insert_data_map: BTreeMap<String, String>,
         db_data: DbData
     ) -> Result<DbData, PlanetError>;
 }
 pub trait ProcessManyField {
     fn process(
         &self,
-        insert_data_collections_map: HashMap<String, Vec<String>>,
+        insert_data_collections_map: BTreeMap<String, Vec<String>>,
         db_data: DbData
     ) -> Result<DbData, PlanetError>;
 }

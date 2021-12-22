@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use tr::tr;
@@ -27,15 +27,15 @@ impl SmallTextField {
 impl StorageField for SmallTextField {
     fn update_config_map(
         &mut self, 
-        field_config_map: &HashMap<String, String>,
-    ) -> Result<HashMap<String, String>, PlanetError> {
+        field_config_map: &BTreeMap<String, String>,
+    ) -> Result<BTreeMap<String, String>, PlanetError> {
         let field_config_map = field_config_map.clone();
         // No special attributes so far for small text field
         return Ok(field_config_map)
     }
     fn build_config(
         &mut self, 
-        _: &HashMap<String, String>,
+        _: &BTreeMap<String, String>,
     ) -> Result<FieldConfig, PlanetError> {
         let config = self.config.clone();
         // No special attributes so far for small text field
@@ -90,15 +90,15 @@ impl LongTextField {
 impl StorageField for LongTextField {
     fn update_config_map(
         &mut self, 
-        field_config_map: &HashMap<String, String>,
-    ) -> Result<HashMap<String, String>, PlanetError> {
+        field_config_map: &BTreeMap<String, String>,
+    ) -> Result<BTreeMap<String, String>, PlanetError> {
         let field_config_map = field_config_map.clone();
         // No special attributes so far for small text field
         return Ok(field_config_map)
     }
     fn build_config(
         &mut self, 
-        _: &HashMap<String, String>,
+        _: &BTreeMap<String, String>,
     ) -> Result<FieldConfig, PlanetError> {
         let config = self.config.clone();
         // No special attributes so far for small text field
@@ -140,8 +140,8 @@ impl StorageField for LongTextField {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SelectField {
     pub config: FieldConfig,
-    pub options_id_map: Option<HashMap<String, String>>,
-    pub options_name_map: Option<HashMap<String, String>>,
+    pub options_id_map: Option<BTreeMap<String, String>>,
+    pub options_name_map: Option<BTreeMap<String, String>>,
 }
 impl SelectField {
     pub fn defaults(field_config: &FieldConfig, table: Option<&DbData>) -> Self {
@@ -153,8 +153,8 @@ impl SelectField {
         };
         if table.is_some() {
             let table = table.unwrap();
-            let mut options_id_map: HashMap<String, String> = HashMap::new();
-            let mut options_name_map: HashMap<String, String> = HashMap::new();
+            let mut options_id_map: BTreeMap<String, String> = BTreeMap::new();
+            let mut options_name_map: BTreeMap<String, String> = BTreeMap::new();
             let field_config = &field_obj.config;
             let field_name = field_config.name.clone().unwrap();
             for data_collection in table.data_collections.clone() {
@@ -174,7 +174,7 @@ impl SelectField {
                             //     },
                             //     ...
                             // ],
-                            let options: &Vec<HashMap<String, String>> = data_collection.get(key).unwrap();
+                            let options: &Vec<BTreeMap<String, String>> = data_collection.get(key).unwrap();
                             for option in options {
                                 options_id_map.insert(
                                     option.get(KEY).unwrap().clone(), 
@@ -198,8 +198,8 @@ impl SelectField {
 impl StorageField for SelectField {
     fn update_config_map(
         &mut self, 
-        field_config_map: &HashMap<String, String>,
-    ) -> Result<HashMap<String, String>, PlanetError> {
+        field_config_map: &BTreeMap<String, String>,
+    ) -> Result<BTreeMap<String, String>, PlanetError> {
         let mut field_config_map = field_config_map.clone();
         let field_config = self.config.clone();
         let field_name = field_config.name.unwrap_or_default();
@@ -216,7 +216,7 @@ impl StorageField for SelectField {
     }
     fn build_config(
         &mut self, 
-        field_config_map: &HashMap<String, String>,
+        field_config_map: &BTreeMap<String, String>,
     ) -> Result<FieldConfig, PlanetError> {
         let mut config = self.config.clone();
         let options_str = field_config_map.get(OPTIONS);

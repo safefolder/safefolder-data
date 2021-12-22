@@ -1,6 +1,6 @@
 use std::str::FromStr;
 use regex::{Regex, Captures};
-use std::{collections::HashMap};
+use std::{collections::BTreeMap};
 use serde::{Deserialize, Serialize};
 use lazy_static::lazy_static;
 
@@ -26,15 +26,15 @@ pub trait CollectionStatsFunction {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Stats {
     function: Option<FunctionParse>,
-    data_map: Option<HashMap<String, String>>,
+    data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: HashMap<String, FieldConfig>
+    field_config_map: BTreeMap<String, FieldConfig>
 }
 impl Stats {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<HashMap<String, String>>,
-        field_config_map: &HashMap<String, FieldConfig>
+        data_map: Option<BTreeMap<String, String>>,
+        field_config_map: &BTreeMap<String, FieldConfig>
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{

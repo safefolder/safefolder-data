@@ -6,7 +6,7 @@ pub mod number;
 pub mod collections;
 
 use std::str::FromStr;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use regex::{Regex, CaptureMatches};
@@ -140,7 +140,7 @@ impl FunctionAttribute {
         };
         return obj
     }
-    pub fn replace(&self, data_map: &HashMap<String, String>) -> Self {
+    pub fn replace(&self, data_map: &BTreeMap<String, String>) -> Self {
         // data_map :: {id} => Value
         let mut item = self.id.clone();
         let remove_quotes = self.remove_quotes.unwrap();
@@ -235,29 +235,29 @@ impl FormulaQueryCompiled {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Formula {
-    pub functions: Option<HashMap<String, CompiledFunction>>,
+    pub functions: Option<BTreeMap<String, CompiledFunction>>,
     pub assignment: Option<AttributeAssign>,
     pub formula: String,
-    pub data: Option<HashMap<String, String>>,
+    pub data: Option<BTreeMap<String, String>>,
 }
 impl Formula {
     pub fn defaults(
         formula: &String,
         formula_format: &String,
         table: Option<DbData>,
-        field_type_map: Option<HashMap<String, String>>,
-        field_name_map: Option<HashMap<String, String>>,
+        field_type_map: Option<BTreeMap<String, String>>,
+        field_name_map: Option<BTreeMap<String, String>>,
         db_table: Option<DbTable>,
         table_name: Option<String>,
         is_assign_function: bool,
-        field_config_map: Option<HashMap<String, FieldConfig>>,
+        field_config_map: Option<BTreeMap<String, FieldConfig>>,
     ) -> Result<Self, PlanetError> {
         //eprintln!("Formula...");
         // If I have an error in compilation, then does not validate. Compilation uses validate of functions.
         // This function is the one does compilation from string formula to FormulaFieldCompiled
         let formula_origin = formula.clone();
         let field_config_map_ = field_config_map.clone();
-        let mut field_config_map: HashMap<String, FieldConfig> = HashMap::new();
+        let mut field_config_map: BTreeMap<String, FieldConfig> = BTreeMap::new();
         if field_config_map_.is_some() {
             field_config_map = field_config_map_.unwrap();
         }
@@ -271,8 +271,8 @@ impl Formula {
         // let expr = &RE_FORMULA_FIELD_FUNCTIONS;
         let mut formula_processed = formula_origin.clone();
         let formula_format = formula_format.clone();
-        let mut field_name_map_: HashMap<String, String> = HashMap::new();
-        let mut field_type_map_: HashMap<String, String> = HashMap::new();
+        let mut field_name_map_: BTreeMap<String, String> = BTreeMap::new();
+        let mut field_type_map_: BTreeMap<String, String> = BTreeMap::new();
         if table.is_some() {
             let table = table.unwrap();
             let db_table = db_table.unwrap();
@@ -293,7 +293,7 @@ impl Formula {
             formula: String::from(""),
             data: None,
         };
-        let mut compiled_functions_map: HashMap<String, CompiledFunction> = HashMap::new();
+        let mut compiled_functions_map: BTreeMap<String, CompiledFunction> = BTreeMap::new();
         let mut compiled_functions: Vec<CompiledFunction> = Vec::new();
         let expr = &RE_FORMULA_FUNCTION_VARIABLES;
         // let expr_chained = &RE_FORMULA_FUNCTION_PIECES;
@@ -390,12 +390,12 @@ impl Formula {
 pub fn compile_assignment(
     formula: &str,
     formula_format: String,
-    functions_map: Option<HashMap<String, CompiledFunction>>,
-    field_name_map: HashMap<String, String>,
-    field_type_map: HashMap<String, String>,
+    functions_map: Option<BTreeMap<String, CompiledFunction>>,
+    field_name_map: BTreeMap<String, String>,
+    field_type_map: BTreeMap<String, String>,
     db_table: Option<DbTable>,
     table_name: Option<String>,
-    field_config_map: &HashMap<String, FieldConfig>
+    field_config_map: &BTreeMap<String, FieldConfig>
 ) -> Result<Option<AttributeAssign>, PlanetError> {
     //eprintln!("compile_assignment...");
     //eprintln!("compile_assignment :: formula: {}", &formula);
@@ -408,7 +408,7 @@ pub fn compile_assignment(
     let assignment: Option<AttributeAssign>;
     if functions_map.is_none() {
         let formula_map= compile_formula(formula_string.clone()).unwrap();
-        let mut compiled_functions_map: HashMap<String, CompiledFunction> = HashMap::new();
+        let mut compiled_functions_map: BTreeMap<String, CompiledFunction> = BTreeMap::new();
         for (function_placeholder, function_text) in formula_map {
             let function_text = function_text.as_str();
             let function_list_ = expr.captures(function_text);
@@ -493,8 +493,8 @@ pub fn formula_attr_collection(
     let expr = &RE_FORMULA_FUNCTION_PIECES;
     let tries = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
     let mut count = 1;
-    let mut formula_map_: HashMap<String, String> = HashMap::new();
-    let mut formula_map: HashMap<String, String> = HashMap::new();
+    let mut formula_map_: BTreeMap<String, String> = BTreeMap::new();
+    let mut formula_map: BTreeMap<String, String> = BTreeMap::new();
     let mut final_attrs = attrs_string.clone();
     for _ in tries {
         let final_attrs_ = final_attrs.clone();
@@ -578,12 +578,12 @@ pub fn formula_attr_collection(
 
 pub fn compile_formula(
     formula: String
-) -> Result<HashMap<String, String>, PlanetError> {
+) -> Result<BTreeMap<String, String>, PlanetError> {
     let expr = &RE_FORMULA_FUNCTION_PIECES;
     // Number tries I repeat processing of functions left
     let tries = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
     let mut count = 1;
-    let mut function_map_: HashMap<String, String> = HashMap::new();
+    let mut function_map_: BTreeMap<String, String> = BTreeMap::new();
     let mut final_formula = formula.clone();
     for _ in tries {
         let final_formula_ = final_formula.clone();
@@ -632,7 +632,7 @@ pub fn compile_formula(
         }
     }
     // Clean function_map for keys not final in the final formula
-    let mut function_map: HashMap<String, String> = HashMap::new();
+    let mut function_map: BTreeMap<String, String> = BTreeMap::new();
     let expr = &RE_FORMULA_FUNCTION_VARIABLES;
     let final_formula_ = final_formula.clone();
     let final_formula_ = final_formula_.as_str();
@@ -671,15 +671,15 @@ pub fn compile_formula(
 pub fn compile_function_text(
     function_text: &str,
     formula_format: &String,
-    field_type_map: &HashMap<String, String>,
-    field_name_map: Option<HashMap<String, String>>,
+    field_type_map: &BTreeMap<String, String>,
+    field_name_map: Option<BTreeMap<String, String>>,
     db_table: Option<DbTable>,
     table_name: Option<String>,
-    field_config_map: Option<HashMap<String, FieldConfig>>,
+    field_config_map: Option<BTreeMap<String, FieldConfig>>,
 ) -> Result<CompiledFunction, PlanetError> {
     //eprintln!("compile_function_text :: function_text: {}", &function_text);
     let field_config_map_wrap = field_config_map.clone();
-    let field_config_map: HashMap<String, FieldConfig> = HashMap::new();
+    let field_config_map: BTreeMap<String, FieldConfig> = BTreeMap::new();
     let formula_format = formula_format.clone();
     let field_type_map = field_type_map.clone();
     // eprintln!("compile_function_text :: field_type_map: {:#?}", &field_type_map);
@@ -818,7 +818,7 @@ pub fn compile_function_text(
             let have_assign_functions = expr.is_match(attr);
             let mut assign_attr = attr.clone().to_string();
             //eprintln!("compile_function_text :: have_assign_functions: {}", &have_assign_functions);
-            // let mut formula_map: HashMap<String, String> = HashMap::new();
+            // let mut formula_map: BTreeMap<String, String> = BTreeMap::new();
             if have_assign_functions {
                 let captures = expr.captures_iter(attr);
                 let capture = captures.last();
@@ -898,11 +898,11 @@ pub struct FunctionParse {
     attributes: Option<Vec<String>>,
     compiled_attributes: Option<Vec<FunctionAttributeItem>>,
     result: Option<FunctionResult>,
-    field_config_map: HashMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, FieldConfig>,
 }
 impl FunctionParse {
     pub fn defaults(name: &String) -> Self {
-        let field_config_map: HashMap<String, FieldConfig> = HashMap::new();
+        let field_config_map: BTreeMap<String, FieldConfig> = BTreeMap::new();
         let obj = FunctionParse{
             name: name.clone(),
             text: None,
@@ -918,8 +918,8 @@ impl FunctionParse {
 
 pub fn prepare_function_parse(
     function_parse: &FunctionParse, 
-    data_map: Option<HashMap<String, String>>,
-) -> (Option<String>, String, Vec<FunctionAttributeItem>, FunctionResult, HashMap<String, String>) {
+    data_map: Option<BTreeMap<String, String>>,
+) -> (Option<String>, String, Vec<FunctionAttributeItem>, FunctionResult, BTreeMap<String, String>) {
     let mut function = function_parse.clone();
     let function_text_wrap = function.text;
     let mut function_text: String = String::from("");
@@ -927,7 +927,7 @@ pub fn prepare_function_parse(
         function_text = function_text_wrap.clone().unwrap();
     }
     let data_map_wrap = data_map;
-    let mut data_map: HashMap<String, String> = HashMap::new();
+    let mut data_map: BTreeMap<String, String> = BTreeMap::new();
     if data_map_wrap.is_some() {
         data_map = data_map_wrap.unwrap();
     }
@@ -949,8 +949,8 @@ pub fn prepare_function_parse(
 
 pub fn process_function(
     function_parse: &FunctionParse, 
-    data_map: Option<HashMap<String, String>>,
-    field_config_map: Option<HashMap<String, FieldConfig>>,
+    data_map: Option<BTreeMap<String, String>>,
+    field_config_map: Option<BTreeMap<String, FieldConfig>>,
 ) -> Result<FunctionParse, PlanetError> {
     // let list_items = Some(expr.captures_iter(function_text));
     // I need either check or list of attributes, so I have only one function to deal with Regex expr.
@@ -961,11 +961,11 @@ pub fn process_function(
     let field_config_map = field_config_map.clone();
     let mut func = function.clone();
     let data = data_map_wrap.clone();
-    let conf: HashMap<String, FieldConfig>;
+    let conf: BTreeMap<String, FieldConfig>;
     if field_config_map.is_some() {
         conf = field_config_map.unwrap();
     } else {
-        conf = HashMap::new();
+        conf = BTreeMap::new();
     }
     match function_name {
         FUNCTION_CONCAT => {
@@ -1175,7 +1175,7 @@ pub struct CompiledFunction {
     pub text: Option<String>,
     pub function_type: FunctionType,
     pub attributes: Option<Vec<FunctionAttributeItem>>,
-    pub data: Option<HashMap<String, String>>,
+    pub data: Option<BTreeMap<String, String>>,
 }
 impl CompiledFunction {
     pub fn defaults(name: &String) -> Self {
@@ -1214,7 +1214,7 @@ pub struct FunctionAttributeItem {
     pub value: Option<String>,
     pub attr_type: AttributeType,
     pub formula: Option<Formula>,
-    pub data: Option<HashMap<String, String>>,
+    pub data: Option<BTreeMap<String, String>>,
 }
 impl FunctionAttributeItem {
     pub fn defaults(id: Option<String>, name: Option<String>, attr_type: AttributeType) -> Self {
@@ -1234,8 +1234,8 @@ impl FunctionAttributeItem {
     }
     pub fn get_value(
         &self, 
-        data_map: &HashMap<String, String>,
-        field_config_map: &HashMap<String, FieldConfig>
+        data_map: &BTreeMap<String, String>,
+        field_config_map: &BTreeMap<String, FieldConfig>
     ) -> Result<String, PlanetError> {
         let data_map = data_map.clone();
         let field_config_map = field_config_map.clone();
@@ -1258,7 +1258,7 @@ impl FunctionAttributeItem {
         } else if formula.is_some() {
             //eprintln!("FunctionAttributeItem.get_value :: formula");
             // I execute the formula and return value
-            // execute_formula(formula: &Formula, data_map: &HashMap<String, String>)
+            // execute_formula(formula: &Formula, data_map: &BTreeMap<String, String>)
             let formula = formula.unwrap();
             value = execute_formula(
                 &formula, 
@@ -1280,7 +1280,7 @@ impl FunctionAttributeItem {
         }
         return Ok(value)
     }
-    pub fn check_assignment(&self, data_map: &HashMap<String, String>) -> bool {
+    pub fn check_assignment(&self, data_map: &BTreeMap<String, String>) -> bool {
         let attr_type = self.attr_type.clone();
         let assignment = self.assignment.clone();
         let mut check = false;
@@ -1294,8 +1294,8 @@ impl FunctionAttributeItem {
 
 pub fn execute_formula(
     formula: &Formula, 
-    data_map: &HashMap<String, String>,
-    field_config_map: &HashMap<String, FieldConfig>,
+    data_map: &BTreeMap<String, String>,
+    field_config_map: &BTreeMap<String, FieldConfig>,
 ) -> Result<String, PlanetError> {
     // 23 + LOG(34)
     // FUNC(attr1, attr2, ...)
@@ -1427,7 +1427,7 @@ pub fn get_attribute_type(field_type: &String, formula_format: Option<String>) -
 
 pub fn get_assignment_reference(
     items: &Vec<String>, 
-    field_name_map: HashMap<String, String>
+    field_name_map: BTreeMap<String, String>
 ) -> Result<(String, Vec<String>), PlanetError> {
     let mut reference_name: String = String::from("");
     let mut items_new: Vec<String> = Vec::new();
@@ -1504,7 +1504,7 @@ pub fn parse_assign_operator(
 pub fn check_assignment(
     attr_assignment: AttributeAssign,
     attr_type: AttributeType,
-    db_data_map: &HashMap<String, String>,
+    db_data_map: &BTreeMap<String, String>,
 ) -> Result<bool, PlanetError> {
     //eprintln!("check_assignment...");
     //eprintln!("check_assignment :: db_data_map: {:#?}", db_data_map);

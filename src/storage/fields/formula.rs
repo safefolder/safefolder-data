@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use tr::tr;
@@ -26,12 +26,12 @@ impl FormulaField {
 impl FormulaField {
     pub fn update_config_map(
         &mut self, 
-        field_config_map: &HashMap<String, String>,
-        field_name_map: &HashMap<String, String>,
-        field_type_map: &HashMap<String, String>,
+        field_config_map: &BTreeMap<String, String>,
+        field_name_map: &BTreeMap<String, String>,
+        field_type_map: &BTreeMap<String, String>,
         db_table: &DbTable,
         table_name: &String,
-    ) -> Result<HashMap<String, String>, PlanetError> {
+    ) -> Result<BTreeMap<String, String>, PlanetError> {
         let mut field_config_map = field_config_map.clone();
         let config = self.config.clone();
         let formula = config.formula;
@@ -62,7 +62,7 @@ impl FormulaField {
     }
     pub fn build_config(
         &mut self, 
-        field_config_map: &HashMap<String, String>,
+        field_config_map: &BTreeMap<String, String>,
     ) -> Result<FieldConfig, PlanetError> {
         let mut config = self.config.clone();
         let formula = field_config_map.get(FORMULA);
@@ -85,8 +85,8 @@ impl FormulaField {
         return Ok(config)
     }
     pub fn validate(&self, 
-        data_map: &HashMap<String, String>,
-        field_config_map: &HashMap<String, FieldConfig>,
+        data_map: &BTreeMap<String, String>,
+        field_config_map: &BTreeMap<String, FieldConfig>,
     ) -> Result<String, PlanetError> {
         let config = self.config.clone();
         let field_config_map = field_config_map.clone();
