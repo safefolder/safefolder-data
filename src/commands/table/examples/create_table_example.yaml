@@ -29,3 +29,7 @@ fields:
       - Madrid
       - Barcelona
       - Valencia
+  - name: Currency
+    field_type: Currency
+    number_decimals: 2
+    currency_symbol: $

@@ -167,6 +167,8 @@ pub struct FieldConfig {
     pub formula_compiled: Option<String>,
     pub date_format: Option<DateFormat>,
     pub time_format: Option<i8>,
+    pub currency_symbol: Option<String>,
+    pub number_decimals: Option<i8>,
 }
 
 impl ConfigStorageField for FieldConfig {
@@ -189,6 +191,8 @@ impl ConfigStorageField for FieldConfig {
             formula_compiled: None,
             date_format: None,
             time_format: None,
+            currency_symbol: None,
+            number_decimals: None,
         };
         if options.is_some() {
             object.options = Some(options.unwrap());
@@ -238,6 +242,8 @@ impl ConfigStorageField for FieldConfig {
                         formula_compiled: None,
                         date_format: None,
                         time_format: None,
+                        currency_symbol: None,
+                        number_decimals: None,
                     };
                     return Some(field_config);
                 }
@@ -345,9 +351,12 @@ impl ConfigStorageField for FieldConfig {
                         let mut obj = AuditDateField::defaults(&field_config);
                         field_config = obj.build_config(field_config_map)?;
                     },
+                    FIELD_TYPE_CURRENCY => {
+                        let mut obj = CurrencyField::defaults(&field_config);
+                        field_config = obj.build_config(field_config_map)?;
+                    },
                     _ => {}
                 }
-
                 &map_fields_by_id.insert(field_id, field_config.clone());
                 &map_fields_by_name.insert(field_name.clone(), field_config.clone());
             }
@@ -473,7 +482,10 @@ impl ConfigStorageField for FieldConfig {
             },
             FIELD_TYPE_LAST_MODIFIED_TIME => {
                 map = AuditDateField::defaults(&field_config_).update_config_map(&map)?;
-            },            
+            },
+            FIELD_TYPE_CURRENCY => {
+                map = CurrencyField::defaults(&field_config_).update_config_map(&map)?;
+            },
             _ => {}
         }
         // eprintln!("map_object_db :: finished!!!");

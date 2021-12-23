@@ -263,6 +263,10 @@ impl<'gb> InsertIntoTable<'gb> {
                             let obj = AuditByField::defaults(&field_config);
                             field_data_wrap = obj.validate(&user_id);
                         },
+                        FIELD_TYPE_CURRENCY => {
+                            let obj = CurrencyField::defaults(&field_config);
+                            field_data_wrap = obj.validate(&field_data);
+                        },
                         _ => {
                             errors.push(
                                 PlanetError::new(
@@ -509,6 +513,26 @@ impl<'gb> Command<String> for GetFromTable<'gb> {
                                 let obj = DurationField::defaults(&field_config_);
                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },                            
+                            FIELD_TYPE_CREATED_TIME => {
+                                let obj = AuditDateField::defaults(&field_config_);
+                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+                            },
+                            FIELD_TYPE_LAST_MODIFIED_TIME => {
+                                let obj = AuditDateField::defaults(&field_config_);
+                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+                            },
+                            FIELD_TYPE_CREATED_BY => {
+                                let obj = AuditByField::defaults(&field_config_);
+                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+                            },
+                            FIELD_TYPE_LAST_MODIFIED_BY => {
+                                let obj = AuditByField::defaults(&field_config_);
+                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+                            },
+                            FIELD_TYPE_CURRENCY => {
+                                let obj = CurrencyField::defaults(&field_config_);
+                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+                            },
                             _ => {
                                 yaml_out_str = yaml_out_str;
                             }

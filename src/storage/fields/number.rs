@@ -3,12 +3,18 @@ use std::collections::BTreeMap;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use tr::tr;
+use lazy_static::lazy_static;
+use regex::{Regex};
+use rust_decimal::prelude::*;
 
 use crate::planet::{PlanetError};
-// use crate::storage::table::{DbData};
 use crate::commands::table::config::FieldConfig;
 use crate::storage::constants::*;
 use crate::storage::fields::*;
+
+lazy_static! {
+    pub static ref RE_CURRENCY: Regex = Regex::new(r#"^(?P<symbol_pre>[^\d\.]*)*(?P<amount>\d+[\.\d+]*)(?P<symbol_post>[^\d\.]+)*$"#).unwrap();
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CheckBoxField {
@@ -168,46 +174,131 @@ impl StorageField for NumberField {
     }
 }
 
-/* #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct NumberField {
-    pub field_config: FieldConfig
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CurrencyField {
+    pub config: FieldConfig
 }
-impl NumberField {
+impl CurrencyField {
     pub fn defaults(field_config: &FieldConfig) -> Self {
         let field_config = field_config.clone();
         let field_obj = Self{
-            field_config: field_config
+            config: field_config
         };
         return field_obj
     }
-    pub fn init_do(field_config: &FieldConfig, data_map: BTreeMap<String, String>, mut db_data: DbData) -> Result<DbData, PlanetError> {
-        let field_object = Self::defaults(field_config);
-        db_data = field_object.process(data_map.clone(), db_data)?;
-        return Ok(db_data)
-    }
-    pub fn init_get(
-        field_config: &FieldConfig, 
-        data: Option<&BTreeMap<String, String>>, 
-        yaml_out_str: &String
-    ) -> Result<String, PlanetError> {
-        let field_config_ = field_config.clone();
-        let field_id = field_config_.id.unwrap();
-        let data = data.unwrap().clone();
-        let field_obj = Self::defaults(&field_config);
-        let value_db = data.get(&field_id);
-        if value_db.is_some() {
-            let value_db = value_db.unwrap().clone();
-            let value = field_obj.get_value(Some(&value_db)).unwrap();
-            let yaml_out_str = field_obj.get_yaml_out(yaml_out_str, &value);    
-            return Ok(yaml_out_str)
-        }
-        let yaml_out_str = yaml_out_str.clone();
-        return Ok(yaml_out_str)
-    }
 }
-impl DbDumpNumber for NumberField {
-    fn get_yaml_out(&self, yaml_string: &String, value: &i32) -> String {
-        let field_config = self.field_config.clone();
+impl StorageField for CurrencyField {
+    fn update_config_map(
+        &mut self, 
+        field_config_map: &BTreeMap<String, String>,
+    ) -> Result<BTreeMap<String, String>, PlanetError> {
+        let mut field_config_map = field_config_map.clone();
+        let config = self.config.clone();
+        let number_decimals = config.number_decimals;
+        let currency_symbol = config.currency_symbol;
+        if number_decimals.is_some() {
+            let number_decimals = number_decimals.unwrap();
+            let number_decimals = number_decimals.to_string();
+            field_config_map.insert(NUMBER_DECIMALS.to_string(), number_decimals);
+        }
+        if currency_symbol.is_some() {
+            let currency_symbol = currency_symbol.unwrap();
+            field_config_map.insert(CURRENCY_SYMBOL.to_string(), currency_symbol);
+        }
+        return Ok(field_config_map)
+    }
+    fn build_config(
+        &mut self, 
+        field_config_map: &BTreeMap<String, String>,
+    ) -> Result<FieldConfig, PlanetError> {
+        let mut config = self.config.clone();
+        let number_decimals = field_config_map.get(NUMBER_DECIMALS);
+        let currency_symbol = field_config_map.get(CURRENCY_SYMBOL);
+        if number_decimals.is_some() {
+            let number_decimals = number_decimals.unwrap().clone();
+            let number_decimals: i8 = FromStr::from_str(number_decimals.as_str()).unwrap();
+            config.number_decimals = Some(number_decimals);
+        }
+        if currency_symbol.is_some() {
+            let currency_symbol = currency_symbol.unwrap().clone();
+            config.currency_symbol = Some(currency_symbol);
+        }
+        return Ok(config)
+    }
+    fn validate(&self, data: &String) -> Result<String, PlanetError> {
+        let mut data = data.clone();
+        let config = self.config.clone();
+        let number_decimals = config.number_decimals;
+        let currency_symbol = config.currency_symbol;
+        if number_decimals.is_none() {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Field not configured for currency \"{}\"", data.clone())),
+                )
+            );            
+        }
+        let number_decimals = number_decimals.unwrap();
+        let number_decimals: u32 = number_decimals.to_u32().unwrap();
+        let currency_symbol = currency_symbol.unwrap();
+        let currency_symbol = currency_symbol.as_str();
+        let expr = &RE_CURRENCY;
+        let match_data = data.clone();
+        let is_valid = expr.is_match(&match_data);
+        if !is_valid {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Validation error on currency \"{}\"", data.clone())),
+                )
+            );
+        }
+        let captures = expr.captures(&match_data).unwrap();
+        let amount_wrap = captures.name("amount");
+        let symbol_pre_wrap = captures.name("symbol_pre");
+        let symbol_post_wrap = captures.name("symbol_post");
+        let mut amount_string: String = String::from("");
+        // eprintln!("CurrencyField.validate :: before symbol replace: {}", &data);
+        if symbol_pre_wrap.is_some() || symbol_post_wrap.is_some() {
+            // I have symbol on sent data
+            if symbol_pre_wrap.is_some() {
+                let symbol_pre = symbol_pre_wrap.unwrap().as_str();
+                // eprintln!("CurrencyField.validate :: [regex] symbol_pre: {}", symbol_pre);
+                data = data.clone().replace(symbol_pre, "");
+            }
+            if symbol_post_wrap.is_some() {
+                let symbol_post = symbol_post_wrap.unwrap().as_str();
+                // eprintln!("CurrencyField.validate :: [regex] symbol_post: {}", symbol_post);
+                data = data.clone().replace(symbol_post, "");
+            }
+        }
+        data = data.trim().to_string();
+        // eprintln!("CurrencyField.validate :: after symbol replace: {}", &data);
+        if amount_wrap.is_some() {
+            // Might be 7658.45 or 7658 or $7658. Need to get number without the currency symbol
+            let amount_str = amount_wrap.unwrap().as_str();
+            // eprintln!("CurrencyField.validate :: [regex] amount_str: {}", amount_str);
+            // 79876.45
+            // format amount to have number decimals from config
+            let amount = Decimal::from_str(amount_str);
+            if amount.is_err() {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Validation error on currency \"{}\"", data.clone())),
+                    )
+                );
+            }
+            let amount = amount.unwrap().round_dp(number_decimals);
+            amount_string = amount.to_string();
+        }
+        // eprintln!("CurrencyField.validate :: amount_string: {}", &amount_string);
+        // data needs to have right number of decimals and the currency symbol
+        data = format!("{}{}", currency_symbol, &amount_string);
+        return Ok(data)
+    }
+    fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
+        let field_config = self.config.clone();
         let field_name = field_config.name.unwrap();
         let mut yaml_string = yaml_string.clone();
         let field = &field_name.truecolor(
@@ -220,82 +311,3 @@ impl DbDumpNumber for NumberField {
         return yaml_string;
     }
 }
-impl ValidateField for NumberField {
-    fn is_valid(&self, value: Option<&String>) -> Result<bool, PlanetError> {
-        let field_config = self.field_config.clone();
-        let required = field_config.required.unwrap();
-        let name = field_config.name.unwrap();
-        if value.is_none() && required == true {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!(
-                        "Field {}{}{} is required", 
-                        String::from("\"").blue(), name.blue(), String::from("\"").blue()
-                    )),
-                )
-            );
-        } else {
-            let value_str = value.unwrap().as_str();
-            let result = i32::from_str(value_str);
-            match result {
-                Ok(_) => {
-                    // let value: i32 = result.unwrap();
-                    return Ok(true);
-                },
-                Err(_) => {
-                    return Ok(false)
-                }
-            }
-        }
-    }
-}
-impl ProcessField for NumberField {
-    fn process(
-        &self,
-        insert_data_map: BTreeMap<String, String>,
-        mut db_data: DbData
-    ) -> Result<DbData, PlanetError> {
-        let field_config = self.field_config.clone();
-        let field_name = field_config.name.unwrap_or_default();
-        let field_id = field_config.id.unwrap_or_default();
-        let value_entry = insert_data_map.get(&field_id).unwrap().clone();
-        let value_db = value_entry.clone();
-        let field = Self{
-            field_config: self.field_config.clone()
-        };
-        let mut data: BTreeMap<String, String> = BTreeMap::new();
-        if db_data.data.is_some() {
-            data = db_data.data.unwrap();
-        }
-        let is_valid = field.is_valid(Some(&value_entry))?;
-        if is_valid == true {
-            &data.insert(field_id, value_db);
-            db_data.data = Some(data);
-            return Ok(db_data);
-        } else {
-            return Err(error_validate_process("Number", &field_name))
-        }
-    }
-}
-impl NumberValueField for NumberField {
-    fn get_value(&self, value_db: Option<&String>) -> Option<i32> {
-        if value_db.is_none() {
-            return None
-        } else {
-            let value_str = value_db.unwrap().as_str();
-            let value: i32 = i32::from_str(value_str).unwrap();
-            return Some(value)
-        }
-    }
-    fn get_value_db(&self, value: Option<&i32>) -> Option<String> {
-        if *&value.is_some() {
-            let value = value.unwrap();
-            let value_str = value.to_string();
-            return Some(value_str);
-        } else {
-            return None
-        }
-    }
-}
- */

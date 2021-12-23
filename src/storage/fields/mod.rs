@@ -23,8 +23,8 @@ These are the core fields implemented so we can tackle the security and permissi
 * 06A Duration                      [impl] - date
 * 07. NumberField                   [impl] - number
 * 08. AuditTimeField                [impl] - date
-* 09. AuditByField                  - text
-* 10. LinkField (This probably later once I have more ops from DbRow to get items, etc...)
+* 09. AuditByField                  [impl] - text
+* 10. LinkField (This probably later once I have more ops from DbRow to get items, etc...) - do last
 * 11. CurrencyField                 - number
 * 12. PercentField                  - number
 * 13. CountField (This is parameters of COUNT() query when we go seq in table, defines query) - agg

@@ -45,6 +45,8 @@ pub const FORMULA_FORMAT: &str = "formula_format";
 pub const FORMULA_COMPILED: &str = "formula_compiled";
 pub const DATE_FORMAT: &str = "date_format";
 pub const TIME_FORMAT: &str = "time_format";
+pub const NUMBER_DECIMALS: &str = "number_decimals";
+pub const CURRENCY_SYMBOL: &str = "currency_symbol";
 
 // Field Types
 pub const FIELD_TYPE_SMALL_TEXT: &str = "Small Text";
@@ -59,6 +61,7 @@ pub const FIELD_TYPE_CREATED_TIME: &str = "Created Time";
 pub const FIELD_TYPE_LAST_MODIFIED_TIME: &str = "Last Modified Time";
 pub const FIELD_TYPE_CREATED_BY: &str = "Created By";
 pub const FIELD_TYPE_LAST_MODIFIED_BY: &str = "Last Modified By";
+pub const FIELD_TYPE_CURRENCY: &str = "Currency";
 
 // Date Format
 pub const DATE_FORMAT_FRIENDLY: &str = "Friendly";
