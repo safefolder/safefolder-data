@@ -355,6 +355,10 @@ impl ConfigStorageField for FieldConfig {
                         let mut obj = CurrencyField::defaults(&field_config);
                         field_config = obj.build_config(field_config_map)?;
                     },
+                    FIELD_TYPE_PERCENTAGE => {
+                        let mut obj = PercentageField::defaults(&field_config);
+                        field_config = obj.build_config(field_config_map)?;
+                    },
                     _ => {}
                 }
                 &map_fields_by_id.insert(field_id, field_config.clone());
@@ -485,6 +489,9 @@ impl ConfigStorageField for FieldConfig {
             },
             FIELD_TYPE_CURRENCY => {
                 map = CurrencyField::defaults(&field_config_).update_config_map(&map)?;
+            },
+            FIELD_TYPE_PERCENTAGE => {
+                map = PercentageField::defaults(&field_config_).update_config_map(&map)?;
             },
             _ => {}
         }

@@ -62,6 +62,7 @@ pub const FIELD_TYPE_LAST_MODIFIED_TIME: &str = "Last Modified Time";
 pub const FIELD_TYPE_CREATED_BY: &str = "Created By";
 pub const FIELD_TYPE_LAST_MODIFIED_BY: &str = "Last Modified By";
 pub const FIELD_TYPE_CURRENCY: &str = "Currency";
+pub const FIELD_TYPE_PERCENTAGE: &str = "Percentage";
 
 // Date Format
 pub const DATE_FORMAT_FRIENDLY: &str = "Friendly";

@@ -267,6 +267,10 @@ impl<'gb> InsertIntoTable<'gb> {
                             let obj = CurrencyField::defaults(&field_config);
                             field_data_wrap = obj.validate(&field_data);
                         },
+                        FIELD_TYPE_PERCENTAGE => {
+                            let obj = PercentageField::defaults(&field_config);
+                            field_data_wrap = obj.validate(&field_data);
+                        },
                         _ => {
                             errors.push(
                                 PlanetError::new(
@@ -531,6 +535,10 @@ impl<'gb> Command<String> for GetFromTable<'gb> {
                             },
                             FIELD_TYPE_CURRENCY => {
                                 let obj = CurrencyField::defaults(&field_config_);
+                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+                            },
+                            FIELD_TYPE_PERCENTAGE => {
+                                let obj = PercentageField::defaults(&field_config_);
                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },
                             _ => {

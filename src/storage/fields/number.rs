@@ -200,6 +200,9 @@ impl StorageField for CurrencyField {
             let number_decimals = number_decimals.unwrap();
             let number_decimals = number_decimals.to_string();
             field_config_map.insert(NUMBER_DECIMALS.to_string(), number_decimals);
+        } else {
+            let number_decimals = String::from("2");
+            field_config_map.insert(NUMBER_DECIMALS.to_string(), number_decimals);
         }
         if currency_symbol.is_some() {
             let currency_symbol = currency_symbol.unwrap();
@@ -290,11 +293,103 @@ impl StorageField for CurrencyField {
                 );
             }
             let amount = amount.unwrap().round_dp(number_decimals);
-            amount_string = amount.to_string();
+            // amount_string = amount.to_string();
+            let number_decimals = number_decimals.to_usize().unwrap();
+            amount_string = format!("{:.1$}", &amount, number_decimals);
         }
         // eprintln!("CurrencyField.validate :: amount_string: {}", &amount_string);
         // data needs to have right number of decimals and the currency symbol
+        
         data = format!("{}{}", currency_symbol, &amount_string);
+        return Ok(data)
+    }
+    fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
+        let field_config = self.config.clone();
+        let field_name = field_config.name.unwrap();
+        let mut yaml_string = yaml_string.clone();
+        let field = &field_name.truecolor(
+            YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
+        );
+        let value = format!("{}", value.to_string().truecolor(
+            YAML_COLOR_YELLOW[0], YAML_COLOR_YELLOW[1], YAML_COLOR_YELLOW[2]
+        ));
+        yaml_string.push_str(format!("  {field}: {value}\n", field=field, value=value).as_str());
+        return yaml_string;
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PercentageField {
+    pub config: FieldConfig
+}
+impl PercentageField {
+    pub fn defaults(field_config: &FieldConfig) -> Self {
+        let field_config = field_config.clone();
+        let field_obj = Self{
+            config: field_config
+        };
+        return field_obj
+    }
+}
+impl StorageField for PercentageField {
+    fn update_config_map(
+        &mut self, 
+        field_config_map: &BTreeMap<String, String>,
+    ) -> Result<BTreeMap<String, String>, PlanetError> {
+        let mut field_config_map = field_config_map.clone();
+        let config = self.config.clone();
+        let number_decimals = config.number_decimals;
+        let number_decimals_string: String;
+        if number_decimals.is_some() {
+            let number_decimals = number_decimals.unwrap();
+            number_decimals_string = number_decimals.to_string();
+        } else {
+            number_decimals_string = String::from("2");
+        }
+        field_config_map.insert(NUMBER_DECIMALS.to_string(), number_decimals_string);
+        return Ok(field_config_map)
+    }
+    fn build_config(
+        &mut self, 
+        field_config_map: &BTreeMap<String, String>,
+    ) -> Result<FieldConfig, PlanetError> {
+        let mut config = self.config.clone();
+        let number_decimals = field_config_map.get(NUMBER_DECIMALS);
+        if number_decimals.is_some() {
+            let number_decimals = number_decimals.unwrap().clone();
+            let number_decimals: i8 = FromStr::from_str(number_decimals.as_str()).unwrap();
+            config.number_decimals = Some(number_decimals);
+        }
+        return Ok(config)
+    }
+    fn validate(&self, data: &String) -> Result<String, PlanetError> {
+        let mut data = data.clone();
+        let config = self.config.clone();
+        let number_decimals = config.number_decimals;
+        if number_decimals.is_none() {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Field not configured for percentage \"{}\"", data.clone())),
+                )
+            );            
+        }
+        let number_decimals = number_decimals.unwrap();
+        let number_decimals: u32 = number_decimals.to_u32().unwrap();
+        let amount_str = data.as_str();
+        // format amount to have number decimals from config
+        let amount = Decimal::from_str(amount_str);
+        if amount.is_err() {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Validation error on percentage \"{}\"", data.clone())),
+                )
+            );
+        }
+        let amount = amount.unwrap().round_dp(number_decimals);
+        let number_decimals = number_decimals.to_usize().unwrap();
+        data = format!("{:.1$}", &amount, number_decimals);
         return Ok(data)
     }
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {

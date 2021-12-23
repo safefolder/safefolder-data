@@ -33,3 +33,6 @@ fields:
     field_type: Currency
     number_decimals: 2
     currency_symbol: $
+  - name: Percentage
+    field_type: Percentage
+    number_decimals: 1
