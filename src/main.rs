@@ -42,7 +42,7 @@ use argparse::{ArgumentParser, StoreTrue, Store};
 use std::collections::HashMap;
 
 use crate::commands::CommandRunner;
-use crate::commands::table::Command;
+use crate::commands::folder::Command;
 use crate::planet::{PlanetContext, Context, ContextSource};
 
 // async fn swarm() {
@@ -202,10 +202,10 @@ fn run_command(runner: CommandRunner) -> Result<String, String> {
         let path_yaml = format!("{}", runner_path_yaml.clone().unwrap());
         let match_option = *&runner.command.as_str();
         match match_option {
-            "CREATE TABLE" => commands::table::schema::CreateTable::runner(&runner, &path_yaml),
-            "INSERT INTO TABLE" => commands::table::data::InsertIntoTable::runner(&runner, &path_yaml),
-            "GET FROM TABLE" => commands::table::data::GetFromTable::runner(&runner, &path_yaml),
-            "SELECT FROM TABLE" => commands::table::data::SelectFromTable::runner(&runner, &path_yaml),
+            "CREATE FOLDER" => commands::folder::schema::CreateFolder::runner(&runner, &path_yaml),
+            "INSERT INTO FOLDER" => commands::folder::data::InsertIntoFolder::runner(&runner, &path_yaml),
+            "GET FROM FOLDER" => commands::folder::data::GetFromFolder::runner(&runner, &path_yaml),
+            "SELECT FROM FOLDER" => commands::folder::data::SelectFromFolder::runner(&runner, &path_yaml),
             _ => println!("default")
         }
         Ok("Command executed".to_string())

@@ -7,8 +7,8 @@ use lazy_static::lazy_static;
 use regex::{Regex};
 
 use crate::planet::{PlanetError};
-use crate::commands::table::config::*;
-use crate::storage::fields::*;
+use crate::commands::folder::config::*;
+use crate::storage::properties::*;
 use crate::storage::constants::*;
 
 lazy_static! {
@@ -17,11 +17,11 @@ lazy_static! {
 
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct DateField {
-    pub config: FieldConfig
+pub struct DateProperty {
+    pub config: PropertyConfig
 }
-impl DateField {
-    pub fn defaults(config: &FieldConfig) -> Self {
+impl DateProperty {
+    pub fn defaults(config: &PropertyConfig) -> Self {
         let field_config = config.clone();
         let field_obj = Self{
             config: field_config
@@ -29,7 +29,7 @@ impl DateField {
         return field_obj
     }
 }
-impl StorageField for DateField {
+impl StorageProperty for DateProperty {
     fn update_config_map(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
@@ -73,7 +73,7 @@ impl StorageField for DateField {
     fn build_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
-    ) -> Result<FieldConfig, PlanetError> {
+    ) -> Result<PropertyConfig, PlanetError> {
         let field_config_map = field_config_map.clone();
         let date_format = field_config_map.get(DATE_FORMAT);
         let time_format = field_config_map.get(TIME_FORMAT);
@@ -216,11 +216,11 @@ impl StorageField for DateField {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct DurationField {
-    pub config: FieldConfig
+pub struct DurationProperty {
+    pub config: PropertyConfig
 }
-impl DurationField {
-    pub fn defaults(config: &FieldConfig) -> Self {
+impl DurationProperty {
+    pub fn defaults(config: &PropertyConfig) -> Self {
         let field_config = config.clone();
         let field_obj = Self{
             config: field_config
@@ -228,7 +228,7 @@ impl DurationField {
         return field_obj
     }
 }
-impl StorageField for DurationField {
+impl StorageProperty for DurationProperty {
     fn update_config_map(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
@@ -239,7 +239,7 @@ impl StorageField for DurationField {
     fn build_config(
         &mut self, 
         _: &BTreeMap<String, String>,
-    ) -> Result<FieldConfig, PlanetError> {
+    ) -> Result<PropertyConfig, PlanetError> {
         let config = self.config.clone();
         return Ok(config)
     }
@@ -313,11 +313,11 @@ impl StorageField for DurationField {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AuditDateField {
-    pub config: FieldConfig,
+pub struct AuditDateProperty {
+    pub config: PropertyConfig,
 }
-impl AuditDateField {
-    pub fn defaults(config: &FieldConfig) -> Self {
+impl AuditDateProperty {
+    pub fn defaults(config: &PropertyConfig) -> Self {
         let field_config = config.clone();
         let field_obj = Self{
             config: field_config,
@@ -325,7 +325,7 @@ impl AuditDateField {
         return field_obj
     }
 }
-impl StorageField for AuditDateField {
+impl StorageProperty for AuditDateProperty {
     fn update_config_map(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
@@ -336,7 +336,7 @@ impl StorageField for AuditDateField {
     fn build_config(
         &mut self, 
         _: &BTreeMap<String, String>,
-    ) -> Result<FieldConfig, PlanetError> {
+    ) -> Result<PropertyConfig, PlanetError> {
         let config = self.config.clone();
         return Ok(config)
     }

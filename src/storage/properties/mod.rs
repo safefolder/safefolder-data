@@ -9,36 +9,58 @@ use colored::Colorize;
 use serde::{Deserialize, Serialize};
 
 use crate::planet::{PlanetError};
-use crate::storage::table::{DbData, DbTable};
-use crate::commands::table::config::*;
+use crate::storage::folder::{DbData, DbFolder};
+use crate::commands::folder::config::*;
 
 /*
 These are the core fields implemented so we can tackle the security and permissions system
 
-* 01. SmallTextField                [impl] - text
-* 02. LongTextField                 [impl] - text : This is the text field, needs to be updated based on full text search.
-* 03. CheckBoxField                 [impl] - number
-* 05. SelectField                   [impl] - text
-* 06. DateField                     [impl] - date
-* 06A Duration                      [impl] - date
-* 07. NumberField                   [impl] - number
-* 08. AuditTimeField                [impl] - date
-* 09. AuditByField                  [impl] - text
-* 10. LinkField (This probably later once I have more ops from DbRow to get items, etc...) - do last
-* 11. CurrencyField                 - number
-* 12. PercentField                  - number
-* 13. CountField (This is parameters of COUNT() query when we go seq in table, defines query) - agg
-* 14. GenerateIdField               - text : Random ids
-* 15. GeneratedNumberField : Sequential number - number : Sequence number.
-* 16. LanguageField                 - text
-* 17. NumberCollectionField : Is this like SetField???
-* 18. SmallTextCollectionField : ????
-* 19. FormulaField                  [impl] - formula
-* 20. SetField: List of items in a field, strings, numbers, etc... All same type, which goes into the definition on the schema table
-* 21. ObjectField: Object embedded with additional information, to group data into objects.
+Table fields
+============
 
-Above fields gives us what we need as EXCEL functions into the formula field. Formula can provide a combination of
-these function fields, which are not needed.
+* SmallTextField                [done] - text
+* LongTextField                 [done] - text : This is the text field, needs to be updated based on full text search.
+* CheckBoxField                 [done] - number
+* SelectField                   [done] - text
+* DateField                     [done] - date
+* Duration                      [done] - date
+* NumberField                   [done] - number
+* AuditTimeField                [done] - date
+* AuditByField                  [done] - text
+* CurrencyField                 [done] - number
+* PercentField                  [done] - number
+* FormulaField                  [done] - formula
+
+* LinkField                     [doing] - reference
+* ReferenceField                [todo]: A reference from a linked folder. Config with linked field.
+
+These are not complex:
+* GenerateIdField               [todo] - text : Random ids
+* GeneratedNumberField          [todo] - number: Sequential number - number : Sequence number.
+* LanguageField                 [todo] - text
+* PhoneField                    [todo]
+* EmailField                    [todo]
+* UrlField                      [todo]
+* RatingField                   [todo]
+
+* SetProfperty                  [todo]
+* ObjectProperty                [todo]
+
+* FolderField                   [todo]: This links to another db file with some media data: photo, etc...
+    In this case we also map into table config, so I can easily have list of folders for this table. I only do
+    one level. Here I define background image for the folder.
+* StatsField                    [todo]: Statistics on linked fields with formula support: AVERAGE, 
+    COUNT, COUNTA, COUNTALL, SUM, MAX, AND, OR, XOR, CONCATENATE. I execute these formulas once I post 
+    processed the links and references. I would need to parse in a way to use those number functions.
+* FileField                     [todo] - Custom file and image management with IPFS. I add many.
+
+I might add for images these functions:
+1. resize
+2. thumb
+3. blur and other simple operations
+
+Above fields gives us what we need as EXCEL functions into the formula field. Formula can provide a combination 
+of these function fields, which are not needed.
 
 **xlformula_engine**
 let formula = parse_formula::parse_string_to_formula(&"=1+2", None::<NoCustomFunction>);
@@ -54,7 +76,7 @@ Then on the app, we have a visual way to add functions, helper content, etc...
 
 */
 
-pub trait StorageField {
+pub trait StorageProperty {
     fn update_config_map(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
@@ -62,47 +84,47 @@ pub trait StorageField {
     fn build_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
-    ) -> Result<FieldConfig, PlanetError>;
+    ) -> Result<PropertyConfig, PlanetError>;
     fn validate(&self, data: &String) -> Result<String, PlanetError>;
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String;
 }
 
-pub trait FormulaStorageField {
+pub trait FormulaStorageProperty {
     fn update_config_map(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
         field_name_map: &BTreeMap<String, String>,
         field_type_map: &BTreeMap<String, String>,
-        db_table: &DbTable,
+        db_table: &DbFolder,
         table_name: &String,
     ) -> Result<BTreeMap<String, String>, PlanetError>;
     fn build_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
-    ) -> Result<FieldConfig, PlanetError>;
+    ) -> Result<PropertyConfig, PlanetError>;
     fn validate(&self, data: &String) -> Result<String, PlanetError>;
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String;
 }
 
 
-pub trait ValidateField {
+pub trait ValidateProperty {
     fn is_valid(&self, value: Option<&String>) -> Result<bool, PlanetError>;
 }
-pub trait ValidateManyField {
+pub trait ValidateManyProperty {
     fn is_valid(&self, value: Option<Vec<String>>) -> Result<bool, PlanetError>;
 }
-pub trait ValidateFormulaField {
+pub trait ValidateFormulaProperty {
     fn is_valid(&self, value: Option<&String>) -> Result<bool, PlanetError>;
 }
 
-pub trait ProcessField {
+pub trait ProcessProperty {
     fn process(
         &self,
         insert_data_map: BTreeMap<String, String>,
         db_data: DbData
     ) -> Result<DbData, PlanetError>;
 }
-pub trait ProcessManyField {
+pub trait ProcessManyProperty {
     fn process(
         &self,
         insert_data_collections_map: BTreeMap<String, Vec<String>>,
@@ -111,7 +133,7 @@ pub trait ProcessManyField {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum FieldType {
+pub enum PropertyType {
     SmallText(String),
     LongText(String),
     CheckBox(bool),

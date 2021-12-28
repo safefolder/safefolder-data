@@ -5,18 +5,18 @@ use tr::tr;
 
 use crate::planet::constants::ID;
 use crate::planet::{PlanetError};
-use crate::storage::table::{DbData};
-use crate::commands::table::config::FieldConfig;
+use crate::storage::folder::{DbData};
+use crate::commands::folder::config::PropertyConfig;
 use crate::storage::constants::*;
 use crate::planet::constants::*;
-use crate::storage::fields::*;
+use crate::storage::properties::*;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct SmallTextField {
-    pub config: FieldConfig
+pub struct SmallTextProperty {
+    pub config: PropertyConfig
 }
-impl SmallTextField {
-    pub fn defaults(field_config: &FieldConfig) -> Self {
+impl SmallTextProperty {
+    pub fn defaults(field_config: &PropertyConfig) -> Self {
         let field_config = field_config.clone();
         let field_obj = Self{
             config: field_config
@@ -24,7 +24,7 @@ impl SmallTextField {
         return field_obj
     }
 }
-impl StorageField for SmallTextField {
+impl StorageProperty for SmallTextProperty {
     fn update_config_map(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
@@ -36,7 +36,7 @@ impl StorageField for SmallTextField {
     fn build_config(
         &mut self, 
         _: &BTreeMap<String, String>,
-    ) -> Result<FieldConfig, PlanetError> {
+    ) -> Result<PropertyConfig, PlanetError> {
         let config = self.config.clone();
         // No special attributes so far for small text field
         return Ok(config)
@@ -75,11 +75,11 @@ impl StorageField for SmallTextField {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct LongTextField {
-    pub config: FieldConfig
+pub struct LongTextProperty {
+    pub config: PropertyConfig
 }
-impl LongTextField {
-    pub fn defaults(field_config: &FieldConfig) -> Self {
+impl LongTextProperty {
+    pub fn defaults(field_config: &PropertyConfig) -> Self {
         let field_config = field_config.clone();
         let field_obj = Self{
             config: field_config
@@ -87,7 +87,7 @@ impl LongTextField {
         return field_obj
     }
 }
-impl StorageField for LongTextField {
+impl StorageProperty for LongTextProperty {
     fn update_config_map(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
@@ -99,7 +99,7 @@ impl StorageField for LongTextField {
     fn build_config(
         &mut self, 
         _: &BTreeMap<String, String>,
-    ) -> Result<FieldConfig, PlanetError> {
+    ) -> Result<PropertyConfig, PlanetError> {
         let config = self.config.clone();
         // No special attributes so far for small text field
         return Ok(config)
@@ -138,13 +138,13 @@ impl StorageField for LongTextField {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct SelectField {
-    pub config: FieldConfig,
+pub struct SelectProperty {
+    pub config: PropertyConfig,
     pub options_id_map: Option<BTreeMap<String, String>>,
     pub options_name_map: Option<BTreeMap<String, String>>,
 }
-impl SelectField {
-    pub fn defaults(field_config: &FieldConfig, table: Option<&DbData>) -> Self {
+impl SelectProperty {
+    pub fn defaults(field_config: &PropertyConfig, table: Option<&DbData>) -> Self {
         let field_config = field_config.clone();
         let mut field_obj = Self{
             config: field_config,
@@ -160,7 +160,7 @@ impl SelectField {
             for data_collection in table.data_collections.clone() {
                 // key for ordering: field_ids
                 for key in data_collection.keys() {
-                    if key.to_lowercase() != String::from(FIELD_IDS) {
+                    if key.to_lowercase() != String::from(PROPERTY_IDS) {
                         // key: Status__select_options
                         let key_items: Vec<&str> = key.split("__").collect();
                         let key_field_name = key_items[0];
@@ -195,7 +195,7 @@ impl SelectField {
         return field_obj;
     }
 }
-impl StorageField for SelectField {
+impl StorageProperty for SelectProperty {
     fn update_config_map(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
@@ -217,7 +217,7 @@ impl StorageField for SelectField {
     fn build_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
-    ) -> Result<FieldConfig, PlanetError> {
+    ) -> Result<PropertyConfig, PlanetError> {
         let mut config = self.config.clone();
         let options_str = field_config_map.get(OPTIONS);
         let options_wrap: Option<Vec<String>>;
@@ -357,11 +357,11 @@ impl StorageField for SelectField {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AuditByField {
-    pub config: FieldConfig
+pub struct AuditByProperty {
+    pub config: PropertyConfig
 }
-impl AuditByField {
-    pub fn defaults(field_config: &FieldConfig) -> Self {
+impl AuditByProperty {
+    pub fn defaults(field_config: &PropertyConfig) -> Self {
         let field_config = field_config.clone();
         let field_obj = Self{
             config: field_config
@@ -369,7 +369,7 @@ impl AuditByField {
         return field_obj
     }
 }
-impl StorageField for AuditByField {
+impl StorageProperty for AuditByProperty {
     fn update_config_map(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
@@ -380,7 +380,7 @@ impl StorageField for AuditByField {
     fn build_config(
         &mut self, 
         _: &BTreeMap<String, String>,
-    ) -> Result<FieldConfig, PlanetError> {
+    ) -> Result<PropertyConfig, PlanetError> {
         let config = self.config.clone();
         return Ok(config)
     }

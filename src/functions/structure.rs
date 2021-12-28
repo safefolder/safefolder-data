@@ -22,13 +22,13 @@ pub struct If {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, PropertyConfig>,
 }
 impl If {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, String>>,
-        field_config_map: &BTreeMap<String, FieldConfig>,
+        field_config_map: &BTreeMap<String, PropertyConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -135,13 +135,13 @@ pub struct And {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, PropertyConfig>,
 }
 impl And {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, String>>,
-        field_config_map: &BTreeMap<String, FieldConfig>,
+        field_config_map: &BTreeMap<String, PropertyConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -235,13 +235,13 @@ pub struct Or {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, PropertyConfig>,
 }
 impl Or {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, String>>,
-        field_config_map: &BTreeMap<String, FieldConfig>,
+        field_config_map: &BTreeMap<String, PropertyConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -335,13 +335,13 @@ pub struct Not {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, PropertyConfig>,
 }
 impl Not {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, String>>,
-        field_config_map: &BTreeMap<String, FieldConfig>,
+        field_config_map: &BTreeMap<String, PropertyConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -435,13 +435,13 @@ pub struct Xor {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, PropertyConfig>,
 }
 impl Xor {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, String>>,
-        field_config_map: &BTreeMap<String, FieldConfig>,
+        field_config_map: &BTreeMap<String, PropertyConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{

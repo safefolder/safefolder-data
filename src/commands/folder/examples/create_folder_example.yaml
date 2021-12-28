@@ -1,38 +1,38 @@
 ---
-command: CREATE TABLE "Super Table"
+command: CREATE FOLDER "Super Folder"
 language:
   codes: ["english", "spanish"]
   default: english
 name:
-  field_type: Small Text
-fields:
+  property_type: Small Text
+properties:
   - name: My Field
-    field_type: Small Text
+    property_type: Small Text
     required: true
     pepito: Hola
   - name: Description
-    field_type: Long Text
+    property_type: Long Text
   - name: Is Published
-    field_type: Checkbox
+    property_type: Checkbox
   - name: Counter
-    field_type: Number
+    property_type: Number
   - name: Status
-    field_type: Select
+    property_type: Select
     options:
       - Draft
       - Published
       - Deleted
   - name: Locations
-    field_type: Select
+    property_type: Select
     many: true
     options:
       - Madrid
       - Barcelona
       - Valencia
   - name: Currency
-    field_type: Currency
+    property_type: Currency
     number_decimals: 2
     currency_symbol: $
   - name: Percentage
-    field_type: Percentage
+    property_type: Percentage
     number_decimals: 1

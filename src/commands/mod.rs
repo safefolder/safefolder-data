@@ -1,4 +1,4 @@
-pub mod table;
+pub mod folder;
 
 use crate::planet::{PlanetContext, Context};
 

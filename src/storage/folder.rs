@@ -15,38 +15,38 @@ use serde_encrypt::{
 use slug::slugify;
 
 use crate::planet::constants::*;
-use crate::storage::{generate_id, ConfigStorageField};
+use crate::storage::{generate_id, ConfigStorageProperty};
 use crate::planet::{PlanetError, PlanetContext, Context};
-use crate::commands::table::config::{DbTableConfig, FieldConfig};
+use crate::commands::folder::config::{DbFolderConfig, PropertyConfig};
 use crate::storage::constants::*;
-use crate::storage::fields::*;
+use crate::storage::properties::*;
 use crate::functions::*;
 
-pub trait Schema<'gb> {
-    fn defaults(planet_context: &'gb PlanetContext<'gb>, context: &'gb Context<'gb>) -> Result<DbTable<'gb>, PlanetError>;
+pub trait FolderSchema<'gb> {
+    fn defaults(planet_context: &'gb PlanetContext<'gb>, context: &'gb Context<'gb>) -> Result<DbFolder<'gb>, PlanetError>;
     fn create(&self, db_data: &DbData) -> Result<DbData, PlanetError>;
     fn get(&self, id: &String) -> Result<DbData, PlanetError>;
-    fn get_by_name(&self, table_name: &str) -> Result<Option<DbData>, PlanetError>;
+    fn get_by_name(&self, folder_name: &str) -> Result<Option<DbData>, PlanetError>;
 }
 
-pub trait Row<'gb> {
+pub trait FolderItem<'gb> {
     fn defaults(
         table_file: &str,
-        db_table: &'gb DbTable<'gb>,
+        db_folder: &'gb DbFolder<'gb>,
         planet_context: &'gb PlanetContext<'gb>, 
         context: &'gb Context<'gb>
-    ) -> Result<DbRow<'gb>, PlanetError>;
-    fn insert(&self, table_name: &String, db_data: &DbData) -> Result<DbData, PlanetError>;
-    fn get(&self, table_name: &String, by: GetItemOption, fields: Option<Vec<String>>) -> Result<DbData, PlanetError>;
+    ) -> Result<DbFolderItem<'gb>, PlanetError>;
+    fn insert(&self, folder_name: &String, db_data: &DbData) -> Result<DbData, PlanetError>;
+    fn get(&self, folder_name: &String, by: GetItemOption, fields: Option<Vec<String>>) -> Result<DbData, PlanetError>;
     fn select(&self, 
-        table_name: &String, 
+        folder_name: &String, 
         r#where: Option<String>, 
         page: Option<usize>,
         number_items: Option<usize>,
         fields: Option<Vec<String>>,
     ) -> Result<SelectResult, PlanetError>;
     fn count(&self, 
-        table_name: &String, 
+        folder_name: &String, 
         r#where: Option<String>, 
     ) -> Result<SelectCountResult, PlanetError>;
     fn total_count(&self) -> Result<SelectCountResult, PlanetError>;
@@ -88,7 +88,7 @@ pub struct NameTree {
 }
 
 // This structure would apply for SchemaData and RowData, we would need to convert from one to the other
-// data has field_id -> value, so if we change field name would not be affected
+// data has field_id -> value, so if we change property name would not be affected
 
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
 pub struct DbData {
@@ -162,11 +162,11 @@ pub struct SchemaData {
     pub id: Option<String>,
     pub routing: RoutingData,
     pub name: String,
-    pub config: DbTableConfig,
+    pub config: DbFolderConfig,
 }
 
 impl SchemaData {
-    pub fn defaults(name: &String, config: &DbTableConfig, account_id: &str, space_id: &str) -> SchemaData {
+    pub fn defaults(name: &String, config: &DbFolderConfig, account_id: &str, space_id: &str) -> SchemaData {
         let schema_data = SchemaData{
             id: generate_id(),
             routing: RoutingData{
@@ -186,25 +186,25 @@ impl SerdeEncryptSharedKey for DbData {
 }
 
 #[derive(Debug, Clone)]
-pub struct DbTable<'gb> {
+pub struct DbFolder<'gb> {
     pub context: &'gb Context<'gb>,
     pub planet_context: &'gb PlanetContext<'gb>,
     db: sled::Db,
 }
 
-impl<'gb> Schema<'gb> for DbTable<'gb> {
+impl<'gb> FolderSchema<'gb> for DbFolder<'gb> {
 
     fn defaults(planet_context: &'gb PlanetContext<'gb>, context: &'gb Context<'gb>) -> 
-        Result<DbTable<'gb>, PlanetError> {
+        Result<DbFolder<'gb>, PlanetError> {
         let mut path: String = String::from("");
         let home_dir = planet_context.home_path.unwrap_or_default();
         let account_id = context.account_id.unwrap_or_default();
         let space_id = context.space_id.unwrap_or_default();
         if account_id != "" && space_id != "" {
-            println!("DbTable.open :: account_id and space_id have been informed");
+            println!("DbFolder.open :: account_id and space_id have been informed");
         } else {
-            // .achiever-planet/tables/tables.db : platform wide table schemas
-            path = format!("{home}/tables/tables.db", home=&home_dir);
+            // .achiever-planet/tables/folders.db : platform wide table schemas
+            path = format!("{home}/folders/folders.db", home=&home_dir);
         }
         let config: sled::Config = sled::Config::default()
             .use_compression(true)
@@ -213,12 +213,12 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
         match result {
             Ok(_) => {
                 let db = result.unwrap();
-                let db_table: DbTable= DbTable{
+                let db_folder: DbFolder= DbFolder{
                     context: context,
                     planet_context: planet_context,
                     db: db
                 };
-                Ok(db_table)
+                Ok(db_folder)
             },
             Err(_) => {
                 let planet_error = PlanetError::new(
@@ -230,7 +230,7 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
         }
     }
 
-    fn get_by_name(&self, table_name: &str) -> Result<Option<DbData>, PlanetError> {
+    fn get_by_name(&self, folder_name: &str) -> Result<Option<DbData>, PlanetError> {
         // I travel table for account_id if any, space id if any and table name
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let iter = self.db.iter();
@@ -247,7 +247,7 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
                 &shared_key);
             let item = item_.unwrap();
             let item_source = item.clone();
-            let matches_name_none = &item.name.unwrap().to_lowercase() == &table_name.to_lowercase();
+            let matches_name_none = &item.name.unwrap().to_lowercase() == &folder_name.to_lowercase();
             let mut check_account: bool = true;
             let routing_response = item.routing;
             if routing_response.is_some() {
@@ -304,21 +304,21 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
     }
 
     fn create(&self, db_data: &DbData) -> Result<DbData, PlanetError> {
-        let table_name = db_data.name.clone().unwrap();
+        let folder_name = db_data.name.clone().unwrap();
         let result_table_exists: Result<Option<DbData>, PlanetError> = self.get_by_name(
-            &table_name.as_str()
+            &folder_name.as_str()
         );
         let table_exists_error = *&result_table_exists.is_err();
         let table_exists = *&table_exists_error == false && *&result_table_exists.unwrap().is_some();
         if table_exists == true {
-            let table_name_str = format!("\"{}\"", &table_name).magenta();
+            let table_name_str = format!("\"{}\"", &folder_name).magenta();
             return Err(PlanetError::new(
                 500, 
                 Some(tr!("Table {} already exists", &table_name_str))));
         } else if *&table_exists_error == true {
             return Err(PlanetError::new(
                 500, 
-                Some(tr!("Error checking table \"{}\"", &table_name))));
+                Some(tr!("Error checking table \"{}\"", &folder_name))));
         }
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let encrypted_schema = db_data.encrypt(&shared_key).unwrap();
@@ -329,7 +329,7 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
         let response = &self.db.insert(id_db, encoded);
         match response {
             Ok(_) => {
-                // println!("DbTable.create :: id: {:?}", &id);
+                // println!("DbFolder.create :: id: {:?}", &id);
                 let item_ = self.get(&id);
                 match item_ {
                     Ok(_) => {
@@ -348,12 +348,12 @@ impl<'gb> Schema<'gb> for DbTable<'gb> {
     }
 }
 
-impl<'gb> DbTable<'gb> {
+impl<'gb> DbFolder<'gb> {
     pub fn get_field_id_map(
-        db_table: &DbTable,
-        table_name: &String
+        db_folder: &DbFolder,
+        folder_name: &String
     ) -> Result<BTreeMap<String, String>, PlanetError> {
-        let table = db_table.get_by_name(table_name).unwrap().unwrap();
+        let table = db_folder.get_by_name(folder_name).unwrap().unwrap();
         let db_fields = table.data_objects.unwrap();
         let mut field_id_map: BTreeMap<String, String> = BTreeMap::new();
         for db_field in db_fields.keys() {
@@ -365,10 +365,10 @@ impl<'gb> DbTable<'gb> {
         Ok(field_id_map)
     }
     pub fn get_field_name_map(
-        db_table: &DbTable,
-        table_name: &String
+        db_folder: &DbFolder,
+        folder_name: &String
     ) -> Result<BTreeMap<String, String>, PlanetError> {
-        let table = db_table.get_by_name(table_name)?;
+        let table = db_folder.get_by_name(folder_name)?;
         if table.is_some() {
             let table = table.unwrap();
             let db_fields = table.data_objects.unwrap();
@@ -427,15 +427,15 @@ impl<'gb> DbTable<'gb> {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct RowItem(pub FieldType);
+pub struct FolderItemElement(pub PropertyType);
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct RowData {
+pub struct FolderItemData {
     pub id: Option<String>,
     pub routing: RoutingData,
-    pub data: Option<BTreeMap<String, RowItem>>,
+    pub data: Option<BTreeMap<String, FolderItemElement>>,
 }
-impl RowData {
+impl FolderItemData {
     pub fn defaults(account_id: &String, space_id: &String) -> Self {
         return Self{
             id: generate_id(),
@@ -455,34 +455,34 @@ pub enum GetItemOption {
 }
 
 #[derive(Debug, Clone)]
-pub struct DbRow<'gb> {
+pub struct DbFolderItem<'gb> {
     pub context: &'gb Context<'gb>,
     pub planet_context: &'gb PlanetContext<'gb>,
-    pub db_table: &'gb DbTable<'gb>,
+    pub db_folder: &'gb DbFolder<'gb>,
     db: sled::Db,
     raw_index: sled::Tree,
     idx_index: sled::Tree,
 }
 
-impl<'gb> Row<'gb> for DbRow<'gb> {
+impl<'gb> FolderItem<'gb> for DbFolderItem<'gb> {
 
     fn defaults(
         table_file: &str,
-        db_table: &'gb DbTable<'gb>,
+        db_folder: &'gb DbFolder<'gb>,
         planet_context: &'gb PlanetContext<'gb>, 
         context: &'gb Context<'gb>
-    ) -> Result<DbRow<'gb>, PlanetError> {
+    ) -> Result<DbFolderItem<'gb>, PlanetError> {
         let mut path: String = String::from("");
         let home_dir = planet_context.home_path.unwrap_or_default();
         let account_id = context.account_id.unwrap_or_default();
         let space_id = context.space_id.unwrap_or_default();
         if account_id != "" && space_id != "" {
-            println!("DbRow.defaults :: account_id and space_id have been informed");
+            println!("DbFolderItem.defaults :: account_id and space_id have been informed");
         } else {
             // .achiever-planet/{table_file} : platform wide table (slug with underscore)
-            path = format!("{home}/tables/{table_file}.db", home=&home_dir, table_file=table_file);
+            path = format!("{home}/folders/{table_file}.db", home=&home_dir, table_file=table_file);
         }
-        eprintln!("DbRow.defaults :: path: {:?}", path);
+        eprintln!("DbFolderItem.defaults :: path: {:?}", path);
         let config: sled::Config = sled::Config::default()
             .use_compression(true)
             .path(path);
@@ -495,11 +495,11 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
                 if raw_index.is_ok() && idx_index.is_ok() {
                     let raw_index = raw_index.unwrap();
                     let idx_index = idx_index.unwrap();
-                    let db_row: DbRow = DbRow{
+                    let db_row: DbFolderItem = DbFolderItem{
                         context: context,
                         planet_context: planet_context,
                         db: db,
-                        db_table: db_table,
+                        db_folder: db_folder,
                         raw_index: raw_index,
                         idx_index: idx_index,
                     };
@@ -522,7 +522,7 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
         }
     }
 
-    fn insert(&self, table_name: &String, db_data: &DbData) -> Result<DbData, PlanetError> {
+    fn insert(&self, folder_name: &String, db_data: &DbData) -> Result<DbData, PlanetError> {
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let encrypted_data = db_data.encrypt(&shared_key).unwrap();
         let encoded: Vec<u8> = encrypted_data.serialize();
@@ -535,7 +535,7 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
         match response {
             Ok(_) => {
                 // Get item
-                let item_ = self.get(&table_name, GetItemOption::ById(id), None);
+                let item_ = self.get(&folder_name, GetItemOption::ById(id), None);
                 match item_ {
                     Ok(_) => {
                         let item = item_.unwrap();
@@ -555,7 +555,7 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
     // We can get items by id (not changing string), and name (we search for slugified name)
     fn get(
         &self, 
-        table_name: &String, 
+        folder_name: &String, 
         by: GetItemOption, 
         fields: Option<Vec<String>>
     ) -> Result<DbData, PlanetError> {
@@ -607,7 +607,7 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
                             //     },
                             // ),
                             let fields = fields.unwrap();
-                            item = self.filter_fields(&table_name, &fields, &item)?;
+                            item = self.filter_fields(&folder_name, &fields, &item)?;
                             Ok(item)
                         }
                     },
@@ -648,11 +648,11 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
         }
     }
     fn count(&self, 
-        table_name: &String, 
+        folder_name: &String, 
         r#where: Option<String>, 
     ) -> Result<SelectCountResult, PlanetError> {
         let select_result = self.select(
-            table_name,
+            folder_name,
             r#where,
             Some(1),
             Some(1),
@@ -676,7 +676,7 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
         return Ok(result);
     }
     fn select(&self, 
-        table_name: &String, 
+        folder_name: &String, 
         r#where: Option<String>, 
         page: Option<usize>,
         number_items_page: Option<usize>,
@@ -685,11 +685,11 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
         let t_1 = Instant::now();
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let iter = self.db.iter();
-        let db_table = self.db_table.clone();
-        let table = db_table.get_by_name(table_name)?.unwrap();
-        let field_config_map = FieldConfig::get_field_config_map(&table).unwrap();
+        let db_folder = self.db_folder.clone();
+        let table = db_folder.get_by_name(folder_name)?.unwrap();
+        let field_config_map = PropertyConfig::get_property_config_map(&table).unwrap();
         let field_config_map_wrap = Some(field_config_map.clone());
-        // eprintln!("DbRow.select :: table: {:#?}", &table);
+        // eprintln!("DbFolderItem.select :: table: {:#?}", &table);
         let fields_wrap = fields.clone();
         let has_fields = fields_wrap.is_some();
         let mut fields: Vec<String> = Vec::new();
@@ -700,7 +700,7 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
         let t_total_1 = Instant::now();
         let result_total_count = self.total_count()?;
         let total = result_total_count.total;
-        eprintln!("DbRow.select :: get total: {} µs", &t_total_1.elapsed().as_micros());
+        eprintln!("DbFolderItem.select :: get total: {} µs", &t_total_1.elapsed().as_micros());
         
         let mut items: Vec<DbData> = Vec::new();
         let page = page.unwrap();
@@ -717,25 +717,25 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
             data_count: 0,
         };
         let t_header = &t_1.elapsed().as_micros();
-        eprintln!("DbRow.select :: t_header: {} µs", &t_header);
+        eprintln!("DbFolderItem.select :: t_header: {} µs", &t_header);
 
         let t_f_1 = Instant::now();
         // Check where_formula is assign or not
         let expr = &RE_FORMULA_ASSIGN;
         let is_assign_function = expr.is_match(&where_formula);
-        eprintln!("DbRow.select :: is_assign_function: {}", &is_assign_function);
+        eprintln!("DbFolderItem.select :: is_assign_function: {}", &is_assign_function);
         let formula_query = Formula::defaults(
             &where_formula, 
             &String::from("bool"), 
             Some(table), 
             None, 
             None, 
-            Some(db_table), 
-            Some(table_name.clone()), 
+            Some(db_folder), 
+            Some(folder_name.clone()), 
             is_assign_function,
             field_config_map_wrap.clone()
         )?;
-        // eprintln!("DbRow.select :: original formula_query: {:#?}", &formula_query);
+        // eprintln!("DbFolderItem.select :: original formula_query: {:#?}", &formula_query);
         let t_f_2 = &t_f_1.elapsed().as_micros();
         eprintln!("select :: Time compile formula: {} µs", &t_f_2);
 
@@ -747,7 +747,7 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
             let item_ = DbData::decrypt_owned(
                 &item_, 
                 &shared_key);
-            eprintln!("DbRow.select :: [{}] encrypt & deser: {} µs", &count, &t_item_1.elapsed().as_micros());
+            eprintln!("DbFolderItem.select :: [{}] encrypt & deser: {} µs", &count, &t_item_1.elapsed().as_micros());
             // let t_item_2 = Instant::now();
             let item = item_.unwrap().clone();
             let routing_response = item.clone().routing;
@@ -772,7 +772,7 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
                 formula_matches = false;
             }
             eprintln!("select :: formula_matches: {}", &formula_matches);
-            eprintln!("DbRow.select :: [{}] formula exec: {} µs", &count, &t_item_3.elapsed().as_micros());
+            eprintln!("DbFolderItem.select :: [{}] formula exec: {} µs", &count, &t_item_3.elapsed().as_micros());
 
             let count_float: f64 = FromStr::from_str(count.to_string().as_str()).unwrap();
             let number_items_page_float: f64 = FromStr::from_str(
@@ -781,7 +781,7 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
             let page_target = page_target as usize;
             if page_target == page && formula_matches {
                 if &has_fields == &true {
-                    let item_new = self.filter_fields(&table_name, &fields, &item)?;
+                    let item_new = self.filter_fields(&folder_name, &fields, &item)?;
                     items.push(item_new);
                 } else {
                     items.push(item);
@@ -792,12 +792,12 @@ impl<'gb> Row<'gb> for DbRow<'gb> {
             // let number_items_page_ = number_items_page as usize;
             count += 1;
             let t_item = t_item_1.elapsed().as_micros();
-            eprintln!("DbRow.select :: item [{}] : {} µs", &count-1, &t_item);
+            eprintln!("DbFolderItem.select :: item [{}] : {} µs", &count-1, &t_item);
         }
         select_result.data = items;
         select_result.data_count = select_result.data.len();
         select_result.time = t_1.elapsed().as_millis() as usize;
-        eprintln!("DbRow.select :: total db time: {} µs", &t_1.elapsed().as_micros());
+        eprintln!("DbFolderItem.select :: total db time: {} µs", &t_1.elapsed().as_micros());
         return Ok(select_result);
     }
 }
@@ -818,15 +818,15 @@ pub struct SelectCountResult {
     data_count: usize,
 }
 
-impl<'gb> DbRow<'gb> {
+impl<'gb> DbFolderItem<'gb> {
 
-    pub fn filter_fields(&self, table_name: &String, fields: &Vec<String>, item: &DbData) -> Result<DbData, PlanetError> {
+    pub fn filter_fields(&self, folder_name: &String, fields: &Vec<String>, item: &DbData) -> Result<DbData, PlanetError> {
         let fields = fields.clone();
         let mut item = item.clone();
         // field_id => field_name
-        let field_id_map= DbTable::get_field_id_map(
-            &self.db_table,
-            table_name
+        let field_id_map= DbFolder::get_field_id_map(
+            &self.db_folder,
+            folder_name
         )?;
         // data
         let mut data_new: BTreeMap<String, String> = BTreeMap::new();
@@ -834,8 +834,8 @@ impl<'gb> DbRow<'gb> {
         if db_data.is_some() {
             for (field_db_id, field_value) in db_data.unwrap() {
                 let field_db_name = &field_id_map.get(&field_db_id).unwrap().clone();
-                for field in &fields {
-                    if field.to_lowercase() == field_db_name.to_lowercase() {
+                for property in &fields {
+                    if property.to_lowercase() == field_db_name.to_lowercase() {
                         data_new.insert(field_db_id.clone(), field_value.clone());
                     }
                 }
@@ -850,8 +850,8 @@ impl<'gb> DbRow<'gb> {
         if db_data_collections.is_some() {
             for (field_db_id, items) in db_data_collections.unwrap() {
                 let field_db_name = &field_id_map.get(&field_db_id).unwrap().clone();
-                for field in &fields {
-                    if field.to_lowercase() == field_db_name.to_lowercase() {
+                for property in &fields {
+                    if property.to_lowercase() == field_db_name.to_lowercase() {
                         data_collections_new.insert(field_db_id.clone(), items.clone());
                     }
                 }
@@ -866,8 +866,8 @@ impl<'gb> DbRow<'gb> {
         if db_data_objects.is_some() {
             for (field_db_id, map) in db_data_objects.unwrap() {
                 let field_db_name = &field_id_map.get(&field_db_id).unwrap().clone();
-                for field in &fields {
-                    if field.to_lowercase() == field_db_name.to_lowercase() {
+                for property in &fields {
+                    if property.to_lowercase() == field_db_name.to_lowercase() {
                         data_objects_new.insert(field_db_id.clone(), map.clone());
                     }
                 }

@@ -13,15 +13,14 @@ use crate::planet::{PlanetContext, PlanetError};
 
 use crate::storage::constants::*;
 use crate::storage::*;
-use crate::storage::table::{DbData, DbTable};
+use crate::storage::folder::{DbData, DbFolder};
 use crate::planet::make_bool_str;
-// use crate::functions::{Formula};
-use crate::storage::fields::{
+use crate::storage::properties::{
     text::*,
     date::*, 
     number::*,
     formula::*,
-    StorageField
+    StorageProperty
 };
 use crate::planet::constants::*;
 
@@ -29,58 +28,58 @@ use super::fetch_yaml_config;
 
 pub struct DbTableConfig02 {
     pub language: BTreeMap<String, String>,
-    pub fields: Option<Vec<BTreeMap<String, String>>>,
+    pub properties: Option<Vec<BTreeMap<String, String>>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct DbTableConfig {
+pub struct DbFolderConfig {
     pub language: Option<LanguageConfig>,
-    pub fields: Option<Vec<FieldConfig>>,
+    pub properties: Option<Vec<PropertyConfig>>,
 }
 
 lazy_static! {
-    static ref RE_COMMAND_CREATE_TABLE: Regex = Regex::new(r#"(CREATE TABLE) "([a-zA-Z0-9_ ]+)""#).unwrap();
-    static ref RE_COMMAND_INSERT_INTO_TABLE: Regex = Regex::new(r#"(INSERT INTO TABLE) "([a-zA-Z0-9_ ]+)""#).unwrap();
-    static ref RE_COMMAND_GET_FROM_TABLE: Regex = Regex::new(r#"(GET FROM TABLE) "([a-zA-Z0-9_ ]+)"#).unwrap();
-    static ref RE_COMMAND_SELECT_FROM_TABLE: Regex = Regex::new(r#"(SELECT FROM TABLE) "([a-zA-Z0-9_ ]+)"#).unwrap();
+    static ref RE_COMMAND_CREATE_FOLDER: Regex = Regex::new(r#"(CREATE FOLDER) "([a-zA-Z0-9_ ]+)""#).unwrap();
+    static ref RE_COMMAND_INSERT_INTO_FOLDER: Regex = Regex::new(r#"(INSERT INTO FOLDER) "([a-zA-Z0-9_ ]+)""#).unwrap();
+    static ref RE_COMMAND_GET_FROM_FOLDER: Regex = Regex::new(r#"(GET FROM FOLDER) "([a-zA-Z0-9_ ]+)"#).unwrap();
+    static ref RE_COMMAND_SELECT_FROM_FOLDER: Regex = Regex::new(r#"(SELECT FROM FOLDER) "([a-zA-Z0-9_ ]+)"#).unwrap();
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
-pub struct CreateTableConfig {
-    #[validate(required, regex="RE_COMMAND_CREATE_TABLE")]
+pub struct CreateFolderConfig {
+    #[validate(required, regex="RE_COMMAND_CREATE_FOLDER")]
     pub command: Option<String>,
     #[validate]
     pub language: Option<LanguageConfig>,
     #[validate(required)]
-    pub name: Option<FieldConfig>,
+    pub name: Option<PropertyConfig>,
     #[validate]
-    pub fields: Option<Vec<FieldConfig>>,
+    pub properties: Option<Vec<PropertyConfig>>,
 }
 
-impl CreateTableConfig {
+impl CreateFolderConfig {
 
-    pub fn defaults(name: Option<FieldConfig>) -> CreateTableConfig {
-        let config: CreateTableConfig = CreateTableConfig{
+    pub fn defaults(name: Option<PropertyConfig>) -> CreateFolderConfig {
+        let config: CreateFolderConfig = CreateFolderConfig{
             command: None,
             language: None,
             name: name,
-            fields: None,
+            properties: None,
         };
         return config
     }
 
-    pub fn import(&self, planet_context: &PlanetContext, yaml_path: &String) -> Result<CreateTableConfig, Vec<PlanetValidationError>> {
+    pub fn import(&self, planet_context: &PlanetContext, yaml_path: &String) -> Result<CreateFolderConfig, Vec<PlanetValidationError>> {
         let yaml_str: String = fetch_yaml_config(&yaml_path);
         // Deseralize the config entity
-        let response: Result<CreateTableConfig, serde_yaml::Error> = serde_yaml::from_str(&yaml_str);
+        let response: Result<CreateFolderConfig, serde_yaml::Error> = serde_yaml::from_str(&yaml_str);
         let import_config: CommandImportConfig = CommandImportConfig{
             command: String::from(""),
             planet_context: planet_context,
         };
         match response {
             Ok(_) => {
-                let mut config_model: CreateTableConfig = response.unwrap();
-                let fields = config_model.clone().fields.unwrap();
+                let mut config_model: CreateFolderConfig = response.unwrap();
+                let properties = config_model.clone().properties.unwrap();
                 let validate: Result<(), ValidationErrors> = config_model.validate();
                 match validate {
                     Ok(_) => {
@@ -88,19 +87,19 @@ impl CreateTableConfig {
                         name_field.required = Some(true);
                         name_field.name = Some(String::from(NAME_CAMEL));
                         config_model.name = Some(name_field);
-                        // eprintln!("CreateTableConfig.import :: config_model: {:#?}", &config_model);
-                        // Go through fields and check if any has name "Name", raising an error since
-                        // is not allowed, reserved field.
-                        for field in fields {
-                            let field_name = field.name.clone().unwrap();
+                        // eprintln!("CreateFolderConfig.import :: config_model: {:#?}", &config_model);
+                        // Go through properties and check if any has name "Name", raising an error since
+                        // is not allowed, reserved property.
+                        for property in properties {
+                            let field_name = property.name.clone().unwrap();
                             if field_name.to_lowercase() == NAME_CAMEL.to_lowercase() {
                                 let mut planet_errors: Vec<PlanetValidationError> = Vec::new();
                                 let error = PlanetValidationError{
-                                    command: String::from("Create Table"),
-                                    field: String::from("Name"),
+                                    command: String::from("Create Folder"),
+                                    property: String::from("Name"),
                                     error_code: String::from("401"),
-                                    message: tr!("Name is reserved field name. You cannot add it into 
-                                    your fields. Use \"name\"")
+                                    message: tr!("Name is reserved property name. You cannot add it into 
+                                    your properties. Use \"name\"")
                                 };
                                 planet_errors.push(error);
                                 return Err(planet_errors);
@@ -143,21 +142,21 @@ pub enum DateFormat {
 }
 
 #[derive(Debug, Deserialize, Serialize, Validate, Clone)]
-pub struct FieldConfig {
+pub struct PropertyConfig {
     #[validate(length(equal=20))]
     #[serde(default="generate_id")]
     pub id: Option<String>,
     #[validate(required)]
     pub name: Option<String>,
     #[validate(required)]
-    pub field_type: Option<String>,
+    pub property_type: Option<String>,
     pub default: Option<String>,
     #[validate(required)]
-    #[serde(default="FieldConfig::version")]
+    #[serde(default="PropertyConfig::version")]
     pub version: Option<String>,
     pub required: Option<bool>,
     #[validate(required)]
-    #[serde(default="FieldConfig::api_version")]
+    #[serde(default="PropertyConfig::api_version")]
     pub api_version: Option<String>,
     pub indexed: Option<bool>,
     pub many: Option<bool>,
@@ -171,14 +170,14 @@ pub struct FieldConfig {
     pub number_decimals: Option<i8>,
 }
 
-impl ConfigStorageField for FieldConfig {
+impl ConfigStorageProperty for PropertyConfig {
     fn defaults(
         options: Option<Vec<String>>,
-    ) -> FieldConfig {
-        let mut object: FieldConfig = FieldConfig{
+    ) -> PropertyConfig {
+        let mut object: PropertyConfig = PropertyConfig{
             id: None,
             name: None,
-            field_type: None,
+            property_type: None,
             default: Some(String::from("")),
             version: Some(String::from(FIELD_VERSION)),
             required: Some(false),
@@ -205,7 +204,7 @@ impl ConfigStorageField for FieldConfig {
     fn api_version() -> Option<String> {
         return Some(String::from(FIELD_API_VERSION));
     }
-    /// Checks that FieldConfig passes validations
+    /// Checks that PropertyConfig passes validations
     fn is_valid(&self) -> Result<(), ValidationErrors> {
         match self.validate() {
             Ok(_) => return Ok(()),
@@ -214,7 +213,7 @@ impl ConfigStorageField for FieldConfig {
             },
         };
     }
-    fn get_name_field(db_data: &DbData) -> Option<FieldConfig> {
+    fn get_name_property(db_data: &DbData) -> Option<PropertyConfig> {
         let db_data = db_data.clone();
         let data_objects = db_data.data_objects;
         if data_objects.is_some() {
@@ -226,10 +225,10 @@ impl ConfigStorageField for FieldConfig {
                     let indexed = make_bool_str(field_config_map.get(INDEXED).unwrap().clone());
                     let many = make_bool_str(field_config_map.get(MANY).unwrap().clone());
                     let field_id = field_config_map.get(ID).unwrap().clone();
-                    let field_config = FieldConfig{
+                    let field_config = PropertyConfig{
                         id: Some(field_id.clone()),
                         name: Some(field_config_map.get(NAME).unwrap().clone()),
-                        field_type: Some(field_config_map.get(FIELD_TYPE).unwrap().clone()),
+                        property_type: Some(field_config_map.get(PROPERTY_TYPE).unwrap().clone()),
                         default: Some(field_config_map.get(DEFAULT).unwrap().clone()),
                         version: Some(field_config_map.get(VERSION).unwrap().clone()),
                         required: Some(required),
@@ -251,29 +250,29 @@ impl ConfigStorageField for FieldConfig {
         }
         return None
     }
-    fn get_field_config_map(table: &DbData) -> Result<BTreeMap<String, FieldConfig>, PlanetError> {
-        let fields = FieldConfig::parse_from_db(table);
-        if fields.is_ok() {
-            let fields = fields.unwrap().clone();
-            let mut map: BTreeMap<String, FieldConfig> = BTreeMap::new();
-            for field in fields {
-                let field_name = field.name.clone().unwrap_or_default();
-                map.insert(field_name, field.clone());
+    fn get_property_config_map(table: &DbData) -> Result<BTreeMap<String, PropertyConfig>, PlanetError> {
+        let properties = PropertyConfig::parse_from_db(table);
+        if properties.is_ok() {
+            let properties = properties.unwrap().clone();
+            let mut map: BTreeMap<String, PropertyConfig> = BTreeMap::new();
+            for property in properties {
+                let field_name = property.name.clone().unwrap_or_default();
+                map.insert(field_name, property.clone());
             }
             return Ok(map)
         }
         return Err(
             PlanetError::new(
                 500, 
-                Some(tr!("Could not get field config map")),
+                Some(tr!("Could not get property config map")),
             )
         )
     }
-    fn parse_from_db(db_data: &DbData) -> Result<Vec<FieldConfig>, PlanetError> {
+    fn parse_from_db(db_data: &DbData) -> Result<Vec<PropertyConfig>, PlanetError> {
         // let select_data: Option<Vec<(String, String)>> = None;
         let db_data = db_data.clone();
-        let mut fields: Vec<FieldConfig> = Vec::new();
-        // I use data_collections, where we store the fields
+        let mut properties: Vec<PropertyConfig> = Vec::new();
+        // I use data_collections, where we store the properties
         let data_collections = db_data.data_collections;
         // let data = db_data.data;
         let data_objects = db_data.data_objects;
@@ -281,27 +280,27 @@ impl ConfigStorageField for FieldConfig {
         // eprintln!("parse_from_db :: data_objects: {:#?}", &data_objects);
         // eprintln!("parse_from_db :: data_collections: {:#?}", &data_collections);
 
-        // 1. Go through data_objects and make map field names field_name -> FieldConfig. Also
+        // 1. Go through data_objects and make map property names field_name -> PropertyConfig. Also
         //   vector for order in 
-        let mut map_fields_by_id: BTreeMap<String, FieldConfig> = BTreeMap::new();
-        let mut map_fields_by_name: BTreeMap<String, FieldConfig> = BTreeMap::new();
+        let mut map_fields_by_id: BTreeMap<String, PropertyConfig> = BTreeMap::new();
+        let mut map_fields_by_name: BTreeMap<String, PropertyConfig> = BTreeMap::new();
         if data_objects.is_some() {
             let data_objects = data_objects.unwrap();
 
             for field_name in data_objects.keys() {
                 let field_config_map = data_objects.get(field_name).unwrap();
-                // Populate FieldConfig with attributes from map, which would do simple fields
-                // Add to map_fields_by_id, already having FieldConfig map
+                // Populate PropertyConfig with attributes from map, which would do simple properties
+                // Add to map_fields_by_id, already having PropertyConfig map
                 let required = make_bool_str(field_config_map.get(REQUIRED).unwrap().clone());
                 let indexed = make_bool_str(field_config_map.get(INDEXED).unwrap().clone());
                 let many = make_bool_str(field_config_map.get(MANY).unwrap().clone());
                 let field_id = field_config_map.get(ID).unwrap().clone();
                 let field_name = field_config_map.get(NAME).unwrap().clone();
-                let field_type_str = field_config_map.get(FIELD_TYPE).unwrap().as_str();
-                let mut field_config = FieldConfig::defaults(None);
+                let field_type_str = field_config_map.get(PROPERTY_TYPE).unwrap().as_str();
+                let mut field_config = PropertyConfig::defaults(None);
                 field_config.id = Some(field_id.clone());
                 field_config.name = Some(field_name.clone());
-                field_config.field_type = Some(field_config_map.get(FIELD_TYPE).unwrap().clone());
+                field_config.property_type = Some(field_config_map.get(PROPERTY_TYPE).unwrap().clone());
                 field_config.default = Some(field_config_map.get(DEFAULT).unwrap().clone());
                 field_config.version = Some(field_config_map.get(VERSION).unwrap().clone());
                 field_config.required = Some(required);
@@ -311,52 +310,52 @@ impl ConfigStorageField for FieldConfig {
                 // eprintln!("parse_from_db :: field_type_str: {}", field_type_str);
                 
                 match field_type_str {
-                    FIELD_TYPE_SMALL_TEXT => {
-                        let mut obj = SmallTextField::defaults(&field_config);
+                    PROPERTY_TYPE_SMALL_TEXT => {
+                        let mut obj = SmallTextProperty::defaults(&field_config);
                         field_config = obj.build_config(field_config_map)?;
                     },
-                    FIELD_TYPE_LONG_TEXT => {
-                        let mut obj = LongTextField::defaults(&field_config);
+                    PROPERTY_TYPE_LONG_TEXT => {
+                        let mut obj = LongTextProperty::defaults(&field_config);
                         field_config = obj.build_config(field_config_map)?;
                     },
-                    FIELD_TYPE_NUMBER => {
-                        let mut obj = NumberField::defaults(&field_config);
+                    PROPERTY_TYPE_NUMBER => {
+                        let mut obj = NumberProperty::defaults(&field_config);
                         field_config = obj.build_config(field_config_map)?;
                     },
-                    FIELD_TYPE_CHECKBOX => {
-                        let mut obj = CheckBoxField::defaults(&field_config);
+                    PROPERTY_TYPE_CHECKBOX => {
+                        let mut obj = CheckBoxProperty::defaults(&field_config);
                         field_config = obj.build_config(field_config_map)?;
                     },
-                    FIELD_TYPE_DATE => {
-                        let mut obj = DateField::defaults(&field_config);
+                    PROPERTY_TYPE_DATE => {
+                        let mut obj = DateProperty::defaults(&field_config);
                         field_config = obj.build_config(field_config_map)?;
                     },
-                    FIELD_TYPE_FORMULA => {
-                        let mut obj = FormulaField::defaults(&field_config);
+                    PROPERTY_TYPE_FORMULA => {
+                        let mut obj = FormulaProperty::defaults(&field_config);
                         field_config = obj.build_config(field_config_map)?;
                     },
-                    FIELD_TYPE_SELECT => {
-                        let mut obj = SelectField::defaults(&field_config, None);
+                    PROPERTY_TYPE_SELECT => {
+                        let mut obj = SelectProperty::defaults(&field_config, None);
                         field_config = obj.build_config(field_config_map)?;
                     },
-                    FIELD_TYPE_DURATION => {
-                        let mut obj = DurationField::defaults(&field_config);
+                    PROPERTY_TYPE_DURATION => {
+                        let mut obj = DurationProperty::defaults(&field_config);
                         field_config = obj.build_config(field_config_map)?;
                     },
-                    FIELD_TYPE_CREATED_TIME => {
-                        let mut obj = AuditDateField::defaults(&field_config);
+                    PROPERTY_TYPE_CREATED_TIME => {
+                        let mut obj = AuditDateProperty::defaults(&field_config);
                         field_config = obj.build_config(field_config_map)?;
                     },
-                    FIELD_TYPE_LAST_MODIFIED_TIME => {
-                        let mut obj = AuditDateField::defaults(&field_config);
+                    PROPERTY_TYPE_LAST_MODIFIED_TIME => {
+                        let mut obj = AuditDateProperty::defaults(&field_config);
                         field_config = obj.build_config(field_config_map)?;
                     },
-                    FIELD_TYPE_CURRENCY => {
-                        let mut obj = CurrencyField::defaults(&field_config);
+                    PROPERTY_TYPE_CURRENCY => {
+                        let mut obj = CurrencyProperty::defaults(&field_config);
                         field_config = obj.build_config(field_config_map)?;
                     },
-                    FIELD_TYPE_PERCENTAGE => {
-                        let mut obj = PercentageField::defaults(&field_config);
+                    PROPERTY_TYPE_PERCENTAGE => {
+                        let mut obj = PercentageProperty::defaults(&field_config);
                         field_config = obj.build_config(field_config_map)?;
                     },
                     _ => {}
@@ -366,8 +365,8 @@ impl ConfigStorageField for FieldConfig {
             }
         }
 
-        // 2. Go through data_collections for select_data and other complex structures. Add fields fo
-        //      fields at map_fields_by_id
+        // 2. Go through data_collections for select_data and other complex structures. Add properties fo
+        //      properties at map_fields_by_id
         let data_collections_1 = data_collections.clone();
         let data_collections_2 = data_collections.clone();
         if data_collections_1.is_some() {
@@ -386,12 +385,12 @@ impl ConfigStorageField for FieldConfig {
                 let field_name = pieces[0];
                 let attr_name = pieces[1];
                 // eprintln!("parse_from_db :: field_name: {:?} attr_name: {:?}", &field_name, &attr_name);
-                if &data_collection_field != FIELD_IDS {
+                if &data_collection_field != PROPERTY_IDS {
                     // select_options, and other structures
                     let field_list = 
                         data_collections.get(&data_collection_field).unwrap().clone();
                     // eprintln!("parse_from_db :: field_list: {:?}", &field_list);
-                    // I need to get the Status field config, get by name
+                    // I need to get the Status property config, get by name
                     // eprintln!("parse_from_db :: data_collection_field: {}", &data_collection_field);
                     // data_collection_field: Status__select_options
                     if *&attr_name.to_lowercase() == SELECT_OPTIONS.to_lowercase() {
@@ -412,27 +411,27 @@ impl ConfigStorageField for FieldConfig {
             }
         }
 
-        // 3. Go through fields_ids (data_collections) having list of ids and add to Vec fields and return
+        // 3. Go through fields_ids (data_collections) having list of ids and add to Vec properties and return
         if data_collections_2.is_some() {
             let data_collections_2 = data_collections_2.unwrap().clone();
-            let field_ids = data_collections_2.get(FIELD_IDS).unwrap();
+            let field_ids = data_collections_2.get(PROPERTY_IDS).unwrap();
             for field_id_data in field_ids.iter() {
                 // eprintln!("parse_from_db :: field_id_data: {:#?}", &field_id_data);
                 let field_id = &field_id_data.get(ID).unwrap().clone();
                 let field_config = map_fields_by_id.get(field_id).unwrap().clone();
-                &fields.push(field_config);
+                &properties.push(field_config);
             }
         }
 
         // }
-        // eprintln!("parse_from_db :: !!!!!!!!!!!!!!! fields: {:#?}", &fields);
-        return Ok(fields)
+        // eprintln!("parse_from_db :: !!!!!!!!!!!!!!! properties: {:#?}", &properties);
+        return Ok(properties)
     }
     fn map_object_db(
         &self, 
         field_type_map: &BTreeMap<String, String>,
         field_name_map: &BTreeMap<String, String>,
-        db_table: &DbTable,
+        db_table: &DbFolder,
         table_name: &String
     ) -> Result<BTreeMap<String, String>, PlanetError> {
         let field_config = self.clone();
@@ -442,13 +441,13 @@ impl ConfigStorageField for FieldConfig {
         let indexed = field_config.indexed.unwrap_or_default();
         let many = field_config.many.unwrap_or_default();
         let field_name = field_config.name.unwrap_or_default();
-        let field_type = field_config.field_type.unwrap_or_default();
+        let property_type = field_config.property_type.unwrap_or_default();
         let field_id = field_config.id.unwrap_or_default();
-        let field_type_str = field_type.as_str();
+        let field_type_str = property_type.as_str();
         // eprintln!("map_object_db :: field_name: {}", &field_name);
         map.insert(String::from(ID), field_id.clone());
         map.insert(String::from(NAME), field_name.clone());
-        map.insert(String::from(FIELD_TYPE), field_type.clone());
+        map.insert(String::from(PROPERTY_TYPE), property_type.clone());
         map.insert(String::from(DEFAULT), field_config.default.unwrap_or_default());
         map.insert(String::from(VERSION), field_config.version.unwrap_or_default());
         map.insert(String::from(REQUIRED), required.to_string());
@@ -457,20 +456,20 @@ impl ConfigStorageField for FieldConfig {
         map.insert(String::from(MANY), many.to_string());
 
         match field_type_str {
-            FIELD_TYPE_SMALL_TEXT => {
-                map = SmallTextField::defaults(&field_config_).update_config_map(&map)?;
+            PROPERTY_TYPE_SMALL_TEXT => {
+                map = SmallTextProperty::defaults(&field_config_).update_config_map(&map)?;
             },
-            FIELD_TYPE_LONG_TEXT => {
-                map = LongTextField::defaults(&field_config_).update_config_map(&map)?;
+            PROPERTY_TYPE_LONG_TEXT => {
+                map = LongTextProperty::defaults(&field_config_).update_config_map(&map)?;
             },
-            FIELD_TYPE_SELECT => {
-                map = SelectField::defaults(&field_config_, None).update_config_map(&map)?;
+            PROPERTY_TYPE_SELECT => {
+                map = SelectProperty::defaults(&field_config_, None).update_config_map(&map)?;
             },
-            FIELD_TYPE_DATE => {
-                map = DateField::defaults(&field_config_).update_config_map(&map)?;
+            PROPERTY_TYPE_DATE => {
+                map = DateProperty::defaults(&field_config_).update_config_map(&map)?;
             },
-            FIELD_TYPE_FORMULA => {
-                map = FormulaField::defaults(&field_config_).update_config_map(
+            PROPERTY_TYPE_FORMULA => {
+                map = FormulaProperty::defaults(&field_config_).update_config_map(
                     &map,
                     &field_name_map,
                     &field_type_map,
@@ -478,20 +477,20 @@ impl ConfigStorageField for FieldConfig {
                     &table_name
                 )?;
             },
-            FIELD_TYPE_DURATION => {
-                map = DurationField::defaults(&field_config_).update_config_map(&map)?;
+            PROPERTY_TYPE_DURATION => {
+                map = DurationProperty::defaults(&field_config_).update_config_map(&map)?;
             },
-            FIELD_TYPE_CREATED_TIME => {
-                map = AuditDateField::defaults(&field_config_).update_config_map(&map)?;
+            PROPERTY_TYPE_CREATED_TIME => {
+                map = AuditDateProperty::defaults(&field_config_).update_config_map(&map)?;
             },
-            FIELD_TYPE_LAST_MODIFIED_TIME => {
-                map = AuditDateField::defaults(&field_config_).update_config_map(&map)?;
+            PROPERTY_TYPE_LAST_MODIFIED_TIME => {
+                map = AuditDateProperty::defaults(&field_config_).update_config_map(&map)?;
             },
-            FIELD_TYPE_CURRENCY => {
-                map = CurrencyField::defaults(&field_config_).update_config_map(&map)?;
+            PROPERTY_TYPE_CURRENCY => {
+                map = CurrencyProperty::defaults(&field_config_).update_config_map(&map)?;
             },
-            FIELD_TYPE_PERCENTAGE => {
-                map = PercentageField::defaults(&field_config_).update_config_map(&map)?;
+            PROPERTY_TYPE_PERCENTAGE => {
+                map = PercentageProperty::defaults(&field_config_).update_config_map(&map)?;
             },
             _ => {}
         }
@@ -502,7 +501,7 @@ impl ConfigStorageField for FieldConfig {
     fn map_collections_db(&self) -> Result<BTreeMap<String, Vec<BTreeMap<String, String>>>, PlanetError> {
         // 08/11/2021 We remove options from here, since is many structure often swapped
         let field_config = self.clone();
-        // let field_type = &field_config.field_type.unwrap();
+        // let property_type = &field_config.property_type.unwrap();
         // let map: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
         // select_options and multi_select_options
         let options = field_config.options.unwrap_or_default();
@@ -524,18 +523,18 @@ impl ConfigStorageField for FieldConfig {
     }
    
     fn map_objects_db(&self) -> Result<BTreeMap<String, Vec<BTreeMap<String, String>>>, PlanetError> {
-        // let field = self.clone();
+        // let property = self.clone();
         let map: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
-        // Include here items where you need field -> object in field configuration
+        // Include here items where you need property -> object in property configuration
         return Ok(map)
     }
 
-    fn get_field_id_map(fields: &Vec<FieldConfig>) -> Result<BTreeMap<String, FieldConfig>, PlanetError> {
-        let mut map: BTreeMap<String, FieldConfig> = BTreeMap::new();
-        for field in fields {
-            let field_ = field.clone();
-            let field_id = field.id.clone().unwrap_or_default();
-            map.insert(field_id, field_);
+    fn get_property_id_map(properties: &Vec<PropertyConfig>) -> Result<BTreeMap<String, PropertyConfig>, PlanetError> {
+        let mut map: BTreeMap<String, PropertyConfig> = BTreeMap::new();
+        for property in properties {
+            let property_ = property.clone();
+            let property_id = property.id.clone().unwrap_or_default();
+            map.insert(property_id, property_);
         }
         return Ok(map)
     }
@@ -571,8 +570,8 @@ fn validate_language_codes(languages: &Vec<String>) -> Result<(), ValidationErro
 
 
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
-pub struct InsertIntoTableConfig {
-    #[validate(required, regex="RE_COMMAND_INSERT_INTO_TABLE")]
+pub struct InsertIntoFolderConfig {
+    #[validate(required, regex="RE_COMMAND_INSERT_INTO_FOLDER")]
     pub command: Option<String>,
     #[validate(required)]
     pub name: Option<String>,
@@ -581,10 +580,10 @@ pub struct InsertIntoTableConfig {
     pub data_collections: Option<BTreeMap<String, Vec<String>>>,
 }
 
-impl InsertIntoTableConfig {
+impl InsertIntoFolderConfig {
 
-    pub fn defaults(name: Option<String>) -> InsertIntoTableConfig {
-        let config: InsertIntoTableConfig = InsertIntoTableConfig{
+    pub fn defaults(name: Option<String>) -> InsertIntoFolderConfig {
+        let config: InsertIntoFolderConfig = InsertIntoFolderConfig{
             command: None,
             name: name,
             data: Some(BTreeMap::new()),
@@ -597,17 +596,17 @@ impl InsertIntoTableConfig {
         &self, 
         planet_context: &PlanetContext, 
         yaml_path: &String
-    ) -> Result<InsertIntoTableConfig, Vec<PlanetValidationError>> {
+    ) -> Result<InsertIntoFolderConfig, Vec<PlanetValidationError>> {
         let yaml_str: String = fetch_yaml_config(&yaml_path);
         // Deseralize the config entity
-        let response: Result<InsertIntoTableConfig, serde_yaml::Error> = serde_yaml::from_str(&yaml_str);
+        let response: Result<InsertIntoFolderConfig, serde_yaml::Error> = serde_yaml::from_str(&yaml_str);
         let import_config: CommandImportConfig = CommandImportConfig{
             command: String::from(""),
             planet_context: planet_context,
         };
         match response {
             Ok(_) => {
-                let config_model: InsertIntoTableConfig = response.unwrap();
+                let config_model: InsertIntoFolderConfig = response.unwrap();
                 let validate: Result<(), ValidationErrors> = config_model.validate();
                 match validate {
                     Ok(_) => {
@@ -634,26 +633,26 @@ impl InsertIntoTableConfig {
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
 pub struct DataId {
     pub id: Option<String>,
-    pub fields: Option<Vec<String>>,
+    pub properties: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
-pub struct GetFromTableConfig {
-    #[validate(required, regex="RE_COMMAND_GET_FROM_TABLE")]
+pub struct GetFromFolderConfig {
+    #[validate(required, regex="RE_COMMAND_GET_FROM_FOLDER")]
     pub command: Option<String>,
     #[validate(required)]
     pub data: Option<DataId>,
 }
 
-impl GetFromTableConfig {
+impl GetFromFolderConfig {
 
-    pub fn defaults(id: String) -> GetFromTableConfig {
+    pub fn defaults(id: String) -> GetFromFolderConfig {
         let data_id: DataId = DataId{
             id: Some(id),
-            fields: None,
+            properties: None,
         };
-        let config: GetFromTableConfig = GetFromTableConfig{
-            command: Some(String::from("GET FROM TABLE")),
+        let config: GetFromFolderConfig = GetFromFolderConfig{
+            command: Some(String::from("GET FROM FOLDER")),
             data: Some(data_id),
         };
         return config
@@ -663,17 +662,17 @@ impl GetFromTableConfig {
         &self, 
         planet_context: &PlanetContext, 
         yaml_path: &String
-    ) -> Result<GetFromTableConfig, Vec<PlanetValidationError>> {
+    ) -> Result<GetFromFolderConfig, Vec<PlanetValidationError>> {
         let yaml_str: String = fetch_yaml_config(&yaml_path);
         // Deseralize the config entity
-        let response: Result<GetFromTableConfig, serde_yaml::Error> = serde_yaml::from_str(&yaml_str);
+        let response: Result<GetFromFolderConfig, serde_yaml::Error> = serde_yaml::from_str(&yaml_str);
         let import_config: CommandImportConfig = CommandImportConfig{
             command: String::from(""),
             planet_context: planet_context,
         };
         match response {
             Ok(_) => {
-                let config_model: GetFromTableConfig = response.unwrap();
+                let config_model: GetFromFolderConfig = response.unwrap();
                 let validate: Result<(), ValidationErrors> = config_model.validate();
                 match validate {
                     Ok(_) => {
@@ -698,27 +697,27 @@ impl GetFromTableConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
-pub struct SelectFromTableConfig {
-    #[validate(required, regex="RE_COMMAND_SELECT_FROM_TABLE")]
+pub struct SelectFromFolderConfig {
+    #[validate(required, regex="RE_COMMAND_SELECT_FROM_FOLDER")]
     pub command: Option<String>,
     #[validate(required)]
     pub r#where: Option<String>,
-    #[serde(default="SelectFromTableConfig::page_default")]
+    #[serde(default="SelectFromFolderConfig::page_default")]
     pub page: Option<String>,
-    #[serde(default="SelectFromTableConfig::number_items_default")]
+    #[serde(default="SelectFromFolderConfig::number_items_default")]
     pub number_items: Option<String>,
-    pub fields: Option<Vec<String>>,
+    pub properties: Option<Vec<String>>,
 }
 
-impl SelectFromTableConfig {
+impl SelectFromFolderConfig {
 
     pub fn defaults(r#where: Option<String>, page: Option<String>, number_items: Option<String>) -> Self {
-        let config: SelectFromTableConfig = Self{
-            command: Some(String::from("SELECT FROM TABLE")),
+        let config: SelectFromFolderConfig = Self{
+            command: Some(String::from("SELECT FROM FOLDER")),
             r#where: r#where,
             page: page,
             number_items: number_items,
-            fields: None,
+            properties: None,
         };
         return config
     }
@@ -732,17 +731,17 @@ impl SelectFromTableConfig {
         &self, 
         planet_context: &PlanetContext, 
         yaml_path: &String
-    ) -> Result<SelectFromTableConfig, Vec<PlanetValidationError>> {
+    ) -> Result<SelectFromFolderConfig, Vec<PlanetValidationError>> {
         let yaml_str: String = fetch_yaml_config(&yaml_path);
         // Deseralize the config entity
-        let response: Result<SelectFromTableConfig, serde_yaml::Error> = serde_yaml::from_str(&yaml_str);
+        let response: Result<SelectFromFolderConfig, serde_yaml::Error> = serde_yaml::from_str(&yaml_str);
         let import_config: CommandImportConfig = CommandImportConfig{
             command: String::from(""),
             planet_context: planet_context,
         };
         match response {
             Ok(_) => {
-                let config_model: SelectFromTableConfig = response.unwrap();
+                let config_model: SelectFromFolderConfig = response.unwrap();
                 let validate: Result<(), ValidationErrors> = config_model.validate();
                 match validate {
                     Ok(_) => {

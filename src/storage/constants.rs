@@ -24,15 +24,15 @@ pub const INDEX_PROFILE_RAW: &str = "raw";
 
 pub const LANGUAGE_CODES: &str = "language_codes";
 pub const LANGUAGE_DEFAULT: &str = "language_default";
-pub const FIELDS: &str = "fields";
-pub const FIELD_IDS: &str = "field_ids";
+pub const PROPERTIES: &str = "properties";
+pub const PROPERTY_IDS: &str = "property_ids";
 pub const SELECT_OPTIONS: &str = "select_options";
 pub const KEY: &str = "key";
 pub const NAME_CAMEL: &str = "Name";
-pub const TABLE_NAME: &str = "table_name";
+pub const FOLDER_NAME: &str = "folder_name";
 
 // FileConfig fields
-pub const FIELD_TYPE: &str = "field_type";
+pub const PROPERTY_TYPE: &str = "property_type";
 pub const DEFAULT: &str = "default";
 pub const VERSION: &str = "version";
 pub const REQUIRED: &str = "required";
@@ -49,20 +49,20 @@ pub const NUMBER_DECIMALS: &str = "number_decimals";
 pub const CURRENCY_SYMBOL: &str = "currency_symbol";
 
 // Field Types
-pub const FIELD_TYPE_SMALL_TEXT: &str = "Small Text";
-pub const FIELD_TYPE_LONG_TEXT: &str = "Long Text";
-pub const FIELD_TYPE_CHECKBOX: &str = "Checkbox";
-pub const FIELD_TYPE_SELECT: &str = "Select";
-pub const FIELD_TYPE_NUMBER: &str = "Number";
-pub const FIELD_TYPE_DATE: &str = "Date";
-pub const FIELD_TYPE_FORMULA: &str = "Formula";
-pub const FIELD_TYPE_DURATION: &str = "Duration";
-pub const FIELD_TYPE_CREATED_TIME: &str = "Created Time";
-pub const FIELD_TYPE_LAST_MODIFIED_TIME: &str = "Last Modified Time";
-pub const FIELD_TYPE_CREATED_BY: &str = "Created By";
-pub const FIELD_TYPE_LAST_MODIFIED_BY: &str = "Last Modified By";
-pub const FIELD_TYPE_CURRENCY: &str = "Currency";
-pub const FIELD_TYPE_PERCENTAGE: &str = "Percentage";
+pub const PROPERTY_TYPE_SMALL_TEXT: &str = "Small Text";
+pub const PROPERTY_TYPE_LONG_TEXT: &str = "Long Text";
+pub const PROPERTY_TYPE_CHECKBOX: &str = "Checkbox";
+pub const PROPERTY_TYPE_SELECT: &str = "Select";
+pub const PROPERTY_TYPE_NUMBER: &str = "Number";
+pub const PROPERTY_TYPE_DATE: &str = "Date";
+pub const PROPERTY_TYPE_FORMULA: &str = "Formula";
+pub const PROPERTY_TYPE_DURATION: &str = "Duration";
+pub const PROPERTY_TYPE_CREATED_TIME: &str = "Created Time";
+pub const PROPERTY_TYPE_LAST_MODIFIED_TIME: &str = "Last Modified Time";
+pub const PROPERTY_TYPE_CREATED_BY: &str = "Created By";
+pub const PROPERTY_TYPE_LAST_MODIFIED_BY: &str = "Last Modified By";
+pub const PROPERTY_TYPE_CURRENCY: &str = "Currency";
+pub const PROPERTY_TYPE_PERCENTAGE: &str = "Percentage";
 
 // Date Format
 pub const DATE_FORMAT_FRIENDLY: &str = "Friendly";

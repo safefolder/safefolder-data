@@ -13,8 +13,8 @@ use regex::{Regex, CaptureMatches};
 use tr::tr;
 use xlformula_engine::{calculate, parse_formula, NoReference, NoCustomFunction};
 
-use crate::storage::table::{DbData, DbTable};
-use crate::commands::table::config::FieldConfig;
+use crate::storage::folder::{DbData, DbFolder};
+use crate::commands::folder::config::PropertyConfig;
 use crate::functions::constants::*;
 use crate::functions::text::*;
 use crate::functions::date::*;
@@ -247,17 +247,17 @@ impl Formula {
         table: Option<DbData>,
         field_type_map: Option<BTreeMap<String, String>>,
         field_name_map: Option<BTreeMap<String, String>>,
-        db_table: Option<DbTable>,
+        db_table: Option<DbFolder>,
         table_name: Option<String>,
         is_assign_function: bool,
-        field_config_map: Option<BTreeMap<String, FieldConfig>>,
+        field_config_map: Option<BTreeMap<String, PropertyConfig>>,
     ) -> Result<Self, PlanetError> {
         //eprintln!("Formula...");
         // If I have an error in compilation, then does not validate. Compilation uses validate of functions.
         // This function is the one does compilation from string formula to FormulaFieldCompiled
         let formula_origin = formula.clone();
         let field_config_map_ = field_config_map.clone();
-        let mut field_config_map: BTreeMap<String, FieldConfig> = BTreeMap::new();
+        let mut field_config_map: BTreeMap<String, PropertyConfig> = BTreeMap::new();
         if field_config_map_.is_some() {
             field_config_map = field_config_map_.unwrap();
         }
@@ -277,8 +277,8 @@ impl Formula {
             let table = table.unwrap();
             let db_table = db_table.unwrap();
             let table_name = table_name.unwrap();
-            field_type_map_ = DbTable::get_field_type_map(&table)?;
-            field_name_map_ = DbTable::get_field_name_map(&db_table, &table_name)?;
+            field_type_map_ = DbFolder::get_field_type_map(&table)?;
+            field_name_map_ = DbFolder::get_field_name_map(&db_table, &table_name)?;
         } else if field_type_map.is_some() && field_name_map.is_some() {
             let field_type_map = field_type_map.unwrap();
             field_type_map_ = field_type_map;
@@ -393,9 +393,9 @@ pub fn compile_assignment(
     functions_map: Option<BTreeMap<String, CompiledFunction>>,
     field_name_map: BTreeMap<String, String>,
     field_type_map: BTreeMap<String, String>,
-    db_table: Option<DbTable>,
+    db_table: Option<DbFolder>,
     table_name: Option<String>,
-    field_config_map: &BTreeMap<String, FieldConfig>
+    field_config_map: &BTreeMap<String, PropertyConfig>
 ) -> Result<Option<AttributeAssign>, PlanetError> {
     //eprintln!("compile_assignment...");
     //eprintln!("compile_assignment :: formula: {}", &formula);
@@ -673,13 +673,13 @@ pub fn compile_function_text(
     formula_format: &String,
     field_type_map: &BTreeMap<String, String>,
     field_name_map: Option<BTreeMap<String, String>>,
-    db_table: Option<DbTable>,
+    db_table: Option<DbFolder>,
     table_name: Option<String>,
-    field_config_map: Option<BTreeMap<String, FieldConfig>>,
+    field_config_map: Option<BTreeMap<String, PropertyConfig>>,
 ) -> Result<CompiledFunction, PlanetError> {
     //eprintln!("compile_function_text :: function_text: {}", &function_text);
     let field_config_map_wrap = field_config_map.clone();
-    let field_config_map: BTreeMap<String, FieldConfig> = BTreeMap::new();
+    let field_config_map: BTreeMap<String, PropertyConfig> = BTreeMap::new();
     let formula_format = formula_format.clone();
     let field_type_map = field_type_map.clone();
     // eprintln!("compile_function_text :: field_type_map: {:#?}", &field_type_map);
@@ -898,11 +898,11 @@ pub struct FunctionParse {
     attributes: Option<Vec<String>>,
     compiled_attributes: Option<Vec<FunctionAttributeItem>>,
     result: Option<FunctionResult>,
-    field_config_map: BTreeMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, PropertyConfig>,
 }
 impl FunctionParse {
     pub fn defaults(name: &String) -> Self {
-        let field_config_map: BTreeMap<String, FieldConfig> = BTreeMap::new();
+        let field_config_map: BTreeMap<String, PropertyConfig> = BTreeMap::new();
         let obj = FunctionParse{
             name: name.clone(),
             text: None,
@@ -950,7 +950,7 @@ pub fn prepare_function_parse(
 pub fn process_function(
     function_parse: &FunctionParse, 
     data_map: Option<BTreeMap<String, String>>,
-    field_config_map: Option<BTreeMap<String, FieldConfig>>,
+    field_config_map: Option<BTreeMap<String, PropertyConfig>>,
 ) -> Result<FunctionParse, PlanetError> {
     // let list_items = Some(expr.captures_iter(function_text));
     // I need either check or list of attributes, so I have only one function to deal with Regex expr.
@@ -961,7 +961,7 @@ pub fn process_function(
     let field_config_map = field_config_map.clone();
     let mut func = function.clone();
     let data = data_map_wrap.clone();
-    let conf: BTreeMap<String, FieldConfig>;
+    let conf: BTreeMap<String, PropertyConfig>;
     if field_config_map.is_some() {
         conf = field_config_map.unwrap();
     } else {
@@ -1235,7 +1235,7 @@ impl FunctionAttributeItem {
     pub fn get_value(
         &self, 
         data_map: &BTreeMap<String, String>,
-        field_config_map: &BTreeMap<String, FieldConfig>
+        field_config_map: &BTreeMap<String, PropertyConfig>
     ) -> Result<String, PlanetError> {
         let data_map = data_map.clone();
         let field_config_map = field_config_map.clone();
@@ -1295,7 +1295,7 @@ impl FunctionAttributeItem {
 pub fn execute_formula(
     formula: &Formula, 
     data_map: &BTreeMap<String, String>,
-    field_config_map: &BTreeMap<String, FieldConfig>,
+    field_config_map: &BTreeMap<String, PropertyConfig>,
 ) -> Result<String, PlanetError> {
     // 23 + LOG(34)
     // FUNC(attr1, attr2, ...)

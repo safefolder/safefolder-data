@@ -7,7 +7,7 @@ use chrono::{DateTime, Datelike, FixedOffset, NaiveDate, Utc, Duration, Timelike
 use tr::tr;
 use ordinal::Ordinal;
 use crate::functions::*;
-use crate::commands::table::config::DateFormat;
+use crate::commands::folder::config::DateFormat;
 
 lazy_static! {
     pub static ref RE_DATE: Regex = Regex::new(r#"^DATE\([\s\n\t]{0,}(?P<year>(([\s\d+-/*]*)|(\{[\w\s]+\})|([A-Z]+\(.[^)]*\))))[\s\n\t]{0,},[\s\n\t]{0,}(?P<month>(([\s\d+-/*]+)|(\{[\w\s]+\})|([A-Z]+\(.[^)]*\))))[\s\n\t]{0,},[\s\n\t]{0,}(?P<day>(([\s\d+-/*]+)|(\{[\w\s]+\})|([A-Z]+\(.[^)]*\))))[\s\n\t]{0,}\)"#).unwrap();
@@ -87,13 +87,13 @@ pub struct Date {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, PropertyConfig>,
 }
 impl Date {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, String>>,
-        field_config_map: &BTreeMap<String, FieldConfig>,
+        field_config_map: &BTreeMap<String, PropertyConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -176,13 +176,13 @@ pub struct DateTimeParse {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, PropertyConfig>,
 }
 impl DateTimeParse {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, String>>,
-        field_config_map: &BTreeMap<String, FieldConfig>,
+        field_config_map: &BTreeMap<String, PropertyConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -374,13 +374,13 @@ pub struct DateParse {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, PropertyConfig>,
 }
 impl DateParse {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, String>>,
-        field_config_map: &BTreeMap<String, FieldConfig>,
+        field_config_map: &BTreeMap<String, PropertyConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -652,13 +652,13 @@ pub struct Now {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, PropertyConfig>,
 }
 impl Now {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, String>>,
-        field_config_map: &BTreeMap<String, FieldConfig>
+        field_config_map: &BTreeMap<String, PropertyConfig>
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -710,13 +710,13 @@ pub struct Today {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, PropertyConfig>,
 }
 impl Today {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, String>>,
-        field_config_map: &BTreeMap<String, FieldConfig>,
+        field_config_map: &BTreeMap<String, PropertyConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -776,13 +776,13 @@ pub struct Days {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, PropertyConfig>,
 }
 impl Days {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, String>>,
-        field_config_map: &BTreeMap<String, FieldConfig>
+        field_config_map: &BTreeMap<String, PropertyConfig>
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -892,13 +892,13 @@ pub struct DateAddDiff {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, PropertyConfig>,
 }
 impl DateAddDiff {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, String>>,
-        field_config_map: &BTreeMap<String, FieldConfig>
+        field_config_map: &BTreeMap<String, PropertyConfig>
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -1164,13 +1164,13 @@ pub struct DateFormatFunc {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, FieldConfig>,
+    field_config_map: BTreeMap<String, PropertyConfig>,
 }
 impl DateFormatFunc {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, String>>,
-        field_config_map: &BTreeMap<String, FieldConfig>
+        field_config_map: &BTreeMap<String, PropertyConfig>
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -1497,7 +1497,7 @@ fn get_rust_date_format(date_obj: DateTime<FixedOffset>, mut format: String) -> 
     return format;
 }
 
-fn get_date_format(field_name: &String, field_config_map: &BTreeMap<String, FieldConfig>) -> String {
+fn get_date_format(field_name: &String, field_config_map: &BTreeMap<String, PropertyConfig>) -> String {
     let field_name = field_name.clone();
     let field_config_map = field_config_map.clone();
     let field_config = field_config_map.get(&field_name);

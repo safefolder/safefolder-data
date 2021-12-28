@@ -1,21 +1,21 @@
 extern crate xid;
 
 // pub mod fields_old;
-pub mod table;
+pub mod folder;
 pub mod constants;
-pub mod fields;
+pub mod properties;
 
 use std::collections::BTreeMap;
 
 use validator::{ValidationErrors};
-use crate::commands::table::config::FieldConfig;
-use crate::storage::table::{DbData, DbTable};
+use crate::commands::folder::config::PropertyConfig;
+use crate::storage::folder::{DbData, DbFolder};
 use crate::planet::PlanetError;
 
-pub trait ConfigStorageField {
+pub trait ConfigStorageProperty {
     fn defaults(
         options: Option<Vec<String>>
-    ) -> FieldConfig;
+    ) -> PropertyConfig;
     fn version() -> Option<String>;
     fn api_version() -> Option<String>;
     fn is_valid(&self) -> Result<(), ValidationErrors>;
@@ -24,17 +24,17 @@ pub trait ConfigStorageField {
     }
     fn map_object_db(
         &self, 
-        field_type_map: &BTreeMap<String, String>,
-        field_name_map: &BTreeMap<String, String>,
-        db_table: &DbTable,
-        table_name: &String
+        property_type_map: &BTreeMap<String, String>,
+        property_name_map: &BTreeMap<String, String>,
+        db_folder: &DbFolder,
+        folder_name: &String
     ) -> Result<BTreeMap<String, String>, PlanetError>;
-    fn get_field_config_map(table: &DbData) -> Result<BTreeMap<String, FieldConfig>, PlanetError>;
+    fn get_property_config_map(folder: &DbData) -> Result<BTreeMap<String, PropertyConfig>, PlanetError>;
     fn map_collections_db(&self) -> Result<BTreeMap<String, Vec<BTreeMap<String, String>>>, PlanetError>;
-    fn parse_from_db(db_data: &DbData) -> Result<Vec<FieldConfig>, PlanetError>;
+    fn parse_from_db(db_data: &DbData) -> Result<Vec<PropertyConfig>, PlanetError>;
     fn map_objects_db(&self) -> Result<BTreeMap<String, Vec<BTreeMap<String, String>>>, PlanetError>;
-    fn get_field_id_map(fields: &Vec<FieldConfig>) -> Result<BTreeMap<String, FieldConfig>, PlanetError>;
-    fn get_name_field(db_data: &DbData) -> Option<FieldConfig>;
+    fn get_property_id_map(properties: &Vec<PropertyConfig>) -> Result<BTreeMap<String, PropertyConfig>, PlanetError>;
+    fn get_name_property(db_data: &DbData) -> Option<PropertyConfig>;
 }
 
 pub fn generate_id() -> Option<String> {
