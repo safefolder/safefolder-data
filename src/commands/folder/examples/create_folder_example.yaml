@@ -1,5 +1,5 @@
 ---
-command: CREATE FOLDER "Super Folder"
+command: CREATE FOLDER "Super Folder 01"
 language:
   codes: ["english", "spanish"]
   default: english

@@ -1,12 +1,12 @@
 ---
-command: INSERT INTO FOLDER "Super Folder"
+command: INSERT INTO FOLDER "Super Folder 01"
 name: Pepito Data 1
 data:
   My Field: pepito
   Description: This is some description I want to include
   Is Published: true
   Counter: 34
-  Status: c75krjqs1s4amn7srtqg
-  Locations: c75krjqs1s4amn7srtrg,c75krjqs1s4amn7srtsg
+  Status: c764oiqs1s40005p3tbg
+  Locations: c764oiqs1s40005p3tcg,c764oiqs1s40005p3tdg
   Currency: 9876.347
   Percentage: 98.56

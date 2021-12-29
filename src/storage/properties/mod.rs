@@ -46,13 +46,14 @@ These are not complex:
 * SetProperty                       [todo] - For example, tags
 * ObjectProperty                    [todo]
 
-* FolderProperty                   [todo]: This links to another db file with some media data: photo, etc...
+* FolderProperty                    [todo]: This links to another db file with some media data: photo, etc...
     In this case we also map into table config, so I can easily have list of folders for this table. I only do
     one level. Here I define background image for the folder.
-* StatsProperty                    [todo]: Statistics on linked fields with formula support: AVERAGE, 
+* StatsProperty                     [todo]: Statistics on linked fields with formula support: AVERAGE, 
     COUNT, COUNTA, COUNTALL, SUM, MAX, AND, OR, XOR, CONCATENATE. I execute these formulas once I post 
     processed the links and references. I would need to parse in a way to use those number functions.
-* FileProperty                     [todo] - Custom file and image management with IPFS. I add many.
+* FileProperty                      [todo] - Custom file and image management with IPFS. I add many.
+* CommandProperty                   [todo]: This does processing for complex cases, like image manipulation
 
 I might add for images these functions:
 1. resize

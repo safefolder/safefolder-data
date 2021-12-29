@@ -31,19 +31,19 @@ pub trait FolderSchema<'gb> {
 
 pub trait FolderItem<'gb> {
     fn defaults(
-        table_file: &str,
+        folder_file: &str,
         db_folder: &'gb DbFolder<'gb>,
         planet_context: &'gb PlanetContext<'gb>, 
         context: &'gb Context<'gb>
     ) -> Result<DbFolderItem<'gb>, PlanetError>;
     fn insert(&self, folder_name: &String, db_data: &DbData) -> Result<DbData, PlanetError>;
-    fn get(&self, folder_name: &String, by: GetItemOption, fields: Option<Vec<String>>) -> Result<DbData, PlanetError>;
+    fn get(&self, folder_name: &String, by: GetItemOption, properties: Option<Vec<String>>) -> Result<DbData, PlanetError>;
     fn select(&self, 
         folder_name: &String, 
         r#where: Option<String>, 
         page: Option<usize>,
         number_items: Option<usize>,
-        fields: Option<Vec<String>>,
+        properties: Option<Vec<String>>,
     ) -> Result<SelectResult, PlanetError>;
     fn count(&self, 
         folder_name: &String, 
@@ -58,22 +58,39 @@ pub trait FolderItem<'gb> {
 pub struct RoutingData {
     pub account_id: Option<String>,
     pub space_id: Option<String>,
+    pub box_id: Option<String>,
+    pub site_id: Option<String>,
     pub ipfs_cid: Option<String>,
 }
 
 impl RoutingData {
-    pub fn defaults(account_id: Option<String>, space_id: Option<String>, ipfs_cid: Option<String>) -> Option<RoutingData> {
-        let mut routing_wrap: Option<RoutingData> = None;
-        let account_id = account_id.unwrap_or_default();
-        let space_id = space_id.unwrap_or_default();
-        if account_id != "" && space_id != "" {
-            let routing = RoutingData{
-                account_id: Some(account_id.to_string()),
-                space_id: Some(space_id.to_string()),
-                ipfs_cid: ipfs_cid,
-            };
-            routing_wrap = Some(routing);
+    pub fn defaults(
+        account_id: Option<String>, 
+        site_id: Option<&str>,
+        space_id: Option<&str>, 
+        box_id: Option<&str>, 
+        ipfs_cid: Option<String>,
+    ) -> Option<RoutingData> {
+        let mut routing = RoutingData{
+            account_id: account_id,
+            site_id: None,
+            space_id: None,
+            box_id: None,
+            ipfs_cid: ipfs_cid,
+        };
+        if site_id.is_some() {
+            let site_id = site_id.unwrap().to_string();
+            routing.site_id = Some(site_id);
         }
+        if space_id.is_some() {
+            let space_id = space_id.unwrap().to_string();
+            routing.space_id = Some(space_id);
+        }
+        if box_id.is_some() {
+            let box_id = box_id.unwrap().to_string();
+            routing.box_id = Some(box_id);
+        }
+        let routing_wrap = Some(routing);
         return routing_wrap
     }
 }
@@ -120,11 +137,24 @@ impl DbData {
         if routing.is_some() {
             let mut routing_map: BTreeMap<String, String> = BTreeMap::new();
             let routing = routing.unwrap();
-            let account_id = routing.account_id.clone().unwrap_or_default();
-            let space_id = routing.space_id.clone().unwrap_or_default();
+            let account_id = routing.account_id.clone().clone();
+            let site_id = routing.site_id.clone();
+            let space_id = routing.space_id.clone();
+            let box_id = routing.box_id.clone();
             let ipfs_cid = routing.ipfs_cid.clone().unwrap_or_default();
-            routing_map.insert(String::from(ACCOUNT_ID), account_id.to_string());
-            routing_map.insert(String::from(SPACE_ID), space_id.to_string());
+            if account_id.is_some() {
+                routing_map.insert(String::from(ACCOUNT_ID), account_id.unwrap().to_string());
+            }
+            if site_id.is_some() {
+                routing_map.insert(String::from(SITE_ID), site_id.unwrap());
+            }
+
+            if space_id.is_some() {
+                routing_map.insert(String::from(SPACE_ID), space_id.unwrap());
+            }
+            if box_id.is_some() {
+                routing_map.insert(String::from(BOX_ID), box_id.unwrap());
+            }            
             routing_map.insert(String::from(IPFS_CID), ipfs_cid);
             routing_map_ = Some(routing_map);
         }
@@ -166,14 +196,40 @@ pub struct SchemaData {
 }
 
 impl SchemaData {
-    pub fn defaults(name: &String, config: &DbFolderConfig, account_id: &str, space_id: &str) -> SchemaData {
+    pub fn defaults(
+        name: &String, 
+        config: &DbFolderConfig, 
+        account_id: Option<&str>, 
+        site_id: Option<&str>, 
+        space_id: Option<&str>, 
+        box_id: Option<&str>, 
+    ) -> SchemaData {
+        let mut routing = RoutingData{
+            account_id: None,
+            site_id: None,
+            space_id: None,
+            box_id: None,
+            ipfs_cid: None,
+        };
+        if account_id.is_some() {
+            let account_id = account_id.unwrap().to_string();
+            routing.account_id = Some(account_id);
+        }
+        if site_id.is_some() {
+            let site_id = site_id.unwrap().to_string();
+            routing.site_id = Some(site_id);
+        }
+        if space_id.is_some() {
+            let space_id = space_id.unwrap().to_string();
+            routing.space_id = Some(space_id);
+        }
+        if box_id.is_some() {
+            let box_id = box_id.unwrap().to_string();
+            routing.box_id = Some(box_id);
+        }
         let schema_data = SchemaData{
             id: generate_id(),
-            routing: RoutingData{
-                account_id: Some(account_id.to_string()),
-                space_id: Some(space_id.to_string()),
-                ipfs_cid: None,
-            },
+            routing: routing,
             name: format!("{}", name),
             config: config.clone(),
         };
@@ -447,14 +503,38 @@ pub struct FolderItemData {
     pub data: Option<BTreeMap<String, FolderItemElement>>,
 }
 impl FolderItemData {
-    pub fn defaults(account_id: &String, space_id: &String) -> Self {
+    pub fn defaults(
+        account_id: Option<&String>, 
+        site_id: Option<&String>,
+        space_id: Option<&String>,
+        box_id: Option<&String>,
+    ) -> Self {
+        let mut routing = RoutingData{
+            account_id: None,
+            site_id: None,
+            space_id: None,
+            box_id: None,
+            ipfs_cid: None,
+        };
+        if account_id.is_some() {
+            let account_id = account_id.unwrap().clone();
+            routing.account_id = Some(account_id);
+        }
+        if site_id.is_some() {
+            let site_id = site_id.unwrap().clone();
+            routing.site_id = Some(site_id);
+        }
+        if space_id.is_some() {
+            let space_id = space_id.unwrap().clone();
+            routing.space_id = Some(space_id);
+        }
+        if box_id.is_some() {
+            let box_id = box_id.unwrap().clone();
+            routing.box_id = Some(box_id);
+        }
         return Self{
             id: generate_id(),
-            routing: RoutingData{
-                account_id: Some(account_id.clone()),
-                space_id: Some(space_id.clone()),
-                ipfs_cid: None
-            },
+            routing: routing,
             data: None,
         };
     }
@@ -478,7 +558,7 @@ pub struct DbFolderItem<'gb> {
 impl<'gb> FolderItem<'gb> for DbFolderItem<'gb> {
 
     fn defaults(
-        table_file: &str,
+        folder_file: &str,
         db_folder: &'gb DbFolder<'gb>,
         planet_context: &'gb PlanetContext<'gb>, 
         context: &'gb Context<'gb>
@@ -487,11 +567,17 @@ impl<'gb> FolderItem<'gb> for DbFolderItem<'gb> {
         let home_dir = planet_context.home_path.unwrap_or_default();
         let account_id = context.account_id.unwrap_or_default();
         let space_id = context.space_id.unwrap_or_default();
+        let box_id = context.box_id.unwrap_or_default();
         if account_id != "" && space_id != "" {
             println!("DbFolderItem.defaults :: account_id and space_id have been informed");
-        } else {
+        } else if space_id == "private" {
             // .achiever-planet/{table_file} : platform wide folder (slug with underscore)
-            path = format!("{home}/folders/{table_file}.db", home=&home_dir, table_file=table_file);
+            path = format!(
+                "{home}/private/boxes/{box_id}/folders/{folder_file}.db", 
+                home=&home_dir, 
+                box_id=box_id,
+                folder_file=folder_file
+            );
         }
         eprintln!("DbFolderItem.defaults :: path: {:?}", path);
         let config: sled::Config = sled::Config::default()

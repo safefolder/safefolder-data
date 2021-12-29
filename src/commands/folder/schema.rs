@@ -44,6 +44,12 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                 let folder_name = &table_name_match["folder_name"].to_string();
                 let config = self.config.clone();
 
+                // routing parameters
+                let account_id = Some(self.context.account_id.unwrap_or_default().to_string());
+                let site_id = self.context.site_id;
+                let space_id = self.context.space_id;
+                let box_id = self.context.box_id;
+
                 // db table options with language data
                 let db_table: DbFolder = result.unwrap();
                 let mut data: BTreeMap<String, String> = BTreeMap::new();
@@ -135,12 +141,12 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                 // eprintln!("CreateFolder.run :: data_objects_new: {:#?}", &data_objects_new);
                 data_collections.insert(String::from(PROPERTY_IDS), field_ids);
                 // routing
-                let account_id = Some(self.context.account_id.unwrap_or_default().to_string());
-                let space_id = Some(self.context.space_id.unwrap_or_default().to_string());
                 let routing_wrap = RoutingData::defaults(
                     account_id, 
-                    space_id, 
-                    None
+                    site_id, 
+                    space_id,
+                    box_id,
+                    None,
                 );
                 let mut data_wrap: Option<BTreeMap<String, String>> = None;
                 let mut data_collections_wrap: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>> = None;

@@ -46,50 +46,60 @@ impl<'gb> InsertIntoFolder<'gb> {
         let expr = Regex::new(r#"(INSERT INTO FOLDER) "(?P<folder_name>[a-zA-Z0-9_ ]+)"#).unwrap();
         let folder_name_match = expr.captures(&command).unwrap();
         let folder_name = &folder_name_match["folder_name"].to_string();
-        let folder_file = slugify(&folder_name);
-        let folder_file = folder_file.as_str().replace("-", "_");
+        // let folder_file = slugify(&folder_name);
+        // let folder_file = folder_file.as_str().replace("-", "_");
+
+        // routing
+        let account_id = Some(self.context.account_id.unwrap_or_default().to_string());
+        let site_id = self.context.site_id;
+        let space_id = self.context.space_id;
+        let box_id = self.context.box_id;
+
+        // folder
+        let mut errors: Vec<PlanetError> = Vec::new();
+        let folder = self.db_folder.get_by_name(folder_name);
+        if folder.is_err() {
+            let error = folder.unwrap_err();
+            errors.push(error);
+            return Err(errors);
+        }
+        let folder = folder.unwrap();
+        if *&folder.is_none() {
+            errors.push(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Could not find folder {}", &folder_name)),
+                )
+            );
+            return Err(errors);
+        }    
+
+        let folder = folder.unwrap();
+        let folder_name = &folder.clone().name.unwrap();
+        let folder_id = folder.clone().id.unwrap();
 
         let result: Result<DbFolderItem<'gb>, PlanetError> = DbFolderItem::defaults(
-            &folder_file,
+            folder_id.as_str(),
             self.db_folder,
             self.planet_context,
             self.context,
         );
-        let mut errors: Vec<PlanetError> = Vec::new();
         match result {
             Ok(_) => {
                 // let data_config = self.config.data.clone();
                 let db_row: DbFolderItem<'gb> = result.unwrap();
                 // I need to get SchemaData and schema for the folder
                 // I go through properties in order to build RowData
-                let folder = self.db_folder.get_by_name(folder_name);
-                if folder.is_err() {
-                    let error = folder.unwrap_err();
-                    errors.push(error);
-                    return Err(errors);
-                }
 
                 // routing
-                let account_id = Some(self.context.account_id.unwrap_or_default().to_string());
-                let space_id = Some(self.context.space_id.unwrap_or_default().to_string());
                 let routing_wrap = RoutingData::defaults(
-                    account_id, 
+                    account_id,
+                    site_id, 
                     space_id, 
+                    box_id,
                     None
                 );
-                let folder = folder.unwrap();
-                if *&folder.is_none() {
-                    errors.push(
-                        PlanetError::new(
-                            500, 
-                            Some(tr!("Could not find folder {}", &folder_name)),
-                        )
-                    );
-                    return Err(errors);
-                }    
-
-                let folder = folder.unwrap();
-                let folder_name = &folder.clone().name.unwrap();
+                
                 // eprintln!("InsertIntoFolder.run :: folder: {:#?}", &folder);
 
                 // I need a way to get list of instance PropertyConfig (properties)
