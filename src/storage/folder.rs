@@ -148,7 +148,7 @@ impl DbData {
                 return Err(
                     PlanetError::new(
                         500, 
-                        Some(tr!("Could not validate table data")),
+                        Some(tr!("Could not validate folder data")),
                     )
                 );
             }
@@ -200,11 +200,22 @@ impl<'gb> FolderSchema<'gb> for DbFolder<'gb> {
         let home_dir = planet_context.home_path.unwrap_or_default();
         let account_id = context.account_id.unwrap_or_default();
         let space_id = context.space_id.unwrap_or_default();
+        let box_id = context.box_id.unwrap_or_default();
+        let site_id_wrap = context.site_id;
+        eprintln!("DbFolder :: space_id: {} box_id: {} is_site: {}", 
+            space_id, box_id, site_id_wrap.is_none());
         if account_id != "" && space_id != "" {
             println!("DbFolder.open :: account_id and space_id have been informed");
+        } else if site_id_wrap.is_none() && space_id == "private" {
+            // .achiever-planet/tables/folders.db : platform wide folder schemas
+            path = format!("{home}/private/folders.db", home=&home_dir);
         } else {
-            // .achiever-planet/tables/folders.db : platform wide table schemas
-            path = format!("{home}/folders/folders.db", home=&home_dir);
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Sites not yet supportted, only private spaces")),
+                )
+            )
         }
         let config: sled::Config = sled::Config::default()
             .use_compression(true)
@@ -223,7 +234,7 @@ impl<'gb> FolderSchema<'gb> for DbFolder<'gb> {
             Err(_) => {
                 let planet_error = PlanetError::new(
                     500, 
-                    Some(tr!("Could not open database")),
+                    Some(tr!("Could not open folder database")),
                 );
                 Err(planet_error)
             }
@@ -231,7 +242,7 @@ impl<'gb> FolderSchema<'gb> for DbFolder<'gb> {
     }
 
     fn get_by_name(&self, folder_name: &str) -> Result<Option<DbData>, PlanetError> {
-        // I travel table for account_id if any, space id if any and table name
+        // I travel folder for account_id if any, space id if any and folder name
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let iter = self.db.iter();
         let mut number_items = 0;
@@ -314,11 +325,11 @@ impl<'gb> FolderSchema<'gb> for DbFolder<'gb> {
             let table_name_str = format!("\"{}\"", &folder_name).magenta();
             return Err(PlanetError::new(
                 500, 
-                Some(tr!("Table {} already exists", &table_name_str))));
+                Some(tr!("Folder {} already exists", &table_name_str))));
         } else if *&table_exists_error == true {
             return Err(PlanetError::new(
                 500, 
-                Some(tr!("Error checking table \"{}\"", &folder_name))));
+                Some(tr!("Error checking folder \"{}\"", &folder_name))));
         }
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let encrypted_schema = db_data.encrypt(&shared_key).unwrap();
@@ -342,7 +353,7 @@ impl<'gb> FolderSchema<'gb> for DbFolder<'gb> {
                 }
             },
             Err(_) => {
-                Err(PlanetError::new(500, Some(tr!("Could not write table schema"))))
+                Err(PlanetError::new(500, Some(tr!("Could not write folder schema"))))
             }
         }
     }
@@ -353,8 +364,8 @@ impl<'gb> DbFolder<'gb> {
         db_folder: &DbFolder,
         folder_name: &String
     ) -> Result<BTreeMap<String, String>, PlanetError> {
-        let table = db_folder.get_by_name(folder_name).unwrap().unwrap();
-        let db_fields = table.data_objects.unwrap();
+        let folder = db_folder.get_by_name(folder_name).unwrap().unwrap();
+        let db_fields = folder.data_objects.unwrap();
         let mut field_id_map: BTreeMap<String, String> = BTreeMap::new();
         for db_field in db_fields.keys() {
             let field_config = db_fields.get(db_field).unwrap();
@@ -368,10 +379,10 @@ impl<'gb> DbFolder<'gb> {
         db_folder: &DbFolder,
         folder_name: &String
     ) -> Result<BTreeMap<String, String>, PlanetError> {
-        let table = db_folder.get_by_name(folder_name)?;
-        if table.is_some() {
-            let table = table.unwrap();
-            let db_fields = table.data_objects.unwrap();
+        let folder = db_folder.get_by_name(folder_name)?;
+        if folder.is_some() {
+            let folder = folder.unwrap();
+            let db_fields = folder.data_objects.unwrap();
             let mut field_id_map: BTreeMap<String, String> = BTreeMap::new();
             for db_field in db_fields.keys() {
                 let field_config = db_fields.get(db_field).unwrap();
@@ -383,15 +394,15 @@ impl<'gb> DbFolder<'gb> {
         } else {
             return Err(PlanetError::new(
                 500, 
-                Some(tr!("Table does not exist")),
+                Some(tr!("Folder does not exist")),
             ));
         }
     }
     // Get field_name -> field_type map
     pub fn get_field_type_map(
-        table: &DbData,
+        folder: &DbData,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
-        let db_fields = table.data_objects.clone().unwrap();
+        let db_fields = folder.data_objects.clone().unwrap();
         let mut field_type_map: BTreeMap<String, String> = BTreeMap::new();
         for db_field in db_fields.keys() {
             let field_name = db_field.clone();
@@ -479,7 +490,7 @@ impl<'gb> FolderItem<'gb> for DbFolderItem<'gb> {
         if account_id != "" && space_id != "" {
             println!("DbFolderItem.defaults :: account_id and space_id have been informed");
         } else {
-            // .achiever-planet/{table_file} : platform wide table (slug with underscore)
+            // .achiever-planet/{table_file} : platform wide folder (slug with underscore)
             path = format!("{home}/folders/{table_file}.db", home=&home_dir, table_file=table_file);
         }
         eprintln!("DbFolderItem.defaults :: path: {:?}", path);
@@ -686,10 +697,10 @@ impl<'gb> FolderItem<'gb> for DbFolderItem<'gb> {
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let iter = self.db.iter();
         let db_folder = self.db_folder.clone();
-        let table = db_folder.get_by_name(folder_name)?.unwrap();
-        let field_config_map = PropertyConfig::get_property_config_map(&table).unwrap();
+        let folder = db_folder.get_by_name(folder_name)?.unwrap();
+        let field_config_map = PropertyConfig::get_property_config_map(&folder).unwrap();
         let field_config_map_wrap = Some(field_config_map.clone());
-        // eprintln!("DbFolderItem.select :: table: {:#?}", &table);
+        // eprintln!("DbFolderItem.select :: folder: {:#?}", &folder);
         let fields_wrap = fields.clone();
         let has_fields = fields_wrap.is_some();
         let mut fields: Vec<String> = Vec::new();
@@ -727,7 +738,7 @@ impl<'gb> FolderItem<'gb> for DbFolderItem<'gb> {
         let formula_query = Formula::defaults(
             &where_formula, 
             &String::from("bool"), 
-            Some(table), 
+            Some(folder), 
             None, 
             None, 
             Some(db_folder), 

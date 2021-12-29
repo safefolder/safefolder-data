@@ -18,46 +18,45 @@ These are the core fields implemented so we can tackle the security and permissi
 Table fields
 ============
 
-* SmallTextField                [done] - text
-* LongTextField                 [done] - text : This is the text field, needs to be updated based on full text search.
-* CheckBoxField                 [done] - number
-* SelectField                   [done] - text
-* DateField                     [done] - date
-* Duration                      [done] - date
-* NumberField                   [done] - number
-* AuditTimeField                [done] - date
-* AuditByField                  [done] - text
-* CurrencyField                 [done] - number
-* PercentField                  [done] - number
-* FormulaField                  [done] - formula
+* SmallTextProperty                 [done] - text
+* LongTextProperty                  [done] - text : This is the text field, needs to be updated based on full text search.
+* CheckBoxProperty                  [done] - number
+* SelectProperty                    [done] - text
+* DateProperty                      [done] - date
+* DurationProperty                  [done] - date
+* NumberProperty                    [done] - number
+* AuditTimeProperty                 [done] - date
+* AuditByProperty                   [done] - text
+* CurrencyProperty                  [done] - number
+* PercentProperty                   [done] - number
+* FormulaProperty                   [done] - formula
 
-* LinkField                     [doing] - reference
-* ReferenceField                [todo]: A reference from a linked folder. Config with linked field.
+* LinkProperty                      [doing] - reference
+* ReferenceProperty                 [todo]: A reference from a linked folder. Config with linked field.
 
 These are not complex:
-* GenerateIdField               [todo] - text : Random ids
-* GeneratedNumberField          [todo] - number: Sequential number - number : Sequence number.
-* LanguageField                 [todo] - text
-* PhoneField                    [todo]
-* EmailField                    [todo]
-* UrlField                      [todo]
-* RatingField                   [todo]
+* GenerateIdProperty                [todo] - text : Random ids
+* GeneratedNumberProperty           [todo] - number: Sequential number - number : Sequence number.
+* LanguageProperty                  [todo] - text
+* PhoneProperty                     [todo]
+* EmailProperty                     [todo]
+* UrlProperty                       [todo]
+* RatingProperty                    [todo]
 
-* SetProfperty                  [todo]
-* ObjectProperty                [todo]
+* SetProperty                       [todo] - For example, tags
+* ObjectProperty                    [todo]
 
-* FolderField                   [todo]: This links to another db file with some media data: photo, etc...
+* FolderProperty                   [todo]: This links to another db file with some media data: photo, etc...
     In this case we also map into table config, so I can easily have list of folders for this table. I only do
     one level. Here I define background image for the folder.
-* StatsField                    [todo]: Statistics on linked fields with formula support: AVERAGE, 
+* StatsProperty                    [todo]: Statistics on linked fields with formula support: AVERAGE, 
     COUNT, COUNTA, COUNTALL, SUM, MAX, AND, OR, XOR, CONCATENATE. I execute these formulas once I post 
     processed the links and references. I would need to parse in a way to use those number functions.
-* FileField                     [todo] - Custom file and image management with IPFS. I add many.
+* FileProperty                     [todo] - Custom file and image management with IPFS. I add many.
 
 I might add for images these functions:
 1. resize
 2. thumb
-3. blur and other simple operations
 
 Above fields gives us what we need as EXCEL functions into the formula field. Formula can provide a combination 
 of these function fields, which are not needed.

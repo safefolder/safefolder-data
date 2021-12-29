@@ -61,6 +61,8 @@ pub struct ContextSource {
     pub data: Option<HashMap<String, String>>,
     pub account_id: Option<String>,
     pub space_id: Option<String>,
+    pub box_id: Option<String>,
+    pub site_id: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -69,6 +71,8 @@ pub struct Context<'gb> {
     pub data: Option<&'gb HashMap<String, String>>,
     pub account_id: Option<&'gb str>,
     pub space_id: Option<&'gb str>,
+    pub box_id: Option<&'gb str>,
+    pub site_id: Option<&'gb str>,
 }
 
 #[derive(Debug, Clone)]

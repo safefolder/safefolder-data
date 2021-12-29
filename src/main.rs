@@ -132,17 +132,28 @@ async fn main() {
     let context_source: ContextSource = ContextSource{
         id: None,
         data: Some(HashMap::new()),
-        space_id: None,
+        space_id: Some(String::from("private")),
         account_id: None,
+        box_id: Some(String::from("base")),
+        site_id: None,
     };
     let account_id = &context_source.account_id.unwrap_or_default();
     let space_id = &context_source.space_id.unwrap_or_default();
-    let context = Context{
+    let box_id = &context_source.box_id.unwrap_or_default();
+    let site_id_wrap = context_source.site_id.clone();
+    let site_id = &context_source.site_id.unwrap_or_default();
+    let mut context = Context{
         id: None,
         data: None,
-        account_id: Some(&account_id),
-        space_id: Some(&space_id),
+        account_id: Some(account_id),
+        space_id: Some(space_id),
+        box_id: Some(box_id),
+        site_id: None,
     };
+    if site_id_wrap.is_some() {
+        context.site_id = Some(site_id)
+    }
+    eprintln!("main.rs :: context: {:#?}", &context);
 
     // // bip32 and encryption
     // let mnemonic = Mnemonic::random(&mut OsRng, Default::default());

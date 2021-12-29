@@ -6,7 +6,7 @@ language:
 name:
   property_type: Small Text
 properties:
-  - name: My Field
+  - name: My Property
     property_type: Small Text
     required: true
     pepito: Hola
