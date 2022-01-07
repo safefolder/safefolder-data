@@ -1,14 +1,14 @@
 extern crate tr;
 extern crate colored;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::time::Instant;
 
 use tr::tr;
 use colored::*;
 use regex::Regex;
 
-use crate::commands::folder::config::{CreateFolderConfig};
+use crate::commands::folder::config::{CreateFolderConfig, PropertyConfig};
 use crate::commands::folder::{Command};
 use crate::commands::{CommandRunner};
 use crate::storage::{ConfigStorageProperty};
@@ -50,8 +50,8 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                 let space_id = self.context.space_id;
                 let box_id = self.context.box_id;
 
-                // db table options with language data
-                let db_table: DbFolder = result.unwrap();
+                // db folder options with language data
+                let db_folder: DbFolder = result.unwrap();
                 let mut data: BTreeMap<String, String> = BTreeMap::new();
                 let language = config.language.unwrap();
                 let language_codes_list = language.codes.unwrap();
@@ -72,22 +72,7 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                 let mut field_name_map: BTreeMap<String, String> = BTreeMap::new();
                 // populate field_type_map and field_name_map
                 let mut field_type_map: BTreeMap<String, String> = BTreeMap::new();
-                // TODO: order properties allphabetically
-                // TODO: order attributes alphabetically inside properties
-                // let mut field_list: Vec<String> = Vec::new();
-                // let mut field_config_map_by_name: BTreeMap<String, FieldConfig> = BTreeMap::new();
-                // for field in properties.iter() {
-                //     let field_name = field.name.clone().unwrap();
-                //     field_list.push(field_name.clone());
-                //     field_config_map_by_name.insert(field_name.clone(), field.clone());
-                // }
-                // field_list.sort();
-                // eprintln!("CreateFolder :: field_list: {:?}", &field_list);
-                // let mut field_config_list: Vec<FieldConfig> = Vec::new();
-                // for field_name in field_list {
-                //     let field_config = field_config_map_by_name.get(&field_name).unwrap();
-                //     field_config_list.push(field_config.clone());
-                // }                
+                let mut properties_map: HashMap<String, PropertyConfig> = HashMap::new();
                 for field in properties.iter() {
                     let field_attrs = field.clone();
                     let field_name = field.name.clone().unwrap();
@@ -95,6 +80,7 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                     let mut field_id_map: BTreeMap<String, String> = BTreeMap::new();
                     let field_id = field_attrs.id.unwrap_or_default();
                     field_id_map.insert(String::from(ID), field_id.clone());
+                    properties_map.insert(field_name.clone(), field.clone());
                     &field_ids.push(field_id_map);
                     if property_type.is_some() {
                         let property_type = property_type.unwrap();
@@ -118,9 +104,10 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                     let field_attrs = field.clone();
                     let field_name = field_attrs.name.unwrap_or_default().clone();
                     let map = &field.map_object_db(
-                        &field_type_map,
-                        &field_name_map,
-                        &db_table,
+                        self.planet_context,
+                        self.context,
+                        &properties_map,
+                        &db_folder,
                         folder_name,
                     )?;
                     data_objects.insert(String::from(field_name.clone()), map.clone());
@@ -130,14 +117,6 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                     // data_collections = map_list.clone();
                     data_collections.extend(map_list);
                 }
-                // let mut data_objects_new: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
-                // for (k, v) in data_objects.clone() {
-                //     let mut data_objects_new_: BTreeMap<String, String> = BTreeMap::new();
-                //     for (k, v) in v {
-                //         data_objects_new_.insert(k, v);
-                //     }
-                //     data_objects_new.insert(k, data_objects_new_);
-                // }
                 // eprintln!("CreateFolder.run :: data_objects_new: {:#?}", &data_objects_new);
                 data_collections.insert(String::from(PROPERTY_IDS), field_ids);
                 // routing
@@ -175,23 +154,91 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                 eprintln!("CreateFolder.run :: db_data: {:#?}", mine);
                 eprintln!("CreateFolder.run :: db_data all: {:#?}", db_data.clone());
 
-                let response: DbData = db_table.create(&db_data)?;
+                let response: DbData = db_folder.create(&db_data)?;
                 let response_src = response.clone();
                 // response.id
                 let folder_name = &response.name.unwrap_or_default();
-                let table_id = &response.id.unwrap();
+                let folder_id = &response.id.unwrap();
+
+                //
+                // Related folders, I need to update their config, like Links
+                //
+                let properties = response.data_objects.unwrap();
+                let mut linked_folder_ids: Vec<String> = Vec::new();
+                let mut map_property_names: BTreeMap<String, String> = BTreeMap::new();
+                let mut map_property_ids: BTreeMap<String, String> = BTreeMap::new();
+                for (_, v) in properties {
+                    let property_type = v.get(PROPERTY_TYPE);
+                    let property_name = v.get(NAME);
+                    let property_id = v.get(ID);
+                    if property_type.is_some() {
+                        let property_type = property_type.unwrap();
+                        let property_name = property_name.unwrap();
+                        let property_id = property_id.unwrap();
+                        if property_type == PROPERTY_TYPE_LINK {
+                            let linked_folder_id = v.get(LINKED_FOLDER_ID);
+                            if linked_folder_id.is_some() {
+                                let linked_folder_id = linked_folder_id.unwrap();
+                                let has_id = linked_folder_ids.contains(linked_folder_id);
+                                if !has_id {
+                                    linked_folder_ids.push(linked_folder_id.clone());
+                                    map_property_names.insert(
+                                        linked_folder_id.clone(), property_name.clone()
+                                    );
+                                    map_property_ids.insert(
+                                        linked_folder_id.clone(), property_id.clone()
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+                // Get each folder from db_folder instance and update with link to this created table
+                let local_property_map = db_data.data_objects.unwrap();
+                for link_folder_id in linked_folder_ids {
+                    let linked_folder = db_folder.get(&link_folder_id);
+                    if linked_folder.is_ok() {
+                        let mut linked_folder = linked_folder.unwrap();
+                        let mut map = linked_folder.data_objects.unwrap();
+                        let property_name = map_property_names.get(&link_folder_id).unwrap();
+                        let mut remote_property_map: BTreeMap<String, String> = local_property_map.get(
+                            property_name
+                        ).unwrap().clone();
+                        // Update property map with properties for local field, Link with link_folder_id being 
+                        // this local property
+                        remote_property_map.insert(String::from(LINKED_FOLDER_ID), folder_id.clone());
+                        remote_property_map.insert(String::from(NAME), folder_name.clone());
+                        remote_property_map.insert(String::from(MANY), String::from(TRUE));
+                        map.insert(folder_name.clone(), remote_property_map);
+                        linked_folder.data_objects = Some(map);
+                        let mut property_ids_map = linked_folder.data_collections.unwrap();
+                        let mut property_ids = property_ids_map.get(
+                            PROPERTY_IDS
+                        ).unwrap().clone();
+                        let property_id = map_property_ids.get(&link_folder_id.clone()).unwrap();
+                        let mut element: BTreeMap<String, String> = BTreeMap::new();
+                        element.insert(String::from(ID),property_id.clone());
+                        property_ids.push(element);
+                        property_ids_map.insert(String::from(PROPERTY_IDS), property_ids);
+                        linked_folder.data_collections = Some(property_ids_map);
+                        eprintln!("CreateFolder.run :: linked_folder: {:#?}", &linked_folder);
+                        db_folder.update(&linked_folder)?;
+                    }
+                }
 
                 println!();
                 let quote_color = format!("{}", String::from("\""));
-                println!("Created table {} :: {} => {}",
+                println!("Created folder {} :: {} => {}",
                     format!("{}{}{}", &quote_color.blue(), &folder_name.blue(), &quote_color.blue()),
-                    &table_id.magenta(),
+                    &folder_id.magenta(),
                     format!("{}{}{}", &quote_color.green(), &folder_name.green(), &quote_color.green()),
                 );
                 eprintln!("CreateFolder.run :: time: {} µs", &t_1.elapsed().as_micros());
 
+                let _mine = db_folder.get_by_name(folder_name);
+
                 Ok(response_src)
-            },
+                },
             Err(error) => {
                 Err(error)
             }

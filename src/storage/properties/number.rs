@@ -239,7 +239,7 @@ impl StorageProperty for CurrencyProperty {
                     500, 
                     Some(tr!("Field not configured for currency \"{}\"", data.clone())),
                 )
-            );            
+            );
         }
         let number_decimals = number_decimals.unwrap();
         let number_decimals: u32 = number_decimals.to_u32().unwrap();

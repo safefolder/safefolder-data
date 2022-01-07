@@ -47,8 +47,12 @@ pub const DATE_FORMAT: &str = "date_format";
 pub const TIME_FORMAT: &str = "time_format";
 pub const NUMBER_DECIMALS: &str = "number_decimals";
 pub const CURRENCY_SYMBOL: &str = "currency_symbol";
+pub const LINKED_FOLDER_ID: &str = "linked_folder_id";
+pub const DELETE_ON_LINK_DROP: &str = "delete_on_link_drop";
+pub const RELATED_PROPERTY: &str = "related_property";
+pub const WHERE: &str = "where";
 
-// Field Types
+// Property Types
 pub const PROPERTY_TYPE_SMALL_TEXT: &str = "Small Text";
 pub const PROPERTY_TYPE_LONG_TEXT: &str = "Long Text";
 pub const PROPERTY_TYPE_CHECKBOX: &str = "Checkbox";
@@ -63,6 +67,8 @@ pub const PROPERTY_TYPE_CREATED_BY: &str = "Created By";
 pub const PROPERTY_TYPE_LAST_MODIFIED_BY: &str = "Last Modified By";
 pub const PROPERTY_TYPE_CURRENCY: &str = "Currency";
 pub const PROPERTY_TYPE_PERCENTAGE: &str = "Percentage";
+pub const PROPERTY_TYPE_LINK: &str = "Link";
+pub const PROPERTY_TYPE_REFERENCE: &str = "Reference";
 
 // Date Format
 pub const DATE_FORMAT_FRIENDLY: &str = "Friendly";

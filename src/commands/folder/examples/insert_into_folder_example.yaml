@@ -10,3 +10,10 @@ data:
   Locations: c764oiqs1s40005p3tcg,c764oiqs1s40005p3tdg
   Currency: 9876.347
   Percentage: 98.56
+data_objects:
+  Status: 
+    - id: c764oiqs1s40005p3tbg
+data_collections:
+  Locations:
+    - id: c764oiqs1s40005p3tcg
+    - id: c764oiqs1s40005p3tdg

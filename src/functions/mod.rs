@@ -6,13 +6,14 @@ pub mod number;
 pub mod collections;
 
 use std::str::FromStr;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap,HashMap};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use regex::{Regex, CaptureMatches};
 use tr::tr;
 use xlformula_engine::{calculate, parse_formula, NoReference, NoCustomFunction};
 
+use crate::storage::ConfigStorageProperty;
 use crate::storage::folder::{DbData, DbFolder};
 use crate::commands::folder::config::PropertyConfig;
 use crate::functions::constants::*;
@@ -245,8 +246,7 @@ impl Formula {
         formula: &String,
         formula_format: &String,
         table: Option<DbData>,
-        field_type_map: Option<BTreeMap<String, String>>,
-        field_name_map: Option<BTreeMap<String, String>>,
+        properties_map: Option<HashMap<String, PropertyConfig>>,
         db_table: Option<DbFolder>,
         table_name: Option<String>,
         is_assign_function: bool,
@@ -256,6 +256,7 @@ impl Formula {
         // If I have an error in compilation, then does not validate. Compilation uses validate of functions.
         // This function is the one does compilation from string formula to FormulaFieldCompiled
         let formula_origin = formula.clone();
+        let properties_map = properties_map.clone();
         let field_config_map_ = field_config_map.clone();
         let mut field_config_map: BTreeMap<String, PropertyConfig> = BTreeMap::new();
         if field_config_map_.is_some() {
@@ -271,19 +272,27 @@ impl Formula {
         // let expr = &RE_FORMULA_FIELD_FUNCTIONS;
         let mut formula_processed = formula_origin.clone();
         let formula_format = formula_format.clone();
-        let mut field_name_map_: BTreeMap<String, String> = BTreeMap::new();
-        let mut field_type_map_: BTreeMap<String, String> = BTreeMap::new();
+        let mut properties_map_: HashMap<String, PropertyConfig> = HashMap::new();
         if table.is_some() {
             let table = table.unwrap();
             let db_table = db_table.unwrap();
             let table_name = table_name.unwrap();
-            field_type_map_ = DbFolder::get_field_type_map(&table)?;
-            field_name_map_ = DbFolder::get_field_name_map(&db_table, &table_name)?;
-        } else if field_type_map.is_some() && field_name_map.is_some() {
-            let field_type_map = field_type_map.unwrap();
-            field_type_map_ = field_type_map;
-            let field_name_map = field_name_map.unwrap();
-            field_name_map_ = field_name_map
+            let field_type_map_ = DbFolder::get_field_type_map(&table)?;
+            let field_name_map_ = DbFolder::get_field_name_map(&db_table, &table_name)?;
+            for (property_name, property_type) in field_type_map_.clone() {
+                let mut property_config = PropertyConfig::defaults(None);
+                property_config.property_type = Some(property_type);
+                property_config.name = Some(property_name.clone());
+                properties_map_.insert(property_name.clone(), property_config);
+            }
+            for (property_name, property_id) in field_name_map_.clone() {
+                let mut property_config = properties_map_.get(&property_name).unwrap().clone();
+                property_config.id = Some(property_id);
+                properties_map_.insert(property_name.clone(), property_config);
+            }
+        } else if properties_map.is_some() {
+            let properties_map = properties_map.unwrap();
+            properties_map_ = properties_map;
         }
         // eprintln!("Formula :: file_name_map_: {:#?}", &field_name_map_);
         // eprintln!("Formula :: file_type_map_: {:#?}", &field_type_map_);
@@ -307,8 +316,7 @@ impl Formula {
                 let mut main_function = compile_function_text(
                     function_text, 
                     &formula_format,
-                    &field_type_map_,
-                    Some(field_name_map_.clone()),
+                    &properties_map_,
                     db_table_i.clone(),
                     table_name_i.clone(),
                     Some(field_config_map.clone())
@@ -371,8 +379,7 @@ impl Formula {
                 formula_processed_str, 
                 formula_format,
                 Some(compiled_functions_map.clone()), 
-                field_name_map_, 
-                field_type_map_,
+                properties_map_, 
                 db_table_i.clone(),
                 table_name_i.clone(),
                 &field_config_map
@@ -391,8 +398,7 @@ pub fn compile_assignment(
     formula: &str,
     formula_format: String,
     functions_map: Option<BTreeMap<String, CompiledFunction>>,
-    field_name_map: BTreeMap<String, String>,
-    field_type_map: BTreeMap<String, String>,
+    properties_map: HashMap<String, PropertyConfig>,
     db_table: Option<DbFolder>,
     table_name: Option<String>,
     field_config_map: &BTreeMap<String, PropertyConfig>
@@ -418,8 +424,7 @@ pub fn compile_assignment(
                 let main_function = compile_function_text(
                     function_text, 
                     &formula_format,
-                    &field_type_map,
-                    Some(field_name_map.clone()),
+                    &properties_map,
                     db_table.clone(),
                     table_name.clone(),
                     field_config_map_wrap.clone()
@@ -456,17 +461,18 @@ pub fn compile_assignment(
         //eprintln!("compile_assignment: items: {:?} op: {:?}", &items, &attribute_operator);
         let (reference_name, items_new) = get_assignment_reference(
             &items, 
-            field_name_map
+            properties_map.clone()
         )?;
         //eprintln!("compile_assignment: reference_name: {} items_new: {:?}", &reference_name, &items_new);
-        let field_type = field_type_map.get(&reference_name);
+        let property_config = properties_map.get(&reference_name).unwrap().clone();
+        let field_type = property_config.property_type;
         //eprintln!("compile_assignment: field_type: {:?}", &field_type);
         let mut attribute_type: AttributeType = AttributeType::Text;
         if field_type.is_some() {
             //eprintln!("compile_assignment: I have field_type...");
             let field_type = field_type.unwrap();
             //eprintln!("compile_assignment: field_type: {}", field_type);
-            attribute_type = get_attribute_type(field_type, None);
+            attribute_type = get_attribute_type(&field_type, None);
             //eprintln!("compile_assignment: attribute_type: {:?}", &attribute_type);
         }
         // {Counter} = 23
@@ -671,8 +677,7 @@ pub fn compile_formula(
 pub fn compile_function_text(
     function_text: &str,
     formula_format: &String,
-    field_type_map: &BTreeMap<String, String>,
-    field_name_map: Option<BTreeMap<String, String>>,
+    properties_map: &HashMap<String, PropertyConfig>,
     db_table: Option<DbFolder>,
     table_name: Option<String>,
     field_config_map: Option<BTreeMap<String, PropertyConfig>>,
@@ -681,7 +686,7 @@ pub fn compile_function_text(
     let field_config_map_wrap = field_config_map.clone();
     let field_config_map: BTreeMap<String, PropertyConfig> = BTreeMap::new();
     let formula_format = formula_format.clone();
-    let field_type_map = field_type_map.clone();
+    let properties_map = properties_map.clone();
     // eprintln!("compile_function_text :: field_type_map: {:#?}", &field_type_map);
     // eprintln!("compile_function_text :: field_name_map: {:#?}", &field_name_map);
     let parts: Vec<&str> = function_text.split("(").collect();
@@ -755,14 +760,15 @@ pub fn compile_function_text(
             // Reference
             // I have attribute name and also the field type -> attribute_type from table
             // eprintln!("compile_function_text :: [{}] is reference", &attr);
-            let field_name_map = field_name_map.clone().unwrap();
             let attr_string = attr.to_string();
             let attr_string = attr_string.
                 replace("\"", "").
                 replace("{", "").
                 replace("}", "");
             let field_name = attr_string.clone();
-            let field_id = field_name_map.get(&field_name.clone());
+            // let field_id = field_name_map.get(&field_name.clone());
+            let property_config = properties_map.get(&field_name).unwrap().clone();
+            let field_id = property_config.id;
             if field_id.is_some() {
                 let field_id = field_id.unwrap().clone();
                 function_attribute.id = Some(field_id);
@@ -770,7 +776,7 @@ pub fn compile_function_text(
             function_attribute.name = Some(field_name);
             
             function_attribute.reference_value = Some(attr_string.clone());
-            let field_type = field_type_map.get(&attr_string);
+            let field_type = property_config.property_type;
             if field_type.is_some() {
                 let field_type = field_type.unwrap().clone();
                 attribute_type = get_attribute_type(&field_type, Some(formula_format.clone()));
@@ -785,8 +791,7 @@ pub fn compile_function_text(
                 &function_attribute_string.clone(),
                 &formula_format,
                 None,
-                Some(field_type_map.clone()),
-                field_name_map.clone(),
+                Some(properties_map.clone()),
                 db_table.clone(),
                 table_name.clone(),
                 false,
@@ -831,8 +836,7 @@ pub fn compile_function_text(
                         &formula, 
                         &formula_format, 
                         None, 
-                        Some(field_type_map.clone()), 
-                        field_name_map.clone(), 
+                        Some(properties_map.clone()), 
                         db_table.clone(), 
                         table_name.clone(),
                         true,
@@ -849,8 +853,7 @@ pub fn compile_function_text(
                 assign_attr.as_str(), 
                 formula_format.clone(),
                 None, 
-                field_name_map.clone().unwrap(), 
-                field_type_map.clone(),
+                properties_map.clone(), 
                 db_table.clone(),
                 table_name.clone(),
                 &field_config_map
@@ -1198,6 +1201,8 @@ pub enum FormulaOperator {
     Smaller,
     GreaterOrEqual,
     SmallerOrEqual,
+    Contains,
+    IsEmpty,
 }
 
 // attributes:
@@ -1427,7 +1432,7 @@ pub fn get_attribute_type(field_type: &String, formula_format: Option<String>) -
 
 pub fn get_assignment_reference(
     items: &Vec<String>, 
-    field_name_map: BTreeMap<String, String>
+    properties_map: HashMap<String, PropertyConfig>
 ) -> Result<(String, Vec<String>), PlanetError> {
     let mut reference_name: String = String::from("");
     let mut items_new: Vec<String> = Vec::new();
@@ -1445,7 +1450,9 @@ pub fn get_assignment_reference(
             // let mut item_string = item_.to_string();
             item = item.replace("{", "}").replace("}", "");
             reference_name = item.clone();
-            let column_id = &field_name_map.get(&item).unwrap();
+            // let column_id = &field_name_map.get(&item).unwrap();
+            let property_config = properties_map.get(&item).unwrap().clone();
+            let column_id = property_config.id.unwrap();
             let column_id = column_id.clone();
             //eprintln!("compile_formula_query :: column_id: {}", column_id);
             item = column_id.clone();

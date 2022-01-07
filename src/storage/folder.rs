@@ -25,6 +25,7 @@ use crate::functions::*;
 pub trait FolderSchema<'gb> {
     fn defaults(planet_context: &'gb PlanetContext<'gb>, context: &'gb Context<'gb>) -> Result<DbFolder<'gb>, PlanetError>;
     fn create(&self, db_data: &DbData) -> Result<DbData, PlanetError>;
+    fn update(&self, db_data: &DbData) -> Result<DbData, PlanetError>;
     fn get(&self, id: &String) -> Result<DbData, PlanetError>;
     fn get_by_name(&self, folder_name: &str) -> Result<Option<DbData>, PlanetError>;
 }
@@ -37,6 +38,7 @@ pub trait FolderItem<'gb> {
         context: &'gb Context<'gb>
     ) -> Result<DbFolderItem<'gb>, PlanetError>;
     fn insert(&self, folder_name: &String, db_data: &DbData) -> Result<DbData, PlanetError>;
+    fn update(&self, db_data: &DbData) -> Result<DbData, PlanetError>;
     fn get(&self, folder_name: &String, by: GetItemOption, properties: Option<Vec<String>>) -> Result<DbData, PlanetError>;
     fn select(&self, 
         folder_name: &String, 
@@ -256,23 +258,20 @@ impl<'gb> FolderSchema<'gb> for DbFolder<'gb> {
         let home_dir = planet_context.home_path.unwrap_or_default();
         let account_id = context.account_id.unwrap_or_default();
         let space_id = context.space_id.unwrap_or_default();
-        let box_id = context.box_id.unwrap_or_default();
         let site_id_wrap = context.site_id;
-        eprintln!("DbFolder :: space_id: {} box_id: {} is_site: {}", 
-            space_id, box_id, site_id_wrap.is_none());
         if account_id != "" && space_id != "" {
             println!("DbFolder.open :: account_id and space_id have been informed");
         } else if site_id_wrap.is_none() && space_id == "private" {
-            // .achiever-planet/tables/folders.db : platform wide folder schemas
             path = format!("{home}/private/folders.db", home=&home_dir);
         } else {
             return Err(
                 PlanetError::new(
                     500, 
-                    Some(tr!("Sites not yet supportted, only private spaces")),
+                    Some(tr!("Sites not yet supported, only private spaces")),
                 )
             )
         }
+        eprintln!("DbFolder.defaults :: path: {}", &path);
         let config: sled::Config = sled::Config::default()
             .use_compression(true)
             .path(path);
@@ -287,7 +286,8 @@ impl<'gb> FolderSchema<'gb> for DbFolder<'gb> {
                 };
                 Ok(db_folder)
             },
-            Err(_) => {
+            Err(err) => {
+                eprintln!("{:?}", &err);
                 let planet_error = PlanetError::new(
                     500, 
                     Some(tr!("Could not open folder database")),
@@ -314,7 +314,9 @@ impl<'gb> FolderSchema<'gb> for DbFolder<'gb> {
                 &shared_key);
             let item = item_.unwrap();
             let item_source = item.clone();
-            let matches_name_none = &item.name.unwrap().to_lowercase() == &folder_name.to_lowercase();
+            let item_name = &item.name.unwrap();
+            eprintln!("DbFolder.get_by_name :: name: {}", item_name);
+            let matches_name_none = &item_name.to_lowercase() == &folder_name.to_lowercase();
             let mut check_account: bool = true;
             let routing_response = item.routing;
             if routing_response.is_some() {
@@ -341,10 +343,17 @@ impl<'gb> FolderSchema<'gb> for DbFolder<'gb> {
                 return Ok(matched_item)
             },
             2 => {
-                return Err(PlanetError::new(500, Some(tr!("Could not fetch item from database"))))
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!(
+                            "Could not fetch item from database, more than 1 item matches folder name."
+                        ))
+                    )
+                )
             },
             _ => {
-                return Err(PlanetError::new(500, Some(tr!("Could not fetch item from database"))))
+                return Err(PlanetError::new(500, Some(tr!("Item not found in folders."))))
             }
         }
     }
@@ -375,17 +384,18 @@ impl<'gb> FolderSchema<'gb> for DbFolder<'gb> {
         let result_table_exists: Result<Option<DbData>, PlanetError> = self.get_by_name(
             &folder_name.as_str()
         );
-        let table_exists_error = *&result_table_exists.is_err();
-        let table_exists = *&table_exists_error == false && *&result_table_exists.unwrap().is_some();
+        let table_exists_error = *&result_table_exists.clone().is_err();
+        let table_exists = *&table_exists_error == false && *&result_table_exists.clone().unwrap().is_some();
         if table_exists == true {
             let table_name_str = format!("\"{}\"", &folder_name).magenta();
             return Err(PlanetError::new(
                 500, 
                 Some(tr!("Folder {} already exists", &table_name_str))));
         } else if *&table_exists_error == true {
+            let error = result_table_exists.unwrap_err();
             return Err(PlanetError::new(
                 500, 
-                Some(tr!("Error checking folder \"{}\"", &folder_name))));
+                Some(tr!("Error checking folder \"{}\": \"{}\"", &folder_name, &error.message))));
         }
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let encrypted_schema = db_data.encrypt(&shared_key).unwrap();
@@ -396,7 +406,9 @@ impl<'gb> FolderSchema<'gb> for DbFolder<'gb> {
         let response = &self.db.insert(id_db, encoded);
         match response {
             Ok(_) => {
-                // println!("DbFolder.create :: id: {:?}", &id);
+                println!("DbFolder.create :: id: {:?} name: {}", &id, &folder_name);
+                let _db_response = response.clone().unwrap();
+                // eprintln!("DbFolder.create :: db_response : {:?}", &db_response);
                 let item_ = self.get(&id);
                 match item_ {
                     Ok(_) => {
@@ -408,6 +420,49 @@ impl<'gb> FolderSchema<'gb> for DbFolder<'gb> {
                     }
                 }
             },
+            Err(_) => {
+                Err(PlanetError::new(500, Some(tr!(
+                    "Could not write folder config into database, generic data error."
+                ))))
+            }
+        }
+    }
+    fn update(&self, folder: &DbData) -> Result<DbData, PlanetError> {
+        let mut folder = folder.clone();
+        let folder_name = folder.name.clone().unwrap();
+        let result_table_exists: Result<Option<DbData>, PlanetError> = self.get_by_name(
+            &folder_name.as_str()
+        );
+        let table_exists_error = *&result_table_exists.clone().is_err();
+        let table_exists = *&table_exists_error == false && *&result_table_exists.clone().unwrap().is_some();
+        if table_exists == false {
+            let table_name_str = format!("\"{}\"", &folder_name).magenta();
+            return Err(PlanetError::new(
+                500, 
+                Some(tr!("Folder {} does not exists", &table_name_str))));
+        } else if *&table_exists_error == true {
+            let error = result_table_exists.unwrap_err();
+            return Err(PlanetError::new(
+                500, 
+                Some(tr!("Error checking folder \"{}\": \"{}\"", &folder_name, &error.message))));
+        }
+        let folder_db = result_table_exists.unwrap().unwrap();
+        folder.id = folder_db.id;
+        let id_db = folder.clone().id.unwrap();
+        let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
+        let encrypted_schema = folder.clone().encrypt(&shared_key).unwrap();
+        let encoded: Vec<u8> = encrypted_schema.serialize();
+        let id_db = xid::Id::from_str(id_db.as_str()).unwrap();
+        let id_db = id_db.as_bytes();
+        let response = &self.db.insert(id_db, encoded);
+        match response {
+            Ok(_) => {
+                let _db_response = response.clone().unwrap();
+                // eprintln!("DbFolder.update :: folder_name: {} db_response : {:?}", 
+                //     &folder_name, &db_response
+                // );
+                Ok(folder.clone())
+            }
             Err(_) => {
                 Err(PlanetError::new(500, Some(tr!("Could not write folder schema"))))
             }
@@ -626,8 +681,6 @@ impl<'gb> FolderItem<'gb> for DbFolderItem<'gb> {
         let id = db_data.id.clone().unwrap();
         let id_db = xid::Id::from_str(id.as_str()).unwrap();
         let id_db = id_db.as_bytes();
-        // TODO: The call already provides the data inserted, check response so I don't need self.get since
-        //       I already have the data.
         let response = &self.db.insert(id_db, encoded);
         match response {
             Ok(_) => {
@@ -648,6 +701,47 @@ impl<'gb> FolderItem<'gb> for DbFolderItem<'gb> {
             }
         }
     }
+    fn update(&self, db_data: &DbData) -> Result<DbData, PlanetError> {
+        let db_data = db_data.clone();
+        let id = db_data.id.clone().unwrap();
+        let id_db = xid::Id::from_str(id.as_str()).unwrap();
+        let id_db = id_db.as_bytes();
+        let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
+        let encrypted_data = db_data.encrypt(&shared_key).unwrap();
+        let encoded: Vec<u8> = encrypted_data.serialize();
+        let response = &self.db.insert(id_db, encoded);
+        match response {
+            Ok(_) => {
+                let response = response.clone().unwrap();
+                let item_db = response.unwrap().to_vec();
+                let item = EncryptedMessage::deserialize(
+                    item_db
+                ).unwrap();
+                let item = DbData::decrypt_owned(
+                    &item, 
+                    &shared_key
+                );
+                match item {
+                    Ok(_) => {
+                        let item = item.unwrap();
+                        Ok(item)
+                    },
+                    Err(_) => {
+                        let error = item.unwrap_err();
+                        Err(PlanetError::new(
+                            500, 
+                            Some(tr!(
+                                "Could not update data, encryption error: {}", error.to_string()
+                            )
+                        )))
+                    }
+                }
+            },
+            Err(_) => {
+                Err(PlanetError::new(500, Some(tr!("Could not update data"))))
+            }
+        }
+    }
 
     // We can get items by id (not changing string), and name (we search for slugified name)
     fn get(
@@ -660,6 +754,7 @@ impl<'gb> FolderItem<'gb> for DbFolderItem<'gb> {
         let item_db: Vec<u8>;
         match by {
             GetItemOption::ById(id) => {
+                eprintln!("DbFolderItem.get :: id: {}", &id);
                 let id_db = xid::Id::from_str(&id).unwrap();
                 let id_db = id_db.as_bytes();
                 let db_result = self.db.get(&id_db);
@@ -784,7 +879,11 @@ impl<'gb> FolderItem<'gb> for DbFolderItem<'gb> {
         let iter = self.db.iter();
         let db_folder = self.db_folder.clone();
         let folder = db_folder.get_by_name(folder_name)?.unwrap();
-        let field_config_map = PropertyConfig::get_property_config_map(&folder).unwrap();
+        let field_config_map = PropertyConfig::get_property_config_map(
+            self.planet_context,
+            self.context,
+            &folder
+        ).unwrap();
         let field_config_map_wrap = Some(field_config_map.clone());
         // eprintln!("DbFolderItem.select :: folder: {:#?}", &folder);
         let fields_wrap = fields.clone();
@@ -825,7 +924,6 @@ impl<'gb> FolderItem<'gb> for DbFolderItem<'gb> {
             &where_formula, 
             &String::from("bool"), 
             Some(folder), 
-            None, 
             None, 
             Some(db_folder), 
             Some(folder_name.clone()), 

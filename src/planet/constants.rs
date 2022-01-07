@@ -15,3 +15,5 @@ pub const IPFS_CID : &str = "ipfs_cid";
 pub const ID: &str = "id";
 pub const VALUE: &str = "value";
 pub const NAME: &str = "name";
+pub const TRUE: &str = "true";
+pub const FALSE: &str = "false";

@@ -1,0 +1,12 @@
+---
+command: CREATE FOLDER "Address"
+language:
+  codes: ["english", "spanish"]
+  default: english
+name:
+  property_type: Small Text
+properties:
+  - name: Street
+    property_type: Small Text
+  - name: Number
+    property_type: Number

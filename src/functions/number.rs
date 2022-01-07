@@ -1367,6 +1367,7 @@ pub fn check_float_compare(value: &f64, compare_to: &f64, op: FormulaOperator) -
                 check = true;
             }
         },
+        _ => {}
     }
     return Ok(check)
 }

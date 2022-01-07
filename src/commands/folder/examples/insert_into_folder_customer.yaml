@@ -1,0 +1,10 @@
+---
+command: INSERT INTO FOLDER "Customer"
+name: Customer 02
+data:
+  Number Employees: 34
+  Description: This is some description I want to include
+data_collections:
+  Addresses:
+    - c7c82aas1s40cj7dn2cg
+    - c7c82d2s1s40d0o9i6a0

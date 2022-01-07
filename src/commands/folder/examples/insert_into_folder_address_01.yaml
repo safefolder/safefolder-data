@@ -1,0 +1,6 @@
+---
+command: INSERT INTO FOLDER "Address"
+name: Address 01
+data:
+  Street: Paseo Marques de Zafra
+  Number: 61

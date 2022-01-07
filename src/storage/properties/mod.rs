@@ -2,8 +2,9 @@ pub mod text;
 pub mod number;
 pub mod formula;
 pub mod date;
+pub mod reference;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use tr::tr;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
@@ -19,7 +20,7 @@ Table fields
 ============
 
 * SmallTextProperty                 [done] - text
-* LongTextProperty                  [done] - text : This is the text field, needs to be updated based on full text search.
+* LongTextProperty                  [partly done] - text : This is the text field, needs to be updated based on full text search.
 * CheckBoxProperty                  [done] - number
 * SelectProperty                    [done] - text
 * DateProperty                      [done] - date
@@ -32,8 +33,9 @@ Table fields
 * FormulaProperty                   [done] - formula
 
 * LinkProperty                      [doing] - reference
-* ReferenceProperty                 [todo]: A reference from a linked folder. Config with linked field.
-
+* ReferenceProperty                 [doing] - A reference from a linked folder. Config with linked field. These
+    are subqueries. We do subquery when get by id. Also when doing select and search operations.
+-
 These are not complex:
 * GenerateIdProperty                [todo] - text : Random ids
 * GeneratedNumberProperty           [todo] - number: Sequential number - number : Sequence number.
@@ -46,7 +48,7 @@ These are not complex:
 * SetProperty                       [todo] - For example, tags
 * ObjectProperty                    [todo]
 
-* FolderProperty                    [todo]: This links to another db file with some media data: photo, etc...
+* SubFolderProperty                 [todo]: This links to another db file with some media data: photo, etc...
     In this case we also map into table config, so I can easily have list of folders for this table. I only do
     one level. Here I define background image for the folder.
 * StatsProperty                     [todo]: Statistics on linked fields with formula support: AVERAGE, 
@@ -54,10 +56,6 @@ These are not complex:
     processed the links and references. I would need to parse in a way to use those number functions.
 * FileProperty                      [todo] - Custom file and image management with IPFS. I add many.
 * CommandProperty                   [todo]: This does processing for complex cases, like image manipulation
-
-I might add for images these functions:
-1. resize
-2. thumb
 
 Above fields gives us what we need as EXCEL functions into the formula field. Formula can provide a combination 
 of these function fields, which are not needed.
@@ -86,6 +84,24 @@ pub trait StorageProperty {
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<PropertyConfig, PlanetError>;
     fn validate(&self, data: &String) -> Result<String, PlanetError>;
+    fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String;
+}
+
+pub trait ObjectStorageProperty<'gb> {
+    fn update_config_map(
+        &mut self, 
+        field_config_map: &BTreeMap<String, String>,
+        properties_map: &HashMap<String, PropertyConfig>,
+        table_name: &String,
+    ) -> Result<BTreeMap<String, String>, PlanetError>;
+    fn build_config(
+        &mut self, 
+        field_config_map: &BTreeMap<String, String>,
+    ) -> Result<PropertyConfig, PlanetError>;
+    fn validate(
+        &self, 
+        data: &Vec<String>, 
+    ) -> Result<Vec<String>, PlanetError>;
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String;
 }
 

@@ -5,12 +5,12 @@ pub mod folder;
 pub mod constants;
 pub mod properties;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap,HashMap};
 
 use validator::{ValidationErrors};
 use crate::commands::folder::config::PropertyConfig;
 use crate::storage::folder::{DbData, DbFolder};
-use crate::planet::PlanetError;
+use crate::planet::{PlanetError, Context, PlanetContext};
 
 pub trait ConfigStorageProperty {
     fn defaults(
@@ -24,14 +24,23 @@ pub trait ConfigStorageProperty {
     }
     fn map_object_db(
         &self, 
-        property_type_map: &BTreeMap<String, String>,
-        property_name_map: &BTreeMap<String, String>,
+        planet_context: &PlanetContext,
+        context: &Context,
+        properties_map: &HashMap<String, PropertyConfig>,
         db_folder: &DbFolder,
         folder_name: &String
     ) -> Result<BTreeMap<String, String>, PlanetError>;
-    fn get_property_config_map(folder: &DbData) -> Result<BTreeMap<String, PropertyConfig>, PlanetError>;
+    fn get_property_config_map(
+        planet_context: &PlanetContext,
+        context: &Context,
+        folder: &DbData
+    ) -> Result<BTreeMap<String, PropertyConfig>, PlanetError>;
     fn map_collections_db(&self) -> Result<BTreeMap<String, Vec<BTreeMap<String, String>>>, PlanetError>;
-    fn parse_from_db(db_data: &DbData) -> Result<Vec<PropertyConfig>, PlanetError>;
+    fn parse_from_db(
+        planet_context: &PlanetContext,
+        context: &Context,
+        db_data: &DbData
+    ) -> Result<Vec<PropertyConfig>, PlanetError>;
     fn map_objects_db(&self) -> Result<BTreeMap<String, Vec<BTreeMap<String, String>>>, PlanetError>;
     fn get_property_id_map(properties: &Vec<PropertyConfig>) -> Result<BTreeMap<String, PropertyConfig>, PlanetError>;
     fn get_name_property(db_data: &DbData) -> Option<PropertyConfig>;

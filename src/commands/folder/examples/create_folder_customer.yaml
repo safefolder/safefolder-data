@@ -1,0 +1,20 @@
+---
+command: CREATE FOLDER "Customer"
+language:
+  codes: ["english", "spanish"]
+  default: english
+name:
+  property_type: Small Text
+properties:
+  - name: Number Employees
+    property_type: Number
+    required: true
+  - name: Description
+    property_type: Long Text
+  - name: Addresses
+    property_type: Link
+    linked_folder_id: c7c815is1s406kaf3j30
+    many: true
+  - name: Street
+    property_type: Reference
+    related_property: Addresses

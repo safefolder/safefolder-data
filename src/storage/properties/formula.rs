@@ -27,27 +27,26 @@ impl FormulaProperty {
     pub fn update_config_map(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
-        field_name_map: &BTreeMap<String, String>,
-        field_type_map: &BTreeMap<String, String>,
+        properties_map: &HashMap<String, PropertyConfig>,
         db_folder: &DbFolder,
         table_name: &String,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
         let mut field_config_map = field_config_map.clone();
         let config = self.config.clone();
+        let properties_map = properties_map.clone();
         let formula = config.formula;
         if formula.is_some() {
             let formula = formula.unwrap();
             let formula_format = config.formula_format.unwrap();
-            let field_type_map = field_type_map.clone();
-            let field_name_map = field_name_map.clone();
+            // let field_type_map = field_type_map.clone();
+            // let field_name_map = field_name_map.clone();
             let db_folder = db_folder.clone();
             let table_name = table_name.clone();
             let formula_compiled = Formula::defaults(
                 &formula,
                 &formula_format,
                 None,
-                Some(field_type_map),
-                Some(field_name_map),
+                Some(properties_map),
                 Some(db_folder),
                 Some(table_name),
                 false,

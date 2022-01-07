@@ -1,6 +1,6 @@
 extern crate xid;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap,HashMap};
 use serde::{Deserialize, Serialize};
 use serde_yaml;
 use validator::{Validate, ValidationErrors, ValidationError};
@@ -9,7 +9,7 @@ use regex::Regex;
 use tr::tr;
 
 use crate::planet::validation::{CommandImportConfig, PlanetValidationError};
-use crate::planet::{PlanetContext, PlanetError};
+use crate::planet::{PlanetContext, PlanetError, Context};
 
 use crate::storage::constants::*;
 use crate::storage::*;
@@ -20,7 +20,9 @@ use crate::storage::properties::{
     date::*, 
     number::*,
     formula::*,
-    StorageProperty
+    reference::*,
+    StorageProperty,
+    ObjectStorageProperty,
 };
 use crate::planet::constants::*;
 
@@ -168,6 +170,9 @@ pub struct PropertyConfig {
     pub time_format: Option<i8>,
     pub currency_symbol: Option<String>,
     pub number_decimals: Option<i8>,
+    pub linked_folder_id: Option<String>,
+    pub delete_on_link_drop: Option<bool>,
+    pub related_property: Option<String>,
 }
 
 impl ConfigStorageProperty for PropertyConfig {
@@ -192,6 +197,9 @@ impl ConfigStorageProperty for PropertyConfig {
             time_format: None,
             currency_symbol: None,
             number_decimals: None,
+            linked_folder_id: None,
+            delete_on_link_drop: None,
+            related_property: None,
         };
         if options.is_some() {
             object.options = Some(options.unwrap());
@@ -225,7 +233,7 @@ impl ConfigStorageProperty for PropertyConfig {
                     let indexed = make_bool_str(field_config_map.get(INDEXED).unwrap().clone());
                     let many = make_bool_str(field_config_map.get(MANY).unwrap().clone());
                     let field_id = field_config_map.get(ID).unwrap().clone();
-                    let field_config = PropertyConfig{
+                    let propertty_config = PropertyConfig{
                         id: Some(field_id.clone()),
                         name: Some(field_config_map.get(NAME).unwrap().clone()),
                         property_type: Some(field_config_map.get(PROPERTY_TYPE).unwrap().clone()),
@@ -243,15 +251,26 @@ impl ConfigStorageProperty for PropertyConfig {
                         time_format: None,
                         currency_symbol: None,
                         number_decimals: None,
+                        linked_folder_id: None,
+                        delete_on_link_drop: None,
+                        related_property: None,
                     };
-                    return Some(field_config);
+                    return Some(propertty_config);
                 }
             }
         }
         return None
     }
-    fn get_property_config_map(table: &DbData) -> Result<BTreeMap<String, PropertyConfig>, PlanetError> {
-        let properties = PropertyConfig::parse_from_db(table);
+    fn get_property_config_map(
+        planet_context: &PlanetContext,
+        context: &Context,
+        table: &DbData
+    ) -> Result<BTreeMap<String, PropertyConfig>, PlanetError> {
+        let properties = PropertyConfig::parse_from_db(
+            planet_context,
+            context,
+            table
+        );
         if properties.is_ok() {
             let properties = properties.unwrap().clone();
             let mut map: BTreeMap<String, PropertyConfig> = BTreeMap::new();
@@ -268,7 +287,11 @@ impl ConfigStorageProperty for PropertyConfig {
             )
         )
     }
-    fn parse_from_db(db_data: &DbData) -> Result<Vec<PropertyConfig>, PlanetError> {
+    fn parse_from_db(
+        planet_context: &PlanetContext,
+        context: &Context,
+        db_data: &DbData
+    ) -> Result<Vec<PropertyConfig>, PlanetError> {
         // let select_data: Option<Vec<(String, String)>> = None;
         let db_data = db_data.clone();
         let mut properties: Vec<PropertyConfig> = Vec::new();
@@ -297,71 +320,89 @@ impl ConfigStorageProperty for PropertyConfig {
                 let field_id = field_config_map.get(ID).unwrap().clone();
                 let field_name = field_config_map.get(NAME).unwrap().clone();
                 let field_type_str = field_config_map.get(PROPERTY_TYPE).unwrap().as_str();
-                let mut field_config = PropertyConfig::defaults(None);
-                field_config.id = Some(field_id.clone());
-                field_config.name = Some(field_name.clone());
-                field_config.property_type = Some(field_config_map.get(PROPERTY_TYPE).unwrap().clone());
-                field_config.default = Some(field_config_map.get(DEFAULT).unwrap().clone());
-                field_config.version = Some(field_config_map.get(VERSION).unwrap().clone());
-                field_config.required = Some(required);
-                field_config.api_version = Some(field_config_map.get(API_VERSION).unwrap().clone());
-                field_config.indexed = Some(indexed);
-                field_config.many = Some(many);
+                let mut propertty_config = PropertyConfig::defaults(None);
+                propertty_config.id = Some(field_id.clone());
+                propertty_config.name = Some(field_name.clone());
+                propertty_config.property_type = Some(field_config_map.get(PROPERTY_TYPE).unwrap().clone());
+                propertty_config.default = Some(field_config_map.get(DEFAULT).unwrap().clone());
+                propertty_config.version = Some(field_config_map.get(VERSION).unwrap().clone());
+                propertty_config.required = Some(required);
+                propertty_config.api_version = Some(field_config_map.get(API_VERSION).unwrap().clone());
+                propertty_config.indexed = Some(indexed);
+                propertty_config.many = Some(many);
                 // eprintln!("parse_from_db :: field_type_str: {}", field_type_str);
                 
                 match field_type_str {
                     PROPERTY_TYPE_SMALL_TEXT => {
-                        let mut obj = SmallTextProperty::defaults(&field_config);
-                        field_config = obj.build_config(field_config_map)?;
+                        let mut obj = SmallTextProperty::defaults(&propertty_config);
+                        propertty_config = obj.build_config(field_config_map)?;
                     },
                     PROPERTY_TYPE_LONG_TEXT => {
-                        let mut obj = LongTextProperty::defaults(&field_config);
-                        field_config = obj.build_config(field_config_map)?;
+                        let mut obj = LongTextProperty::defaults(&propertty_config);
+                        propertty_config = obj.build_config(field_config_map)?;
                     },
                     PROPERTY_TYPE_NUMBER => {
-                        let mut obj = NumberProperty::defaults(&field_config);
-                        field_config = obj.build_config(field_config_map)?;
+                        let mut obj = NumberProperty::defaults(&propertty_config);
+                        propertty_config = obj.build_config(field_config_map)?;
                     },
                     PROPERTY_TYPE_CHECKBOX => {
-                        let mut obj = CheckBoxProperty::defaults(&field_config);
-                        field_config = obj.build_config(field_config_map)?;
+                        let mut obj = CheckBoxProperty::defaults(&propertty_config);
+                        propertty_config = obj.build_config(field_config_map)?;
                     },
                     PROPERTY_TYPE_DATE => {
-                        let mut obj = DateProperty::defaults(&field_config);
-                        field_config = obj.build_config(field_config_map)?;
+                        let mut obj = DateProperty::defaults(&propertty_config);
+                        propertty_config = obj.build_config(field_config_map)?;
                     },
                     PROPERTY_TYPE_FORMULA => {
-                        let mut obj = FormulaProperty::defaults(&field_config);
-                        field_config = obj.build_config(field_config_map)?;
+                        let mut obj = FormulaProperty::defaults(&propertty_config);
+                        propertty_config = obj.build_config(field_config_map)?;
                     },
                     PROPERTY_TYPE_SELECT => {
-                        let mut obj = SelectProperty::defaults(&field_config, None);
-                        field_config = obj.build_config(field_config_map)?;
+                        let mut obj = SelectProperty::defaults(&propertty_config, None);
+                        propertty_config = obj.build_config(field_config_map)?;
                     },
                     PROPERTY_TYPE_DURATION => {
-                        let mut obj = DurationProperty::defaults(&field_config);
-                        field_config = obj.build_config(field_config_map)?;
+                        let mut obj = DurationProperty::defaults(&propertty_config);
+                        propertty_config = obj.build_config(field_config_map)?;
                     },
                     PROPERTY_TYPE_CREATED_TIME => {
-                        let mut obj = AuditDateProperty::defaults(&field_config);
-                        field_config = obj.build_config(field_config_map)?;
+                        let mut obj = AuditDateProperty::defaults(&propertty_config);
+                        propertty_config = obj.build_config(field_config_map)?;
                     },
                     PROPERTY_TYPE_LAST_MODIFIED_TIME => {
-                        let mut obj = AuditDateProperty::defaults(&field_config);
-                        field_config = obj.build_config(field_config_map)?;
+                        let mut obj = AuditDateProperty::defaults(&propertty_config);
+                        propertty_config = obj.build_config(field_config_map)?;
                     },
                     PROPERTY_TYPE_CURRENCY => {
-                        let mut obj = CurrencyProperty::defaults(&field_config);
-                        field_config = obj.build_config(field_config_map)?;
+                        let mut obj = CurrencyProperty::defaults(&propertty_config);
+                        propertty_config = obj.build_config(field_config_map)?;
                     },
                     PROPERTY_TYPE_PERCENTAGE => {
-                        let mut obj = PercentageProperty::defaults(&field_config);
-                        field_config = obj.build_config(field_config_map)?;
+                        let mut obj = PercentageProperty::defaults(&propertty_config);
+                        propertty_config = obj.build_config(field_config_map)?;
+                    },
+                    PROPERTY_TYPE_LINK => {
+                        let mut obj = LinkProperty::defaults(
+                            planet_context,
+                            context,
+                            &propertty_config,
+                            None,
+                        );
+                        propertty_config = obj.build_config(field_config_map)?;
+                    },
+                    PROPERTY_TYPE_REFERENCE => {
+                        let mut obj = ReferenceProperty::defaults(
+                            planet_context,
+                            context,
+                            &propertty_config,
+                            None,
+                        );
+                        propertty_config = obj.build_config(field_config_map)?;
                     },
                     _ => {}
                 }
-                &map_fields_by_id.insert(field_id, field_config.clone());
-                &map_fields_by_name.insert(field_name.clone(), field_config.clone());
+                &map_fields_by_id.insert(field_id, propertty_config.clone());
+                &map_fields_by_name.insert(field_name.clone(), propertty_config.clone());
             }
         }
 
@@ -395,8 +436,8 @@ impl ConfigStorageProperty for PropertyConfig {
                     // data_collection_field: Status__select_options
                     if *&attr_name.to_lowercase() == SELECT_OPTIONS.to_lowercase() {
                         // eprintln!("parse_from_db :: I get into the options process",);
-                        let mut field_config_ = map_fields_by_name.get(field_name).unwrap().clone();
-                        let field_id = &field_config_.id.clone().unwrap();
+                        let mut propertty_config_ = map_fields_by_name.get(field_name).unwrap().clone();
+                        let field_id = &propertty_config_.id.clone().unwrap();
                         let field_id = field_id.clone();
                         let mut field_options: Vec<String> = Vec::new();
                         for field_item in field_list {
@@ -404,8 +445,8 @@ impl ConfigStorageProperty for PropertyConfig {
                             field_options.push(field_value);
                         }
                         // eprintln!("parse_from_db :: options: {:#?}", &field_options);
-                        field_config_.options = Some(field_options);
-                        map_fields_by_id.insert(field_id, field_config_);
+                        propertty_config_.options = Some(field_options);
+                        map_fields_by_id.insert(field_id, propertty_config_);
                     }
                 }
             }
@@ -418,8 +459,8 @@ impl ConfigStorageProperty for PropertyConfig {
             for field_id_data in field_ids.iter() {
                 // eprintln!("parse_from_db :: field_id_data: {:#?}", &field_id_data);
                 let field_id = &field_id_data.get(ID).unwrap().clone();
-                let field_config = map_fields_by_id.get(field_id).unwrap().clone();
-                &properties.push(field_config);
+                let propertty_config = map_fields_by_id.get(field_id).unwrap().clone();
+                &properties.push(propertty_config);
             }
         }
 
@@ -429,68 +470,93 @@ impl ConfigStorageProperty for PropertyConfig {
     }
     fn map_object_db(
         &self, 
-        field_type_map: &BTreeMap<String, String>,
-        field_name_map: &BTreeMap<String, String>,
-        db_table: &DbFolder,
-        table_name: &String
+        planet_context: &PlanetContext,
+        context: &Context,
+        properties_map: &HashMap<String, PropertyConfig>,
+        db_folder: &DbFolder,
+        folder_name: &String,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
-        let field_config = self.clone();
-        let field_config_ = self.clone();
+        // I use this operation when creating folders
+        let propertty_config = self.clone();
+        let propertty_config_ = self.clone();
         let mut map: BTreeMap<String, String> = BTreeMap::new();
-        let required = field_config.required.unwrap_or_default();
-        let indexed = field_config.indexed.unwrap_or_default();
-        let many = field_config.many.unwrap_or_default();
-        let field_name = field_config.name.unwrap_or_default();
-        let property_type = field_config.property_type.unwrap_or_default();
-        let field_id = field_config.id.unwrap_or_default();
+        let required = propertty_config.required.unwrap_or_default();
+        let indexed = propertty_config.indexed.unwrap_or_default();
+        let many = propertty_config.many.unwrap_or_default();
+        let field_name = propertty_config.name.unwrap_or_default();
+        let property_type = propertty_config.property_type.unwrap_or_default();
+        let field_id = propertty_config.id.unwrap_or_default();
         let field_type_str = property_type.as_str();
         // eprintln!("map_object_db :: field_name: {}", &field_name);
         map.insert(String::from(ID), field_id.clone());
         map.insert(String::from(NAME), field_name.clone());
         map.insert(String::from(PROPERTY_TYPE), property_type.clone());
-        map.insert(String::from(DEFAULT), field_config.default.unwrap_or_default());
-        map.insert(String::from(VERSION), field_config.version.unwrap_or_default());
+        map.insert(String::from(DEFAULT), propertty_config.default.unwrap_or_default());
+        map.insert(String::from(VERSION), propertty_config.version.unwrap_or_default());
         map.insert(String::from(REQUIRED), required.to_string());
-        map.insert(String::from(API_VERSION), field_config.api_version.unwrap_or_default());
+        map.insert(String::from(API_VERSION), propertty_config.api_version.unwrap_or_default());
         map.insert(String::from(INDEXED), indexed.to_string());
         map.insert(String::from(MANY), many.to_string());
 
         match field_type_str {
             PROPERTY_TYPE_SMALL_TEXT => {
-                map = SmallTextProperty::defaults(&field_config_).update_config_map(&map)?;
+                map = SmallTextProperty::defaults(&propertty_config_).update_config_map(&map)?;
             },
             PROPERTY_TYPE_LONG_TEXT => {
-                map = LongTextProperty::defaults(&field_config_).update_config_map(&map)?;
+                map = LongTextProperty::defaults(&propertty_config_).update_config_map(&map)?;
             },
             PROPERTY_TYPE_SELECT => {
-                map = SelectProperty::defaults(&field_config_, None).update_config_map(&map)?;
+                map = SelectProperty::defaults(&propertty_config_, None).update_config_map(&map)?;
             },
             PROPERTY_TYPE_DATE => {
-                map = DateProperty::defaults(&field_config_).update_config_map(&map)?;
+                map = DateProperty::defaults(&propertty_config_).update_config_map(&map)?;
             },
             PROPERTY_TYPE_FORMULA => {
-                map = FormulaProperty::defaults(&field_config_).update_config_map(
+                map = FormulaProperty::defaults(&propertty_config_).update_config_map(
                     &map,
-                    &field_name_map,
-                    &field_type_map,
-                    &db_table,
-                    &table_name
+                    &properties_map,
+                    &db_folder,
+                    &folder_name
                 )?;
             },
             PROPERTY_TYPE_DURATION => {
-                map = DurationProperty::defaults(&field_config_).update_config_map(&map)?;
+                map = DurationProperty::defaults(&propertty_config_).update_config_map(&map)?;
             },
             PROPERTY_TYPE_CREATED_TIME => {
-                map = AuditDateProperty::defaults(&field_config_).update_config_map(&map)?;
+                map = AuditDateProperty::defaults(&propertty_config_).update_config_map(&map)?;
             },
             PROPERTY_TYPE_LAST_MODIFIED_TIME => {
-                map = AuditDateProperty::defaults(&field_config_).update_config_map(&map)?;
+                map = AuditDateProperty::defaults(&propertty_config_).update_config_map(&map)?;
             },
             PROPERTY_TYPE_CURRENCY => {
-                map = CurrencyProperty::defaults(&field_config_).update_config_map(&map)?;
+                map = CurrencyProperty::defaults(&propertty_config_).update_config_map(&map)?;
             },
             PROPERTY_TYPE_PERCENTAGE => {
-                map = PercentageProperty::defaults(&field_config_).update_config_map(&map)?;
+                map = PercentageProperty::defaults(&propertty_config_).update_config_map(&map)?;
+            },
+            PROPERTY_TYPE_LINK => {
+                map = LinkProperty::defaults(
+                    planet_context,
+                    context,
+                    &propertty_config_,
+                    Some(&db_folder),
+                ).update_config_map(
+                    &map,
+                    &properties_map,
+                    &folder_name
+                )?;
+            },
+            PROPERTY_TYPE_REFERENCE => {
+                map = ReferenceProperty::defaults(
+                    planet_context,
+                    context,
+                    &propertty_config_,
+                    Some(&db_folder),
+                ).update_config_map(
+                    &map,
+                    &properties_map,
+                    &folder_name
+                )?;
             },
             _ => {}
         }
@@ -500,11 +566,11 @@ impl ConfigStorageProperty for PropertyConfig {
 
     fn map_collections_db(&self) -> Result<BTreeMap<String, Vec<BTreeMap<String, String>>>, PlanetError> {
         // 08/11/2021 We remove options from here, since is many structure often swapped
-        let field_config = self.clone();
-        // let property_type = &field_config.property_type.unwrap();
+        let propertty_config = self.clone();
+        // let property_type = &propertty_config.property_type.unwrap();
         // let map: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
         // select_options and multi_select_options
-        let options = field_config.options.unwrap_or_default();
+        let options = propertty_config.options.unwrap_or_default();
         let mut map: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
         let mut select_options: Vec<BTreeMap<String, String>> = Vec::new();
         for select_value in options {
@@ -515,7 +581,7 @@ impl ConfigStorageProperty for PropertyConfig {
             select_options.push(map);
         }
         if select_options.len() != 0 {
-            let field_name = field_config.name.unwrap_or_default();
+            let field_name = propertty_config.name.unwrap_or_default();
             let collection_field = format!("{}__select_options", field_name);
             map.insert(collection_field, select_options);    
         }
@@ -587,7 +653,7 @@ impl InsertIntoFolderConfig {
             command: None,
             name: name,
             data: Some(BTreeMap::new()),
-            data_collections: None
+            data_collections: None,
         };
         return config
     }
