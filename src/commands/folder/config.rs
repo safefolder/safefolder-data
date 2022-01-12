@@ -539,7 +539,7 @@ impl ConfigStorageProperty for PropertyConfig {
                     planet_context,
                     context,
                     &propertty_config_,
-                    Some(&db_folder),
+                    Some(db_folder.clone()),
                 ).update_config_map(
                     &map,
                     &properties_map,
@@ -551,7 +551,7 @@ impl ConfigStorageProperty for PropertyConfig {
                     planet_context,
                     context,
                     &propertty_config_,
-                    Some(&db_folder),
+                    Some(db_folder.clone()),
                 ).update_config_map(
                     &map,
                     &properties_map,

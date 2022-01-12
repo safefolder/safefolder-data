@@ -35,7 +35,7 @@ use crate::storage::properties::reference::*;
 pub struct InsertIntoFolder<'gb> {
     pub planet_context: &'gb PlanetContext<'gb>,
     pub context: &'gb Context<'gb>,
-    pub db_folder: &'gb DbFolder<'gb>,
+    pub db_folder: DbFolder,
     pub config: InsertIntoFolderConfig,
 }
 
@@ -101,12 +101,6 @@ impl<'gb> InsertIntoFolder<'gb> {
         let folder_name = &folder_name_match["folder_name"].to_string();
         // eprintln!("InsertIntoFolder.run :: folder_name: {}", folder_name);
 
-        // routing
-        let account_id = Some(self.context.account_id.unwrap_or_default().to_string());
-        let site_id = self.context.site_id;
-        let space_id = self.context.space_id;
-        let box_id = self.context.box_id;
-
         // folder
         let mut errors: Vec<PlanetError> = Vec::new();
         let folder = self.db_folder.get_by_name(folder_name);
@@ -131,22 +125,30 @@ impl<'gb> InsertIntoFolder<'gb> {
         // eprintln!("InsertIntoFolder.run :: Got folder! folder_name: {}", folder_name);
         let folder_id = folder.clone().id.unwrap();
 
-        let result: Result<DbFolderItem<'gb>, PlanetError> = DbFolderItem::defaults(
+        let home_dir = self.planet_context.home_path.unwrap_or_default();
+        let account_id = self.context.account_id.unwrap_or_default();
+        let space_id = self.context.space_id.unwrap_or_default();
+        let site_id = self.context.site_id.unwrap_or_default();
+        let box_id = self.context.box_id.unwrap_or_default();
+        let result: Result<DbFolderItem, PlanetError> = DbFolderItem::defaults(
+            home_dir,
+            account_id,
+            space_id,
+            site_id,
+            box_id,
             folder_id.as_str(),
-            self.db_folder,
-            self.planet_context,
-            self.context,
+            &self.db_folder,
         );
         match result {
             Ok(_) => {
-                let db_row: DbFolderItem<'gb> = result.unwrap();
+                let db_row: DbFolderItem = result.unwrap();
 
                 // routing
                 let routing_wrap = RoutingData::defaults(
-                    account_id,
-                    site_id, 
-                    space_id, 
-                    box_id,
+                    Some(account_id.to_string()),
+                    Some(site_id), 
+                    Some(space_id), 
+                    Some(box_id),
                     None
                 );
                 
@@ -378,7 +380,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                                 self.planet_context,
                                 self.context,
                                 &property_config,
-                                Some(&self.db_folder),
+                                Some(self.db_folder.clone()),
                             );
                             let result = obj.validate(&property_data);
                             if result.is_err() {
@@ -506,11 +508,14 @@ impl<'gb> InsertIntoFolder<'gb> {
                             let main_data_map = main_data_map.unwrap();
                             for (_property_name, id_list) in main_data_map {
                                 for item_id in id_list {
-                                    let result: Result<DbFolderItem<'gb>, PlanetError> = DbFolderItem::defaults(
+                                    let result: Result<DbFolderItem, PlanetError> = DbFolderItem::defaults(
+                                        home_dir,
+                                        account_id,
+                                        space_id,
+                                        site_id,
+                                        box_id,
                                         remote_folder_id.as_str(),
-                                        self.db_folder,
-                                        self.planet_context,
-                                        self.context,
+                                        &self.db_folder,
                                     );
                                     if result.is_err() {
                                         // Return error about database problem
@@ -589,16 +594,22 @@ impl<'gb> InsertIntoFolder<'gb> {
         );
         match config {
             Ok(_) => {
+                let home_dir = runner.planet_context.home_path.unwrap_or_default();
+                let account_id = runner.context.account_id.unwrap_or_default();
+                let space_id = runner.context.space_id.unwrap_or_default();
+                let site_id = runner.context.site_id.unwrap_or_default();
                 let db_folder= DbFolder::defaults(
-                    runner.planet_context,
-                    runner.context,
+                    Some(home_dir),
+                    Some(account_id),
+                    Some(space_id),
+                    Some(site_id),
                 ).unwrap();
         
                 let insert_into_table: InsertIntoFolder = InsertIntoFolder{
                     planet_context: runner.planet_context,
                     context: runner.context,
                     config: config.unwrap(),
-                    db_folder: &db_folder,
+                    db_folder: db_folder.clone(),
                 };
                 let result: Result<_, Vec<PlanetError>> = insert_into_table.run();
                 match result {
@@ -665,7 +676,7 @@ impl<'gb> InsertIntoFolder<'gb> {
 pub struct GetFromFolder<'gb> {
     pub planet_context: &'gb PlanetContext<'gb>,
     pub context: &'gb Context<'gb>,
-    pub db_folder: &'gb DbFolder<'gb>,
+    pub db_folder: DbFolder,
     pub config: GetFromFolderConfig,
 }
 
@@ -679,16 +690,24 @@ impl<'gb> Command<String> for GetFromFolder<'gb> {
         let folder_file = slugify(&folder_name);
         let folder_file = folder_file.as_str().replace("-", "_");
 
-        let result: Result<DbFolderItem<'gb>, PlanetError> = DbFolderItem::defaults(
-            &folder_file,
-            self.db_folder,
-            self.planet_context,
-            self.context,
+        let home_dir = self.planet_context.home_path.unwrap_or_default();
+        let account_id = self.context.account_id.unwrap_or_default();
+        let space_id = self.context.space_id.unwrap_or_default();
+        let site_id = self.context.site_id.unwrap_or_default();
+        let box_id = self.context.box_id.unwrap_or_default();
+        let result: Result<DbFolderItem, PlanetError> = DbFolderItem::defaults(
+            home_dir,
+            account_id,
+            space_id,
+            site_id,
+            box_id,
+            folder_file.as_str(),
+            &self.db_folder,
         );
         match result {
             Ok(_) => {
                 // let data_config = self.config.data.clone();
-                let db_row: DbFolderItem<'gb> = result.unwrap();
+                let db_row: DbFolderItem = result.unwrap();
                 // I need to get SchemaData and schema for the folder
                 // I go through properties in order to build RowData                
                 let folder = self.db_folder.get_by_name(folder_name)?;
@@ -842,16 +861,22 @@ impl<'gb> Command<String> for GetFromFolder<'gb> {
         );
         match config {
             Ok(_) => {
+                let home_dir = runner.planet_context.home_path.unwrap_or_default();
+                let account_id = runner.context.account_id.unwrap_or_default();
+                let space_id = runner.context.space_id.unwrap_or_default();
+                let site_id = runner.context.site_id.unwrap_or_default();
                 let db_folder= DbFolder::defaults(
-                    runner.planet_context,
-                    runner.context,
+                    Some(home_dir),
+                    Some(account_id),
+                    Some(space_id),
+                    Some(site_id),
                 ).unwrap();
 
                 let insert_into_table: GetFromFolder = GetFromFolder{
                     planet_context: runner.planet_context,
                     context: runner.context,
                     config: config.unwrap(),
-                    db_folder: &db_folder,
+                    db_folder: db_folder.clone(),
                 };
                 let result: Result<_, PlanetError> = insert_into_table.run();
                 match result {
@@ -897,7 +922,7 @@ impl<'gb> Command<String> for GetFromFolder<'gb> {
 pub struct SelectFromFolder<'gb> {
     pub planet_context: &'gb PlanetContext<'gb>,
     pub context: &'gb Context<'gb>,
-    pub db_folder: &'gb DbFolder<'gb>,
+    pub db_folder: DbFolder,
     pub config: SelectFromFolderConfig,
 }
 
@@ -912,15 +937,23 @@ impl<'gb> Command<String> for SelectFromFolder<'gb> {
         let folder_file = folder_file.as_str().replace("-", "_");
         eprintln!("SelectFromFolder.run :: folder_file: {}", &folder_file);
 
-        let result: Result<DbFolderItem<'gb>, PlanetError> = DbFolderItem::defaults(
-            &folder_file,
-            self.db_folder,
-            self.planet_context,
-            self.context,
+        let home_dir = self.planet_context.home_path.unwrap_or_default();
+        let account_id = self.context.account_id.unwrap_or_default();
+        let space_id = self.context.space_id.unwrap_or_default();
+        let site_id = self.context.site_id.unwrap_or_default();
+        let box_id = self.context.box_id.unwrap_or_default();
+        let result: Result<DbFolderItem, PlanetError> = DbFolderItem::defaults(
+            home_dir,
+            account_id,
+            space_id,
+            site_id,
+            box_id,
+            folder_file.as_str(),
+            &self.db_folder,
         );
         match result {
             Ok(_) => {
-                let db_row: DbFolderItem<'gb> = result.unwrap();
+                let db_row: DbFolderItem = result.unwrap();
                 let config = self.config.clone();
                 let r#where = config.r#where;
                 let page = config.page;
@@ -967,16 +1000,22 @@ impl<'gb> Command<String> for SelectFromFolder<'gb> {
         );
         match config {
             Ok(_) => {
+                let home_dir = runner.planet_context.home_path.unwrap_or_default();
+                let account_id = runner.context.account_id.unwrap_or_default();
+                let space_id = runner.context.space_id.unwrap_or_default();
+                let site_id = runner.context.site_id.unwrap_or_default();
                 let db_folder= DbFolder::defaults(
-                    runner.planet_context,
-                    runner.context,
+                    Some(home_dir),
+                    Some(account_id),
+                    Some(space_id),
+                    Some(site_id),
                 ).unwrap();
 
                 let select_from_table: SelectFromFolder = SelectFromFolder{
                     planet_context: runner.planet_context,
                     context: runner.context,
                     config: config.unwrap(),
-                    db_folder: &db_folder,
+                    db_folder: db_folder.clone(),
                 };
                 let result: Result<_, PlanetError> = select_from_table.run();
                 match result {

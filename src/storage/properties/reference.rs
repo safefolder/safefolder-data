@@ -15,14 +15,14 @@ pub struct LinkProperty<'gb> {
     pub config: PropertyConfig,
     pub planet_context: &'gb PlanetContext<'gb>,
     pub context: &'gb Context<'gb>,
-    pub db_folder: Option<&'gb DbFolder<'gb>>,
+    pub db_folder: Option<DbFolder>,
 }
 impl<'gb> LinkProperty<'gb> {
     pub fn defaults(
         planet_context: &'gb PlanetContext, 
         context: &'gb Context, 
         property_config: &PropertyConfig,
-        db_folder: Option<&'gb DbFolder<'gb>>,
+        db_folder: Option<DbFolder>,
     ) -> Self {
         let property_config = property_config.clone();
         let field_obj = Self{
@@ -59,7 +59,7 @@ impl<'gb> ObjectStorageProperty<'gb> for LinkProperty<'gb> {
         let linked_folder_id = linked_folder_id.unwrap();
         // Get folder config by folder id
         // let db_folder = DbFolder::defaults(self.planet_context, self.context)?;
-        let _ = self.db_folder.unwrap().get(&linked_folder_id)?;
+        let _ = self.db_folder.clone().unwrap().get(&linked_folder_id)?;
         field_config_map.insert(LINKED_FOLDER_ID.to_string(), linked_folder_id);
         // These are options, not required
         if many.is_some() {
@@ -119,7 +119,7 @@ impl<'gb> ObjectStorageProperty<'gb> for LinkProperty<'gb> {
         let data = data.clone();
         let config = self.config.clone();
         let linked_folder_id = config.linked_folder_id.unwrap();
-        let db_folder = self.db_folder.unwrap();
+        let db_folder = self.db_folder.clone().unwrap();
         //eprintln!("LinkProperty.validate  :: linked_folder_id: {}", &linked_folder_id);
         let folder = db_folder.get(&linked_folder_id)?;
         let folder_name = folder.name.unwrap();
@@ -134,11 +134,19 @@ impl<'gb> ObjectStorageProperty<'gb> for LinkProperty<'gb> {
                 )
             );
         }
-        let result: Result<DbFolderItem<'gb>, PlanetError> = DbFolderItem::defaults(
+        let home_dir = self.planet_context.home_path.unwrap_or_default();
+        let account_id = self.context.account_id.unwrap_or_default();
+        let space_id = self.context.space_id.unwrap_or_default();
+        let site_id = self.context.site_id.unwrap_or_default();
+        let box_id = self.context.box_id.unwrap_or_default();
+        let result: Result<DbFolderItem, PlanetError> = DbFolderItem::defaults(
+            home_dir,
+            account_id,
+            space_id,
+            site_id,
+            box_id,
             &linked_folder_id,
             &db_folder,
-            self.planet_context,
-            self.context,
         );
         if result.is_err() {
             return Err(
@@ -183,14 +191,14 @@ pub struct ReferenceProperty<'gb> {
     pub config: PropertyConfig,
     pub planet_context: &'gb PlanetContext<'gb>,
     pub context: &'gb Context<'gb>,
-    pub db_folder: Option<&'gb DbFolder<'gb>>,
+    pub db_folder: Option<DbFolder>,
 }
 impl<'gb> ReferenceProperty<'gb> {
     pub fn defaults(
         planet_context: &'gb PlanetContext, 
         context: &'gb Context, 
         property_config: &PropertyConfig,
-        db_folder: Option<&'gb DbFolder<'gb>>,
+        db_folder: Option<DbFolder>,
     ) -> Self {
         let property_config = property_config.clone();
         let field_obj = Self{
@@ -209,7 +217,7 @@ impl<'gb> ObjectStorageProperty<'gb> for ReferenceProperty<'gb> {
         properties_map: &HashMap<String, PropertyConfig>,
         folder_name: &String,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
-        let db_folder = self.db_folder.unwrap();
+        let db_folder = self.db_folder.clone().unwrap();
         let mut field_config_map = field_config_map.clone();
         let config = self.config.clone();
         let related_property = config.related_property;

@@ -17,3 +17,7 @@ pub const VALUE: &str = "value";
 pub const NAME: &str = "name";
 pub const TRUE: &str = "true";
 pub const FALSE: &str = "false";
+pub const PARTITION: &str = "partition";
+pub const ITEMS_PER_PARTITION: u16 = 1000;
+pub const MAX_PARTITIONS: u16 = 1000;
+pub const MAX_ITEMS_PER_PARTITION: u32 = 1000000;

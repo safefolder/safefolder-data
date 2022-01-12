@@ -32,9 +32,15 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
 
     fn run(&self) -> Result<DbData, PlanetError> {
         let t_1 = Instant::now();
+        let home_dir = self.planet_context.home_path.unwrap_or_default();
+        let account_id = self.context.account_id.unwrap_or_default();
+        let space_id = self.context.space_id.unwrap_or_default();
+        let site_id = self.context.site_id.unwrap_or_default();
         let result: Result<DbFolder, PlanetError> = DbFolder::defaults(
-            self.planet_context,
-            self.context,
+            Some(home_dir),
+            Some(account_id),
+            Some(space_id),
+            Some(site_id),
         );
         match result {
             Ok(_) => {

@@ -2,9 +2,12 @@ extern crate sled;
 extern crate slug;
 
 use std::str::FromStr;
+use std::thread;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use std::collections::BTreeMap;
 use colored::Colorize;
+use rust_decimal::prelude::ToPrimitive;
 use validator::{Validate, ValidationErrors};
 use serde::{Deserialize, Serialize};
 use tr::tr;
@@ -15,31 +18,44 @@ use serde_encrypt::{
 use slug::slugify;
 
 use crate::planet::constants::*;
-use crate::storage::{generate_id, ConfigStorageProperty};
-use crate::planet::{PlanetError, PlanetContext, Context};
-use crate::commands::folder::config::{DbFolderConfig, PropertyConfig};
+use crate::storage::{generate_id};
+use crate::planet::{PlanetError};
+use crate::commands::folder::config::{DbFolderConfig};
 use crate::storage::constants::*;
 use crate::storage::properties::*;
-use crate::functions::*;
+// use crate::functions::*;
 
-pub trait FolderSchema<'gb> {
-    fn defaults(planet_context: &'gb PlanetContext<'gb>, context: &'gb Context<'gb>) -> Result<DbFolder<'gb>, PlanetError>;
+pub trait FolderSchema {
+    fn defaults(
+        home_dir: Option<&str>,
+        account_id: Option<&str>,
+        space_id: Option<&str>,
+        site_id: Option<&str>,
+    ) -> Result<DbFolder, PlanetError>;
     fn create(&self, db_data: &DbData) -> Result<DbData, PlanetError>;
     fn update(&self, db_data: &DbData) -> Result<DbData, PlanetError>;
     fn get(&self, id: &String) -> Result<DbData, PlanetError>;
     fn get_by_name(&self, folder_name: &str) -> Result<Option<DbData>, PlanetError>;
 }
 
-pub trait FolderItem<'gb> {
+pub trait FolderItem {
     fn defaults(
-        folder_file: &str,
-        db_folder: &'gb DbFolder<'gb>,
-        planet_context: &'gb PlanetContext<'gb>, 
-        context: &'gb Context<'gb>
-    ) -> Result<DbFolderItem<'gb>, PlanetError>;
+        home_dir: &str,
+        account_id: &str,
+        space_id: &str,
+        site_id: &str,
+        box_id: &str,
+        folder_id: &str,
+        db_folder: &DbFolder,
+    ) -> Result<DbFolderItem, PlanetError>;
     fn insert(&self, folder_name: &String, db_data: &DbData) -> Result<DbData, PlanetError>;
     fn update(&self, db_data: &DbData) -> Result<DbData, PlanetError>;
-    fn get(&self, folder_name: &String, by: GetItemOption, properties: Option<Vec<String>>) -> Result<DbData, PlanetError>;
+    fn get(
+        &self, 
+        folder_name: &String, 
+        by: GetItemOption, 
+        properties: Option<Vec<String>>
+    ) -> Result<DbData, PlanetError>;
     fn select(&self, 
         folder_name: &String, 
         r#where: Option<String>, 
@@ -244,24 +260,30 @@ impl SerdeEncryptSharedKey for DbData {
 }
 
 #[derive(Debug, Clone)]
-pub struct DbFolder<'gb> {
-    pub context: &'gb Context<'gb>,
-    pub planet_context: &'gb PlanetContext<'gb>,
+pub struct DbFolder {
+    pub home_dir: Option<String>,
+    pub account_id: Option<String>,
+    pub space_id: Option<String>,
+    pub site_id: Option<String>,
+    pub box_id: Option<String>,
     db: sled::Db,
 }
 
-impl<'gb> FolderSchema<'gb> for DbFolder<'gb> {
+impl FolderSchema for DbFolder {
 
-    fn defaults(planet_context: &'gb PlanetContext<'gb>, context: &'gb Context<'gb>) -> 
-        Result<DbFolder<'gb>, PlanetError> {
+    fn defaults(
+        home_dir: Option<&str>,
+        account_id: Option<&str>,
+        space_id: Option<&str>,
+        site_id: Option<&str>,
+    ) -> Result<DbFolder, PlanetError> {
         let mut path: String = String::from("");
-        let home_dir = planet_context.home_path.unwrap_or_default();
-        let account_id = context.account_id.unwrap_or_default();
-        let space_id = context.space_id.unwrap_or_default();
-        let site_id_wrap = context.site_id;
+        let home_dir = home_dir.unwrap_or_default();
+        let account_id = account_id.unwrap_or_default();
+        let space_id = space_id.unwrap_or_default();
         if account_id != "" && space_id != "" {
             println!("DbFolder.open :: account_id and space_id have been informed");
-        } else if site_id_wrap.is_none() && space_id == "private" {
+        } else if site_id.is_none() && space_id == "private" {
             path = format!("{home}/private/folders.db", home=&home_dir);
         } else {
             return Err(
@@ -271,6 +293,7 @@ impl<'gb> FolderSchema<'gb> for DbFolder<'gb> {
                 )
             )
         }
+        let site_id = site_id.unwrap_or_default();
         eprintln!("DbFolder.defaults :: path: {}", &path);
         let config: sled::Config = sled::Config::default()
             .use_compression(true)
@@ -280,9 +303,12 @@ impl<'gb> FolderSchema<'gb> for DbFolder<'gb> {
             Ok(_) => {
                 let db = result.unwrap();
                 let db_folder: DbFolder= DbFolder{
-                    context: context,
-                    planet_context: planet_context,
-                    db: db
+                    home_dir: Some(home_dir.to_string()),
+                    account_id: Some(account_id.to_string()),
+                    space_id: Some(space_id.to_string()),
+                    site_id: Some(site_id.to_string()),
+                    box_id: None,
+                    db: db,
                 };
                 Ok(db_folder)
             },
@@ -303,8 +329,10 @@ impl<'gb> FolderSchema<'gb> for DbFolder<'gb> {
         let iter = self.db.iter();
         let mut number_items = 0;
         let mut matched_item: Option<DbData> = None;
-        let ctx_account_id = self.context.account_id.unwrap_or_default();
-        let ctx_space_id = self.context.space_id.unwrap_or_default();
+        let ctx_account_id = self.account_id.clone().unwrap_or_default();
+        let ctx_account_id = ctx_account_id.as_str();
+        let ctx_space_id = self.space_id.clone().unwrap_or_default();
+        let ctx_space_id = ctx_space_id.as_str();
         for result in iter {
             let tuple = result.unwrap();
             let item_db = tuple.1.to_vec();
@@ -470,7 +498,7 @@ impl<'gb> FolderSchema<'gb> for DbFolder<'gb> {
     }
 }
 
-impl<'gb> DbFolder<'gb> {
+impl DbFolder {
     pub fn get_field_id_map(
         db_folder: &DbFolder,
         folder_name: &String
@@ -600,41 +628,157 @@ pub enum GetItemOption {
     ByName(String),
 }
 
+// let home_dir = planet_context.home_path.unwrap_or_default();
+// let account_id = context.account_id.unwrap_or_default();
+// let space_id = context.space_id.unwrap_or_default();
+// let box_id = context.box_id.unwrap_or_default();
+
+
 #[derive(Debug, Clone)]
-pub struct DbFolderItem<'gb> {
-    pub context: &'gb Context<'gb>,
-    pub planet_context: &'gb PlanetContext<'gb>,
-    pub db_folder: &'gb DbFolder<'gb>,
-    db: sled::Db,
-    raw_index: sled::Tree,
-    idx_index: sled::Tree,
+pub struct DbFolderItem {
+    pub db_folder: DbFolder,
+    pub folder_id: Option<String>,
+    pub home_dir: Option<String>,
+    pub account_id: Option<String>,
+    pub space_id: Option<String>,
+    pub site_id: Option<String>,
+    pub box_id: Option<String>,
 }
 
-impl<'gb> FolderItem<'gb> for DbFolderItem<'gb> {
+impl DbFolderItem {
 
-    fn defaults(
-        folder_file: &str,
-        db_folder: &'gb DbFolder<'gb>,
-        planet_context: &'gb PlanetContext<'gb>, 
-        context: &'gb Context<'gb>
-    ) -> Result<DbFolderItem<'gb>, PlanetError> {
+    fn get_partition(
+        &self,
+        item_id: &str,
+    ) -> Result<u16, PlanetError> {
+        let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
+        let account_id = self.account_id.clone().unwrap_or_default();
+        let account_id = account_id.as_str();
+        let space_id = self.space_id.clone().unwrap_or_default();
+        let space_id = space_id.as_str();
+        let box_id = self.box_id.clone().unwrap_or_default();
+        let box_id = box_id.as_str();
+        let site_id = self.site_id.clone().unwrap_or_default();
+        let site_id = site_id.as_str();
+        let partition:u16;
+        let db = self.open_partitions()?;
+        let id_db = xid::Id::from_str(item_id).unwrap();
+        let id_db = id_db.as_bytes();
+        let db_result = db.get(&id_db);
+        if db_result.is_err() {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Could not open partition database")),
+                )
+            )
+        }
+        let db_result = db_result.unwrap();
+        if db_result.is_none() {
+            // I need to assign a parition for this item_id, since none has been assigned, and write to db. Used for insert calls.
+            let number_parition_items = db.len();
+            let number_parition_items = number_parition_items.to_u16().unwrap();
+            partition = number_parition_items/ITEMS_PER_PARTITION + 1;
+            // write to db partition
+            let mut data: BTreeMap<String, String> = BTreeMap::new();
+            let item_id_string = item_id.to_string();
+            data.insert(PARTITION.to_string(), partition.to_string());
+            let routing_wrap = RoutingData::defaults(
+                Some(account_id.to_string()),
+                Some(site_id), 
+                Some(space_id), 
+                Some(box_id),
+                None
+            );    
+            let db_data = DbData::defaults(
+                &item_id_string, 
+                Some(data), 
+                None, 
+                None, 
+                None, 
+                routing_wrap, 
+                None
+            )?;
+            let encrypted_data = db_data.encrypt(&shared_key).unwrap();
+            let encoded: Vec<u8> = encrypted_data.serialize();
+            let response = db.insert(id_db, encoded);
+            match response {
+                Ok(_) => {
+                    return Ok(partition)
+                },
+                Err(_) => {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!("Could not write partition")),
+                        )
+                    )        
+                }
+            }
+        }
+        let db_result = db_result.unwrap();
+        let item_db = db_result.to_vec();
+        let item_ = EncryptedMessage::deserialize(item_db).unwrap();
+        let item_ = DbData::decrypt_owned(
+            &item_, 
+            &shared_key);
+        match item_ {
+            Ok(_) => {
+                let partition_db = item_.unwrap();
+                let data = partition_db.data;
+                if data.is_some() {
+                    let data = data.unwrap();
+                    let partition_wrap = data.get(PARTITION);
+                    if partition_wrap.is_some() {
+                        let partition_str = partition_wrap.unwrap().as_str();
+                        partition = FromStr::from_str(partition_str).unwrap();
+                        return Ok(partition)
+                    }
+                }
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Could not open partition database, no data")),
+                    )
+                )
+            },
+            Err(_) => {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Could not open partition database, encrypt and serialize error")),
+                    )
+                )
+            }
+        }
+    }
+
+    fn _get_current_partition(
+        &self,
+        folder_id: &str,
+    ) -> Result<u16, PlanetError> {
         let mut path: String = String::from("");
-        let home_dir = planet_context.home_path.unwrap_or_default();
-        let account_id = context.account_id.unwrap_or_default();
-        let space_id = context.space_id.unwrap_or_default();
-        let box_id = context.box_id.unwrap_or_default();
+        let home_dir = self.home_dir.clone().unwrap_or_default();
+        let home_dir = home_dir.as_str();
+        let account_id = self.account_id.clone().unwrap_or_default();
+        let account_id = account_id.as_str();
+        let space_id = self.space_id.clone().unwrap_or_default();
+        let space_id = space_id.as_str();
+        let box_id = self.box_id.clone().unwrap_or_default();
+        let box_id = box_id.as_str();
+        let partition:u16;
         if account_id != "" && space_id != "" {
-            println!("DbFolderItem.defaults :: account_id and space_id have been informed");
+            println!("DbFolderItem.get_current_partition :: account_id and space_id have been informed");
         } else if space_id == "private" {
             // .achiever-planet/{table_file} : platform wide folder (slug with underscore)
             path = format!(
-                "{home}/private/boxes/{box_id}/folders/{folder_file}.db", 
+                "{home}/private/boxes/{box_id}/folders/{folder_id}/partition.db", 
                 home=&home_dir, 
                 box_id=box_id,
-                folder_file=folder_file
+                folder_id=folder_id
             );
         }
-        eprintln!("DbFolderItem.defaults :: path: {:?}", path);
+        eprintln!("DbFolderItem.get_current_partition :: path: {:?}", path);
         let config: sled::Config = sled::Config::default()
             .use_compression(true)
             .path(path);
@@ -642,36 +786,205 @@ impl<'gb> FolderItem<'gb> for DbFolderItem<'gb> {
         match result {
             Ok(_) => {
                 let db = result.unwrap();
-                let raw_index = db.open_tree(INDEX_PROFILE_RAW);
-                let idx_index = db.open_tree(INDEX_PROFILE_IDX);
-                if raw_index.is_ok() && idx_index.is_ok() {
-                    let raw_index = raw_index.unwrap();
-                    let idx_index = idx_index.unwrap();
-                    let db_row: DbFolderItem = DbFolderItem{
-                        context: context,
-                        planet_context: planet_context,
-                        db: db,
-                        db_folder: db_folder,
-                        raw_index: raw_index,
-                        idx_index: idx_index,
-                    };
-                    Ok(db_row)
-                } else {
-                    let planet_error = PlanetError::new(
-                        500, 
-                        Some(tr!("Could not open index trees")),
-                    );
-                    Err(planet_error)
-                }
+                let number_parition_items = db.len();
+                let number_parition_items = number_parition_items.to_u16().unwrap();
+                partition = number_parition_items/ITEMS_PER_PARTITION + 1;
+                return Ok(partition)
             },
             Err(_) => {
-                let planet_error = PlanetError::new(
-                    500, 
-                    Some(tr!("Could not open database")),
-                );
-                Err(planet_error)
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Could not open partition database")),
+                    )
+                )
             }
         }
+    }
+
+    fn open_partition_by_item(
+        &self,
+        item_id: &str,
+    ) -> Result<sled::Db, PlanetError> {
+        let partition = self.get_partition(item_id);
+        let partition = partition.unwrap();
+        if partition > MAX_PARTITIONS {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Maximum number of partitions reached. Maximum number of items in a folder is 1,000,000")),
+                )
+            )
+        }
+        let db = self.open_partition(&partition)?;
+        return Ok(db)
+    }
+
+    fn open_partition(
+        &self,
+        partition: &u16,
+    ) -> Result<sled::Db, PlanetError> {
+        let mut path: String = String::from("");
+        let folder_id = self.folder_id.clone().unwrap_or_default();
+        let folder_id = folder_id.as_str();
+        let account_id = self.account_id.clone().unwrap_or_default();
+        let account_id = account_id.as_str();
+        let space_id = self.space_id.clone().unwrap_or_default();
+        let space_id = space_id.as_str();
+        let box_id = self.box_id.clone().unwrap_or_default();
+        let box_id = box_id.as_str();
+        let home_dir = self.home_dir.clone().unwrap_or_default();
+        let home_dir = home_dir.as_str();
+        let partition_str = partition.to_string();
+        let partition_str = format!("{:0>4}", partition_str);
+        if account_id != "" && space_id != "" {
+            println!("DbFolderItem.open_partition :: account_id and space_id have been informed");
+        } else if space_id == "private" {
+            // .achiever-planet/{table_file} : platform wide folder (slug with underscore)
+            path = format!(
+                "{home}/private/boxes/{box_id}/folders/{folder_id}/{partition_str}.db", 
+                home=&home_dir, 
+                box_id=box_id,
+                folder_id=folder_id,
+                partition_str=partition_str,
+            );
+        }
+        eprintln!("DbFolderItem.open_partition :: path: {:?}", path);
+        let config: sled::Config = sled::Config::default()
+            .use_compression(true)
+            .path(path);
+        let result: Result<sled::Db, sled::Error> = config.open();
+        if result.is_err() {
+            let error = result.unwrap_err();
+            let message = error.to_string();
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("{}", message)),
+                )
+            )
+        }
+        let db = result.unwrap();
+        return Ok(db)
+    }
+
+    fn close_partition(&self, db: &sled::Db) -> Result<usize, PlanetError> {
+        let size = db.flush();
+        if size.is_err() {
+            let error = size.unwrap_err();
+            let message = error.to_string();
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("{}", message)),
+                )
+            )
+        }
+        let size = size.unwrap();
+        return Ok(size)
+    }
+
+    fn open_partitions(
+        &self,
+    ) -> Result<sled::Db, PlanetError> {
+        let mut path: String = String::from("");
+        let home_dir = self.home_dir.clone().unwrap_or_default();
+        let home_dir = home_dir.as_str();
+        let account_id = self.account_id.clone().unwrap_or_default();
+        let account_id = account_id.as_str();
+        let space_id = self.space_id.clone().unwrap_or_default();
+        let space_id = space_id.as_str();
+        let box_id = self.box_id.clone().unwrap_or_default();
+        let box_id = box_id.as_str();
+        let folder_id = self.folder_id.clone().unwrap_or_default();
+        let folder_id = folder_id.as_str();
+        if account_id != "" && space_id != "" {
+            println!("DbFolderItem.open_partitions :: account_id and space_id have been informed");
+        } else if space_id == "private" {
+            // .achiever-planet/{table_file} : platform wide folder (slug with underscore)
+            path = format!(
+                "{home}/private/boxes/{box_id}/folders/{folder_id}/partition.db", 
+                home=&home_dir, 
+                box_id=box_id,
+                folder_id=folder_id
+            );
+        }
+        eprintln!("DbFolderItem.open_partitions :: path: {:?}", path);
+        let config: sled::Config = sled::Config::default()
+            .use_compression(true)
+            .path(path);
+        let result: Result<sled::Db, sled::Error> = config.open();
+        if result.is_err() {
+            let error = result.unwrap_err();
+            let message = error.to_string();
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("{}", message)),
+                )
+            )
+        }
+        let db = result.unwrap();
+        return Ok(db)
+    }
+
+    fn _close_partitions(&self, db: &sled::Db) -> Result<usize, PlanetError> {
+        let size = db.flush();
+        if size.is_err() {
+            let error = size.unwrap_err();
+            let message = error.to_string();
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("{}", message)),
+                )
+            )
+        }
+        let size = size.unwrap();
+        return Ok(size)
+    }
+
+    fn get_partitions(&self) -> Result<Vec<u16>, PlanetError> {
+        let mut list_partitions: Vec<u16> = Vec::new();
+        let count = self.total_count()?;
+        let number_items = count.total.to_u16().unwrap();
+        // 1200 items => 2 partitions
+        // 1000 items => 1 partition
+        // 1950 items => 2 partitions
+        let mut number_partitions = number_items/ITEMS_PER_PARTITION;
+        let rest = number_items%ITEMS_PER_PARTITION;
+        if rest != 0 {
+            number_partitions += 1;
+        }
+        for item in 1..number_partitions {
+            list_partitions.push(item);
+        }
+        return Ok(list_partitions)
+    }
+
+}
+
+impl FolderItem for DbFolderItem {
+
+    fn defaults(
+        home_dir: &str,
+        account_id: &str,
+        space_id: &str,
+        site_id: &str,
+        box_id: &str,
+        folder_id: &str,
+        db_folder: &DbFolder,
+    ) -> Result<DbFolderItem, PlanetError> {
+        let db_row: DbFolderItem = DbFolderItem{
+            home_dir: Some(home_dir.to_string()),
+            account_id: Some(account_id.to_string()),
+            space_id: Some(space_id.to_string()),
+            box_id: Some(box_id.to_string()),
+            site_id: Some(site_id.to_string()),
+            db_folder: db_folder.clone(),
+            folder_id: Some(folder_id.to_string()),
+        };
+        Ok(db_row)
     }
 
     fn insert(&self, folder_name: &String, db_data: &DbData) -> Result<DbData, PlanetError> {
@@ -681,7 +994,8 @@ impl<'gb> FolderItem<'gb> for DbFolderItem<'gb> {
         let id = db_data.id.clone().unwrap();
         let id_db = xid::Id::from_str(id.as_str()).unwrap();
         let id_db = id_db.as_bytes();
-        let response = &self.db.insert(id_db, encoded);
+        let db = self.open_partition_by_item(&id)?;
+        let response = &db.insert(id_db, encoded);
         match response {
             Ok(_) => {
                 // Get item
@@ -701,6 +1015,7 @@ impl<'gb> FolderItem<'gb> for DbFolderItem<'gb> {
             }
         }
     }
+
     fn update(&self, db_data: &DbData) -> Result<DbData, PlanetError> {
         let db_data = db_data.clone();
         let id = db_data.id.clone().unwrap();
@@ -709,7 +1024,8 @@ impl<'gb> FolderItem<'gb> for DbFolderItem<'gb> {
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let encrypted_data = db_data.encrypt(&shared_key).unwrap();
         let encoded: Vec<u8> = encrypted_data.serialize();
-        let response = &self.db.insert(id_db, encoded);
+        let db = self.open_partition_by_item(&id)?;
+        let response = &db.insert(id_db, encoded);
         match response {
             Ok(_) => {
                 let response = response.clone().unwrap();
@@ -757,7 +1073,8 @@ impl<'gb> FolderItem<'gb> for DbFolderItem<'gb> {
                 eprintln!("DbFolderItem.get :: id: {}", &id);
                 let id_db = xid::Id::from_str(&id).unwrap();
                 let id_db = id_db.as_bytes();
-                let db_result = self.db.get(&id_db);
+                let db = self.open_partition_by_item(&id)?;
+                let db_result = db.get(&id_db);
                 if db_result.is_err() {
                     return Err(
                         PlanetError::new(
@@ -809,24 +1126,58 @@ impl<'gb> FolderItem<'gb> for DbFolderItem<'gb> {
                 }
             },
             GetItemOption::ByName(name) => {
-                let mut found = false;
-                let mut wrap_db_data: Option<DbData> = None;
-                for db_result in self.db.iter() {
-                    let (_, db_item) = db_result.unwrap();
-                    let db_item = db_item.to_vec();
-                    let item_ = EncryptedMessage::deserialize(db_item).unwrap();
-                    let item_ = DbData::decrypt_owned(
-                        &item_, 
-                        &shared_key);
-                    let item_db_data = item_.unwrap();
-                    let item_db_data_ = item_db_data.clone();
-                    let item_db_name = &item_db_data.name.unwrap();
-                    if item_db_name == &name {
-                        found = true;
-                        wrap_db_data = Some(item_db_data_);
-                        break
-                    }
+                let partitions = self.get_partitions()?;
+                let this: Arc<Mutex<DbFolderItem>> = Arc::new(Mutex::new(self.clone()));
+                eprintln!("DbFolderItem.get :: partitions: {:?}", &partitions);
+                let mut handles= vec![];
+                // Threads to fetch name from all partitions
+                let wrap_db_data: Arc<Mutex<Option<DbData>>> = Arc::new(Mutex::new(None));
+                let shared_key: Arc<Mutex<SharedKey>> = Arc::new(Mutex::new(shared_key));
+                let name: Arc<Mutex<String>> = Arc::new(Mutex::new(name));
+                for partition in partitions {
+                    let this = Arc::clone(&this);
+                    let wrap_db_data = Arc::clone(&wrap_db_data);
+                    let shared_key = Arc::clone(&shared_key);
+                    let name = Arc::clone(&name);
+                    let handle = thread::spawn(move || {
+                        // open partition and search for name
+                        let this = this.lock().unwrap();
+                        let shared_key = shared_key.lock().unwrap();
+                        let name = name.lock().unwrap();
+                        let db = this.open_partition(&partition).unwrap();
+                        let mut my_wrap_db_data: Option<DbData> = None;
+                        for db_result in db.iter() {
+                            let (_, db_item) = db_result.unwrap();
+                            let db_item = db_item.to_vec();
+                            let item_ = EncryptedMessage::deserialize(
+                                db_item
+                            ).unwrap();
+                            let item_ = DbData::decrypt_owned(
+                                &item_, 
+                                &shared_key
+                            );
+                            let item_db_data = item_.unwrap();
+                            let item_db_data_ = item_db_data.clone();
+                            let item_db_name = &item_db_data.name.unwrap();
+                            if *item_db_name == *name {
+                                my_wrap_db_data = Some(item_db_data_);
+                                break;
+                            }
+                        }
+                        let _ = this.close_partition(&db);
+                        if my_wrap_db_data.is_some() {
+                            let mut wrap_db_data = wrap_db_data.lock().unwrap();
+                            *wrap_db_data = my_wrap_db_data;
+                        }
+                    });
+                    handles.push(handle);
                 }
+                for handle in handles {
+                    handle.join().unwrap();
+                }
+                let wrap_db_data_ = wrap_db_data.lock().unwrap().clone();
+                let found = wrap_db_data_.is_some();
+            
                 if found == false {
                     return Err(
                         PlanetError::new(
@@ -835,7 +1186,7 @@ impl<'gb> FolderItem<'gb> for DbFolderItem<'gb> {
                         )
                     );
                 }
-                return Ok(wrap_db_data.unwrap())
+                return Ok(wrap_db_data_.unwrap())
             }
         }
     }
@@ -859,7 +1210,8 @@ impl<'gb> FolderItem<'gb> for DbFolderItem<'gb> {
     }
     fn total_count(&self) -> Result<SelectCountResult, PlanetError> {
         let t_1 = Instant::now();
-        let total = self.db.len();
+        let db = self.open_partitions()?;
+        let total = db.len();
         let result = SelectCountResult{
             time: t_1.elapsed().as_millis() as usize,
             total: total,
@@ -868,131 +1220,133 @@ impl<'gb> FolderItem<'gb> for DbFolderItem<'gb> {
         return Ok(result);
     }
     fn select(&self, 
-        folder_name: &String, 
-        r#where: Option<String>, 
-        page: Option<usize>,
-        number_items_page: Option<usize>,
-        fields: Option<Vec<String>>,
+        _folder_name: &String, 
+        r#_where: Option<String>, 
+        _page: Option<usize>,
+        _number_items_page: Option<usize>,
+        _fields: Option<Vec<String>>,
     ) -> Result<SelectResult, PlanetError> {
-        let t_1 = Instant::now();
-        let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
-        let iter = self.db.iter();
-        let db_folder = self.db_folder.clone();
-        let folder = db_folder.get_by_name(folder_name)?.unwrap();
-        let field_config_map = PropertyConfig::get_property_config_map(
-            self.planet_context,
-            self.context,
-            &folder
-        ).unwrap();
-        let field_config_map_wrap = Some(field_config_map.clone());
-        // eprintln!("DbFolderItem.select :: folder: {:#?}", &folder);
-        let fields_wrap = fields.clone();
-        let has_fields = fields_wrap.is_some();
-        let mut fields: Vec<String> = Vec::new();
-        if fields_wrap.is_some() {
-            fields = fields_wrap.unwrap();
-        }
+        // let t_1 = Instant::now();
+        // let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
+        // let iter = self.db.iter();
+        // let db_folder = self.db_folder.clone();
+        // let folder = db_folder.get_by_name(folder_name)?.unwrap();
+        // let field_config_map = PropertyConfig::get_property_config_map(
+        //     self.planet_context,
+        //     self.context,
+        //     &folder
+        // ).unwrap();
+        // let field_config_map_wrap = Some(field_config_map.clone());
+        // // eprintln!("DbFolderItem.select :: folder: {:#?}", &folder);
+        // let fields_wrap = fields.clone();
+        // let has_fields = fields_wrap.is_some();
+        // let mut fields: Vec<String> = Vec::new();
+        // if fields_wrap.is_some() {
+        //     fields = fields_wrap.unwrap();
+        // }
         
-        let t_total_1 = Instant::now();
-        let result_total_count = self.total_count()?;
-        let total = result_total_count.total;
-        eprintln!("DbFolderItem.select :: get total: {} µs", &t_total_1.elapsed().as_micros());
+        // let t_total_1 = Instant::now();
+        // let result_total_count = self.total_count()?;
+        // let total = result_total_count.total;
+        // eprintln!("DbFolderItem.select :: get total: {} µs", &t_total_1.elapsed().as_micros());
         
-        let mut items: Vec<DbData> = Vec::new();
-        let page = page.unwrap();
-        let number_items_page = number_items_page.unwrap();
-        let where_formula = r#where.clone();
-        let where_formula = where_formula.unwrap_or_default();
-        let mut count = 1;
+        // let mut items: Vec<DbData> = Vec::new();
+        // let page = page.unwrap();
+        // let number_items_page = number_items_page.unwrap();
+        // let where_formula = r#where.clone();
+        // let where_formula = where_formula.unwrap_or_default();
+        // let mut count = 1;
         // Think way to return total
-        let mut select_result = SelectResult{
+        let total = 0;
+        let page = 0;
+        let select_result = SelectResult{
             total: total,
             time: 0,
             page: page,
             data: Vec::new(),
             data_count: 0,
         };
-        let t_header = &t_1.elapsed().as_micros();
-        eprintln!("DbFolderItem.select :: t_header: {} µs", &t_header);
+        // let t_header = &t_1.elapsed().as_micros();
+        // eprintln!("DbFolderItem.select :: t_header: {} µs", &t_header);
 
-        let t_f_1 = Instant::now();
-        // Check where_formula is assign or not
-        let expr = &RE_FORMULA_ASSIGN;
-        let is_assign_function = expr.is_match(&where_formula);
-        eprintln!("DbFolderItem.select :: is_assign_function: {}", &is_assign_function);
-        let formula_query = Formula::defaults(
-            &where_formula, 
-            &String::from("bool"), 
-            Some(folder), 
-            None, 
-            Some(db_folder), 
-            Some(folder_name.clone()), 
-            is_assign_function,
-            field_config_map_wrap.clone()
-        )?;
-        // eprintln!("DbFolderItem.select :: original formula_query: {:#?}", &formula_query);
-        let t_f_2 = &t_f_1.elapsed().as_micros();
-        eprintln!("select :: Time compile formula: {} µs", &t_f_2);
+        // let t_f_1 = Instant::now();
+        // // Check where_formula is assign or not
+        // let expr = &RE_FORMULA_ASSIGN;
+        // let is_assign_function = expr.is_match(&where_formula);
+        // eprintln!("DbFolderItem.select :: is_assign_function: {}", &is_assign_function);
+        // let formula_query = Formula::defaults(
+        //     &where_formula, 
+        //     &String::from("bool"), 
+        //     Some(folder), 
+        //     None, 
+        //     Some(db_folder), 
+        //     Some(folder_name.clone()), 
+        //     is_assign_function,
+        //     field_config_map_wrap.clone()
+        // )?;
+        // // eprintln!("DbFolderItem.select :: original formula_query: {:#?}", &formula_query);
+        // let t_f_2 = &t_f_1.elapsed().as_micros();
+        // eprintln!("select :: Time compile formula: {} µs", &t_f_2);
 
-        for result in iter {
-            let t_item_1 = Instant::now();
-            let tuple = result.unwrap();
-            let item_db = tuple.1.to_vec();
-            let item_ = EncryptedMessage::deserialize(item_db).unwrap();
-            let item_ = DbData::decrypt_owned(
-                &item_, 
-                &shared_key);
-            eprintln!("DbFolderItem.select :: [{}] encrypt & deser: {} µs", &count, &t_item_1.elapsed().as_micros());
-            // let t_item_2 = Instant::now();
-            let item = item_.unwrap().clone();
-            let routing_response = item.clone().routing;
-            if routing_response.is_some() {
-                let routing = routing_response.unwrap();
-                let account_id = routing.get(ACCOUNT_ID).unwrap().as_str();
-                let space_id = routing.get(SPACE_ID).unwrap().as_str();
-                if account_id == "" && space_id == "" {
-                    continue
-                }
-            }
+        // for result in iter {
+        //     let t_item_1 = Instant::now();
+        //     let tuple = result.unwrap();
+        //     let item_db = tuple.1.to_vec();
+        //     let item_ = EncryptedMessage::deserialize(item_db).unwrap();
+        //     let item_ = DbData::decrypt_owned(
+        //         &item_, 
+        //         &shared_key);
+        //     eprintln!("DbFolderItem.select :: [{}] encrypt & deser: {} µs", &count, &t_item_1.elapsed().as_micros());
+        //     // let t_item_2 = Instant::now();
+        //     let item = item_.unwrap().clone();
+        //     let routing_response = item.clone().routing;
+        //     if routing_response.is_some() {
+        //         let routing = routing_response.unwrap();
+        //         let account_id = routing.get(ACCOUNT_ID).unwrap().as_str();
+        //         let space_id = routing.get(SPACE_ID).unwrap().as_str();
+        //         if account_id == "" && space_id == "" {
+        //             continue
+        //         }
+        //     }
 
-            let formula_matches: bool;
-            let formula_result: String;
-            let t_item_3 = Instant::now();
-            let data_map = item.clone().data.unwrap();
+        //     let formula_matches: bool;
+        //     let formula_result: String;
+        //     let t_item_3 = Instant::now();
+        //     let data_map = item.clone().data.unwrap();
 
-            formula_result = execute_formula(&formula_query, &data_map, &field_config_map)?;
-            if formula_result == String::from("1") {
-                formula_matches = true;
-            } else {
-                formula_matches = false;
-            }
-            eprintln!("select :: formula_matches: {}", &formula_matches);
-            eprintln!("DbFolderItem.select :: [{}] formula exec: {} µs", &count, &t_item_3.elapsed().as_micros());
+        //     formula_result = execute_formula(&formula_query, &data_map, &field_config_map)?;
+        //     if formula_result == String::from("1") {
+        //         formula_matches = true;
+        //     } else {
+        //         formula_matches = false;
+        //     }
+        //     eprintln!("select :: formula_matches: {}", &formula_matches);
+        //     eprintln!("DbFolderItem.select :: [{}] formula exec: {} µs", &count, &t_item_3.elapsed().as_micros());
 
-            let count_float: f64 = FromStr::from_str(count.to_string().as_str()).unwrap();
-            let number_items_page_float: f64 = FromStr::from_str(
-                number_items_page.to_string().as_str()).unwrap();
-            let page_target = (count_float / number_items_page_float).round() + 1.0;
-            let page_target = page_target as usize;
-            if page_target == page && formula_matches {
-                if &has_fields == &true {
-                    let item_new = self.filter_fields(&folder_name, &fields, &item)?;
-                    items.push(item_new);
-                } else {
-                    items.push(item);
-                }
-            } else {
-                continue
-            }
-            // let number_items_page_ = number_items_page as usize;
-            count += 1;
-            let t_item = t_item_1.elapsed().as_micros();
-            eprintln!("DbFolderItem.select :: item [{}] : {} µs", &count-1, &t_item);
-        }
-        select_result.data = items;
-        select_result.data_count = select_result.data.len();
-        select_result.time = t_1.elapsed().as_millis() as usize;
-        eprintln!("DbFolderItem.select :: total db time: {} µs", &t_1.elapsed().as_micros());
+        //     let count_float: f64 = FromStr::from_str(count.to_string().as_str()).unwrap();
+        //     let number_items_page_float: f64 = FromStr::from_str(
+        //         number_items_page.to_string().as_str()).unwrap();
+        //     let page_target = (count_float / number_items_page_float).round() + 1.0;
+        //     let page_target = page_target as usize;
+        //     if page_target == page && formula_matches {
+        //         if &has_fields == &true {
+        //             let item_new = self.filter_fields(&folder_name, &fields, &item)?;
+        //             items.push(item_new);
+        //         } else {
+        //             items.push(item);
+        //         }
+        //     } else {
+        //         continue
+        //     }
+        //     // let number_items_page_ = number_items_page as usize;
+        //     count += 1;
+        //     let t_item = t_item_1.elapsed().as_micros();
+        //     eprintln!("DbFolderItem.select :: item [{}] : {} µs", &count-1, &t_item);
+        // }
+        // select_result.data = items;
+        // select_result.data_count = select_result.data.len();
+        // select_result.time = t_1.elapsed().as_millis() as usize;
+        // eprintln!("DbFolderItem.select :: total db time: {} µs", &t_1.elapsed().as_micros());
         return Ok(select_result);
     }
 }
@@ -1013,7 +1367,7 @@ pub struct SelectCountResult {
     data_count: usize,
 }
 
-impl<'gb> DbFolderItem<'gb> {
+impl DbFolderItem {
 
     pub fn filter_fields(&self, folder_name: &String, fields: &Vec<String>, item: &DbData) -> Result<DbData, PlanetError> {
         let fields = fields.clone();
