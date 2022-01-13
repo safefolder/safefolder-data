@@ -156,7 +156,7 @@ impl<'gb> ObjectStorageProperty<'gb> for LinkProperty<'gb> {
                 )
             );
         }
-        let db_folder_item = result.unwrap();
+        let mut db_folder_item = result.unwrap();
         // I will check I am able to fetch the link remote by id and fetch name
         for item_id in data.clone() {
             //eprintln!("LinkProperty.validate  :: item_id: {}", &item_id);

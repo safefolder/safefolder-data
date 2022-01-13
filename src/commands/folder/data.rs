@@ -141,7 +141,7 @@ impl<'gb> InsertIntoFolder<'gb> {
         );
         match result {
             Ok(_) => {
-                let db_row: DbFolderItem = result.unwrap();
+                let mut db_row: DbFolderItem = result.unwrap();
 
                 // routing
                 let routing_wrap = RoutingData::defaults(
@@ -218,7 +218,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                 let name = insert_name.unwrap();
                 // Check name does not exist
                 // eprintln!("InsertIntoFolder.run :: name: {}", &name);
-                let name_exists = self.check_name_exists(&folder_name, &name, &db_row);
+                let name_exists = self.check_name_exists(&folder_name, &name, &mut db_row);
                 eprintln!("InsertIntoFolder.run :: record name_exists: {}", &name_exists);
                 if name_exists {
                     errors.push(
@@ -520,7 +520,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                                     if result.is_err() {
                                         // Return error about database problem
                                     }
-                                    let db_row = result.unwrap();
+                                    let mut db_row = result.unwrap();
                                     let linked_item = db_row.get(
                                         &folder_name, 
                                         GetItemOption::ById(item_id.clone()), 
@@ -597,12 +597,11 @@ impl<'gb> InsertIntoFolder<'gb> {
                 let home_dir = runner.planet_context.home_path.unwrap_or_default();
                 let account_id = runner.context.account_id.unwrap_or_default();
                 let space_id = runner.context.space_id.unwrap_or_default();
-                let site_id = runner.context.site_id.unwrap_or_default();
                 let db_folder= DbFolder::defaults(
                     Some(home_dir),
                     Some(account_id),
                     Some(space_id),
-                    Some(site_id),
+                    None,
                 ).unwrap();
         
                 let insert_into_table: InsertIntoFolder = InsertIntoFolder{
@@ -656,7 +655,7 @@ impl<'gb> InsertIntoFolder<'gb> {
 }
 
 impl<'gb> InsertIntoFolder<'gb> {
-    pub fn check_name_exists(&self, folder_name: &String, name: &String, db_row: &DbFolderItem) -> bool {
+    pub fn check_name_exists(&self, folder_name: &String, name: &String, db_row: &mut DbFolderItem) -> bool {
         let check: bool;
         let name = name.clone();
         let result = db_row.get(&folder_name, GetItemOption::ByName(name), None);
@@ -707,7 +706,7 @@ impl<'gb> Command<String> for GetFromFolder<'gb> {
         match result {
             Ok(_) => {
                 // let data_config = self.config.data.clone();
-                let db_row: DbFolderItem = result.unwrap();
+                let mut db_row: DbFolderItem = result.unwrap();
                 // I need to get SchemaData and schema for the folder
                 // I go through properties in order to build RowData                
                 let folder = self.db_folder.get_by_name(folder_name)?;
@@ -953,7 +952,7 @@ impl<'gb> Command<String> for SelectFromFolder<'gb> {
         );
         match result {
             Ok(_) => {
-                let db_row: DbFolderItem = result.unwrap();
+                let mut db_row: DbFolderItem = result.unwrap();
                 let config = self.config.clone();
                 let r#where = config.r#where;
                 let page = config.page;

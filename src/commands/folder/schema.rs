@@ -87,7 +87,7 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                     let field_id = field_attrs.id.unwrap_or_default();
                     field_id_map.insert(String::from(ID), field_id.clone());
                     properties_map.insert(field_name.clone(), field.clone());
-                    &field_ids.push(field_id_map);
+                    let _ = &field_ids.push(field_id_map);
                     if property_type.is_some() {
                         let property_type = property_type.unwrap();
                         field_type_map.insert(field_name.clone(), property_type);

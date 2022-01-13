@@ -401,8 +401,8 @@ impl ConfigStorageProperty for PropertyConfig {
                     },
                     _ => {}
                 }
-                &map_fields_by_id.insert(field_id, propertty_config.clone());
-                &map_fields_by_name.insert(field_name.clone(), propertty_config.clone());
+                let _ = &map_fields_by_id.insert(field_id, propertty_config.clone());
+                let _ = &map_fields_by_name.insert(field_name.clone(), propertty_config.clone());
             }
         }
 
@@ -460,7 +460,7 @@ impl ConfigStorageProperty for PropertyConfig {
                 // eprintln!("parse_from_db :: field_id_data: {:#?}", &field_id_data);
                 let field_id = &field_id_data.get(ID).unwrap().clone();
                 let propertty_config = map_fields_by_id.get(field_id).unwrap().clone();
-                &properties.push(propertty_config);
+                let _ = &properties.push(propertty_config);
             }
         }
 

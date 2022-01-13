@@ -7,8 +7,9 @@ edition = "2018"
 
 [dependencies]
 yaml-rust = "0.4"
+# yaml validator client warning
 yaml-validator = {version = "0.1.0"}
-sled = {version = "0.34.6", features = ["compression", "zstd"]}
+sled = {version = "0.34.7", features = ["compression", "zstd"]}
 yaml-validator-cli = {version="0.1.0"}
 tantivy = {version="0.15.2"}
 stop-words = {version="0.4.0"}
@@ -20,6 +21,7 @@ validator = { version = "0.14", features=["derive", "phone", "unic", "card"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = {version="0.8"}
 i18n-embed = {version="0.10"}
+# warning
 xtr = {version="0.1.6"}
 tr = {version="0.1.6"}
 xid = {version="1.0.0"}

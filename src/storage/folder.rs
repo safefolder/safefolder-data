@@ -2,7 +2,7 @@ extern crate sled;
 extern crate slug;
 
 use std::str::FromStr;
-use std::thread;
+use std::{thread};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use std::collections::BTreeMap;
@@ -48,26 +48,26 @@ pub trait FolderItem {
         folder_id: &str,
         db_folder: &DbFolder,
     ) -> Result<DbFolderItem, PlanetError>;
-    fn insert(&self, folder_name: &String, db_data: &DbData) -> Result<DbData, PlanetError>;
-    fn update(&self, db_data: &DbData) -> Result<DbData, PlanetError>;
+    fn insert(&mut self, folder_name: &String, db_data: &DbData) -> Result<DbData, PlanetError>;
+    fn update(&mut self, db_data: &DbData) -> Result<DbData, PlanetError>;
     fn get(
-        &self, 
+        &mut self, 
         folder_name: &String, 
         by: GetItemOption, 
         properties: Option<Vec<String>>
     ) -> Result<DbData, PlanetError>;
-    fn select(&self, 
+    fn select(&mut self, 
         folder_name: &String, 
         r#where: Option<String>, 
         page: Option<usize>,
         number_items: Option<usize>,
         properties: Option<Vec<String>>,
     ) -> Result<SelectResult, PlanetError>;
-    fn count(&self, 
+    fn count(&mut self, 
         folder_name: &String, 
         r#where: Option<String>, 
     ) -> Result<SelectCountResult, PlanetError>;
-    fn total_count(&self) -> Result<SelectCountResult, PlanetError>;
+    fn total_count(&mut self) -> Result<SelectCountResult, PlanetError>;
 }
 
 // lifetimes: gb (global, for contexts), db, bs
@@ -628,12 +628,6 @@ pub enum GetItemOption {
     ByName(String),
 }
 
-// let home_dir = planet_context.home_path.unwrap_or_default();
-// let account_id = context.account_id.unwrap_or_default();
-// let space_id = context.space_id.unwrap_or_default();
-// let box_id = context.box_id.unwrap_or_default();
-
-
 #[derive(Debug, Clone)]
 pub struct DbFolderItem {
     pub db_folder: DbFolder,
@@ -643,12 +637,14 @@ pub struct DbFolderItem {
     pub space_id: Option<String>,
     pub site_id: Option<String>,
     pub box_id: Option<String>,
+    pub db: Option<sled::Db>,
+    pub db_partitions: Option<sled::Db>,
 }
 
 impl DbFolderItem {
 
     fn get_partition(
-        &self,
+        &mut self,
         item_id: &str,
     ) -> Result<u16, PlanetError> {
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
@@ -704,6 +700,8 @@ impl DbFolderItem {
             let response = db.insert(id_db, encoded);
             match response {
                 Ok(_) => {
+                    let _ = self.close_partitions(&db);
+                    eprintln!("DbFolderItem.get_partition :: [not exist] partition: {}", &partition);
                     return Ok(partition)
                 },
                 Err(_) => {
@@ -732,6 +730,7 @@ impl DbFolderItem {
                     if partition_wrap.is_some() {
                         let partition_str = partition_wrap.unwrap().as_str();
                         partition = FromStr::from_str(partition_str).unwrap();
+                        let _ = self.close_partitions(&db);
                         return Ok(partition)
                     }
                 }
@@ -753,57 +752,8 @@ impl DbFolderItem {
         }
     }
 
-    fn _get_current_partition(
-        &self,
-        folder_id: &str,
-    ) -> Result<u16, PlanetError> {
-        let mut path: String = String::from("");
-        let home_dir = self.home_dir.clone().unwrap_or_default();
-        let home_dir = home_dir.as_str();
-        let account_id = self.account_id.clone().unwrap_or_default();
-        let account_id = account_id.as_str();
-        let space_id = self.space_id.clone().unwrap_or_default();
-        let space_id = space_id.as_str();
-        let box_id = self.box_id.clone().unwrap_or_default();
-        let box_id = box_id.as_str();
-        let partition:u16;
-        if account_id != "" && space_id != "" {
-            println!("DbFolderItem.get_current_partition :: account_id and space_id have been informed");
-        } else if space_id == "private" {
-            // .achiever-planet/{table_file} : platform wide folder (slug with underscore)
-            path = format!(
-                "{home}/private/boxes/{box_id}/folders/{folder_id}/partition.db", 
-                home=&home_dir, 
-                box_id=box_id,
-                folder_id=folder_id
-            );
-        }
-        eprintln!("DbFolderItem.get_current_partition :: path: {:?}", path);
-        let config: sled::Config = sled::Config::default()
-            .use_compression(true)
-            .path(path);
-        let result: Result<sled::Db, sled::Error> = config.open();
-        match result {
-            Ok(_) => {
-                let db = result.unwrap();
-                let number_parition_items = db.len();
-                let number_parition_items = number_parition_items.to_u16().unwrap();
-                partition = number_parition_items/ITEMS_PER_PARTITION + 1;
-                return Ok(partition)
-            },
-            Err(_) => {
-                return Err(
-                    PlanetError::new(
-                        500, 
-                        Some(tr!("Could not open partition database")),
-                    )
-                )
-            }
-        }
-    }
-
     fn open_partition_by_item(
-        &self,
+        &mut self,
         item_id: &str,
     ) -> Result<sled::Db, PlanetError> {
         let partition = self.get_partition(item_id);
@@ -821,7 +771,7 @@ impl DbFolderItem {
     }
 
     fn open_partition(
-        &self,
+        &mut self,
         partition: &u16,
     ) -> Result<sled::Db, PlanetError> {
         let mut path: String = String::from("");
@@ -837,6 +787,10 @@ impl DbFolderItem {
         let home_dir = home_dir.as_str();
         let partition_str = partition.to_string();
         let partition_str = format!("{:0>4}", partition_str);
+        if self.db.is_some() {
+            let db = self.db.clone().unwrap();
+            return Ok(db)
+        }
         if account_id != "" && space_id != "" {
             println!("DbFolderItem.open_partition :: account_id and space_id have been informed");
         } else if space_id == "private" {
@@ -865,6 +819,7 @@ impl DbFolderItem {
             )
         }
         let db = result.unwrap();
+        self.db = Some(db.clone());
         return Ok(db)
     }
 
@@ -881,11 +836,12 @@ impl DbFolderItem {
             )
         }
         let size = size.unwrap();
+        drop(db);
         return Ok(size)
     }
 
     fn open_partitions(
-        &self,
+        &mut self,
     ) -> Result<sled::Db, PlanetError> {
         let mut path: String = String::from("");
         let home_dir = self.home_dir.clone().unwrap_or_default();
@@ -898,6 +854,10 @@ impl DbFolderItem {
         let box_id = box_id.as_str();
         let folder_id = self.folder_id.clone().unwrap_or_default();
         let folder_id = folder_id.as_str();
+        if self.db_partitions.is_some() {
+            let db = self.db_partitions.clone().unwrap();
+            return Ok(db)
+        }
         if account_id != "" && space_id != "" {
             println!("DbFolderItem.open_partitions :: account_id and space_id have been informed");
         } else if space_id == "private" {
@@ -925,10 +885,11 @@ impl DbFolderItem {
             )
         }
         let db = result.unwrap();
+        self.db_partitions = Some(db.clone());
         return Ok(db)
     }
 
-    fn _close_partitions(&self, db: &sled::Db) -> Result<usize, PlanetError> {
+    fn close_partitions(&self, db: &sled::Db) -> Result<usize, PlanetError> {
         let size = db.flush();
         if size.is_err() {
             let error = size.unwrap_err();
@@ -941,10 +902,12 @@ impl DbFolderItem {
             )
         }
         let size = size.unwrap();
+        drop(db);
+        // thread::sleep(time::Duration::new(5, 0));
         return Ok(size)
     }
 
-    fn get_partitions(&self) -> Result<Vec<u16>, PlanetError> {
+    fn get_partitions(&mut self) -> Result<Vec<u16>, PlanetError> {
         let mut list_partitions: Vec<u16> = Vec::new();
         let count = self.total_count()?;
         let number_items = count.total.to_u16().unwrap();
@@ -956,7 +919,7 @@ impl DbFolderItem {
         if rest != 0 {
             number_partitions += 1;
         }
-        for item in 1..number_partitions {
+        for item in 1..number_partitions+1 {
             list_partitions.push(item);
         }
         return Ok(list_partitions)
@@ -983,11 +946,13 @@ impl FolderItem for DbFolderItem {
             site_id: Some(site_id.to_string()),
             db_folder: db_folder.clone(),
             folder_id: Some(folder_id.to_string()),
+            db: None,
+            db_partitions: None,
         };
         Ok(db_row)
     }
 
-    fn insert(&self, folder_name: &String, db_data: &DbData) -> Result<DbData, PlanetError> {
+    fn insert(&mut self, folder_name: &String, db_data: &DbData) -> Result<DbData, PlanetError> {
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let encrypted_data = db_data.encrypt(&shared_key).unwrap();
         let encoded: Vec<u8> = encrypted_data.serialize();
@@ -996,6 +961,7 @@ impl FolderItem for DbFolderItem {
         let id_db = id_db.as_bytes();
         let db = self.open_partition_by_item(&id)?;
         let response = &db.insert(id_db, encoded);
+        let _ = self.close_partition(&db);
         match response {
             Ok(_) => {
                 // Get item
@@ -1016,7 +982,7 @@ impl FolderItem for DbFolderItem {
         }
     }
 
-    fn update(&self, db_data: &DbData) -> Result<DbData, PlanetError> {
+    fn update(&mut self, db_data: &DbData) -> Result<DbData, PlanetError> {
         let db_data = db_data.clone();
         let id = db_data.id.clone().unwrap();
         let id_db = xid::Id::from_str(id.as_str()).unwrap();
@@ -1061,7 +1027,7 @@ impl FolderItem for DbFolderItem {
 
     // We can get items by id (not changing string), and name (we search for slugified name)
     fn get(
-        &self, 
+        &mut self, 
         folder_name: &String, 
         by: GetItemOption, 
         fields: Option<Vec<String>>
@@ -1101,6 +1067,7 @@ impl FolderItem for DbFolderItem {
                     Ok(_) => {
                         let mut item = item_.unwrap();
                         if fields.is_none() {
+                            let _ = self.close_partition(&db);
                             Ok(item)    
                         } else {
                             // eprintln!("get :: item: {:#?}", &item);
@@ -1126,9 +1093,9 @@ impl FolderItem for DbFolderItem {
                 }
             },
             GetItemOption::ByName(name) => {
+                eprintln!("DbFolderItem.get :: by name, name: {}", &name);
                 let partitions = self.get_partitions()?;
                 let this: Arc<Mutex<DbFolderItem>> = Arc::new(Mutex::new(self.clone()));
-                eprintln!("DbFolderItem.get :: partitions: {:?}", &partitions);
                 let mut handles= vec![];
                 // Threads to fetch name from all partitions
                 let wrap_db_data: Arc<Mutex<Option<DbData>>> = Arc::new(Mutex::new(None));
@@ -1141,7 +1108,7 @@ impl FolderItem for DbFolderItem {
                     let name = Arc::clone(&name);
                     let handle = thread::spawn(move || {
                         // open partition and search for name
-                        let this = this.lock().unwrap();
+                        let mut this = this.lock().unwrap();
                         let shared_key = shared_key.lock().unwrap();
                         let name = name.lock().unwrap();
                         let db = this.open_partition(&partition).unwrap();
@@ -1190,7 +1157,7 @@ impl FolderItem for DbFolderItem {
             }
         }
     }
-    fn count(&self, 
+    fn count(&mut self, 
         folder_name: &String, 
         r#where: Option<String>, 
     ) -> Result<SelectCountResult, PlanetError> {
@@ -1208,18 +1175,22 @@ impl FolderItem for DbFolderItem {
         };
         return Ok(result)
     }
-    fn total_count(&self) -> Result<SelectCountResult, PlanetError> {
+    fn total_count(&mut self) -> Result<SelectCountResult, PlanetError> {
         let t_1 = Instant::now();
         let db = self.open_partitions()?;
         let total = db.len();
+        let _ = self.close_partitions(&db);
         let result = SelectCountResult{
             time: t_1.elapsed().as_millis() as usize,
             total: total,
             data_count: total,
         };
+        let _ = result.time;
+        let _ = result.total;
+        let _ = result.data_count;
         return Ok(result);
     }
-    fn select(&self, 
+    fn select(&mut self, 
         _folder_name: &String, 
         r#_where: Option<String>, 
         _page: Option<usize>,
@@ -1266,6 +1237,11 @@ impl FolderItem for DbFolderItem {
             data: Vec::new(),
             data_count: 0,
         };
+        let _ = select_result.data;
+        let _ = select_result.total;
+        let _ = select_result.time;
+        let _ = select_result.page;
+        let _ = select_result.data_count;
         // let t_header = &t_1.elapsed().as_micros();
         // eprintln!("DbFolderItem.select :: t_header: {} µs", &t_header);
 
