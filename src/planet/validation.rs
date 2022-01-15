@@ -11,13 +11,13 @@ use crate::planet::PlanetContext;
 #[derive(Debug, Clone)]
 pub struct PlanetValidationError {
     pub command: String,
-    pub property: String,
+    pub column: String,
     pub error_code: String,
     pub message: String,
 }
 
 struct ValidationMessageFields {
-    property: String,
+    column: String,
     value: ColoredString,  
 }
 
@@ -32,26 +32,26 @@ impl<'gb> CommandImportConfig<'gb> {
         println!("parse_serde :: error: {:#?}", error);
         let error_str: &str = &*error.to_string();
         println!("parse_serde :: error str: {}", error_str);
-        let mut property: &str = "";
+        let mut column: &str = "";
         let mut error_type: &str = "";
         let mut field_value: &str = "";
         if error_str.find(":").is_some() {
             let error_fields: Vec<&str> = error_str.split(":").collect();
-            property = error_fields[0];
+            column = error_fields[0];
             error_type = error_fields[1].trim();
             let error_fields_next: Vec<&str> = error_fields[2].split(",").collect();
             field_value = error_fields_next[0];    
         } else {
-            // duplicate property `command` at line 2 column 8
+            // duplicate column `command` at line 2 column 8
             if Some(error_str.find(constants::SERDE_ERROR_TYPE_DUPLICATE_FIELD)).is_some() {
                 error_type = constants::SERDE_ERROR_TYPE_DUPLICATE_FIELD;
                 let items_error_str: Vec<&str> = error_str.split("`").collect();
-                property = items_error_str[1];
+                column = items_error_str[1];
             }
         }
         let mut error: PlanetValidationError = PlanetValidationError{
             command: self.command.to_string(),
-            property: String::from(property),
+            column: String::from(column),
             error_code: String::from(""),
             message: String::from("")
         };
@@ -60,8 +60,8 @@ impl<'gb> CommandImportConfig<'gb> {
                 // number: invalid type: string "pepito34", expected u64 at line 3 column 9
                 error.error_code = String::from(constants::SERDE_ERROR_TYPE_INVALID_TYPE);
                 error.message = tr!(
-                    "{command}{sep} Invalid type for property {property} with value: {value}", 
-                    property=format!("{}{}{}", String::from("").magenta(), property.magenta(), String::from("").magenta()),
+                    "{command}{sep} Invalid type for column {column} with value: {value}", 
+                    column=format!("{}{}{}", String::from("").magenta(), column.magenta(), String::from("").magenta()),
                     value=field_value.green(),
                     command=self.command.blue(),
                     sep=String::from(":").blue(),
@@ -71,8 +71,8 @@ impl<'gb> CommandImportConfig<'gb> {
             constants::SERDE_ERROR_TYPE_INVALID_VALUE => {
                 error.error_code = String::from(constants::SERDE_ERROR_TYPE_INVALID_VALUE);
                 error.message = tr!(
-                    "{command}{sep} Invalid value for property {property}", 
-                    property=format!("{}{}{}", String::from("\"").magenta(), property.magenta(), String::from("\"").magenta()),
+                    "{command}{sep} Invalid value for column {column}", 
+                    column=format!("{}{}{}", String::from("\"").magenta(), column.magenta(), String::from("\"").magenta()),
                     command=self.command.blue(),
                     sep=String::from(":").blue(),
                 );
@@ -81,8 +81,8 @@ impl<'gb> CommandImportConfig<'gb> {
             constants::SERDE_ERROR_TYPE_INVALID_LENGTH => {
                 error.error_code = String::from(constants::SERDE_ERROR_TYPE_INVALID_LENGTH);
                 error.message = tr!(
-                    "{command}{sep} Invalid length for property {property}", 
-                    property=format!("{}{}{}", String::from("\"").magenta(), property.magenta(), String::from("\"").magenta()),
+                    "{command}{sep} Invalid length for column {column}", 
+                    column=format!("{}{}{}", String::from("\"").magenta(), column.magenta(), String::from("\"").magenta()),
                     command=self.command.blue(),
                     sep=String::from(":").blue(),
                 );
@@ -91,8 +91,8 @@ impl<'gb> CommandImportConfig<'gb> {
             constants::SERDE_ERROR_TYPE_UNKOWN_VARIANT => {
                 error.error_code = String::from(constants::SERDE_ERROR_TYPE_UNKOWN_VARIANT);
                 error.message = tr!(
-                    "{command}{sep} Unknown variant for property {property}", 
-                    property=format!("{}{}{}", String::from("\"").magenta(), property.magenta(), String::from("\"").magenta()),
+                    "{command}{sep} Unknown variant for column {column}", 
+                    column=format!("{}{}{}", String::from("\"").magenta(), column.magenta(), String::from("\"").magenta()),
                     value=field_value,
                     command=self.command.blue(),
                     sep=String::from(":").blue(),
@@ -102,8 +102,8 @@ impl<'gb> CommandImportConfig<'gb> {
             constants::SERDE_ERROR_TYPE_UNKNOWN_FIELD => {
                 error.error_code = String::from(constants::SERDE_ERROR_TYPE_UNKNOWN_FIELD);
                 error.message = tr!(
-                    "{command}{sep} Unknown property for {property}", 
-                    property=format!("{}{}{}", String::from("\"").magenta(), property.magenta(), String::from("\"").magenta()),
+                    "{command}{sep} Unknown column for {column}", 
+                    column=format!("{}{}{}", String::from("\"").magenta(), column.magenta(), String::from("\"").magenta()),
                     command=self.command.blue(),
                     sep=String::from(":").blue(),
                 );
@@ -112,19 +112,19 @@ impl<'gb> CommandImportConfig<'gb> {
             constants::SERDE_ERROR_TYPE_MISSING_FIELD => {
                 error.error_code = String::from(constants::SERDE_ERROR_TYPE_MISSING_FIELD);
                 error.message = tr!(
-                    "{command}{sep} Missing property", 
+                    "{command}{sep} Missing column", 
                     command=self.command,
                     sep=String::from(":").blue()
                 );
                 return error;
             },
             constants::SERDE_ERROR_TYPE_DUPLICATE_FIELD => {
-                // duplicate property `command` at line 2 column 8
+                // duplicate column `command` at line 2 column 8
                 error.error_code = String::from(constants::SERDE_ERROR_TYPE_DUPLICATE_FIELD);
                 error.message = tr!(
-                    "{command}{sep}: Duplicate property {property}", 
+                    "{command}{sep}: Duplicate column {column}", 
                     command=self.command.blue(),
-                    property=format!("{}{}{}", String::from("\"").magenta(), property.magenta(), String::from("\"").magenta()),
+                    column=format!("{}{}{}", String::from("\"").magenta(), column.magenta(), String::from("\"").magenta()),
                     sep=String::from(":").blue()
                 );
                 return error;
@@ -137,7 +137,7 @@ impl<'gb> CommandImportConfig<'gb> {
         let message_field: ValidationMessageFields;
         if main_error_field.len() == 0 {
             message_field = ValidationMessageFields{
-                property: format!(
+                column: format!(
                     "{}{}{}", 
                     String::from("\"").magenta(), 
                     error_field.magenta(),
@@ -150,7 +150,7 @@ impl<'gb> CommandImportConfig<'gb> {
             let error_field_equal = error.params.get("equal");
             if error_field_equal.is_some() {
                 message_field = ValidationMessageFields{
-                    property: format!(
+                    column: format!(
                         "{}{}{}.{}{}{}", 
                         String::from("\"").magenta(), 
                         main_error_field.magenta(),
@@ -164,7 +164,7 @@ impl<'gb> CommandImportConfig<'gb> {
             } else {
                 // main_error_field: command
                 message_field = ValidationMessageFields{
-                    property: format!(
+                    column: format!(
                         "{}{}{}", 
                         String::from("\"").magenta(), 
                         main_error_field.magenta(),
@@ -187,7 +187,7 @@ impl<'gb> CommandImportConfig<'gb> {
         for error in errors {
             let mut planet_error: PlanetValidationError = PlanetValidationError {
                 command: self.command.to_string(),
-                property: String::from(error_field),
+                column: String::from(error_field),
                 error_code: format!("{}_equal", error.code),
                 message: String::from(""),
                 };
@@ -197,71 +197,71 @@ impl<'gb> CommandImportConfig<'gb> {
                 &error);
             if error.code == "length" && error.params.contains_key("equal") {
             planet_error.message = tr!(
-                "{command}{sep}: {property} has length not equal to {value}",
+                "{command}{sep}: {column} has length not equal to {value}",
                 command=command.blue(),
                 sep=String::from(":").blue(),
-                property=message_fields.property,
+                column=message_fields.column,
                 value=message_fields.value,
                 );
                 planet_errors.push(planet_error);
             } else if error.code == "length" && error.params.contains_key("min") {
                     planet_error.message = tr!(
-                        "{command}{sep}: {property} has length lower than {value}",
+                        "{command}{sep}: {column} has length lower than {value}",
                         command=command.blue(),
                         sep=String::from(":").blue(),
-                        property=message_fields.property,
+                        column=message_fields.column,
                         value=message_fields.value,
                     );
                     planet_errors.push(planet_error);
             } else if error.code == "length" && error.params.contains_key("max") {
                     planet_error.message = tr!(
-                        "{command}{sep}: {property} has length higher than {value}",
+                        "{command}{sep}: {column} has length higher than {value}",
                         command=command.blue(),
                         sep=String::from(":").blue(),
-                        property=message_fields.property,
+                        column=message_fields.column,
                         value=message_fields.value,
                     );
                     planet_errors.push(planet_error);
             } else if error.code == "required" {
                 planet_error.message = tr!(
-                    "{command}{sep}: {property} is required",
+                    "{command}{sep}: {column} is required",
                     command=command.blue(),
                     sep=String::from(":").blue(),
-                    property=message_fields.property,
+                    column=message_fields.column,
                     );
                     planet_errors.push(planet_error);
             } else if error.code == "contains" {
                 planet_error.message = tr!(
-                    "{command}{sep}: {property} does not contain {value}.",
+                    "{command}{sep}: {column} does not contain {value}.",
                     command=command.blue(),
                     sep=String::from(":").blue(),
-                    property=message_fields.property,
+                    column=message_fields.column,
                     value=message_fields.value,
                     );
                     planet_errors.push(planet_error);
             } else if error.code == "regex" {
                 // [ValidationError { code: "regex", message: None, params: {"value": String("CREATE TABLE")} }]
                 planet_error.message = tr!(
-                    "{command}{sep}: {property} did not pass formatting validation. Check documentation.",
+                    "{command}{sep}: {column} did not pass formatting validation. Check documentation.",
                     command=command.blue(),
                     sep=String::from(":").blue(),
-                    property=message_fields.property,
+                    column=message_fields.column,
                 );
                 planet_errors.push(planet_error);
             } else if error.code == "range" && error.params.contains_key("min") {
                 planet_error.message = tr!(
-                    "{command}{sep}: {property} value {value} is lower than defined range.",
+                    "{command}{sep}: {column} value {value} is lower than defined range.",
                     command=command.blue(),
                     sep=String::from(":").blue(),
-                    property=message_fields.property,
+                    column=message_fields.column,
                 );
                 planet_errors.push(planet_error);
             } else if error.code == "range" && error.params.contains_key("max") {
                 planet_error.message = tr!(
-                    "{command}{sep}: {property} value {value} is higher than defined range.",
+                    "{command}{sep}: {column} value {value} is higher than defined range.",
                     command=command.blue(),
                     sep=String::from(":").blue(),
-                    property=message_fields.property,
+                    column=message_fields.column,
                 );
                 planet_errors.push(planet_error);
             }

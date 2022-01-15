@@ -13,9 +13,9 @@ use regex::{Regex, CaptureMatches};
 use tr::tr;
 use xlformula_engine::{calculate, parse_formula, NoReference, NoCustomFunction};
 
-use crate::storage::ConfigStorageProperty;
+use crate::storage::ConfigStorageColumn;
 use crate::storage::folder::{DbData, DbFolder};
-use crate::commands::folder::config::PropertyConfig;
+use crate::commands::folder::config::ColumnConfig;
 use crate::functions::constants::*;
 use crate::functions::text::*;
 use crate::functions::date::*;
@@ -246,11 +246,11 @@ impl Formula {
         formula: &String,
         formula_format: &String,
         table: Option<DbData>,
-        properties_map: Option<HashMap<String, PropertyConfig>>,
+        properties_map: Option<HashMap<String, ColumnConfig>>,
         db_table: Option<DbFolder>,
         table_name: Option<String>,
         is_assign_function: bool,
-        field_config_map: Option<BTreeMap<String, PropertyConfig>>,
+        field_config_map: Option<BTreeMap<String, ColumnConfig>>,
     ) -> Result<Self, PlanetError> {
         //eprintln!("Formula...");
         // If I have an error in compilation, then does not validate. Compilation uses validate of functions.
@@ -258,7 +258,7 @@ impl Formula {
         let formula_origin = formula.clone();
         let properties_map = properties_map.clone();
         let field_config_map_ = field_config_map.clone();
-        let mut field_config_map: BTreeMap<String, PropertyConfig> = BTreeMap::new();
+        let mut field_config_map: BTreeMap<String, ColumnConfig> = BTreeMap::new();
         if field_config_map_.is_some() {
             field_config_map = field_config_map_.unwrap();
         }
@@ -272,23 +272,23 @@ impl Formula {
         // let expr = &RE_FORMULA_FIELD_FUNCTIONS;
         let mut formula_processed = formula_origin.clone();
         let formula_format = formula_format.clone();
-        let mut properties_map_: HashMap<String, PropertyConfig> = HashMap::new();
+        let mut properties_map_: HashMap<String, ColumnConfig> = HashMap::new();
         if table.is_some() {
             let table = table.unwrap();
             let db_table = db_table.unwrap();
             let table_name = table_name.unwrap();
             let field_type_map_ = DbFolder::get_field_type_map(&table)?;
             let field_name_map_ = DbFolder::get_field_name_map(&db_table, &table_name)?;
-            for (property_name, property_type) in field_type_map_.clone() {
-                let mut property_config = PropertyConfig::defaults(None);
-                property_config.property_type = Some(property_type);
-                property_config.name = Some(property_name.clone());
-                properties_map_.insert(property_name.clone(), property_config);
+            for (column_name, column_type) in field_type_map_.clone() {
+                let mut column_config = ColumnConfig::defaults(None);
+                column_config.column_type = Some(column_type);
+                column_config.name = Some(column_name.clone());
+                properties_map_.insert(column_name.clone(), column_config);
             }
-            for (property_name, property_id) in field_name_map_.clone() {
-                let mut property_config = properties_map_.get(&property_name).unwrap().clone();
-                property_config.id = Some(property_id);
-                properties_map_.insert(property_name.clone(), property_config);
+            for (column_name, column_id) in field_name_map_.clone() {
+                let mut column_config = properties_map_.get(&column_name).unwrap().clone();
+                column_config.id = Some(column_id);
+                properties_map_.insert(column_name.clone(), column_config);
             }
         } else if properties_map.is_some() {
             let properties_map = properties_map.unwrap();
@@ -398,10 +398,10 @@ pub fn compile_assignment(
     formula: &str,
     formula_format: String,
     functions_map: Option<BTreeMap<String, CompiledFunction>>,
-    properties_map: HashMap<String, PropertyConfig>,
+    properties_map: HashMap<String, ColumnConfig>,
     db_table: Option<DbFolder>,
     table_name: Option<String>,
-    field_config_map: &BTreeMap<String, PropertyConfig>
+    field_config_map: &BTreeMap<String, ColumnConfig>
 ) -> Result<Option<AttributeAssign>, PlanetError> {
     //eprintln!("compile_assignment...");
     //eprintln!("compile_assignment :: formula: {}", &formula);
@@ -464,8 +464,8 @@ pub fn compile_assignment(
             properties_map.clone()
         )?;
         //eprintln!("compile_assignment: reference_name: {} items_new: {:?}", &reference_name, &items_new);
-        let property_config = properties_map.get(&reference_name).unwrap().clone();
-        let field_type = property_config.property_type;
+        let column_config = properties_map.get(&reference_name).unwrap().clone();
+        let field_type = column_config.column_type;
         //eprintln!("compile_assignment: field_type: {:?}", &field_type);
         let mut attribute_type: AttributeType = AttributeType::Text;
         if field_type.is_some() {
@@ -677,14 +677,14 @@ pub fn compile_formula(
 pub fn compile_function_text(
     function_text: &str,
     formula_format: &String,
-    properties_map: &HashMap<String, PropertyConfig>,
+    properties_map: &HashMap<String, ColumnConfig>,
     db_table: Option<DbFolder>,
     table_name: Option<String>,
-    field_config_map: Option<BTreeMap<String, PropertyConfig>>,
+    field_config_map: Option<BTreeMap<String, ColumnConfig>>,
 ) -> Result<CompiledFunction, PlanetError> {
     //eprintln!("compile_function_text :: function_text: {}", &function_text);
     let field_config_map_wrap = field_config_map.clone();
-    let field_config_map: BTreeMap<String, PropertyConfig> = BTreeMap::new();
+    let field_config_map: BTreeMap<String, ColumnConfig> = BTreeMap::new();
     let formula_format = formula_format.clone();
     let properties_map = properties_map.clone();
     // eprintln!("compile_function_text :: field_type_map: {:#?}", &field_type_map);
@@ -767,8 +767,8 @@ pub fn compile_function_text(
                 replace("}", "");
             let field_name = attr_string.clone();
             // let field_id = field_name_map.get(&field_name.clone());
-            let property_config = properties_map.get(&field_name).unwrap().clone();
-            let field_id = property_config.id;
+            let column_config = properties_map.get(&field_name).unwrap().clone();
+            let field_id = column_config.id;
             if field_id.is_some() {
                 let field_id = field_id.unwrap().clone();
                 function_attribute.id = Some(field_id);
@@ -776,7 +776,7 @@ pub fn compile_function_text(
             function_attribute.name = Some(field_name);
             
             function_attribute.reference_value = Some(attr_string.clone());
-            let field_type = property_config.property_type;
+            let field_type = column_config.column_type;
             if field_type.is_some() {
                 let field_type = field_type.unwrap().clone();
                 attribute_type = get_attribute_type(&field_type, Some(formula_format.clone()));
@@ -901,11 +901,11 @@ pub struct FunctionParse {
     attributes: Option<Vec<String>>,
     compiled_attributes: Option<Vec<FunctionAttributeItem>>,
     result: Option<FunctionResult>,
-    field_config_map: BTreeMap<String, PropertyConfig>,
+    field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl FunctionParse {
     pub fn defaults(name: &String) -> Self {
-        let field_config_map: BTreeMap<String, PropertyConfig> = BTreeMap::new();
+        let field_config_map: BTreeMap<String, ColumnConfig> = BTreeMap::new();
         let obj = FunctionParse{
             name: name.clone(),
             text: None,
@@ -953,7 +953,7 @@ pub fn prepare_function_parse(
 pub fn process_function(
     function_parse: &FunctionParse, 
     data_map: Option<BTreeMap<String, String>>,
-    field_config_map: Option<BTreeMap<String, PropertyConfig>>,
+    field_config_map: Option<BTreeMap<String, ColumnConfig>>,
 ) -> Result<FunctionParse, PlanetError> {
     // let list_items = Some(expr.captures_iter(function_text));
     // I need either check or list of attributes, so I have only one function to deal with Regex expr.
@@ -964,7 +964,7 @@ pub fn process_function(
     let field_config_map = field_config_map.clone();
     let mut func = function.clone();
     let data = data_map_wrap.clone();
-    let conf: BTreeMap<String, PropertyConfig>;
+    let conf: BTreeMap<String, ColumnConfig>;
     if field_config_map.is_some() {
         conf = field_config_map.unwrap();
     } else {
@@ -1240,7 +1240,7 @@ impl FunctionAttributeItem {
     pub fn get_value(
         &self, 
         data_map: &BTreeMap<String, String>,
-        field_config_map: &BTreeMap<String, PropertyConfig>
+        field_config_map: &BTreeMap<String, ColumnConfig>
     ) -> Result<String, PlanetError> {
         let data_map = data_map.clone();
         let field_config_map = field_config_map.clone();
@@ -1300,7 +1300,7 @@ impl FunctionAttributeItem {
 pub fn execute_formula(
     formula: &Formula, 
     data_map: &BTreeMap<String, String>,
-    field_config_map: &BTreeMap<String, PropertyConfig>,
+    field_config_map: &BTreeMap<String, ColumnConfig>,
 ) -> Result<String, PlanetError> {
     // 23 + LOG(34)
     // FUNC(attr1, attr2, ...)
@@ -1432,7 +1432,7 @@ pub fn get_attribute_type(field_type: &String, formula_format: Option<String>) -
 
 pub fn get_assignment_reference(
     items: &Vec<String>, 
-    properties_map: HashMap<String, PropertyConfig>
+    properties_map: HashMap<String, ColumnConfig>
 ) -> Result<(String, Vec<String>), PlanetError> {
     let mut reference_name: String = String::from("");
     let mut items_new: Vec<String> = Vec::new();
@@ -1451,8 +1451,8 @@ pub fn get_assignment_reference(
             item = item.replace("{", "}").replace("}", "");
             reference_name = item.clone();
             // let column_id = &field_name_map.get(&item).unwrap();
-            let property_config = properties_map.get(&item).unwrap().clone();
-            let column_id = property_config.id.unwrap();
+            let column_config = properties_map.get(&item).unwrap().clone();
+            let column_id = column_config.id.unwrap();
             let column_id = column_id.clone();
             //eprintln!("compile_formula_query :: column_id: {}", column_id);
             item = column_id.clone();

@@ -25,14 +25,14 @@ pub const INDEX_PROFILE_RAW: &str = "raw";
 pub const LANGUAGE_CODES: &str = "language_codes";
 pub const LANGUAGE_DEFAULT: &str = "language_default";
 pub const PROPERTIES: &str = "properties";
-pub const PROPERTY_IDS: &str = "property_ids";
+pub const COLUMN_IDS: &str = "Column_ids";
 pub const SELECT_OPTIONS: &str = "select_options";
 pub const KEY: &str = "key";
 pub const NAME_CAMEL: &str = "Name";
 pub const FOLDER_NAME: &str = "folder_name";
 
 // FileConfig fields
-pub const PROPERTY_TYPE: &str = "property_type";
+pub const COLUMN_TYPE: &str = "Column_type";
 pub const DEFAULT: &str = "default";
 pub const VERSION: &str = "version";
 pub const REQUIRED: &str = "required";
@@ -49,26 +49,26 @@ pub const NUMBER_DECIMALS: &str = "number_decimals";
 pub const CURRENCY_SYMBOL: &str = "currency_symbol";
 pub const LINKED_FOLDER_ID: &str = "linked_folder_id";
 pub const DELETE_ON_LINK_DROP: &str = "delete_on_link_drop";
-pub const RELATED_PROPERTY: &str = "related_property";
+pub const RELATED_COLUMN: &str = "related_Column";
 pub const WHERE: &str = "where";
 
-// Property Types
-pub const PROPERTY_TYPE_SMALL_TEXT: &str = "Small Text";
-pub const PROPERTY_TYPE_LONG_TEXT: &str = "Long Text";
-pub const PROPERTY_TYPE_CHECKBOX: &str = "Checkbox";
-pub const PROPERTY_TYPE_SELECT: &str = "Select";
-pub const PROPERTY_TYPE_NUMBER: &str = "Number";
-pub const PROPERTY_TYPE_DATE: &str = "Date";
-pub const PROPERTY_TYPE_FORMULA: &str = "Formula";
-pub const PROPERTY_TYPE_DURATION: &str = "Duration";
-pub const PROPERTY_TYPE_CREATED_TIME: &str = "Created Time";
-pub const PROPERTY_TYPE_LAST_MODIFIED_TIME: &str = "Last Modified Time";
-pub const PROPERTY_TYPE_CREATED_BY: &str = "Created By";
-pub const PROPERTY_TYPE_LAST_MODIFIED_BY: &str = "Last Modified By";
-pub const PROPERTY_TYPE_CURRENCY: &str = "Currency";
-pub const PROPERTY_TYPE_PERCENTAGE: &str = "Percentage";
-pub const PROPERTY_TYPE_LINK: &str = "Link";
-pub const PROPERTY_TYPE_REFERENCE: &str = "Reference";
+// Column Types
+pub const COLUMN_TYPE_SMALL_TEXT: &str = "Small Text";
+pub const COLUMN_TYPE_LONG_TEXT: &str = "Long Text";
+pub const COLUMN_TYPE_CHECKBOX: &str = "Checkbox";
+pub const COLUMN_TYPE_SELECT: &str = "Select";
+pub const COLUMN_TYPE_NUMBER: &str = "Number";
+pub const COLUMN_TYPE_DATE: &str = "Date";
+pub const COLUMN_TYPE_FORMULA: &str = "Formula";
+pub const COLUMN_TYPE_DURATION: &str = "Duration";
+pub const COLUMN_TYPE_CREATED_TIME: &str = "Created Time";
+pub const COLUMN_TYPE_LAST_MODIFIED_TIME: &str = "Last Modified Time";
+pub const COLUMN_TYPE_CREATED_BY: &str = "Created By";
+pub const COLUMN_TYPE_LAST_MODIFIED_BY: &str = "Last Modified By";
+pub const COLUMN_TYPE_CURRENCY: &str = "Currency";
+pub const COLUMN_TYPE_PERCENTAGE: &str = "Percentage";
+pub const COLUMN_TYPE_LINK: &str = "Link";
+pub const COLUMN_TYPE_REFERENCE: &str = "Reference";
 
 // Date Format
 pub const DATE_FORMAT_FRIENDLY: &str = "Friendly";

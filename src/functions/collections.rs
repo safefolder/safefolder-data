@@ -28,13 +28,13 @@ pub struct Stats {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, PropertyConfig>
+    field_config_map: BTreeMap<String, ColumnConfig>
 }
 impl Stats {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, String>>,
-        field_config_map: &BTreeMap<String, PropertyConfig>
+        field_config_map: &BTreeMap<String, ColumnConfig>
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{

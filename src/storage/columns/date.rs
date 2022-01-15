@@ -8,7 +8,7 @@ use regex::{Regex};
 
 use crate::planet::{PlanetError};
 use crate::commands::folder::config::*;
-use crate::storage::properties::*;
+use crate::storage::columns::*;
 use crate::storage::constants::*;
 
 lazy_static! {
@@ -17,11 +17,11 @@ lazy_static! {
 
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct DateProperty {
-    pub config: PropertyConfig
+pub struct DateColumn {
+    pub config: ColumnConfig
 }
-impl DateProperty {
-    pub fn defaults(config: &PropertyConfig) -> Self {
+impl DateColumn {
+    pub fn defaults(config: &ColumnConfig) -> Self {
         let field_config = config.clone();
         let field_obj = Self{
             config: field_config
@@ -29,7 +29,7 @@ impl DateProperty {
         return field_obj
     }
 }
-impl StorageProperty for DateProperty {
+impl StorageColumn for DateColumn {
     fn update_config_map(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
@@ -73,7 +73,7 @@ impl StorageProperty for DateProperty {
     fn build_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
-    ) -> Result<PropertyConfig, PlanetError> {
+    ) -> Result<ColumnConfig, PlanetError> {
         let field_config_map = field_config_map.clone();
         let date_format = field_config_map.get(DATE_FORMAT);
         let time_format = field_config_map.get(TIME_FORMAT);
@@ -216,11 +216,11 @@ impl StorageProperty for DateProperty {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct DurationProperty {
-    pub config: PropertyConfig
+pub struct DurationColumn {
+    pub config: ColumnConfig
 }
-impl DurationProperty {
-    pub fn defaults(config: &PropertyConfig) -> Self {
+impl DurationColumn {
+    pub fn defaults(config: &ColumnConfig) -> Self {
         let field_config = config.clone();
         let field_obj = Self{
             config: field_config
@@ -228,7 +228,7 @@ impl DurationProperty {
         return field_obj
     }
 }
-impl StorageProperty for DurationProperty {
+impl StorageColumn for DurationColumn {
     fn update_config_map(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
@@ -239,7 +239,7 @@ impl StorageProperty for DurationProperty {
     fn build_config(
         &mut self, 
         _: &BTreeMap<String, String>,
-    ) -> Result<PropertyConfig, PlanetError> {
+    ) -> Result<ColumnConfig, PlanetError> {
         let config = self.config.clone();
         return Ok(config)
     }
@@ -313,11 +313,11 @@ impl StorageProperty for DurationProperty {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AuditDateProperty {
-    pub config: PropertyConfig,
+pub struct AuditDateColumn {
+    pub config: ColumnConfig,
 }
-impl AuditDateProperty {
-    pub fn defaults(config: &PropertyConfig) -> Self {
+impl AuditDateColumn {
+    pub fn defaults(config: &ColumnConfig) -> Self {
         let field_config = config.clone();
         let field_obj = Self{
             config: field_config,
@@ -325,7 +325,7 @@ impl AuditDateProperty {
         return field_obj
     }
 }
-impl StorageProperty for AuditDateProperty {
+impl StorageColumn for AuditDateColumn {
     fn update_config_map(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
@@ -336,7 +336,7 @@ impl StorageProperty for AuditDateProperty {
     fn build_config(
         &mut self, 
         _: &BTreeMap<String, String>,
-    ) -> Result<PropertyConfig, PlanetError> {
+    ) -> Result<ColumnConfig, PlanetError> {
         let config = self.config.clone();
         return Ok(config)
     }

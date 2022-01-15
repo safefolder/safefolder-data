@@ -22,7 +22,7 @@ use crate::storage::{generate_id};
 use crate::planet::{PlanetError};
 use crate::commands::folder::config::{DbFolderConfig};
 use crate::storage::constants::*;
-use crate::storage::properties::*;
+use crate::storage::columns::*;
 // use crate::functions::*;
 
 pub trait FolderSchema {
@@ -123,7 +123,7 @@ pub struct NameTree {
 }
 
 // This structure would apply for SchemaData and RowData, we would need to convert from one to the other
-// data has field_id -> value, so if we change property name would not be affected
+// data has field_id -> value, so if we change column name would not be affected
 
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
 pub struct DbData {
@@ -577,7 +577,7 @@ impl DbFolder {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct FolderItemElement(pub PropertyType);
+pub struct FolderItemElement(pub ColumnType);
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FolderItemData {
@@ -1202,7 +1202,7 @@ impl FolderItem for DbFolderItem {
         // let iter = self.db.iter();
         // let db_folder = self.db_folder.clone();
         // let folder = db_folder.get_by_name(folder_name)?.unwrap();
-        // let field_config_map = PropertyConfig::get_property_config_map(
+        // let field_config_map = ColumnConfig::get_Column_config_map(
         //     self.planet_context,
         //     self.context,
         //     &folder
@@ -1359,8 +1359,8 @@ impl DbFolderItem {
         if db_data.is_some() {
             for (field_db_id, field_value) in db_data.unwrap() {
                 let field_db_name = &field_id_map.get(&field_db_id).unwrap().clone();
-                for property in &fields {
-                    if property.to_lowercase() == field_db_name.to_lowercase() {
+                for column in &fields {
+                    if column.to_lowercase() == field_db_name.to_lowercase() {
                         data_new.insert(field_db_id.clone(), field_value.clone());
                     }
                 }
@@ -1375,8 +1375,8 @@ impl DbFolderItem {
         if db_data_collections.is_some() {
             for (field_db_id, items) in db_data_collections.unwrap() {
                 let field_db_name = &field_id_map.get(&field_db_id).unwrap().clone();
-                for property in &fields {
-                    if property.to_lowercase() == field_db_name.to_lowercase() {
+                for column in &fields {
+                    if column.to_lowercase() == field_db_name.to_lowercase() {
                         data_collections_new.insert(field_db_id.clone(), items.clone());
                     }
                 }
@@ -1391,8 +1391,8 @@ impl DbFolderItem {
         if db_data_objects.is_some() {
             for (field_db_id, map) in db_data_objects.unwrap() {
                 let field_db_name = &field_id_map.get(&field_db_id).unwrap().clone();
-                for property in &fields {
-                    if property.to_lowercase() == field_db_name.to_lowercase() {
+                for column in &fields {
+                    if column.to_lowercase() == field_db_name.to_lowercase() {
                         data_objects_new.insert(field_db_id.clone(), map.clone());
                     }
                 }

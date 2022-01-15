@@ -19,43 +19,43 @@ These are the core fields implemented so we can tackle the security and permissi
 Table fields
 ============
 
-* SmallTextProperty                 [done] - text
-* LongTextProperty                  [partly done] - text : This is the text field, needs to be updated based on full text search.
-* CheckBoxProperty                  [done] - number
-* SelectProperty                    [done] - text
-* DateProperty                      [done] - date
-* DurationProperty                  [done] - date
-* NumberProperty                    [done] - number
-* AuditTimeProperty                 [done] - date
-* AuditByProperty                   [done] - text
-* CurrencyProperty                  [done] - number
-* PercentProperty                   [done] - number
-* FormulaProperty                   [done] - formula
+* SmallTextColumn                 [done] - text
+* LongTextColumn                  [partly done] - text : This is the text field, needs to be updated based on full text search.
+* CheckBoxColumn                  [done] - number
+* SelectColumn                    [done] - text
+* DateColumn                      [done] - date
+* DurationColumn                  [done] - date
+* NumberColumn                    [done] - number
+* AuditTimeColumn                 [done] - date
+* AuditByColumn                   [done] - text
+* CurrencyColumn                  [done] - number
+* PercentColumn                   [done] - number
+* FormulaColumn                   [done] - formula
 
-* LinkProperty                      [doing] - reference
-* ReferenceProperty                 [doing] - A reference from a linked folder. Config with linked field. These
+* LinkColumn                      [doing] - reference
+* ReferenceColumn                 [doing] - A reference from a linked folder. Config with linked field. These
     are subqueries. We do subquery when get by id. Also when doing select and search operations.
 -
 These are not complex:
-* GenerateIdProperty                [todo] - text : Random ids
-* GeneratedNumberProperty           [todo] - number: Sequential number - number : Sequence number.
-* LanguageProperty                  [todo] - text
-* PhoneProperty                     [todo]
-* EmailProperty                     [todo]
-* UrlProperty                       [todo]
-* RatingProperty                    [todo]
+* GenerateIdColumn                [todo] - text : Random ids
+* GeneratedNumberColumn           [todo] - number: Sequential number - number : Sequence number.
+* LanguageColumn                  [todo] - text
+* PhoneColumn                     [todo]
+* EmailColumn                     [todo]
+* UrlColumn                       [todo]
+* RatingColumn                    [todo]
 
-* SetProperty                       [todo] - For example, tags
-* ObjectProperty                    [todo]
+* SetColumn                       [todo] - For example, tags
+* ObjectColumn                    [todo]
 
-* SubFolderProperty                 [todo]: This links to another db file with some media data: photo, etc...
+* SubFolderColumn                 [todo]: This links to another db file with some media data: photo, etc...
     In this case we also map into table config, so I can easily have list of folders for this table. I only do
     one level. Here I define background image for the folder.
-* StatsProperty                     [todo]: Statistics on linked fields with formula support: AVERAGE, 
+* StatsColumn                     [todo]: Statistics on linked fields with formula support: AVERAGE, 
     COUNT, COUNTA, COUNTALL, SUM, MAX, AND, OR, XOR, CONCATENATE. I execute these formulas once I post 
     processed the links and references. I would need to parse in a way to use those number functions.
-* FileProperty                      [todo] - Custom file and image management with IPFS. I add many.
-* CommandProperty                   [todo]: This does processing for complex cases, like image manipulation
+* FileColumn                      [todo] - Custom file and image management with IPFS. I add many.
+* CommandColumn                   [todo]: This does processing for complex cases, like image manipulation
 
 Above fields gives us what we need as EXCEL functions into the formula field. Formula can provide a combination 
 of these function fields, which are not needed.
@@ -74,7 +74,7 @@ Then on the app, we have a visual way to add functions, helper content, etc...
 
 */
 
-pub trait StorageProperty {
+pub trait StorageColumn {
     fn update_config_map(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
@@ -82,22 +82,22 @@ pub trait StorageProperty {
     fn build_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
-    ) -> Result<PropertyConfig, PlanetError>;
+    ) -> Result<ColumnConfig, PlanetError>;
     fn validate(&self, data: &String) -> Result<String, PlanetError>;
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String;
 }
 
-pub trait ObjectStorageProperty<'gb> {
+pub trait ObjectStorageColumn<'gb> {
     fn update_config_map(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
-        properties_map: &HashMap<String, PropertyConfig>,
+        properties_map: &HashMap<String, ColumnConfig>,
         table_name: &String,
     ) -> Result<BTreeMap<String, String>, PlanetError>;
     fn build_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
-    ) -> Result<PropertyConfig, PlanetError>;
+    ) -> Result<ColumnConfig, PlanetError>;
     fn validate(
         &self, 
         data: &Vec<String>, 
@@ -105,7 +105,7 @@ pub trait ObjectStorageProperty<'gb> {
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String;
 }
 
-pub trait FormulaStorageProperty {
+pub trait FormulaStorageColumn {
     fn update_config_map(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
@@ -117,30 +117,30 @@ pub trait FormulaStorageProperty {
     fn build_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
-    ) -> Result<PropertyConfig, PlanetError>;
+    ) -> Result<ColumnConfig, PlanetError>;
     fn validate(&self, data: &String) -> Result<String, PlanetError>;
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String;
 }
 
 
-pub trait ValidateProperty {
+pub trait ValidateColumn {
     fn is_valid(&self, value: Option<&String>) -> Result<bool, PlanetError>;
 }
-pub trait ValidateManyProperty {
+pub trait ValidateManyColumn {
     fn is_valid(&self, value: Option<Vec<String>>) -> Result<bool, PlanetError>;
 }
-pub trait ValidateFormulaProperty {
+pub trait ValidateFormulaColumn {
     fn is_valid(&self, value: Option<&String>) -> Result<bool, PlanetError>;
 }
 
-pub trait ProcessProperty {
+pub trait ProcessColumn {
     fn process(
         &self,
         insert_data_map: BTreeMap<String, String>,
         db_data: DbData
     ) -> Result<DbData, PlanetError>;
 }
-pub trait ProcessManyProperty {
+pub trait ProcessManyColumn {
     fn process(
         &self,
         insert_data_collections_map: BTreeMap<String, Vec<String>>,
@@ -149,7 +149,7 @@ pub trait ProcessManyProperty {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum PropertyType {
+pub enum ColumnType {
     SmallText(String),
     LongText(String),
     CheckBox(bool),

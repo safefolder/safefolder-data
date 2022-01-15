@@ -3,30 +3,30 @@ use colored::Colorize;
 use tr::tr;
 
 use crate::planet::{PlanetError, PlanetContext, Context};
-use crate::commands::folder::config::PropertyConfig;
+use crate::commands::folder::config::ColumnConfig;
 use crate::storage::constants::*;
 use crate::planet::constants::*;
-use crate::storage::properties::*;
+use crate::storage::columns::*;
 use crate::storage::folder::*;
 use crate::functions::Formula;
 
 #[derive(Debug, Clone)]
-pub struct LinkProperty<'gb> {
-    pub config: PropertyConfig,
+pub struct LinkColumn<'gb> {
+    pub config: ColumnConfig,
     pub planet_context: &'gb PlanetContext<'gb>,
     pub context: &'gb Context<'gb>,
     pub db_folder: Option<DbFolder>,
 }
-impl<'gb> LinkProperty<'gb> {
+impl<'gb> LinkColumn<'gb> {
     pub fn defaults(
         planet_context: &'gb PlanetContext, 
         context: &'gb Context, 
-        property_config: &PropertyConfig,
+        column_config: &ColumnConfig,
         db_folder: Option<DbFolder>,
     ) -> Self {
-        let property_config = property_config.clone();
+        let column_config = column_config.clone();
         let field_obj = Self{
-            config: property_config,
+            config: column_config,
             planet_context: planet_context,
             context: context,
             db_folder: db_folder,
@@ -34,11 +34,11 @@ impl<'gb> LinkProperty<'gb> {
         return field_obj
     }
 }
-impl<'gb> ObjectStorageProperty<'gb> for LinkProperty<'gb> {
+impl<'gb> ObjectStorageColumn<'gb> for LinkColumn<'gb> {
     fn update_config_map(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
-        _: &HashMap<String, PropertyConfig>,
+        _: &HashMap<String, ColumnConfig>,
         _: &String,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
         let mut field_config_map = field_config_map.clone();
@@ -46,13 +46,13 @@ impl<'gb> ObjectStorageProperty<'gb> for LinkProperty<'gb> {
         let many = config.many;
         let linked_folder_id = config.linked_folder_id;
         let delete_on_link_drop = config.delete_on_link_drop;
-        // linked folder id is required for a link property
+        // linked folder id is required for a link Column
         if linked_folder_id.is_none() {
             let name = config.name.unwrap_or_default();
             return Err(
                 PlanetError::new(
                     500, 
-                    Some(tr!("Property not configured for links: \"{}\"", name)),
+                    Some(tr!("Column not configured for links: \"{}\"", name)),
                 )
             );
         }
@@ -83,7 +83,7 @@ impl<'gb> ObjectStorageProperty<'gb> for LinkProperty<'gb> {
     fn build_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
-    ) -> Result<PropertyConfig, PlanetError> {
+    ) -> Result<ColumnConfig, PlanetError> {
         let field_config_map = field_config_map.clone();
         let mut config = self.config.clone();
         let many = field_config_map.get(MANY);
@@ -115,17 +115,17 @@ impl<'gb> ObjectStorageProperty<'gb> for LinkProperty<'gb> {
         &self, 
         data: &Vec<String>, 
     ) -> Result<Vec<String>, PlanetError> {
-        //eprintln!("LinkProperty.validate :: data: {:?}", data);
+        //eprintln!("LinkColumn.validate :: data: {:?}", data);
         let data = data.clone();
         let config = self.config.clone();
         let linked_folder_id = config.linked_folder_id.unwrap();
         let db_folder = self.db_folder.clone().unwrap();
-        //eprintln!("LinkProperty.validate  :: linked_folder_id: {}", &linked_folder_id);
+        //eprintln!("LinkColumn.validate  :: linked_folder_id: {}", &linked_folder_id);
         let folder = db_folder.get(&linked_folder_id)?;
         let folder_name = folder.name.unwrap();
-        //eprintln!("LinkProperty.validate  :: folder_name: {}", &folder_name);
+        //eprintln!("LinkColumn.validate  :: folder_name: {}", &folder_name);
         let many = config.many.unwrap();
-        //eprintln!("LinkProperty.validate  :: many: {}", &many);
+        //eprintln!("LinkColumn.validate  :: many: {}", &many);
         if many == false && data.len() > 1 {
             return Err(
                 PlanetError::new(
@@ -159,7 +159,7 @@ impl<'gb> ObjectStorageProperty<'gb> for LinkProperty<'gb> {
         let mut db_folder_item = result.unwrap();
         // I will check I am able to fetch the link remote by id and fetch name
         for item_id in data.clone() {
-            //eprintln!("LinkProperty.validate  :: item_id: {}", &item_id);
+            //eprintln!("LinkColumn.validate  :: item_id: {}", &item_id);
             let _ = db_folder_item.get(
                 &folder_name, 
                 GetItemOption::ById(item_id), 
@@ -169,8 +169,8 @@ impl<'gb> ObjectStorageProperty<'gb> for LinkProperty<'gb> {
         return Ok(data);
     }
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
-        let property_config = self.config.clone();
-        let field_name = property_config.name.unwrap();
+        let column_config = self.config.clone();
+        let field_name = column_config.name.unwrap();
         let mut yaml_string = yaml_string.clone();
         let field = &field_name.truecolor(
             YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
@@ -187,22 +187,22 @@ impl<'gb> ObjectStorageProperty<'gb> for LinkProperty<'gb> {
 }
 
 #[derive(Debug, Clone)]
-pub struct ReferenceProperty<'gb> {
-    pub config: PropertyConfig,
+pub struct ReferenceColumn<'gb> {
+    pub config: ColumnConfig,
     pub planet_context: &'gb PlanetContext<'gb>,
     pub context: &'gb Context<'gb>,
     pub db_folder: Option<DbFolder>,
 }
-impl<'gb> ReferenceProperty<'gb> {
+impl<'gb> ReferenceColumn<'gb> {
     pub fn defaults(
         planet_context: &'gb PlanetContext, 
         context: &'gb Context, 
-        property_config: &PropertyConfig,
+        column_config: &ColumnConfig,
         db_folder: Option<DbFolder>,
     ) -> Self {
-        let property_config = property_config.clone();
+        let column_config = column_config.clone();
         let field_obj = Self{
-            config: property_config,
+            config: column_config,
             planet_context: planet_context,
             context: context,
             db_folder: db_folder,
@@ -210,39 +210,39 @@ impl<'gb> ReferenceProperty<'gb> {
         return field_obj
     }
 }
-impl<'gb> ObjectStorageProperty<'gb> for ReferenceProperty<'gb> {
+impl<'gb> ObjectStorageColumn<'gb> for ReferenceColumn<'gb> {
     fn update_config_map(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
-        properties_map: &HashMap<String, PropertyConfig>,
+        properties_map: &HashMap<String, ColumnConfig>,
         folder_name: &String,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
         let db_folder = self.db_folder.clone().unwrap();
         let mut field_config_map = field_config_map.clone();
         let config = self.config.clone();
-        let related_property = config.related_property;
-        if related_property.is_none() {
+        let related_column = config.related_column;
+        if related_column.is_none() {
             let name = config.name.unwrap_or_default();
             return Err(
                 PlanetError::new(
                     500, 
-                    Some(tr!("Property not configured for reference: \"{}\". It needs 
-                    to have \"related_property\"", name)),
+                    Some(tr!("Column not configured for reference: \"{}\". It needs 
+                    to have \"related_column\"", name)),
                 )
             );
         }
-        let related_property = related_property.unwrap();
-        let related_property_obj = properties_map.get(&related_property);
-        if related_property_obj.is_none() {
+        let related_column = related_column.unwrap();
+        let related_column_obj = properties_map.get(&related_column);
+        if related_column_obj.is_none() {
             return Err(
                 PlanetError::new(
                     500, 
-                    Some(tr!("Related property \"{}\" not found.", &related_property)),
+                    Some(tr!("Related Column \"{}\" not found.", &related_column)),
                 )
             );
         }
-        //eprintln!("Reference.update_config_map :: related_property: {}", &related_property);
-        let related = properties_map.get(&related_property);
+        //eprintln!("Reference.update_config_map :: related_column: {}", &related_column);
+        let related = properties_map.get(&related_column);
         if related.is_some() {
             let related = related.unwrap().clone();
             let many = related.many.unwrap();
@@ -252,7 +252,7 @@ impl<'gb> ObjectStorageProperty<'gb> for ReferenceProperty<'gb> {
                 field_config_map.insert(String::from(MANY), String::from(FALSE));
             }
         }
-        field_config_map.insert(RELATED_PROPERTY.to_string(), related_property);
+        field_config_map.insert(RELATED_COLUMN.to_string(), related_column);
         // formula
         let formula = config.formula;
         if formula.is_some() {
@@ -283,7 +283,7 @@ impl<'gb> ObjectStorageProperty<'gb> for ReferenceProperty<'gb> {
     fn build_config(
         &mut self, 
         _: &BTreeMap<String, String>,
-    ) -> Result<PropertyConfig, PlanetError> {
+    ) -> Result<ColumnConfig, PlanetError> {
         let config = self.config.clone();
         return Ok(config)
     }
@@ -295,8 +295,8 @@ impl<'gb> ObjectStorageProperty<'gb> for ReferenceProperty<'gb> {
         return Ok(data);
     }
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
-        let property_config = self.config.clone();
-        let field_name = property_config.name.unwrap();
+        let column_config = self.config.clone();
+        let field_name = column_config.name.unwrap();
         let mut yaml_string = yaml_string.clone();
         let field = &field_name.truecolor(
             YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]

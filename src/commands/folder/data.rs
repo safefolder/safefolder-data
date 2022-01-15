@@ -19,18 +19,18 @@ use crate::commands::{CommandRunner};
 use crate::planet::constants::{ID, NAME};
 use crate::storage::folder::{DbFolder, DbFolderItem, FolderItem, FolderSchema, DbData, GetItemOption};
 use crate::storage::folder::*;
-use crate::storage::{ConfigStorageProperty, generate_id};
+use crate::storage::{ConfigStorageColumn, generate_id};
 use crate::planet::{
     PlanetContext, 
     PlanetError,
     Context,
     validation::PlanetValidationError,
 };
-use crate::storage::properties::{text::*, StorageProperty, ObjectStorageProperty};
-use crate::storage::properties::number::*;
-use crate::storage::properties::date::*;
-use crate::storage::properties::formula::*;
-use crate::storage::properties::reference::*;
+use crate::storage::columns::{text::*, StorageColumn, ObjectStorageColumn};
+use crate::storage::columns::number::*;
+use crate::storage::columns::date::*;
+use crate::storage::columns::formula::*;
+use crate::storage::columns::reference::*;
 
 pub struct InsertIntoFolder<'gb> {
     pub planet_context: &'gb PlanetContext<'gb>,
@@ -53,12 +53,12 @@ impl<'gb> InsertIntoFolder<'gb> {
             if id_map.is_some() {
                 let id_map = id_map.unwrap();
                 let id = id_map.get(ID);
-                let property_type = id_map.get(PROPERTY_TYPE);
+                let column_type = id_map.get(COLUMN_TYPE);
                 if id.is_some() {
                     let id = id.unwrap().clone();
-                    let property_type = property_type.unwrap().clone();
-                    if property_type == PROPERTY_TYPE_LINK.to_string() {
-                        // property_id => remote folder item id
+                    let column_type = column_type.unwrap().clone();
+                    if column_type == COLUMN_TYPE_LINK.to_string() {
+                        // column_id => remote folder item id
                         insert_id_data_objects_map.insert(id, value);
                     } else {
                         insert_id_data_map.insert(id, value);
@@ -154,19 +154,19 @@ impl<'gb> InsertIntoFolder<'gb> {
                 
                 // eprintln!("InsertIntoFolder.run :: folder: {:#?}", &folder);
 
-                // I need a way to get list of instance PropertyConfig (properties)
-                let config_properties = PropertyConfig::parse_from_db(
+                // I need a way to get list of instance ColumnConfig (properties)
+                let config_columns = ColumnConfig::parse_from_db(
                     self.planet_context,
                     self.context,
                     &folder
                 );
-                if config_properties.is_err() {
-                    let error = config_properties.unwrap_err();
+                if config_columns.is_err() {
+                    let error = config_columns.unwrap_err();
                     errors.push(error);
                     return Err(errors);
                 }
-                let config_properties = config_properties.unwrap();
-                // eprintln!("InsertIntoFolder.run :: config_properties: {:#?}", &config_properties);
+                let config_columns = config_columns.unwrap();
+                // eprintln!("InsertIntoFolder.run :: config_columns: {:#?}", &config_columns);
 
                 let insert_data_map: BTreeMap<String, String> = self.config.data.clone().unwrap();
                 let insert_data_collections_map = self.config.data_collections.clone();
@@ -192,25 +192,25 @@ impl<'gb> InsertIntoFolder<'gb> {
                 // let insert_data_collections_map = self.config.data_collections.clone().unwrap();
                 // eprintln!("InsertIntoFolder.run :: insert_data__collections_map: {:#?}", &insert_data_collections_map);
                 // TODO: Change for the item name
-                // We will use this when we have the Name property, which is required in all tables
+                // We will use this when we have the Name column, which is required in all tables
                 // eprintln!("InsertIntoFolder.run :: routing_wrap: {:#?}", &routing_wrap);
 
                 // Keep in mind on name attribute for DbData
-                // 1. Can be small text or any other property, so we need to do validation and generation of data...
+                // 1. Can be small text or any other column, so we need to do validation and generation of data...
                 // 2. Becaouse if formula is generated from other properties, is generated number or id is also generated
                 // I also need a set of properties allowed to be name (Small Text, Formula), but this in future....
                 // name on YAML not required, since can be generated
-                // Check property type and attribute to validate
+                // Check column type and attribute to validate
                 // So far only take Small Text
-                let name_field: PropertyConfig = PropertyConfig::get_name_property(&folder).unwrap();
-                let name_field_type = name_field.property_type.unwrap().clone();
+                let name_column: ColumnConfig = ColumnConfig::get_name_column(&folder).unwrap();
+                let name_column_type = name_column.column_type.unwrap().clone();
                 let insert_name = self.config.name.clone();
                 // Only support so far Small Text and needs to be informed in YAML with name
-                if name_field_type != PROPERTY_TYPE_SMALL_TEXT.to_string() || insert_name.is_none() {
+                if name_column_type != COLUMN_TYPE_SMALL_TEXT.to_string() || insert_name.is_none() {
                     errors.push(
                         PlanetError::new(
                             500, 
-                            Some(tr!("You need to include name property when inserting data into database.
+                            Some(tr!("You need to include name column when inserting data into database.
                              Only \"Small Text\" supported so far")),
                         )
                     );
@@ -250,145 +250,145 @@ impl<'gb> InsertIntoFolder<'gb> {
                 let mut data: BTreeMap<String, String> = BTreeMap::new();
                 let mut data_objects: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
                 let mut data_collections: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
-                let mut property_config_map: BTreeMap<String, PropertyConfig> = BTreeMap::new();
-                for property in config_properties.clone() {
-                    let field_name = property.name.clone().unwrap();
-                    property_config_map.insert(field_name, property.clone());
+                let mut column_config_map: BTreeMap<String, ColumnConfig> = BTreeMap::new();
+                for column in config_columns.clone() {
+                    let field_name = column.name.clone().unwrap();
+                    column_config_map.insert(field_name, column.clone());
                 }
-                let mut links_map: HashMap<String, Vec<PropertyConfig>> = HashMap::new();
+                let mut links_map: HashMap<String, Vec<ColumnConfig>> = HashMap::new();
                 let mut links_data_map: HashMap<String, HashMap<String, Vec<String>>> = HashMap::new();
-                for property in config_properties {
-                    let mut property_data: Option<Vec<String>> = None;
-                    let property_config = property.clone();
-                    let property_type = property.property_type.unwrap_or_default();
-                    let property_type = property_type.as_str();
-                    let property_name = property.name.unwrap();
-                    eprintln!("InsertIntoFolder.run :: \"{}\" property_type: {}", &property_name, &property_type);
-                    // I always have a property id
-                    let property_id = property.id.unwrap_or_default();
+                for column in config_columns {
+                    let mut column_data: Option<Vec<String>> = None;
+                    let column_config = column.clone();
+                    let column_type = column.column_type.unwrap_or_default();
+                    let column_type = column_type.as_str();
+                    let column_name = column.name.unwrap();
+                    eprintln!("InsertIntoFolder.run :: \"{}\" column_type: {}", &column_name, &column_type);
+                    // I always have a column id
+                    let column_id = column.id.unwrap_or_default();
                     
-                    let data_item = insert_id_data_map.get(&property_id);
+                    let data_item = insert_id_data_map.get(&column_id);
                     if data_item.is_some() {
                         eprintln!("InsertIntoFolder.run :: have data_item...");
                         let data_item = data_item.unwrap().clone();
                         let mut items = Vec::new();
                         items.push(data_item);
-                        property_data = Some(items);
+                        column_data = Some(items);
                     }
                     let data_objects_item = insert_id_data_objects_map.get(
-                        &property_id
+                        &column_id
                     );
-                    if data_objects_item.is_some() && property_data.is_none() {
+                    if data_objects_item.is_some() && column_data.is_none() {
                         eprintln!("InsertIntoFolder.run :: have data_objects_item...");
                         let mut items = Vec::new();
                         items.push(data_objects_item.unwrap().clone());
-                        property_data = Some(items);
+                        column_data = Some(items);
                     }
                     let data_collections_item = insert_id_data_collections_map.get(
-                        &property_id
+                        &column_id
                     );
-                    if data_collections_item.is_some() && property_data.is_none() {
+                    if data_collections_item.is_some() && column_data.is_none() {
                         eprintln!("InsertIntoFolder.run :: have data_collections_item...");
                         let data_collections_item = data_collections_item.unwrap().clone();
-                        property_data = Some(data_collections_item);
+                        column_data = Some(data_collections_item);
                     }
                     // In case we don't have any value and is system generated we skip
-                    eprintln!("InsertIntoFolder.run :: before check .. property_data: {:?}", &property_data);
-                    if property_data.is_none() &&
+                    eprintln!("InsertIntoFolder.run :: before check .. column_data: {:?}", &column_data);
+                    if column_data.is_none() &&
                         (
-                            property_type != PROPERTY_TYPE_FORMULA && 
-                            property_type != PROPERTY_TYPE_CREATED_TIME && 
-                            property_type != PROPERTY_TYPE_LAST_MODIFIED_TIME
+                            column_type != COLUMN_TYPE_FORMULA && 
+                            column_type != COLUMN_TYPE_CREATED_TIME && 
+                            column_type != COLUMN_TYPE_LAST_MODIFIED_TIME
                         ) {
-                            eprintln!("InsertIntoFolder.run :: \"{}\" I skip...", &property_name);
+                            eprintln!("InsertIntoFolder.run :: \"{}\" I skip...", &column_name);
                         continue
                     }
-                    let property_data_: Vec<String>;
-                    if property_data.is_some() {
-                        property_data_ = property_data.clone().unwrap().clone();
+                    let column_data_: Vec<String>;
+                    if column_data.is_some() {
+                        column_data_ = column_data.clone().unwrap().clone();
                     } else {
                         let mut items = Vec::new();
                         items.push(String::from(""));
-                        property_data_ = items;
+                        column_data_ = items;
                     }
-                    let property_data = property_data_;
-                    eprintln!("InsertIntoFolder.run :: \"{}\" property_data: {:?}", &property_name, &property_data);
-                    let mut property_data_wrap: Result<String, PlanetError> = Ok(String::from(""));
+                    let column_data = column_data_;
+                    eprintln!("InsertIntoFolder.run :: \"{}\" column_data: {:?}", &column_name, &column_data);
+                    let mut column_data_wrap: Result<String, PlanetError> = Ok(String::from(""));
                     let mut skip_data_assign = false;
-                    match property_type {
-                        PROPERTY_TYPE_SMALL_TEXT => {
-                            let obj = SmallTextProperty::defaults(&property_config);
-                            property_data_wrap = obj.validate(&property_data[0]);
+                    match column_type {
+                        COLUMN_TYPE_SMALL_TEXT => {
+                            let obj = SmallTextColumn::defaults(&column_config);
+                            column_data_wrap = obj.validate(&column_data[0]);
                         },
-                        PROPERTY_TYPE_LONG_TEXT => {
-                            let obj = LongTextProperty::defaults(&property_config);
-                            property_data_wrap = obj.validate(&property_data[0]);
+                        COLUMN_TYPE_LONG_TEXT => {
+                            let obj = LongTextColumn::defaults(&column_config);
+                            column_data_wrap = obj.validate(&column_data[0]);
                         },
-                        PROPERTY_TYPE_CHECKBOX => {
-                            let obj = CheckBoxProperty::defaults(&property_config);
-                            property_data_wrap = obj.validate(&property_data[0]);
+                        COLUMN_TYPE_CHECKBOX => {
+                            let obj = CheckBoxColumn::defaults(&column_config);
+                            column_data_wrap = obj.validate(&column_data[0]);
                         },
-                        PROPERTY_TYPE_NUMBER => {
-                            let obj = NumberProperty::defaults(&property_config);
-                            property_data_wrap = obj.validate(&property_data[0]);
+                        COLUMN_TYPE_NUMBER => {
+                            let obj = NumberColumn::defaults(&column_config);
+                            column_data_wrap = obj.validate(&column_data[0]);
                         },
-                        PROPERTY_TYPE_SELECT => {
-                            let obj = SelectProperty::defaults(
-                                &property_config, 
+                        COLUMN_TYPE_SELECT => {
+                            let obj = SelectColumn::defaults(
+                                &column_config, 
                                 Some(&folder)
                             );
-                            property_data_wrap = obj.validate(&property_data[0]);
+                            column_data_wrap = obj.validate(&column_data[0]);
                         },
-                        PROPERTY_TYPE_FORMULA => {
-                            let obj = FormulaProperty::defaults(&property_config);
-                            property_data_wrap = obj.validate(&data, &property_config_map);
+                        COLUMN_TYPE_FORMULA => {
+                            let obj = FormulaColumn::defaults(&column_config);
+                            column_data_wrap = obj.validate(&data, &column_config_map);
                         },
-                        PROPERTY_TYPE_DATE => {
-                            let obj = DateProperty::defaults(&property_config);
-                            property_data_wrap = obj.validate(&property_data[0]);
+                        COLUMN_TYPE_DATE => {
+                            let obj = DateColumn::defaults(&column_config);
+                            column_data_wrap = obj.validate(&column_data[0]);
                         },
-                        PROPERTY_TYPE_DURATION => {
-                            let obj = DurationProperty::defaults(&property_config);
-                            property_data_wrap = obj.validate(&property_data[0]);
+                        COLUMN_TYPE_DURATION => {
+                            let obj = DurationColumn::defaults(&column_config);
+                            column_data_wrap = obj.validate(&column_data[0]);
                         },
-                        PROPERTY_TYPE_CREATED_TIME => {
-                            let obj = AuditDateProperty::defaults(&property_config);
-                            property_data_wrap = obj.validate(&property_data[0]);
+                        COLUMN_TYPE_CREATED_TIME => {
+                            let obj = AuditDateColumn::defaults(&column_config);
+                            column_data_wrap = obj.validate(&column_data[0]);
                         },
-                        PROPERTY_TYPE_LAST_MODIFIED_TIME => {
-                            let obj = AuditDateProperty::defaults(&property_config);
-                            property_data_wrap = obj.validate(&property_data[0]);
+                        COLUMN_TYPE_LAST_MODIFIED_TIME => {
+                            let obj = AuditDateColumn::defaults(&column_config);
+                            column_data_wrap = obj.validate(&column_data[0]);
                         },
-                        PROPERTY_TYPE_CREATED_BY => {
-                            let obj = AuditByProperty::defaults(&property_config);
-                            property_data_wrap = obj.validate(&user_id);
+                        COLUMN_TYPE_CREATED_BY => {
+                            let obj = AuditByColumn::defaults(&column_config);
+                            column_data_wrap = obj.validate(&user_id);
                         },
-                        PROPERTY_TYPE_LAST_MODIFIED_BY => {
-                            let obj = AuditByProperty::defaults(&property_config);
-                            property_data_wrap = obj.validate(&user_id);
+                        COLUMN_TYPE_LAST_MODIFIED_BY => {
+                            let obj = AuditByColumn::defaults(&column_config);
+                            column_data_wrap = obj.validate(&user_id);
                         },
-                        PROPERTY_TYPE_CURRENCY => {
-                            let obj = CurrencyProperty::defaults(&property_config);
-                            property_data_wrap = obj.validate(&property_data[0]);
+                        COLUMN_TYPE_CURRENCY => {
+                            let obj = CurrencyColumn::defaults(&column_config);
+                            column_data_wrap = obj.validate(&column_data[0]);
                         },
-                        PROPERTY_TYPE_PERCENTAGE => {
-                            let obj = PercentageProperty::defaults(&property_config);
-                            property_data_wrap = obj.validate(&property_data[0]);
+                        COLUMN_TYPE_PERCENTAGE => {
+                            let obj = PercentageColumn::defaults(&column_config);
+                            column_data_wrap = obj.validate(&column_data[0]);
                         },
-                        PROPERTY_TYPE_LINK => {
-                            let obj = LinkProperty::defaults(
+                        COLUMN_TYPE_LINK => {
+                            let obj = LinkColumn::defaults(
                                 self.planet_context,
                                 self.context,
-                                &property_config,
+                                &column_config,
                                 Some(self.db_folder.clone()),
                             );
-                            let result = obj.validate(&property_data);
+                            let result = obj.validate(&column_data);
                             if result.is_err() {
                                 let error = result.clone().err().unwrap();
                                 errors.push(error);
                             }
                             let id_list = result.unwrap();
-                            let many = property_config.many.unwrap();
+                            let many = column_config.many.unwrap();
                             if many {
                                 let mut items: Vec<BTreeMap<String, String>> = Vec::new();
                                 for item_id in id_list.clone() {
@@ -396,34 +396,34 @@ impl<'gb> InsertIntoFolder<'gb> {
                                     map.insert(ID.to_string(), item_id);
                                     items.push(map);
                                 }
-                                data_collections.insert(property_id.clone(), items);
+                                data_collections.insert(column_id.clone(), items);
                             } else {
                                 let mut map: BTreeMap<String, String> = BTreeMap::new();
                                 let value = id_list[0].clone();
                                 map.insert(ID.to_string(), value);
-                                data_objects.insert(property_id.clone(), map);
+                                data_objects.insert(column_id.clone(), map);
                             }
                             skip_data_assign = true;
                             // links_map
-                            let linked_folder_id = property_config.clone().linked_folder_id.unwrap();
+                            let linked_folder_id = column_config.clone().linked_folder_id.unwrap();
                             let map_item = links_map.get(
                                 &linked_folder_id
                             );
                             if map_item.is_some() {
                                 let mut array = map_item.unwrap().clone();
-                                array.push(property_config);
-                                links_map.insert(property_id.clone(), array.clone());
+                                array.push(column_config);
+                                links_map.insert(column_id.clone(), array.clone());
                             } else {
-                                let mut array: Vec<PropertyConfig> = Vec::new();
-                                array.push(property_config);
-                                links_map.insert(property_id.clone(), array);
+                                let mut array: Vec<ColumnConfig> = Vec::new();
+                                array.push(column_config);
+                                links_map.insert(column_id.clone(), array);
                             }
                             // links_data_map
                             // address folder id => {"Home Addresses" => [jdskdsj], "Work Addresses": [djdks8dsjk]}
                             let map_item_data = links_data_map.get(&linked_folder_id);
                             if map_item_data.is_some() {
                                 let mut my_map = map_item_data.unwrap().clone();
-                                let my_list_wrap = my_map.get(&property_name.clone());
+                                let my_list_wrap = my_map.get(&column_name.clone());
                                 let mut my_list: Vec<String>;
                                 if my_list_wrap.is_some() {
                                     my_list = my_list_wrap.unwrap().clone();
@@ -433,37 +433,37 @@ impl<'gb> InsertIntoFolder<'gb> {
                                 for item_id in id_list.clone() {
                                     my_list.push(item_id);
                                 }
-                                my_map.insert(property_name.clone(), my_list);
-                                links_data_map.insert(property_id.clone(), my_map);
+                                my_map.insert(column_name.clone(), my_list);
+                                links_data_map.insert(column_id.clone(), my_map);
                             } else {
                                 let mut my_map: HashMap<String, Vec<String>> = HashMap::new();
                                 let mut my_list: Vec<String> = Vec::new();
                                 for item_id in id_list.clone() {
                                     my_list.push(item_id);
                                 }
-                                my_map.insert(property_name.clone(), my_list);
-                                links_data_map.insert(property_id.clone(), my_map);
+                                my_map.insert(column_name.clone(), my_list);
+                                links_data_map.insert(column_id.clone(), my_map);
                             }
                         },
                         _ => {
                             errors.push(
                                 PlanetError::new(
                                     500, 
-                                    Some(tr!("Field \"{}\" not supported.", &property_type)),
+                                    Some(tr!("Field \"{}\" not supported.", &column_type)),
                                 )
                             );
                         }
                     };
                     eprintln!("InsertIntoFolder.run :: \"{}\" skip_data_assign: {} data: {} objects: {} collections: {}", 
-                        &property_name,
+                        &column_name,
                         &skip_data_assign,
-                        &property_data_wrap.is_ok(),
+                        &column_data_wrap.is_ok(),
                         &data_objects.len(),
                         &data_collections.len(),
                     );
                     if skip_data_assign == false {
                         let tuple = handle_field_response(
-                            &property_data_wrap, &errors, &property_id, &data
+                            &column_data_wrap, &errors, &column_id, &data
                         );
                         data = tuple.0;
                         errors = tuple.1;
@@ -492,9 +492,9 @@ impl<'gb> InsertIntoFolder<'gb> {
                 let id_record = response.clone().id.unwrap();
                 eprintln!("InsertIntoFolder.run :: time: {} µs", &t_1.elapsed().as_micros());
                 // links
-                for (property_id, config_property_list) in links_map {
+                for (column_id, config_column_list) in links_map {
                     // Get db item for this link
-                    for config in config_property_list {
+                    for config in config_column_list {
                         let many = config.many.unwrap();
                         let remote_folder_id = config.linked_folder_id;
                         if remote_folder_id.is_none() {
@@ -503,10 +503,10 @@ impl<'gb> InsertIntoFolder<'gb> {
                         let remote_folder_id = remote_folder_id.unwrap();
                         let folder = self.db_folder.get(&remote_folder_id).unwrap();
                         let folder_name = folder.name.unwrap();
-                        let main_data_map = links_data_map.get(&property_id);
+                        let main_data_map = links_data_map.get(&column_id);
                         if main_data_map.is_some() {
                             let main_data_map = main_data_map.unwrap();
-                            for (_property_name, id_list) in main_data_map {
+                            for (_column_name, id_list) in main_data_map {
                                 for item_id in id_list {
                                     let result: Result<DbFolderItem, PlanetError> = DbFolderItem::defaults(
                                         home_dir,
@@ -537,7 +537,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                                             } else {
                                                 data_collections = BTreeMap::new();
                                             }
-                                            let list_wrap = data_collections.get(&property_id);
+                                            let list_wrap = data_collections.get(&column_id);
                                             let mut list: Vec<BTreeMap<String, String>>;
                                             if list_wrap.is_some() {
                                                 list = list_wrap.unwrap().clone();
@@ -550,7 +550,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                                                 item_object.insert(ID.to_string(), id_record.clone());
                                                 list.push(item_object);
                                             }
-                                            data_collections.insert(property_id.clone(), list);
+                                            data_collections.insert(column_id.clone(), list);
                                             linked_item.data_collections = Some(data_collections);
                                             let _linked_item = db_row.update(&linked_item);
                                         } else {
@@ -563,7 +563,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                                             }
                                             let mut item_object: BTreeMap<String, String> = BTreeMap::new();
                                             item_object.insert(ID.to_string(), id_record.clone());
-                                            data_objects.insert(property_id.clone(), item_object);
+                                            data_objects.insert(column_id.clone(), item_object);
                                             linked_item.data_objects = Some(data_objects);
                                             let _linked_item = db_row.update(&linked_item);
                                         }
@@ -720,13 +720,13 @@ impl<'gb> Command<String> for GetFromFolder<'gb> {
                 }
                 let folder = folder.unwrap();
                 let data_collections = folder.clone().data_collections;
-                let field_ids = data_collections.unwrap().get(PROPERTY_IDS).unwrap().clone();
-                let config_properties = PropertyConfig::parse_from_db(
+                let field_ids = data_collections.unwrap().get(COLUMN_IDS).unwrap().clone();
+                let config_columns = ColumnConfig::parse_from_db(
                     self.planet_context,
                     self.context,
                     &folder
                 )?;
-                let field_id_map: BTreeMap<String, PropertyConfig> = PropertyConfig::get_property_id_map(&config_properties)?;
+                let field_id_map: BTreeMap<String, ColumnConfig> = ColumnConfig::get_column_id_map(&config_columns)?;
                 let properties = self.config.data.clone().unwrap().properties;
                 eprintln!("GetFromFolder.run :: properties: {:?}", &properties);
                 let item_id = self.config.data.clone().unwrap().id.unwrap();
@@ -742,8 +742,8 @@ impl<'gb> Command<String> for GetFromFolder<'gb> {
                 let id_yaml = format!("{}", 
                     id_yaml_value.truecolor(YAML_COLOR_ORANGE[0], YAML_COLOR_ORANGE[1], YAML_COLOR_ORANGE[2]), 
                 );
-                yaml_out_str.push_str(format!("{property}: {value}\n", 
-                    property=String::from(ID).truecolor(
+                yaml_out_str.push_str(format!("{column}: {value}\n", 
+                    column=String::from(ID).truecolor(
                         YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
                     ), 
                     value=&id_yaml
@@ -753,8 +753,8 @@ impl<'gb> Command<String> for GetFromFolder<'gb> {
                 let name_yaml = format!("{}", 
                     name_yaml_value.truecolor(YAML_COLOR_ORANGE[0], YAML_COLOR_ORANGE[1], YAML_COLOR_ORANGE[2]), 
                 );
-                yaml_out_str.push_str(format!("{property}: {value}\n", 
-                    property=String::from(NAME).truecolor(
+                yaml_out_str.push_str(format!("{column}: {value}\n", 
+                    column=String::from(NAME).truecolor(
                         YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
                     ), 
                     value=&name_yaml
@@ -763,76 +763,76 @@ impl<'gb> Command<String> for GetFromFolder<'gb> {
                     String::from("data:").truecolor(YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]),
                 ).as_str());
                 if data.is_some() {
-                    // property_id -> string value
+                    // column_id -> string value
                     let data = data.unwrap();
-                    // I need to go through in same order as properties were registered in PropertyConfig when creating schema
+                    // I need to go through in same order as properties were registered in ColumnConfig when creating schema
                     for field_id_data in field_ids {
-                        let property_id = field_id_data.get(ID).unwrap();
-                        let property_config = field_id_map.get(property_id).unwrap().clone();
-                        let field_config_ = property_config.clone();
-                        let property_type = property_config.property_type.unwrap();
-                        let property_type =property_type.as_str();
-                        let value = data.get(property_id);
+                        let column_id = field_id_data.get(ID).unwrap();
+                        let column_config = field_id_map.get(column_id).unwrap().clone();
+                        let field_config_ = column_config.clone();
+                        let column_type = column_config.column_type.unwrap();
+                        let column_type = column_type.as_str();
+                        let value = data.get(column_id);
                         if value.is_none() {
                             continue
                         }
                         let value = value.unwrap();
                         // Get will return YAML document for the data
-                        match property_type {
-                            PROPERTY_TYPE_SMALL_TEXT => {
-                                let obj = SmallTextProperty::defaults(&field_config_);
+                        match column_type {
+                            COLUMN_TYPE_SMALL_TEXT => {
+                                let obj = SmallTextColumn::defaults(&field_config_);
                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },
-                            PROPERTY_TYPE_LONG_TEXT => {
-                                let obj = LongTextProperty::defaults(&field_config_);
+                            COLUMN_TYPE_LONG_TEXT => {
+                                let obj = LongTextColumn::defaults(&field_config_);
                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },
-                            PROPERTY_TYPE_CHECKBOX => {
-                                let obj = CheckBoxProperty::defaults(&field_config_);
+                            COLUMN_TYPE_CHECKBOX => {
+                                let obj = CheckBoxColumn::defaults(&field_config_);
                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },
-                            PROPERTY_TYPE_NUMBER => {
-                                let obj = NumberProperty::defaults(&field_config_);
+                            COLUMN_TYPE_NUMBER => {
+                                let obj = NumberColumn::defaults(&field_config_);
                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },
-                            PROPERTY_TYPE_SELECT => {
-                                let obj = SelectProperty::defaults(&field_config_, Some(&folder));
+                            COLUMN_TYPE_SELECT => {
+                                let obj = SelectColumn::defaults(&field_config_, Some(&folder));
                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },
-                            PROPERTY_TYPE_FORMULA => {
-                                let obj = FormulaProperty::defaults(&field_config_);
+                            COLUMN_TYPE_FORMULA => {
+                                let obj = FormulaColumn::defaults(&field_config_);
                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },
-                            PROPERTY_TYPE_DATE => {
-                                let obj = DateProperty::defaults(&field_config_);
+                            COLUMN_TYPE_DATE => {
+                                let obj = DateColumn::defaults(&field_config_);
                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },
-                            PROPERTY_TYPE_DURATION => {
-                                let obj = DurationProperty::defaults(&field_config_);
+                            COLUMN_TYPE_DURATION => {
+                                let obj = DurationColumn::defaults(&field_config_);
                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },                            
-                            PROPERTY_TYPE_CREATED_TIME => {
-                                let obj = AuditDateProperty::defaults(&field_config_);
+                            COLUMN_TYPE_CREATED_TIME => {
+                                let obj = AuditDateColumn::defaults(&field_config_);
                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },
-                            PROPERTY_TYPE_LAST_MODIFIED_TIME => {
-                                let obj = AuditDateProperty::defaults(&field_config_);
+                            COLUMN_TYPE_LAST_MODIFIED_TIME => {
+                                let obj = AuditDateColumn::defaults(&field_config_);
                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },
-                            PROPERTY_TYPE_CREATED_BY => {
-                                let obj = AuditByProperty::defaults(&field_config_);
+                            COLUMN_TYPE_CREATED_BY => {
+                                let obj = AuditByColumn::defaults(&field_config_);
                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },
-                            PROPERTY_TYPE_LAST_MODIFIED_BY => {
-                                let obj = AuditByProperty::defaults(&field_config_);
+                            COLUMN_TYPE_LAST_MODIFIED_BY => {
+                                let obj = AuditByColumn::defaults(&field_config_);
                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },
-                            PROPERTY_TYPE_CURRENCY => {
-                                let obj = CurrencyProperty::defaults(&field_config_);
+                            COLUMN_TYPE_CURRENCY => {
+                                let obj = CurrencyColumn::defaults(&field_config_);
                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },
-                            PROPERTY_TYPE_PERCENTAGE => {
-                                let obj = PercentageProperty::defaults(&field_config_);
+                            COLUMN_TYPE_PERCENTAGE => {
+                                let obj = PercentageColumn::defaults(&field_config_);
                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },
                             _ => {
@@ -1058,21 +1058,21 @@ impl<'gb> Command<String> for SelectFromFolder<'gb> {
 }
 
 fn handle_field_response(
-    property_data: &Result<String, PlanetError>, 
+    column_data: &Result<String, PlanetError>, 
     errors: &Vec<PlanetError>, 
-    property_id: &String,
+    column_id: &String,
     data: &BTreeMap<String, String>
 ) -> (BTreeMap<String, String>, Vec<PlanetError>) {
-    let property_data = property_data.clone();
+    let column_data = column_data.clone();
     let mut errors = errors.clone();
     let mut data = data.clone();
-    let property_id = property_id.clone();
-    if property_data.is_err() {
-        let err = property_data.unwrap_err();
+    let column_id = column_id.clone();
+    if column_data.is_err() {
+        let err = column_data.unwrap_err();
         errors.push(err);
     } else {
-        let property_data = property_data.unwrap();
-        data.insert(property_id, property_data);
+        let column_data = column_data.unwrap();
+        data.insert(column_id, column_data);
     }
     return (data, errors)
 }

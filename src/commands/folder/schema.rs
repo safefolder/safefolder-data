@@ -8,10 +8,10 @@ use tr::tr;
 use colored::*;
 use regex::Regex;
 
-use crate::commands::folder::config::{CreateFolderConfig, PropertyConfig};
+use crate::commands::folder::config::{CreateFolderConfig, ColumnConfig};
 use crate::commands::folder::{Command};
 use crate::commands::{CommandRunner};
-use crate::storage::{ConfigStorageProperty};
+use crate::storage::{ConfigStorageColumn};
 use crate::storage::folder::{DbFolder, FolderSchema, DbData, RoutingData};
 use crate::planet::{
     PlanetContext, 
@@ -78,19 +78,19 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                 let mut field_name_map: BTreeMap<String, String> = BTreeMap::new();
                 // populate field_type_map and field_name_map
                 let mut field_type_map: BTreeMap<String, String> = BTreeMap::new();
-                let mut properties_map: HashMap<String, PropertyConfig> = HashMap::new();
+                let mut properties_map: HashMap<String, ColumnConfig> = HashMap::new();
                 for field in properties.iter() {
                     let field_attrs = field.clone();
                     let field_name = field.name.clone().unwrap();
-                    let property_type = field.property_type.clone();
+                    let column_type = field.column_type.clone();
                     let mut field_id_map: BTreeMap<String, String> = BTreeMap::new();
                     let field_id = field_attrs.id.unwrap_or_default();
                     field_id_map.insert(String::from(ID), field_id.clone());
                     properties_map.insert(field_name.clone(), field.clone());
                     let _ = &field_ids.push(field_id_map);
-                    if property_type.is_some() {
-                        let property_type = property_type.unwrap();
-                        field_type_map.insert(field_name.clone(), property_type);
+                    if column_type.is_some() {
+                        let column_type = column_type.unwrap();
+                        field_type_map.insert(field_name.clone(), column_type);
                     }
                     let field_name_str = field_name.as_str();
                     if field_name_map.get(field_name_str).is_some() == false {
@@ -124,7 +124,7 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                     data_collections.extend(map_list);
                 }
                 // eprintln!("CreateFolder.run :: data_objects_new: {:#?}", &data_objects_new);
-                data_collections.insert(String::from(PROPERTY_IDS), field_ids);
+                data_collections.insert(String::from(COLUMN_IDS), field_ids);
                 // routing
                 let routing_wrap = RoutingData::defaults(
                     account_id, 
@@ -171,28 +171,28 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                 //
                 let properties = response.data_objects.unwrap();
                 let mut linked_folder_ids: Vec<String> = Vec::new();
-                let mut map_property_names: BTreeMap<String, String> = BTreeMap::new();
-                let mut map_property_ids: BTreeMap<String, String> = BTreeMap::new();
+                let mut map_column_names: BTreeMap<String, String> = BTreeMap::new();
+                let mut map_column_ids: BTreeMap<String, String> = BTreeMap::new();
                 for (_, v) in properties {
-                    let property_type = v.get(PROPERTY_TYPE);
-                    let property_name = v.get(NAME);
-                    let property_id = v.get(ID);
-                    if property_type.is_some() {
-                        let property_type = property_type.unwrap();
-                        let property_name = property_name.unwrap();
-                        let property_id = property_id.unwrap();
-                        if property_type == PROPERTY_TYPE_LINK {
+                    let column_type = v.get(COLUMN_TYPE);
+                    let column_name = v.get(NAME);
+                    let column_id = v.get(ID);
+                    if column_type.is_some() {
+                        let column_type = column_type.unwrap();
+                        let column_name = column_name.unwrap();
+                        let column_id = column_id.unwrap();
+                        if column_type == COLUMN_TYPE_LINK {
                             let linked_folder_id = v.get(LINKED_FOLDER_ID);
                             if linked_folder_id.is_some() {
                                 let linked_folder_id = linked_folder_id.unwrap();
                                 let has_id = linked_folder_ids.contains(linked_folder_id);
                                 if !has_id {
                                     linked_folder_ids.push(linked_folder_id.clone());
-                                    map_property_names.insert(
-                                        linked_folder_id.clone(), property_name.clone()
+                                    map_column_names.insert(
+                                        linked_folder_id.clone(), column_name.clone()
                                     );
-                                    map_property_ids.insert(
-                                        linked_folder_id.clone(), property_id.clone()
+                                    map_column_ids.insert(
+                                        linked_folder_id.clone(), column_id.clone()
                                     );
                                 }
                             }
@@ -200,33 +200,33 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                     }
                 }
                 // Get each folder from db_folder instance and update with link to this created table
-                let local_property_map = db_data.data_objects.unwrap();
+                let local_column_map = db_data.data_objects.unwrap();
                 for link_folder_id in linked_folder_ids {
                     let linked_folder = db_folder.get(&link_folder_id);
                     if linked_folder.is_ok() {
                         let mut linked_folder = linked_folder.unwrap();
                         let mut map = linked_folder.data_objects.unwrap();
-                        let property_name = map_property_names.get(&link_folder_id).unwrap();
-                        let mut remote_property_map: BTreeMap<String, String> = local_property_map.get(
-                            property_name
+                        let column_name = map_column_names.get(&link_folder_id).unwrap();
+                        let mut remote_column_map: BTreeMap<String, String> = local_column_map.get(
+                            column_name
                         ).unwrap().clone();
-                        // Update property map with properties for local field, Link with link_folder_id being 
-                        // this local property
-                        remote_property_map.insert(String::from(LINKED_FOLDER_ID), folder_id.clone());
-                        remote_property_map.insert(String::from(NAME), folder_name.clone());
-                        remote_property_map.insert(String::from(MANY), String::from(TRUE));
-                        map.insert(folder_name.clone(), remote_property_map);
+                        // Update Column map with properties for local field, Link with link_folder_id being 
+                        // this local Column
+                        remote_column_map.insert(String::from(LINKED_FOLDER_ID), folder_id.clone());
+                        remote_column_map.insert(String::from(NAME), folder_name.clone());
+                        remote_column_map.insert(String::from(MANY), String::from(TRUE));
+                        map.insert(folder_name.clone(), remote_column_map);
                         linked_folder.data_objects = Some(map);
-                        let mut property_ids_map = linked_folder.data_collections.unwrap();
-                        let mut property_ids = property_ids_map.get(
-                            PROPERTY_IDS
+                        let mut column_ids_map = linked_folder.data_collections.unwrap();
+                        let mut column_ids = column_ids_map.get(
+                            COLUMN_IDS
                         ).unwrap().clone();
-                        let property_id = map_property_ids.get(&link_folder_id.clone()).unwrap();
+                        let column_id = map_column_ids.get(&link_folder_id.clone()).unwrap();
                         let mut element: BTreeMap<String, String> = BTreeMap::new();
-                        element.insert(String::from(ID),property_id.clone());
-                        property_ids.push(element);
-                        property_ids_map.insert(String::from(PROPERTY_IDS), property_ids);
-                        linked_folder.data_collections = Some(property_ids_map);
+                        element.insert(String::from(ID),column_id.clone());
+                        column_ids.push(element);
+                        column_ids_map.insert(String::from(COLUMN_IDS), column_ids);
+                        linked_folder.data_collections = Some(column_ids_map);
                         eprintln!("CreateFolder.run :: linked_folder: {:#?}", &linked_folder);
                         db_folder.update(&linked_folder)?;
                     }

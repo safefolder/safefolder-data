@@ -5,17 +5,17 @@ use tr::tr;
 use serde_yaml;
 
 use crate::planet::{PlanetError};
-use crate::commands::folder::config::PropertyConfig;
+use crate::commands::folder::config::ColumnConfig;
 use crate::storage::constants::*;
 use crate::functions::{execute_formula, Formula};
-use crate::storage::properties::*;
+use crate::storage::columns::*;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct FormulaProperty {
-    pub config: PropertyConfig
+pub struct FormulaColumn {
+    pub config: ColumnConfig
 }
-impl FormulaProperty {
-    pub fn defaults(field_config: &PropertyConfig) -> Self {
+impl FormulaColumn {
+    pub fn defaults(field_config: &ColumnConfig) -> Self {
         let field_config = field_config.clone();
         let field_obj = Self{
             config: field_config
@@ -23,11 +23,11 @@ impl FormulaProperty {
         return field_obj
     }
 }
-impl FormulaProperty {
+impl FormulaColumn {
     pub fn update_config_map(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
-        properties_map: &HashMap<String, PropertyConfig>,
+        properties_map: &HashMap<String, ColumnConfig>,
         db_folder: &DbFolder,
         table_name: &String,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
@@ -62,7 +62,7 @@ impl FormulaProperty {
     pub fn build_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
-    ) -> Result<PropertyConfig, PlanetError> {
+    ) -> Result<ColumnConfig, PlanetError> {
         let mut config = self.config.clone();
         let formula = field_config_map.get(FORMULA);
         let formula_compiled = field_config_map.get(FORMULA_COMPILED);
@@ -85,7 +85,7 @@ impl FormulaProperty {
     }
     pub fn validate(&self, 
         data_map: &BTreeMap<String, String>,
-        field_config_map: &BTreeMap<String, PropertyConfig>,
+        field_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Result<String, PlanetError> {
         let config = self.config.clone();
         let field_config_map = field_config_map.clone();
@@ -103,7 +103,7 @@ impl FormulaProperty {
             return Err(
                 PlanetError::new(
                     500, 
-                    Some(tr!("Formula not found on formula property")),
+                    Some(tr!("Formula not found on formula column")),
                 )
             );
         }
@@ -111,22 +111,22 @@ impl FormulaProperty {
     pub fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
         let field_config = self.config.clone();
         let mut value = value.clone();
-        // eprintln!("FormulaProperty.get_yaml_out :: field_config: {:#?}", field_config.clone());
-        // eprintln!("FormulaProperty.get_yaml_out :: value: {:?}", &value);
+        // eprintln!("FormulaColumn.get_yaml_out :: field_config: {:#?}", field_config.clone());
+        // eprintln!("FormulaColumn.get_yaml_out :: value: {:?}", &value);
         let field_name = field_config.name.unwrap();
         let mut yaml_string = yaml_string.clone();
-        let property = &field_name.truecolor(
+        let column = &field_name.truecolor(
             YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
         );
         let formula_format = field_config.formula_format.unwrap();
-        // eprintln!("FormulaProperty.get_yaml_out :: formula_format: {:?}", &formula_format);
+        // eprintln!("FormulaColumn.get_yaml_out :: formula_format: {:?}", &formula_format);
         if &formula_format == FORMULA_FORMAT_TEXT {
             value = format!("{}", 
                 value.truecolor(YAML_COLOR_ORANGE[0], YAML_COLOR_ORANGE[1], YAML_COLOR_ORANGE[2]), 
             );
-            // eprintln!("FormulaProperty.get_yaml_out :: Text : value: {}", &value);
+            // eprintln!("FormulaColumn.get_yaml_out :: Text : value: {}", &value);
         } else if &formula_format == FORMULA_FORMAT_NUMBER {
-            // eprintln!("FormulaProperty.get_yaml_out :: Number : value: {}", &value);
+            // eprintln!("FormulaColumn.get_yaml_out :: Number : value: {}", &value);
             value = value.replace("\"", "");
             value = format!("{}", value.truecolor(
                 YAML_COLOR_YELLOW[0], YAML_COLOR_YELLOW[1], YAML_COLOR_YELLOW[2]
@@ -147,8 +147,8 @@ impl FormulaProperty {
                 value.truecolor(YAML_COLOR_ORANGE[0], YAML_COLOR_ORANGE[1], YAML_COLOR_ORANGE[2]), 
             );
         }
-        // eprintln!("FormulaProperty.get_yaml_out :: value: {}", &value);
-        yaml_string.push_str(format!("  {property}: {value}\n", property=property, value=value).as_str());
+        // eprintln!("FormulaColumn.get_yaml_out :: value: {}", &value);
+        yaml_string.push_str(format!("  {column}: {value}\n", column=column, value=value).as_str());
         return yaml_string;
     }
 }

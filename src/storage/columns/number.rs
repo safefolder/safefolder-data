@@ -8,20 +8,20 @@ use regex::{Regex};
 use rust_decimal::prelude::*;
 
 use crate::planet::{PlanetError};
-use crate::commands::folder::config::PropertyConfig;
+use crate::commands::folder::config::ColumnConfig;
 use crate::storage::constants::*;
-use crate::storage::properties::*;
+use crate::storage::columns::*;
 
 lazy_static! {
     pub static ref RE_CURRENCY: Regex = Regex::new(r#"^(?P<symbol_pre>[^\d\.]*)*(?P<amount>\d+[\.\d+]*)(?P<symbol_post>[^\d\.]+)*$"#).unwrap();
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct CheckBoxProperty {
-    pub config: PropertyConfig
+pub struct CheckBoxColumn {
+    pub config: ColumnConfig
 }
-impl CheckBoxProperty {
-    pub fn defaults(field_config: &PropertyConfig) -> Self {
+impl CheckBoxColumn {
+    pub fn defaults(field_config: &ColumnConfig) -> Self {
         let field_config = field_config.clone();
         let field_obj = Self{
             config: field_config
@@ -29,7 +29,7 @@ impl CheckBoxProperty {
         return field_obj
     }
 }
-impl StorageProperty for CheckBoxProperty {
+impl StorageColumn for CheckBoxColumn {
     fn update_config_map(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
@@ -41,7 +41,7 @@ impl StorageProperty for CheckBoxProperty {
     fn build_config(
         &mut self, 
         _: &BTreeMap<String, String>,
-    ) -> Result<PropertyConfig, PlanetError> {
+    ) -> Result<ColumnConfig, PlanetError> {
         let config = self.config.clone();
         // No special attributes so far for small text field
         return Ok(config)
@@ -52,7 +52,7 @@ impl StorageProperty for CheckBoxProperty {
         let field_config = self.config.clone();
         let required = field_config.required.unwrap();
         let name = field_config.name.unwrap();
-        // eprintln!("CheckBoxProperty.is_valid :: value: {:?}", &value);
+        // eprintln!("CheckBoxColumn.is_valid :: value: {:?}", &value);
         if data == String::from("") && required == true {
             return Err(
                 PlanetError::new(
@@ -65,7 +65,7 @@ impl StorageProperty for CheckBoxProperty {
             );
         } else {
             let value_str = data.as_str();
-            // eprintln!("CheckBoxProperty.is_valid :: value_str: {:?}", &value_str);
+            // eprintln!("CheckBoxColumn.is_valid :: value_str: {:?}", &value_str);
             if value_str == "true" || value_str == "false" {
                 return Ok(data);
             } else {
@@ -97,11 +97,11 @@ impl StorageProperty for CheckBoxProperty {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct NumberProperty {
-    pub config: PropertyConfig
+pub struct NumberColumn {
+    pub config: ColumnConfig
 }
-impl NumberProperty {
-    pub fn defaults(field_config: &PropertyConfig) -> Self {
+impl NumberColumn {
+    pub fn defaults(field_config: &ColumnConfig) -> Self {
         let field_config = field_config.clone();
         let field_obj = Self{
             config: field_config
@@ -109,7 +109,7 @@ impl NumberProperty {
         return field_obj
     }
 }
-impl StorageProperty for NumberProperty {
+impl StorageColumn for NumberColumn {
     fn update_config_map(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
@@ -121,7 +121,7 @@ impl StorageProperty for NumberProperty {
     fn build_config(
         &mut self, 
         _: &BTreeMap<String, String>,
-    ) -> Result<PropertyConfig, PlanetError> {
+    ) -> Result<ColumnConfig, PlanetError> {
         let config = self.config.clone();
         // No special attributes so far for small text field
         return Ok(config)
@@ -175,11 +175,11 @@ impl StorageProperty for NumberProperty {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct CurrencyProperty {
-    pub config: PropertyConfig
+pub struct CurrencyColumn {
+    pub config: ColumnConfig
 }
-impl CurrencyProperty {
-    pub fn defaults(field_config: &PropertyConfig) -> Self {
+impl CurrencyColumn {
+    pub fn defaults(field_config: &ColumnConfig) -> Self {
         let field_config = field_config.clone();
         let field_obj = Self{
             config: field_config
@@ -187,7 +187,7 @@ impl CurrencyProperty {
         return field_obj
     }
 }
-impl StorageProperty for CurrencyProperty {
+impl StorageColumn for CurrencyColumn {
     fn update_config_map(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
@@ -213,7 +213,7 @@ impl StorageProperty for CurrencyProperty {
     fn build_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
-    ) -> Result<PropertyConfig, PlanetError> {
+    ) -> Result<ColumnConfig, PlanetError> {
         let mut config = self.config.clone();
         let number_decimals = field_config_map.get(NUMBER_DECIMALS);
         let currency_symbol = field_config_map.get(CURRENCY_SYMBOL);
@@ -261,26 +261,26 @@ impl StorageProperty for CurrencyProperty {
         let symbol_pre_wrap = captures.name("symbol_pre");
         let symbol_post_wrap = captures.name("symbol_post");
         let mut amount_string: String = String::from("");
-        // eprintln!("CurrencyProperty.validate :: before symbol replace: {}", &data);
+        // eprintln!("CurrencyColumn.validate :: before symbol replace: {}", &data);
         if symbol_pre_wrap.is_some() || symbol_post_wrap.is_some() {
             // I have symbol on sent data
             if symbol_pre_wrap.is_some() {
                 let symbol_pre = symbol_pre_wrap.unwrap().as_str();
-                // eprintln!("CurrencyProperty.validate :: [regex] symbol_pre: {}", symbol_pre);
+                // eprintln!("CurrencyColumn.validate :: [regex] symbol_pre: {}", symbol_pre);
                 data = data.clone().replace(symbol_pre, "");
             }
             if symbol_post_wrap.is_some() {
                 let symbol_post = symbol_post_wrap.unwrap().as_str();
-                // eprintln!("CurrencyProperty.validate :: [regex] symbol_post: {}", symbol_post);
+                // eprintln!("CurrencyColumn.validate :: [regex] symbol_post: {}", symbol_post);
                 data = data.clone().replace(symbol_post, "");
             }
         }
         data = data.trim().to_string();
-        // eprintln!("CurrencyProperty.validate :: after symbol replace: {}", &data);
+        // eprintln!("CurrencyColumn.validate :: after symbol replace: {}", &data);
         if amount_wrap.is_some() {
             // Might be 7658.45 or 7658 or $7658. Need to get number without the currency symbol
             let amount_str = amount_wrap.unwrap().as_str();
-            // eprintln!("CurrencyProperty.validate :: [regex] amount_str: {}", amount_str);
+            // eprintln!("CurrencyColumn.validate :: [regex] amount_str: {}", amount_str);
             // 79876.45
             // format amount to have number decimals from config
             let amount = Decimal::from_str(amount_str);
@@ -297,7 +297,7 @@ impl StorageProperty for CurrencyProperty {
             let number_decimals = number_decimals.to_usize().unwrap();
             amount_string = format!("{:.1$}", &amount, number_decimals);
         }
-        // eprintln!("CurrencyProperty.validate :: amount_string: {}", &amount_string);
+        // eprintln!("CurrencyColumn.validate :: amount_string: {}", &amount_string);
         // data needs to have right number of decimals and the currency symbol
         
         data = format!("{}{}", currency_symbol, &amount_string);
@@ -319,11 +319,11 @@ impl StorageProperty for CurrencyProperty {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct PercentageProperty {
-    pub config: PropertyConfig
+pub struct PercentageColumn {
+    pub config: ColumnConfig
 }
-impl PercentageProperty {
-    pub fn defaults(field_config: &PropertyConfig) -> Self {
+impl PercentageColumn {
+    pub fn defaults(field_config: &ColumnConfig) -> Self {
         let field_config = field_config.clone();
         let field_obj = Self{
             config: field_config
@@ -331,7 +331,7 @@ impl PercentageProperty {
         return field_obj
     }
 }
-impl StorageProperty for PercentageProperty {
+impl StorageColumn for PercentageColumn {
     fn update_config_map(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
@@ -352,7 +352,7 @@ impl StorageProperty for PercentageProperty {
     fn build_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
-    ) -> Result<PropertyConfig, PlanetError> {
+    ) -> Result<ColumnConfig, PlanetError> {
         let mut config = self.config.clone();
         let number_decimals = field_config_map.get(NUMBER_DECIMALS);
         if number_decimals.is_some() {

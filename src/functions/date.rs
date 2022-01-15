@@ -87,13 +87,13 @@ pub struct Date {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, PropertyConfig>,
+    field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Date {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, String>>,
-        field_config_map: &BTreeMap<String, PropertyConfig>,
+        field_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -176,13 +176,13 @@ pub struct DateTimeParse {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, PropertyConfig>,
+    field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl DateTimeParse {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, String>>,
-        field_config_map: &BTreeMap<String, PropertyConfig>,
+        field_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -374,13 +374,13 @@ pub struct DateParse {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, PropertyConfig>,
+    field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl DateParse {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, String>>,
-        field_config_map: &BTreeMap<String, PropertyConfig>,
+        field_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -652,13 +652,13 @@ pub struct Now {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, PropertyConfig>,
+    field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Now {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, String>>,
-        field_config_map: &BTreeMap<String, PropertyConfig>
+        field_config_map: &BTreeMap<String, ColumnConfig>
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -710,13 +710,13 @@ pub struct Today {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, PropertyConfig>,
+    field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Today {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, String>>,
-        field_config_map: &BTreeMap<String, PropertyConfig>,
+        field_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -776,13 +776,13 @@ pub struct Days {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, PropertyConfig>,
+    field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Days {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, String>>,
-        field_config_map: &BTreeMap<String, PropertyConfig>
+        field_config_map: &BTreeMap<String, ColumnConfig>
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -892,13 +892,13 @@ pub struct DateAddDiff {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, PropertyConfig>,
+    field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl DateAddDiff {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, String>>,
-        field_config_map: &BTreeMap<String, PropertyConfig>
+        field_config_map: &BTreeMap<String, ColumnConfig>
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -1164,13 +1164,13 @@ pub struct DateFormatFunc {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, String>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, PropertyConfig>,
+    field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl DateFormatFunc {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, String>>,
-        field_config_map: &BTreeMap<String, PropertyConfig>
+        field_config_map: &BTreeMap<String, ColumnConfig>
     ) -> Self {
         let field_config_map = field_config_map.clone();
         return Self{
@@ -1497,7 +1497,7 @@ fn get_rust_date_format(date_obj: DateTime<FixedOffset>, mut format: String) -> 
     return format;
 }
 
-fn get_date_format(field_name: &String, field_config_map: &BTreeMap<String, PropertyConfig>) -> String {
+fn get_date_format(field_name: &String, field_config_map: &BTreeMap<String, ColumnConfig>) -> String {
     let field_name = field_name.clone();
     let field_config_map = field_config_map.clone();
     let field_config = field_config_map.get(&field_name);

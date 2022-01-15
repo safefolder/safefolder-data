@@ -4,35 +4,35 @@ language:
   codes: ["english", "spanish"]
   default: english
 name:
-  property_type: Small Text
+  Column_type: Small Text
 properties:
-  - name: My Property
-    property_type: Small Text
+  - name: My Column
+    Column_type: Small Text
     required: true
     pepito: Hola
   - name: Description
-    property_type: Long Text
+    Column_type: Long Text
   - name: Is Published
-    property_type: Checkbox
+    Column_type: Checkbox
   - name: Counter
-    property_type: Number
+    Column_type: Number
   - name: Status
-    property_type: Select
+    Column_type: Select
     options:
       - Draft
       - Published
       - Deleted
   - name: Locations
-    property_type: Select
+    Column_type: Select
     many: true
     options:
       - Madrid
       - Barcelona
       - Valencia
   - name: Currency
-    property_type: Currency
+    Column_type: Currency
     number_decimals: 2
     currency_symbol: $
   - name: Percentage
-    property_type: Percentage
+    Column_type: Percentage
     number_decimals: 1
