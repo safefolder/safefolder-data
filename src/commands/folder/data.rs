@@ -166,7 +166,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                     return Err(errors);
                 }
                 let config_columns = config_columns.unwrap();
-                // eprintln!("InsertIntoFolder.run :: config_columns: {:#?}", &config_columns);
+                eprintln!("InsertIntoFolder.run :: config_columns: {:#?}", &config_columns);
 
                 let insert_data_map: BTreeMap<String, String> = self.config.data.clone().unwrap();
                 let insert_data_collections_map = self.config.data_collections.clone();
@@ -257,7 +257,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                 }
                 let mut links_map: HashMap<String, Vec<ColumnConfig>> = HashMap::new();
                 let mut links_data_map: HashMap<String, HashMap<String, Vec<String>>> = HashMap::new();
-                for column in config_columns {
+                for column in config_columns.clone() {
                     let mut column_data: Option<Vec<String>> = None;
                     let column_config = column.clone();
                     let column_type = column.column_type.unwrap_or_default();
@@ -467,6 +467,28 @@ impl<'gb> InsertIntoFolder<'gb> {
                         );
                         data = tuple.0;
                         errors = tuple.1;
+                    }
+                }
+                // text and language
+                eprintln!("InsertIntoFolder.run :: text...");
+                for column_config in config_columns {
+                    let column_config_ = column_config.clone();
+                    let column_type = &column_config.column_type.unwrap();
+                    let column_type = column_type.as_str();
+                    let column_id = &column_config.id.unwrap();
+                    eprintln!("InsertIntoFolder.run :: column_type: {}", column_type);
+                    if column_type == COLUMN_TYPE_TEXT {
+                        eprintln!("InsertIntoFolder.run :: do...");
+                        let obj = TextColumn::defaults(
+                            &column_config_,
+                            Some(column_config_map.clone()),
+                        );
+                        let result = obj.validate(&data, &folder);
+                        if result.is_err() {
+
+                        }
+                        let text = result.unwrap();
+                        data.insert(column_id.clone(), text);
                     }
                 }
                 if errors.len() > 0 {

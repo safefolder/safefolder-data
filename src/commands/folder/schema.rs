@@ -126,25 +126,33 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                     data_collections.extend(map_list);
                 }
                 // eprintln!("CreateFolder.run :: data_objects_new: {:#?}", &data_objects_new);
-                data_collections.insert(String::from(COLUMN_IDS), column_ids);
                 // language column
+                let column_id = &generate_id().unwrap_or_default();
                 data_objects.insert(
                     LANGUAGE_COLUMN.to_string(), 
                     create_minimum_column_map(
-                        &generate_id().unwrap_or_default(),
+                        column_id,
                         &LANGUAGE_COLUMN.to_string(),
                         &COLUMN_TYPE_LANGUAGE.to_string(),
                     )
                 );
+                let mut column_id_map: BTreeMap<String, String> = BTreeMap::new();
+                column_id_map.insert(String::from(ID), column_id.clone());
+                column_ids.push(column_id_map);
                 // text column
+                let column_id = &generate_id().unwrap_or_default();
                 data_objects.insert(
                     TEXT_COLUMN.to_string(), 
                     create_minimum_column_map(
-                        &generate_id().unwrap_or_default(),
+                        column_id,
                         &TEXT_COLUMN.to_string(),
                         &COLUMN_TYPE_TEXT.to_string(),
                     )
                 );
+                let mut column_id_map: BTreeMap<String, String> = BTreeMap::new();
+                column_id_map.insert(String::from(ID), column_id.clone());
+                column_ids.push(column_id_map);
+                data_collections.insert(String::from(COLUMN_IDS), column_ids);
                 // routing
                 let routing_wrap = RoutingData::defaults(
                     account_id, 

@@ -2,6 +2,10 @@ use std::collections::BTreeMap;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use tr::tr;
+use asciifolding::fold_to_ascii;
+use lazy_static::lazy_static;
+use regex::{Regex};
+
 
 use crate::planet::constants::ID;
 use crate::planet::{PlanetError};
@@ -11,6 +15,11 @@ use crate::storage::constants::*;
 use crate::planet::constants::*;
 use crate::storage::columns::*;
 
+lazy_static! {
+    pub static ref RE_TEXT: Regex = Regex::new(r#"[\w\d]+"#).unwrap();
+}
+
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SmallTextColumn {
     pub config: ColumnConfig
@@ -18,10 +27,10 @@ pub struct SmallTextColumn {
 impl SmallTextColumn {
     pub fn defaults(column_config: &ColumnConfig) -> Self {
         let column_config = column_config.clone();
-        let field_obj = Self{
+        let column_obj = Self{
             config: column_config
         };
-        return field_obj
+        return column_obj
     }
 }
 impl StorageColumn for SmallTextColumn {
@@ -81,10 +90,10 @@ pub struct LongTextColumn {
 impl LongTextColumn {
     pub fn defaults(column_config: &ColumnConfig) -> Self {
         let column_config = column_config.clone();
-        let field_obj = Self{
+        let column_obj = Self{
             config: column_config
         };
-        return field_obj
+        return column_obj
     }
 }
 impl StorageColumn for LongTextColumn {
@@ -144,20 +153,20 @@ pub struct SelectColumn {
     pub options_name_map: Option<BTreeMap<String, String>>,
 }
 impl SelectColumn {
-    pub fn defaults(column_config: &ColumnConfig, table: Option<&DbData>) -> Self {
+    pub fn defaults(column_config: &ColumnConfig, folder: Option<&DbData>) -> Self {
         let column_config = column_config.clone();
-        let mut field_obj = Self{
+        let mut column_obj = Self{
             config: column_config,
             options_id_map: None,
             options_name_map: None,
         };
-        if table.is_some() {
-            let table = table.unwrap();
+        if folder.is_some() {
+            let folder = folder.unwrap();
             let mut options_id_map: BTreeMap<String, String> = BTreeMap::new();
             let mut options_name_map: BTreeMap<String, String> = BTreeMap::new();
-            let column_config = &field_obj.config;
+            let column_config = &column_obj.config;
             let column_name = column_config.name.clone().unwrap();
-            for data_collection in table.data_collections.clone() {
+            for data_collection in folder.data_collections.clone() {
                 // key for ordering: field_ids
                 for key in data_collection.keys() {
                     if key.to_lowercase() != String::from(COLUMN_IDS) {
@@ -189,10 +198,10 @@ impl SelectColumn {
                     }
                 }
             }
-            field_obj.options_id_map = Some(options_id_map);
-            field_obj.options_name_map = Some(options_name_map);
+            column_obj.options_id_map = Some(options_id_map);
+            column_obj.options_name_map = Some(options_name_map);
         }
-        return field_obj;
+        return column_obj;
     }
 }
 impl StorageColumn for SelectColumn {
@@ -253,7 +262,7 @@ impl StorageColumn for SelectColumn {
             let id_list: Vec<&str> = value_id.split(",").collect();
             let column_config = self.config.clone();
             // Check that value appears on the config for choices id -> value
-            // The option id is obtained from the table config
+            // The option id is obtained from the folder config
             let options = column_config.options.unwrap();
             let options_name_map = &self.options_name_map.clone().unwrap();
             let options_id_map = &self.options_id_map.clone().unwrap();
@@ -363,10 +372,10 @@ pub struct AuditByColumn {
 impl AuditByColumn {
     pub fn defaults(column_config: &ColumnConfig) -> Self {
         let column_config = column_config.clone();
-        let field_obj = Self{
+        let column_obj = Self{
             config: column_config
         };
-        return field_obj
+        return column_obj
     }
 }
 impl StorageColumn for AuditByColumn {
@@ -389,7 +398,7 @@ impl StorageColumn for AuditByColumn {
         // LastModifiedBy: I map into insert and update
         // I save the user id
         // The user id should not come from the payload, but from the auth system
-        // TODO: Check user_id exists on table of users, or any other mean of storage
+        // TODO: Check user_id exists on folder of users, or any other mean of storage
         let user_id = data.clone();
         return Ok(user_id)
     }
@@ -448,31 +457,133 @@ impl StorageColumn for LanguageColumn {
 }
 
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone)]
 pub struct TextColumn {
     pub config: ColumnConfig,
-    pub options_id_map: Option<BTreeMap<String, String>>,
-    pub options_name_map: Option<BTreeMap<String, String>>,
+    pub column_config_map: Option<BTreeMap<String, ColumnConfig>>,
 }
-impl StorageColumn for TextColumn {
-    fn update_config_map(
+impl TextColumn {
+    pub fn defaults(
+        column_config: &ColumnConfig,
+        column_config_map: Option<BTreeMap<String, ColumnConfig>>,
+    ) -> Self {
+        let column_config = column_config.clone();
+        let field_obj = Self{
+            config: column_config,
+            column_config_map: column_config_map.clone(),
+        };
+        return field_obj
+    }
+}
+impl TextColumn {
+    pub fn update_config_map(
         &mut self, 
         column_config_map: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
         let column_config_map = column_config_map.clone();
         return Ok(column_config_map)
     }
-    fn build_config(
+    pub fn build_config(
         &mut self, 
         _: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {
         let config = self.config.clone();
         return Ok(config)
     }
-    fn validate(&self, data: &String) -> Result<String, PlanetError> {
+    pub fn validate(&self, data_map: &BTreeMap<String, String>, folder: &DbData) -> Result<String, PlanetError> {
+        let mut data = String::from("");
+        let folder = folder.clone();
+        let column_config_map = self.column_config_map.clone().unwrap();
+        for (column_name, column_config) in column_config_map {
+            let column_type = column_config.column_type.unwrap();
+            let column_type = column_type.as_str();
+            let column_id = column_config.id.unwrap();
+            let mut value_wrap: Option<&String> = None;
+            match column_type {
+                COLUMN_TYPE_SMALL_TEXT => {
+                    value_wrap = data_map.get(&column_id);
+                },
+                COLUMN_TYPE_LONG_TEXT => {
+                    value_wrap = data_map.get(&column_id);
+                },
+                COLUMN_TYPE_NUMBER => {
+                    value_wrap = data_map.get(&column_id);
+                },
+                COLUMN_TYPE_SELECT => {
+                    // Need to check from data_map the values sent, which can be a list separated by commas
+                    value_wrap = data_map.get(&column_id);
+                    if value_wrap.is_some() {
+                        let mut value_ids: Vec<&str> = Vec::new();
+                        let values = value_wrap.unwrap();
+                        if values.find(",").is_some() {
+                            value_ids = values.split(",").collect();
+                        } else {
+                            value_ids.push(values);
+                        }
+                        for data_collection in folder.data_collections.clone() {
+                            for (key, collection_value) in data_collection {
+                                if key.to_lowercase() != String::from(COLUMN_IDS) {
+                                    let key_items: Vec<&str> = key.split("__").collect();
+                                    let key_column_name = key_items[0];
+                                    let key_column_type = key_items[1];
+                                    if key_column_type == SELECT_OPTIONS && 
+                                       key_column_name.to_lowercase() == column_name.to_lowercase() {
+                                        for option_ in collection_value {
+                                            let option_key = option_.get(KEY).unwrap().clone();
+                                            let option_value = option_.get(VALUE).unwrap().clone();
+                                            for value_id in value_ids.clone() {
+                                                if option_key.as_str() == value_id {
+                                                    data = format!("{} {}", &data, option_value);
+                                                    value_wrap = None;
+                                                }    
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }    
+                    }
+                },
+                COLUMN_TYPE_DATE => {
+                    value_wrap = data_map.get(&column_id);
+                },
+                COLUMN_TYPE_DURATION => {
+                    value_wrap = data_map.get(&column_id);
+                },
+                COLUMN_TYPE_CURRENCY => {
+                    value_wrap = data_map.get(&column_id);
+                },
+                COLUMN_TYPE_PERCENTAGE => {
+                    value_wrap = data_map.get(&column_id);
+                },
+                _ => {},
+            }
+            if value_wrap.is_some() {
+                let value = Some(value_wrap.unwrap().clone());
+                if value.is_some() {
+                    let value = value.unwrap();
+                    data = format!("{} {}", &data, value);
+                }    
+            } else {
+                continue
+            }
+        }
+        // Do ascii folding
+        data = fold_to_ascii(data.as_str());
+        // Through regex, parse only words and numbers, remove duplicate whitespace
+        let expr = &RE_TEXT;
+        let mut data_new = String::from("");
+        let words = expr.captures_iter(data.as_str());
+        for word in words {
+            let word = word.get(0).unwrap().as_str();
+            data_new = format!("{} {}", data_new, word);
+        }
+        data = data_new;
+        // Convert to lower
+        data = data.to_lowercase();
         return Ok(data.clone())
     }
-    fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
+    pub fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
         let column_config = self.config.clone();
         let column_name = column_config.name.unwrap();
         let mut yaml_string = yaml_string.clone();
