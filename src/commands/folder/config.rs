@@ -30,13 +30,13 @@ use super::fetch_yaml_config;
 
 pub struct DbTableConfig02 {
     pub language: BTreeMap<String, String>,
-    pub properties: Option<Vec<BTreeMap<String, String>>>,
+    pub columns: Option<Vec<BTreeMap<String, String>>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DbFolderConfig {
     pub language: Option<LanguageConfig>,
-    pub properties: Option<Vec<ColumnConfig>>,
+    pub columns: Option<Vec<ColumnConfig>>,
 }
 
 lazy_static! {
@@ -52,10 +52,12 @@ pub struct CreateFolderConfig {
     pub command: Option<String>,
     #[validate]
     pub language: Option<LanguageConfig>,
+    #[validate]
+    pub text_search: Option<TextSearchConfig>,
     #[validate(required)]
     pub name: Option<ColumnConfig>,
     #[validate]
-    pub properties: Option<Vec<ColumnConfig>>,
+    pub columns: Option<Vec<ColumnConfig>>,
 }
 
 impl CreateFolderConfig {
@@ -64,8 +66,9 @@ impl CreateFolderConfig {
         let config: CreateFolderConfig = CreateFolderConfig{
             command: None,
             language: None,
+            text_search: None,
             name: name,
-            properties: None,
+            columns: None,
         };
         return config
     }
@@ -81,7 +84,7 @@ impl CreateFolderConfig {
         match response {
             Ok(_) => {
                 let mut config_model: CreateFolderConfig = response.unwrap();
-                let properties = config_model.clone().properties.unwrap();
+                let columns = config_model.clone().columns.unwrap();
                 let validate: Result<(), ValidationErrors> = config_model.validate();
                 match validate {
                     Ok(_) => {
@@ -90,18 +93,18 @@ impl CreateFolderConfig {
                         name_field.name = Some(String::from(NAME_CAMEL));
                         config_model.name = Some(name_field);
                         // eprintln!("CreateFolderConfig.import :: config_model: {:#?}", &config_model);
-                        // Go through properties and check if any has name "Name", raising an error since
+                        // Go through columns and check if any has name "Name", raising an error since
                         // is not allowed, reserved column.
-                        for column in properties {
-                            let field_name = column.name.clone().unwrap();
-                            if field_name.to_lowercase() == NAME_CAMEL.to_lowercase() {
+                        for column in columns {
+                            let column_name = column.name.clone().unwrap();
+                            if column_name.to_lowercase() == NAME_CAMEL.to_lowercase() {
                                 let mut planet_errors: Vec<PlanetValidationError> = Vec::new();
                                 let error = PlanetValidationError{
                                     command: String::from("Create Folder"),
                                     column: String::from("Name"),
                                     error_code: String::from("401"),
                                     message: tr!("Name is reserved column name. You cannot add it into 
-                                    your properties. Use \"name\"")
+                                    your columns. Use \"name\"")
                                 };
                                 planet_errors.push(error);
                                 return Err(planet_errors);
@@ -129,10 +132,13 @@ impl CreateFolderConfig {
 
 #[derive(Debug, Deserialize, Serialize, Validate, Clone)]
 pub struct LanguageConfig {
-    #[validate(required, custom="validate_language_codes")]
-    pub codes: Option<Vec<String>>,
     #[validate(custom="validate_default_language")]
     pub default: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, Validate, Clone)]
+pub struct TextSearchConfig {
+    pub column_relevance: BTreeMap<String, u8>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -226,15 +232,15 @@ impl ConfigStorageColumn for ColumnConfig {
         let data_objects = db_data.data_objects;
         if data_objects.is_some() {
             let data_objects = data_objects.unwrap();
-            for field_name in data_objects.keys() {
-                if field_name == NAME_CAMEL {
-                    let field_config_map = data_objects.get(field_name).unwrap();
+            for column_name in data_objects.keys() {
+                if column_name == NAME_CAMEL {
+                    let field_config_map = data_objects.get(column_name).unwrap();
                     let required = make_bool_str(field_config_map.get(REQUIRED).unwrap().clone());
                     let indexed = make_bool_str(field_config_map.get(INDEXED).unwrap().clone());
                     let many = make_bool_str(field_config_map.get(MANY).unwrap().clone());
-                    let field_id = field_config_map.get(ID).unwrap().clone();
+                    let column_id = field_config_map.get(ID).unwrap().clone();
                     let propertty_config = ColumnConfig{
-                        id: Some(field_id.clone()),
+                        id: Some(column_id.clone()),
                         name: Some(field_config_map.get(NAME).unwrap().clone()),
                         column_type: Some(field_config_map.get(COLUMN_TYPE).unwrap().clone()),
                         default: Some(field_config_map.get(DEFAULT).unwrap().clone()),
@@ -266,17 +272,17 @@ impl ConfigStorageColumn for ColumnConfig {
         context: &Context,
         table: &DbData
     ) -> Result<BTreeMap<String, ColumnConfig>, PlanetError> {
-        let properties = ColumnConfig::parse_from_db(
+        let columns = ColumnConfig::parse_from_db(
             planet_context,
             context,
             table
         );
-        if properties.is_ok() {
-            let properties = properties.unwrap().clone();
+        if columns.is_ok() {
+            let columns = columns.unwrap().clone();
             let mut map: BTreeMap<String, ColumnConfig> = BTreeMap::new();
-            for column in properties {
-                let field_name = column.name.clone().unwrap_or_default();
-                map.insert(field_name, column.clone());
+            for column in columns {
+                let column_name = column.name.clone().unwrap_or_default();
+                map.insert(column_name, column.clone());
             }
             return Ok(map)
         }
@@ -294,8 +300,8 @@ impl ConfigStorageColumn for ColumnConfig {
     ) -> Result<Vec<ColumnConfig>, PlanetError> {
         // let select_data: Option<Vec<(String, String)>> = None;
         let db_data = db_data.clone();
-        let mut properties: Vec<ColumnConfig> = Vec::new();
-        // I use data_collections, where we store the properties
+        let mut columns: Vec<ColumnConfig> = Vec::new();
+        // I use data_collections, where we store the columns
         let data_collections = db_data.data_collections;
         // let data = db_data.data;
         let data_objects = db_data.data_objects;
@@ -303,26 +309,26 @@ impl ConfigStorageColumn for ColumnConfig {
         // eprintln!("parse_from_db :: data_objects: {:#?}", &data_objects);
         // eprintln!("parse_from_db :: data_collections: {:#?}", &data_collections);
 
-        // 1. Go through data_objects and make map column names field_name -> ColumnConfig. Also
+        // 1. Go through data_objects and make map column names column_name -> ColumnConfig. Also
         //   vector for order in 
         let mut map_fields_by_id: BTreeMap<String, ColumnConfig> = BTreeMap::new();
         let mut map_fields_by_name: BTreeMap<String, ColumnConfig> = BTreeMap::new();
         if data_objects.is_some() {
             let data_objects = data_objects.unwrap();
 
-            for field_name in data_objects.keys() {
-                let field_config_map = data_objects.get(field_name).unwrap();
-                // Populate ColumnConfig with attributes from map, which would do simple properties
+            for column_name in data_objects.keys() {
+                let field_config_map = data_objects.get(column_name).unwrap();
+                // Populate ColumnConfig with attributes from map, which would do simple columns
                 // Add to map_fields_by_id, already having ColumnConfig map
                 let required = make_bool_str(field_config_map.get(REQUIRED).unwrap().clone());
                 let indexed = make_bool_str(field_config_map.get(INDEXED).unwrap().clone());
                 let many = make_bool_str(field_config_map.get(MANY).unwrap().clone());
-                let field_id = field_config_map.get(ID).unwrap().clone();
-                let field_name = field_config_map.get(NAME).unwrap().clone();
+                let column_id = field_config_map.get(ID).unwrap().clone();
+                let column_name = field_config_map.get(NAME).unwrap().clone();
                 let field_type_str = field_config_map.get(COLUMN_TYPE).unwrap().as_str();
                 let mut propertty_config = ColumnConfig::defaults(None);
-                propertty_config.id = Some(field_id.clone());
-                propertty_config.name = Some(field_name.clone());
+                propertty_config.id = Some(column_id.clone());
+                propertty_config.name = Some(column_name.clone());
                 propertty_config.column_type = Some(field_config_map.get(COLUMN_TYPE).unwrap().clone());
                 propertty_config.default = Some(field_config_map.get(DEFAULT).unwrap().clone());
                 propertty_config.version = Some(field_config_map.get(VERSION).unwrap().clone());
@@ -401,13 +407,13 @@ impl ConfigStorageColumn for ColumnConfig {
                     },
                     _ => {}
                 }
-                let _ = &map_fields_by_id.insert(field_id, propertty_config.clone());
-                let _ = &map_fields_by_name.insert(field_name.clone(), propertty_config.clone());
+                let _ = &map_fields_by_id.insert(column_id, propertty_config.clone());
+                let _ = &map_fields_by_name.insert(column_name.clone(), propertty_config.clone());
             }
         }
 
-        // 2. Go through data_collections for select_data and other complex structures. Add properties fo
-        //      properties at map_fields_by_id
+        // 2. Go through data_collections for select_data and other complex structures. Add columns fo
+        //      columns at map_fields_by_id
         let data_collections_1 = data_collections.clone();
         let data_collections_2 = data_collections.clone();
         if data_collections_1.is_some() {
@@ -420,12 +426,12 @@ impl ConfigStorageColumn for ColumnConfig {
                 if index.is_none() {
                     continue;
                 }
-                // {field_name}__{attr}
+                // {column_name}__{attr}
                 let pieces = &data_collection_field.split("__");
                 let pieces: Vec<&str> = pieces.clone().collect();
-                let field_name = pieces[0];
+                let column_name = pieces[0];
                 let attr_name = pieces[1];
-                // eprintln!("parse_from_db :: field_name: {:?} attr_name: {:?}", &field_name, &attr_name);
+                // eprintln!("parse_from_db :: column_name: {:?} attr_name: {:?}", &column_name, &attr_name);
                 if &data_collection_field != COLUMN_IDS {
                     // select_options, and other structures
                     let field_list = 
@@ -436,9 +442,9 @@ impl ConfigStorageColumn for ColumnConfig {
                     // data_collection_field: Status__select_options
                     if *&attr_name.to_lowercase() == SELECT_OPTIONS.to_lowercase() {
                         // eprintln!("parse_from_db :: I get into the options process",);
-                        let mut propertty_config_ = map_fields_by_name.get(field_name).unwrap().clone();
-                        let field_id = &propertty_config_.id.clone().unwrap();
-                        let field_id = field_id.clone();
+                        let mut propertty_config_ = map_fields_by_name.get(column_name).unwrap().clone();
+                        let column_id = &propertty_config_.id.clone().unwrap();
+                        let column_id = column_id.clone();
                         let mut field_options: Vec<String> = Vec::new();
                         for field_item in field_list {
                             let field_value = field_item.get(VALUE).unwrap().clone();
@@ -446,27 +452,27 @@ impl ConfigStorageColumn for ColumnConfig {
                         }
                         // eprintln!("parse_from_db :: options: {:#?}", &field_options);
                         propertty_config_.options = Some(field_options);
-                        map_fields_by_id.insert(field_id, propertty_config_);
+                        map_fields_by_id.insert(column_id, propertty_config_);
                     }
                 }
             }
         }
 
-        // 3. Go through fields_ids (data_collections) having list of ids and add to Vec properties and return
+        // 3. Go through fields_ids (data_collections) having list of ids and add to Vec columns and return
         if data_collections_2.is_some() {
             let data_collections_2 = data_collections_2.unwrap().clone();
             let field_ids = data_collections_2.get(COLUMN_IDS).unwrap();
             for field_id_data in field_ids.iter() {
                 // eprintln!("parse_from_db :: field_id_data: {:#?}", &field_id_data);
-                let field_id = &field_id_data.get(ID).unwrap().clone();
-                let propertty_config = map_fields_by_id.get(field_id).unwrap().clone();
-                let _ = &properties.push(propertty_config);
+                let column_id = &field_id_data.get(ID).unwrap().clone();
+                let propertty_config = map_fields_by_id.get(column_id).unwrap().clone();
+                let _ = &columns.push(propertty_config);
             }
         }
 
         // }
-        // eprintln!("parse_from_db :: !!!!!!!!!!!!!!! properties: {:#?}", &properties);
-        return Ok(properties)
+        // eprintln!("parse_from_db :: !!!!!!!!!!!!!!! columns: {:#?}", &columns);
+        return Ok(columns)
     }
     fn map_object_db(
         &self, 
@@ -483,13 +489,13 @@ impl ConfigStorageColumn for ColumnConfig {
         let required = propertty_config.required.unwrap_or_default();
         let indexed = propertty_config.indexed.unwrap_or_default();
         let many = propertty_config.many.unwrap_or_default();
-        let field_name = propertty_config.name.unwrap_or_default();
+        let column_name = propertty_config.name.unwrap_or_default();
         let column_type = propertty_config.column_type.unwrap_or_default();
-        let field_id = propertty_config.id.unwrap_or_default();
+        let column_id = propertty_config.id.unwrap_or_default();
         let field_type_str = column_type.as_str();
-        // eprintln!("map_object_db :: field_name: {}", &field_name);
-        map.insert(String::from(ID), field_id.clone());
-        map.insert(String::from(NAME), field_name.clone());
+        // eprintln!("map_object_db :: column_name: {}", &column_name);
+        map.insert(String::from(ID), column_id.clone());
+        map.insert(String::from(NAME), column_name.clone());
         map.insert(String::from(COLUMN_TYPE), column_type.clone());
         map.insert(String::from(DEFAULT), propertty_config.default.unwrap_or_default());
         map.insert(String::from(VERSION), propertty_config.version.unwrap_or_default());
@@ -581,8 +587,8 @@ impl ConfigStorageColumn for ColumnConfig {
             select_options.push(map);
         }
         if select_options.len() != 0 {
-            let field_name = propertty_config.name.unwrap_or_default();
-            let collection_field = format!("{}__select_options", field_name);
+            let column_name = propertty_config.name.unwrap_or_default();
+            let collection_field = format!("{}__select_options", column_name);
             map.insert(collection_field, select_options);    
         }
         return Ok(map)
@@ -595,9 +601,9 @@ impl ConfigStorageColumn for ColumnConfig {
         return Ok(map)
     }
 
-    fn get_column_id_map(properties: &Vec<ColumnConfig>) -> Result<BTreeMap<String, ColumnConfig>, PlanetError> {
+    fn get_column_id_map(columns: &Vec<ColumnConfig>) -> Result<BTreeMap<String, ColumnConfig>, PlanetError> {
         let mut map: BTreeMap<String, ColumnConfig> = BTreeMap::new();
-        for column in properties {
+        for column in columns {
             let column_ = column.clone();
             let column_id = column.id.clone().unwrap_or_default();
             map.insert(column_id, column_);
@@ -616,24 +622,6 @@ fn validate_default_language(language: &String) -> Result<(), ValidationError> {
     }
     
 }
-
-fn validate_language_codes(languages: &Vec<String>) -> Result<(), ValidationError> {
-    let db_languages = get_db_languages();
-    let mut check: bool = true;
-    for language in languages.into_iter() {
-        let language = &**language;
-        if !db_languages.contains(&language) {
-            check = false;
-        }
-    }
-    if check {
-        return Ok(())
-    } else {
-        return Err(ValidationError::new("Invalid Language"));
-    }
-
-}
-
 
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
 pub struct InsertIntoFolderConfig {
@@ -699,7 +687,7 @@ impl InsertIntoFolderConfig {
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
 pub struct DataId {
     pub id: Option<String>,
-    pub properties: Option<Vec<String>>,
+    pub columns: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
@@ -715,7 +703,7 @@ impl GetFromFolderConfig {
     pub fn defaults(id: String) -> GetFromFolderConfig {
         let data_id: DataId = DataId{
             id: Some(id),
-            properties: None,
+            columns: None,
         };
         let config: GetFromFolderConfig = GetFromFolderConfig{
             command: Some(String::from("GET FROM FOLDER")),
@@ -772,7 +760,7 @@ pub struct SelectFromFolderConfig {
     pub page: Option<String>,
     #[serde(default="SelectFromFolderConfig::number_items_default")]
     pub number_items: Option<String>,
-    pub properties: Option<Vec<String>>,
+    pub columns: Option<Vec<String>>,
 }
 
 impl SelectFromFolderConfig {
@@ -783,7 +771,7 @@ impl SelectFromFolderConfig {
             r#where: r#where,
             page: page,
             number_items: number_items,
-            properties: None,
+            columns: None,
         };
         return config
     }
@@ -828,4 +816,18 @@ impl SelectFromFolderConfig {
             }
         }
     }
+}
+
+pub fn create_minimum_column_map(
+    column_id: &String,
+    column_name: &String,
+    column_type: &String,
+) -> BTreeMap<String, String> {
+    let mut map: BTreeMap<String, String> = BTreeMap::new();
+    let api_version = ColumnConfig::api_version().unwrap();
+    map.insert(String::from(ID), column_id.clone());
+    map.insert(String::from(NAME), column_name.clone());
+    map.insert(String::from(COLUMN_TYPE), column_type.clone());
+    map.insert(String::from(API_VERSION), api_version);
+    return map
 }

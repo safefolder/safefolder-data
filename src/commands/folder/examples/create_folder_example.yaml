@@ -1,38 +1,37 @@
 ---
-command: CREATE FOLDER "Super Folder 01"
+command: CREATE FOLDER "Super Folder 02"
 language:
-  codes: ["english", "spanish"]
   default: english
 name:
-  Column_type: Small Text
-properties:
+  column_type: Small Text
+columns:
   - name: My Column
-    Column_type: Small Text
+    column_type: Small Text
     required: true
     pepito: Hola
   - name: Description
-    Column_type: Long Text
+    column_type: Long Text
   - name: Is Published
-    Column_type: Checkbox
+    column_type: Checkbox
   - name: Counter
-    Column_type: Number
+    column_type: Number
   - name: Status
-    Column_type: Select
+    column_type: Select
     options:
       - Draft
       - Published
       - Deleted
   - name: Locations
-    Column_type: Select
+    column_type: Select
     many: true
     options:
       - Madrid
       - Barcelona
       - Valencia
   - name: Currency
-    Column_type: Currency
+    column_type: Currency
     number_decimals: 2
     currency_symbol: $
   - name: Percentage
-    Column_type: Percentage
+    column_type: Percentage
     number_decimals: 1

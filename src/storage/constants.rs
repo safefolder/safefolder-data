@@ -25,14 +25,14 @@ pub const INDEX_PROFILE_RAW: &str = "raw";
 pub const LANGUAGE_CODES: &str = "language_codes";
 pub const LANGUAGE_DEFAULT: &str = "language_default";
 pub const PROPERTIES: &str = "properties";
-pub const COLUMN_IDS: &str = "Column_ids";
+pub const COLUMN_IDS: &str = "column_ids";
 pub const SELECT_OPTIONS: &str = "select_options";
 pub const KEY: &str = "key";
 pub const NAME_CAMEL: &str = "Name";
 pub const FOLDER_NAME: &str = "folder_name";
 
 // FileConfig fields
-pub const COLUMN_TYPE: &str = "Column_type";
+pub const COLUMN_TYPE: &str = "column_type";
 pub const DEFAULT: &str = "default";
 pub const VERSION: &str = "version";
 pub const REQUIRED: &str = "required";
@@ -49,7 +49,9 @@ pub const NUMBER_DECIMALS: &str = "number_decimals";
 pub const CURRENCY_SYMBOL: &str = "currency_symbol";
 pub const LINKED_FOLDER_ID: &str = "linked_folder_id";
 pub const DELETE_ON_LINK_DROP: &str = "delete_on_link_drop";
-pub const RELATED_COLUMN: &str = "related_Column";
+pub const RELATED_COLUMN: &str = "related_column";
+pub const LANGUAGE_COLUMN: &str = "Language";
+pub const TEXT_COLUMN: &str = "Text";
 pub const WHERE: &str = "where";
 
 // Column Types
@@ -69,6 +71,8 @@ pub const COLUMN_TYPE_CURRENCY: &str = "Currency";
 pub const COLUMN_TYPE_PERCENTAGE: &str = "Percentage";
 pub const COLUMN_TYPE_LINK: &str = "Link";
 pub const COLUMN_TYPE_REFERENCE: &str = "Reference";
+pub const COLUMN_TYPE_LANGUAGE: &str = "Language";
+pub const COLUMN_TYPE_TEXT: &str = "Text";
 
 // Date Format
 pub const DATE_FORMAT_FRIENDLY: &str = "Friendly";

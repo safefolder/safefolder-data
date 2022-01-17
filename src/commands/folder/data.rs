@@ -154,7 +154,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                 
                 // eprintln!("InsertIntoFolder.run :: folder: {:#?}", &folder);
 
-                // I need a way to get list of instance ColumnConfig (properties)
+                // I need a way to get list of instance ColumnConfig (columns)
                 let config_columns = ColumnConfig::parse_from_db(
                     self.planet_context,
                     self.context,
@@ -197,8 +197,8 @@ impl<'gb> InsertIntoFolder<'gb> {
 
                 // Keep in mind on name attribute for DbData
                 // 1. Can be small text or any other column, so we need to do validation and generation of data...
-                // 2. Becaouse if formula is generated from other properties, is generated number or id is also generated
-                // I also need a set of properties allowed to be name (Small Text, Formula), but this in future....
+                // 2. Becaouse if formula is generated from other columns, is generated number or id is also generated
+                // I also need a set of columns allowed to be name (Small Text, Formula), but this in future....
                 // name on YAML not required, since can be generated
                 // Check column type and attribute to validate
                 // So far only take Small Text
@@ -708,7 +708,7 @@ impl<'gb> Command<String> for GetFromFolder<'gb> {
                 // let data_config = self.config.data.clone();
                 let mut db_row: DbFolderItem = result.unwrap();
                 // I need to get SchemaData and schema for the folder
-                // I go through properties in order to build RowData                
+                // I go through columns in order to build RowData                
                 let folder = self.db_folder.get_by_name(folder_name)?;
                 if *&folder.is_none() {
                     return Err(
@@ -727,12 +727,12 @@ impl<'gb> Command<String> for GetFromFolder<'gb> {
                     &folder
                 )?;
                 let field_id_map: BTreeMap<String, ColumnConfig> = ColumnConfig::get_column_id_map(&config_columns)?;
-                let properties = self.config.data.clone().unwrap().properties;
-                eprintln!("GetFromFolder.run :: properties: {:?}", &properties);
+                let columns = self.config.data.clone().unwrap().columns;
+                eprintln!("GetFromFolder.run :: columns: {:?}", &columns);
                 let item_id = self.config.data.clone().unwrap().id.unwrap();
                 // Get item from database
-                let db_data = db_row.get(&folder_name, GetItemOption::ById(item_id), properties)?;
-                // data and basic properties
+                let db_data = db_row.get(&folder_name, GetItemOption::ById(item_id), columns)?;
+                // data and basic columns
                 let data = db_data.data;
                 let mut yaml_out_str = String::from("---\n");
                 // id
@@ -765,7 +765,7 @@ impl<'gb> Command<String> for GetFromFolder<'gb> {
                 if data.is_some() {
                     // column_id -> string value
                     let data = data.unwrap();
-                    // I need to go through in same order as properties were registered in ColumnConfig when creating schema
+                    // I need to go through in same order as columns were registered in ColumnConfig when creating schema
                     for field_id_data in field_ids {
                         let column_id = field_id_data.get(ID).unwrap();
                         let column_config = field_id_map.get(column_id).unwrap().clone();
@@ -957,7 +957,7 @@ impl<'gb> Command<String> for SelectFromFolder<'gb> {
                 let r#where = config.r#where;
                 let page = config.page;
                 let number_items = config.number_items;
-                let properties = config.properties;
+                let columns = config.columns;
                 let mut page_wrap: Option<usize> = None;
                 let mut number_items_wrap: Option<usize> = None;
                 if page.is_some() {
@@ -975,7 +975,7 @@ impl<'gb> Command<String> for SelectFromFolder<'gb> {
                     r#where, 
                     page_wrap, 
                     number_items_wrap, 
-                    properties,
+                    columns,
                 )?;
                 eprintln!("SelectFromFolder :: result: {:#?}", &result);
                 // Later on, I do pretty print

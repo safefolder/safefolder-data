@@ -8,7 +8,11 @@ use tr::tr;
 use colored::*;
 use regex::Regex;
 
-use crate::commands::folder::config::{CreateFolderConfig, ColumnConfig};
+use crate::commands::folder::config::{
+    CreateFolderConfig, 
+    ColumnConfig, 
+    create_minimum_column_map,
+};
 use crate::commands::folder::{Command};
 use crate::commands::{CommandRunner};
 use crate::storage::{ConfigStorageColumn};
@@ -19,6 +23,7 @@ use crate::planet::{
     Context, 
     validation::PlanetValidationError,
 };
+use crate::storage::generate_id;
 use crate::storage::constants::*;
 use crate::planet::constants::*;
 
@@ -35,12 +40,12 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
         let home_dir = self.planet_context.home_path.unwrap_or_default();
         let account_id = self.context.account_id.unwrap_or_default();
         let space_id = self.context.space_id.unwrap_or_default();
-        let site_id = self.context.site_id.unwrap_or_default();
+        let site_id = self.context.site_id;
         let result: Result<DbFolder, PlanetError> = DbFolder::defaults(
             Some(home_dir),
             Some(account_id),
             Some(space_id),
-            Some(site_id),
+            site_id,
         );
         match result {
             Ok(_) => {
@@ -60,71 +65,86 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                 let db_folder: DbFolder = result.unwrap();
                 let mut data: BTreeMap<String, String> = BTreeMap::new();
                 let language = config.language.unwrap();
-                let language_codes_list = language.codes.unwrap();
-                let language_codes_str = language_codes_list.join(",");
                 let language_default = language.default;
-                data.insert(String::from(LANGUAGE_CODES), language_codes_str);
                 data.insert(String::from(LANGUAGE_DEFAULT), language_default);
 
                 // config data
                 let mut data_objects: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
                 let mut data_collections: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
-                let mut properties = config.properties.unwrap().clone();
-                let mut field_ids: Vec<BTreeMap<String, String>> = Vec::new();
+                let mut columns = config.columns.unwrap().clone();
+                let mut column_ids: Vec<BTreeMap<String, String>> = Vec::new();
 
-                // name field
+                // name column
                 let name_field_config = config.name.unwrap();
-                properties.insert(0, name_field_config);
-                let mut field_name_map: BTreeMap<String, String> = BTreeMap::new();
-                // populate field_type_map and field_name_map
-                let mut field_type_map: BTreeMap<String, String> = BTreeMap::new();
-                let mut properties_map: HashMap<String, ColumnConfig> = HashMap::new();
-                for field in properties.iter() {
-                    let field_attrs = field.clone();
-                    let field_name = field.name.clone().unwrap();
-                    let column_type = field.column_type.clone();
-                    let mut field_id_map: BTreeMap<String, String> = BTreeMap::new();
-                    let field_id = field_attrs.id.unwrap_or_default();
-                    field_id_map.insert(String::from(ID), field_id.clone());
-                    properties_map.insert(field_name.clone(), field.clone());
-                    let _ = &field_ids.push(field_id_map);
+                columns.insert(0, name_field_config);
+                let mut column_name_map: BTreeMap<String, String> = BTreeMap::new();
+                // populate column_type_map and column_name_map
+                let mut column_type_map: BTreeMap<String, String> = BTreeMap::new();
+                let mut columns_map: HashMap<String, ColumnConfig> = HashMap::new();
+                for column in columns.iter() {
+                    let column_attrs = column.clone();
+                    let column_name = column.name.clone().unwrap();
+                    let column_type = column.column_type.clone();
+                    let mut column_id_map: BTreeMap<String, String> = BTreeMap::new();
+                    let column_id = column_attrs.id.unwrap_or_default();
+                    column_id_map.insert(String::from(ID), column_id.clone());
+                    columns_map.insert(column_name.clone(), column.clone());
+                    let _ = &column_ids.push(column_id_map);
                     if column_type.is_some() {
                         let column_type = column_type.unwrap();
-                        field_type_map.insert(field_name.clone(), column_type);
+                        column_type_map.insert(column_name.clone(), column_type);
                     }
-                    let field_name_str = field_name.as_str();
-                    if field_name_map.get(field_name_str).is_some() == false {
+                    let column_name_str = column_name.as_str();
+                    if column_name_map.get(column_name_str).is_some() == false {
                         // id => name
-                        field_name_map.insert(field_name.clone(), field_id.clone());
+                        column_name_map.insert(column_name.clone(), column_id.clone());
                     } else {
                         return Err(
                             PlanetError::new(
                                 500, 
-                                Some(tr!("There is already a field with name \"{}\"", &field_name)),
+                                Some(tr!("There is already a column with name \"{}\"", &column_name)),
                             )
                         );
                     }
                 }
-                for field in properties.iter() {
-                    // field simple attributes
-                    let field_attrs = field.clone();
-                    let field_name = field_attrs.name.unwrap_or_default().clone();
-                    let map = &field.map_object_db(
+                for column in columns.iter() {
+                    // column simple attributes
+                    let column_attrs = column.clone();
+                    let column_name = column_attrs.name.unwrap_or_default().clone();
+                    let map = column.map_object_db(
                         self.planet_context,
                         self.context,
-                        &properties_map,
+                        &columns_map,
                         &db_folder,
                         folder_name,
                     )?;
-                    data_objects.insert(String::from(field_name.clone()), map.clone());
-                    // field complex attributes like select_data
-                    let map_list = &field.map_collections_db()?;
+                    data_objects.insert(String::from(column_name.clone()), map.clone());
+                    // column complex attributes like select_data
+                    let map_list = &column.map_collections_db()?;
                     let map_list = map_list.clone();
                     // data_collections = map_list.clone();
                     data_collections.extend(map_list);
                 }
                 // eprintln!("CreateFolder.run :: data_objects_new: {:#?}", &data_objects_new);
-                data_collections.insert(String::from(COLUMN_IDS), field_ids);
+                data_collections.insert(String::from(COLUMN_IDS), column_ids);
+                // language column
+                data_objects.insert(
+                    LANGUAGE_COLUMN.to_string(), 
+                    create_minimum_column_map(
+                        &generate_id().unwrap_or_default(),
+                        &LANGUAGE_COLUMN.to_string(),
+                        &COLUMN_TYPE_LANGUAGE.to_string(),
+                    )
+                );
+                // text column
+                data_objects.insert(
+                    TEXT_COLUMN.to_string(), 
+                    create_minimum_column_map(
+                        &generate_id().unwrap_or_default(),
+                        &TEXT_COLUMN.to_string(),
+                        &COLUMN_TYPE_TEXT.to_string(),
+                    )
+                );
                 // routing
                 let routing_wrap = RoutingData::defaults(
                     account_id, 
@@ -156,7 +176,7 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                 )?;
                 // Onl output TEMP the choices data to include in insert
                 let mut mine = db_data.clone().data_collections.unwrap();
-                mine.remove("field_ids");
+                mine.remove("column_ids");
                 eprintln!("CreateFolder.run :: db_data: {:#?}", mine);
                 eprintln!("CreateFolder.run :: db_data all: {:#?}", db_data.clone());
 
@@ -169,11 +189,11 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                 //
                 // Related folders, I need to update their config, like Links
                 //
-                let properties = response.data_objects.unwrap();
+                let columns = response.data_objects.unwrap();
                 let mut linked_folder_ids: Vec<String> = Vec::new();
                 let mut map_column_names: BTreeMap<String, String> = BTreeMap::new();
                 let mut map_column_ids: BTreeMap<String, String> = BTreeMap::new();
-                for (_, v) in properties {
+                for (_, v) in columns {
                     let column_type = v.get(COLUMN_TYPE);
                     let column_name = v.get(NAME);
                     let column_id = v.get(ID);
@@ -210,7 +230,7 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                         let mut remote_column_map: BTreeMap<String, String> = local_column_map.get(
                             column_name
                         ).unwrap().clone();
-                        // Update Column map with properties for local field, Link with link_folder_id being 
+                        // Update Column map with columns for local column, Link with link_folder_id being 
                         // this local Column
                         remote_column_map.insert(String::from(LINKED_FOLDER_ID), folder_id.clone());
                         remote_column_map.insert(String::from(NAME), folder_name.clone());
