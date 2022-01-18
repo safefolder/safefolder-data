@@ -4,6 +4,7 @@ extern crate serde_yaml;
 extern crate colored;
 extern crate lazy_static;
 extern crate tokio;
+use lingua::{LanguageDetector, LanguageDetectorBuilder};
 
 pub mod commands;
 pub mod storage;
@@ -44,6 +45,7 @@ use std::collections::HashMap;
 use crate::commands::CommandRunner;
 use crate::commands::folder::Command;
 use crate::planet::{PlanetContext, Context, ContextSource};
+use planet::constants::*;
 
 // async fn swarm() {
 //     const BOOTNODES: [&'static str; 4] = [
@@ -92,6 +94,7 @@ async fn main() {
     let mut op = String::from("run");
     let mut scope = String::from("");
     // println!("account_id: {}", hex::encode_upper(account_id));
+    let _: LanguageDetector = LanguageDetectorBuilder::from_languages(&LANGUAGES).with_preloaded_language_models().build();
 
     { // this block limits scope of borrows by ap.refer() method
         let mut ap = ArgumentParser::new();

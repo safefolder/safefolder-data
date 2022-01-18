@@ -11,6 +11,7 @@ use validator::{ValidationErrors};
 use crate::commands::folder::config::ColumnConfig;
 use crate::storage::folder::{DbData, DbFolder};
 use crate::planet::{PlanetError, Context, PlanetContext};
+use crate::planet::constants::*;
 
 pub trait ConfigStorageColumn {
     fn defaults(
@@ -57,15 +58,15 @@ pub fn generate_id() -> Option<String> {
 
 pub fn get_db_languages() -> Vec<&'static str> {
     let languages = vec![
-        "spanish", 
-        "english",
-        "french",
-        "german",
-        "italian",
-        "portuguese",
-        "norweian",
-        "swedish",
-        "danish",
+        LANGUAGE_SPANISH, 
+        LANGUAGE_ENGLISH,
+        LANGUAGE_FRENCH,
+        LANGUAGE_GERMAN,
+        LANGUAGE_ITALIAN,
+        LANGUAGE_PORTUGUESE,
+        LANGUAGE_NORWEGIAN,
+        LANGUAGE_SWEDISH,
+        LANGUAGE_DANISH,
     ];
     return languages
 }

@@ -126,19 +126,6 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                     data_collections.extend(map_list);
                 }
                 // eprintln!("CreateFolder.run :: data_objects_new: {:#?}", &data_objects_new);
-                // language column
-                let column_id = &generate_id().unwrap_or_default();
-                data_objects.insert(
-                    LANGUAGE_COLUMN.to_string(), 
-                    create_minimum_column_map(
-                        column_id,
-                        &LANGUAGE_COLUMN.to_string(),
-                        &COLUMN_TYPE_LANGUAGE.to_string(),
-                    )
-                );
-                let mut column_id_map: BTreeMap<String, String> = BTreeMap::new();
-                column_id_map.insert(String::from(ID), column_id.clone());
-                column_ids.push(column_id_map);
                 // text column
                 let column_id = &generate_id().unwrap_or_default();
                 data_objects.insert(
@@ -147,6 +134,19 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                         column_id,
                         &TEXT_COLUMN.to_string(),
                         &COLUMN_TYPE_TEXT.to_string(),
+                    )
+                );
+                let mut column_id_map: BTreeMap<String, String> = BTreeMap::new();
+                column_id_map.insert(String::from(ID), column_id.clone());
+                column_ids.push(column_id_map);
+                // language column
+                let column_id = &generate_id().unwrap_or_default();
+                data_objects.insert(
+                    LANGUAGE_COLUMN.to_string(), 
+                    create_minimum_column_map(
+                        column_id,
+                        &LANGUAGE_COLUMN.to_string(),
+                        &COLUMN_TYPE_LANGUAGE.to_string(),
                     )
                 );
                 let mut column_id_map: BTreeMap<String, String> = BTreeMap::new();

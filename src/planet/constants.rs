@@ -1,4 +1,9 @@
 
+use lingua::{Language};
+use lingua::Language::{Danish, German, Spanish, French, Italian, Nynorsk, Portuguese, Swedish, English};
+
+pub const LANGUAGES: [Language; 9] = [English, Danish, German, Spanish, French, Italian, Nynorsk, Portuguese, Swedish];
+
 pub const SERDE_ERROR_TYPE_INVALID_TYPE: &str = "invalid type";
 pub const SERDE_ERROR_TYPE_INVALID_VALUE: &str = "invalid value";
 pub const SERDE_ERROR_TYPE_INVALID_LENGTH: &str = "invalid length";
@@ -21,3 +26,23 @@ pub const PARTITION: &str = "partition";
 pub const ITEMS_PER_PARTITION: u16 = 1000;
 pub const MAX_PARTITIONS: u16 = 1000;
 pub const MAX_ITEMS_PER_PARTITION: u32 = 1000000;
+
+// Languages
+pub const LANGUAGE_SPANISH: &str = "spanish";
+pub const LANGUAGE_ENGLISH: &str = "english";
+pub const LANGUAGE_FRENCH: &str = "french";
+pub const LANGUAGE_GERMAN: &str = "german";
+pub const LANGUAGE_ITALIAN: &str = "italian";
+pub const LANGUAGE_PORTUGUESE: &str = "portuguese";
+pub const LANGUAGE_NORWEGIAN: &str = "norwegian";
+pub const LANGUAGE_SWEDISH: &str = "swedish";
+pub const LANGUAGE_DANISH: &str = "danish";
+pub const LANGUAGE_CODE_SPANISH: &str = "es";
+pub const LANGUAGE_CODE_ENGLISH: &str = "en";
+pub const LANGUAGE_CODE_FRENCH: &str = "fr";
+pub const LANGUAGE_CODE_GERMAN: &str = "de";
+pub const LANGUAGE_CODE_ITALIAN: &str = "it";
+pub const LANGUAGE_CODE_PORTUGUESE: &str = "pt";
+pub const LANGUAGE_CODE_NORWEGIAN: &str = "no";
+pub const LANGUAGE_CODE_SWEDISH: &str = "sw";
+pub const LANGUAGE_CODE_DANISH: &str = "da";

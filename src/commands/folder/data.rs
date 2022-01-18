@@ -470,25 +470,45 @@ impl<'gb> InsertIntoFolder<'gb> {
                     }
                 }
                 // text and language
-                eprintln!("InsertIntoFolder.run :: text...");
+                let mut text: String = String::from("");
                 for column_config in config_columns {
                     let column_config_ = column_config.clone();
                     let column_type = &column_config.column_type.unwrap();
                     let column_type = column_type.as_str();
                     let column_id = &column_config.id.unwrap();
-                    eprintln!("InsertIntoFolder.run :: column_type: {}", column_type);
                     if column_type == COLUMN_TYPE_TEXT {
-                        eprintln!("InsertIntoFolder.run :: do...");
                         let obj = TextColumn::defaults(
                             &column_config_,
                             Some(column_config_map.clone()),
                         );
-                        let result = obj.validate(&data, &folder);
-                        if result.is_err() {
-
+                        let result_text = obj.validate(&data, &folder);
+                        if result_text.is_err() {
+                            let error_message = result_text.clone().unwrap_err().message;
+                            errors.push(
+                                PlanetError::new(
+                                    500, 
+                                    Some(tr!("Error capturing text for folder item: {}", &error_message)),
+                                )
+                            );
                         }
-                        let text = result.unwrap();
-                        data.insert(column_id.clone(), text);
+                        text = result_text.unwrap();
+                        data.insert(column_id.clone(), text.clone());
+                    } else if column_type == COLUMN_TYPE_LANGUAGE {
+                        let obj = LanguageColumn::defaults(
+                            &column_config_,
+                        );
+                        let result_lang = obj.validate(&text, &folder);
+                        if result_lang.is_err() {
+                            let error_message = result_lang.clone().unwrap_err().message;
+                            errors.push(
+                                PlanetError::new(
+                                    500, 
+                                    Some(tr!("Error capturing language for folder item: {}", &error_message)),
+                                )
+                            );
+                        }
+                        let language_code = result_lang.unwrap();
+                        data.insert(column_id.clone(), language_code);
                     }
                 }
                 if errors.len() > 0 {

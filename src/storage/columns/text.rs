@@ -5,7 +5,7 @@ use tr::tr;
 use asciifolding::fold_to_ascii;
 use lazy_static::lazy_static;
 use regex::{Regex};
-
+use lingua::{Language, LanguageDetector, LanguageDetectorBuilder};
 
 use crate::planet::constants::ID;
 use crate::planet::{PlanetError};
@@ -420,28 +420,79 @@ impl StorageColumn for AuditByColumn {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LanguageColumn {
     pub config: ColumnConfig,
-    pub options_id_map: Option<BTreeMap<String, String>>,
-    pub options_name_map: Option<BTreeMap<String, String>>,
 }
-impl StorageColumn for LanguageColumn {
-    fn update_config_map(
+impl LanguageColumn {
+    pub fn defaults(
+        column_config: &ColumnConfig,
+    ) -> Self {
+        let column_config = column_config.clone();
+        let field_obj = Self{
+            config: column_config,
+        };
+        return field_obj
+    }
+}
+impl LanguageColumn {
+    pub fn update_config_map(
         &mut self, 
         column_config_map: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
         let column_config_map = column_config_map.clone();
         return Ok(column_config_map)
     }
-    fn build_config(
+    pub fn build_config(
         &mut self, 
         _: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {
         let config = self.config.clone();
         return Ok(config)
     }
-    fn validate(&self, data: &String) -> Result<String, PlanetError> {
-        return Ok(data.clone())
+    pub fn validate(&self, text: &String, folder: &DbData) -> Result<String, PlanetError> {
+        let detector: LanguageDetector = LanguageDetectorBuilder::from_languages(&LANGUAGES).with_preloaded_language_models().build();
+        let detected_language: Option<Language> = detector.detect_language_of(text);
+        let mut language_code = String::from("");
+        if detected_language.is_some() {
+            let detected_language = detected_language.unwrap();
+            language_code = detected_language.iso_code_639_1().to_string();
+        } else {
+            // We get the default language for the folder from folder config
+            let folder = folder.clone();
+            let data = folder.data.unwrap();
+            let language_default = data.get(&LANGUAGE_DEFAULT.to_string()).unwrap().as_str();
+            match language_default {
+                LANGUAGE_DANISH => {
+                    return Ok(String::from(LANGUAGE_CODE_DANISH))
+                },
+                LANGUAGE_ENGLISH => {
+                    return Ok(String::from(LANGUAGE_CODE_ENGLISH))
+                },
+                LANGUAGE_SPANISH => {
+                    return Ok(String::from(LANGUAGE_CODE_SPANISH))
+                },
+                LANGUAGE_FRENCH => {
+                    return Ok(String::from(LANGUAGE_CODE_FRENCH))
+                },
+                LANGUAGE_ITALIAN => {
+                    return Ok(String::from(LANGUAGE_CODE_ITALIAN))
+                },
+                LANGUAGE_GERMAN => {
+                    return Ok(String::from(LANGUAGE_CODE_GERMAN))
+                },
+                LANGUAGE_PORTUGUESE => {
+                    return Ok(String::from(LANGUAGE_CODE_PORTUGUESE))
+                },
+                LANGUAGE_NORWEGIAN => {
+                    return Ok(String::from(LANGUAGE_CODE_NORWEGIAN))
+                },
+                LANGUAGE_SWEDISH => {
+                    return Ok(String::from(LANGUAGE_CODE_SWEDISH))
+                },
+                _ => {},
+            }
+        }
+        return Ok(language_code)
     }
-    fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
+    pub fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
         let column_config = self.config.clone();
         let column_name = column_config.name.unwrap();
         let mut yaml_string = yaml_string.clone();
