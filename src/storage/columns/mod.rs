@@ -35,6 +35,7 @@ Table fields
 * ReferenceColumn                 [done] - A reference from a linked folder. Config with linked field. These
     are subqueries. We do subquery when get by id. Also when doing select and search operations.
 * LanguageColumn                  [done] - text
+* TextColumn                      [done] - text
 
 -
 These are not complex:
