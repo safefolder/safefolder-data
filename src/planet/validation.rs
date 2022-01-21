@@ -37,10 +37,18 @@ impl<'gb> CommandImportConfig<'gb> {
         let mut field_value: &str = "";
         if error_str.find(":").is_some() {
             let error_fields: Vec<&str> = error_str.split(":").collect();
-            column = error_fields[0];
-            error_type = error_fields[1].trim();
-            let error_fields_next: Vec<&str> = error_fields[2].split(",").collect();
-            field_value = error_fields_next[0];    
+            println!("parse_serde :: error_fields: {:?}", &error_fields);
+            if error_fields.len() == 3 {
+                column = error_fields[0];
+                error_type = error_fields[1].trim();
+                let error_fields_next: Vec<&str> = error_fields[2].split(",").collect();
+                field_value = error_fields_next[0];        
+            } else {
+                // error_fields: ["text_search", " missing field `column_relevance` at line 6 column 12"]
+                column = error_fields[0];
+                error_type = "";
+                field_value = error_fields[1];
+            }
         } else {
             // duplicate column `command` at line 2 column 8
             if Some(error_str.find(constants::SERDE_ERROR_TYPE_DUPLICATE_FIELD)).is_some() {
@@ -129,7 +137,18 @@ impl<'gb> CommandImportConfig<'gb> {
                 );
                 return error;
             },
-            _ => {return error},
+            _ => {
+                error.error_code = String::from("Error");
+                error.message = tr!(
+                    "Error on configuration field {column}, {field_value}.", 
+                    command=self.command.blue(),
+                    column=format!("{}{}{}", String::from("\"").magenta(), column.magenta(), String::from("\"").magenta()),
+                    sep=String::from(":").blue(),
+                    field_value=field_value
+                );
+
+                return error
+            },
         }
     }
 
@@ -264,6 +283,27 @@ impl<'gb> CommandImportConfig<'gb> {
                     column=message_fields.column,
                 );
                 planet_errors.push(planet_error);
+            } else {
+                let value_wrap = error.params.get("value");
+                if value_wrap.is_some() {
+                    let value = value_wrap.unwrap().to_string();
+                    planet_error.message = tr!(
+                        "{command}{sep}: {code} :: {value}.",
+                        command=command.blue(),
+                        sep=String::from(":").blue(),
+                        code=error.code,
+                        value=value
+                    );
+                    planet_errors.push(planet_error);
+                } else {
+                    planet_error.message = tr!(
+                        "{command}{sep}: {code}.",
+                        command=command.blue(),
+                        sep=String::from(":").blue(),
+                        code=error.code,
+                    );
+                    planet_errors.push(planet_error);
+                }
             }
         }
         return planet_errors;
@@ -318,6 +358,7 @@ impl<'gb> CommandImportConfig<'gb> {
     }
 
     pub fn parse_validator(&self, command: &String, errors: ValidationErrors) -> Vec<PlanetValidationError> {
+        eprintln!("parse_validator :: command: {}", command);
         let all_errors = errors.into_errors();
         let mut planet_errors: Vec<PlanetValidationError> = Vec::new();
         for (error_field, error_kind) in all_errors {

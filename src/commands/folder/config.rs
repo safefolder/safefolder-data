@@ -46,6 +46,18 @@ lazy_static! {
     static ref RE_COMMAND_SELECT_FROM_FOLDER: Regex = Regex::new(r#"(SELECT FROM FOLDER) "([a-zA-Z0-9_ ]+)"#).unwrap();
 }
 
+#[derive(Debug, Deserialize, Serialize, Validate, Clone)]
+pub struct LanguageConfig {
+    #[validate(custom="validate_default_language")]
+    pub default: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, Validate, Clone)]
+pub struct TextSearchConfig {
+    #[validate(custom="validate_column_relevance")]
+    pub column_relevance: BTreeMap<String, u8>,
+}
+
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
 pub struct CreateFolderConfig {
     #[validate(required, regex="RE_COMMAND_CREATE_FOLDER")]
@@ -83,6 +95,7 @@ impl CreateFolderConfig {
         };
         match response {
             Ok(_) => {
+                eprintln!("CreateFolderConfig.import :: Imported fine");
                 let mut config_model: CreateFolderConfig = response.unwrap();
                 let columns = config_model.clone().columns.unwrap();
                 let validate: Result<(), ValidationErrors> = config_model.validate();
@@ -113,6 +126,7 @@ impl CreateFolderConfig {
                         return Ok(config_model);
                     },
                     Err(errors) => {
+                        eprintln!("CreateFolderConfig.import :: ValidationErrors: {:?}", &errors);
                         let command = &config_model.command.unwrap();
                         let planet_errors: Vec<PlanetValidationError> = import_config.parse_validator(
                             command, errors);
@@ -121,6 +135,7 @@ impl CreateFolderConfig {
                 }
             },
             Err(error) => {
+                eprintln!("CreateFolderConfig.import :: error: {:?}", &error);
                 let mut planet_errors: Vec<PlanetValidationError> = Vec::new();
                 planet_errors.push(import_config.parse_serde(&error));
                 return Err(planet_errors);
@@ -128,17 +143,6 @@ impl CreateFolderConfig {
         }
     }
 
-}
-
-#[derive(Debug, Deserialize, Serialize, Validate, Clone)]
-pub struct LanguageConfig {
-    #[validate(custom="validate_default_language")]
-    pub default: String,
-}
-
-#[derive(Debug, Deserialize, Serialize, Validate, Clone)]
-pub struct TextSearchConfig {
-    pub column_relevance: BTreeMap<String, u8>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -232,37 +236,35 @@ impl ConfigStorageColumn for ColumnConfig {
         let data_objects = db_data.data_objects;
         if data_objects.is_some() {
             let data_objects = data_objects.unwrap();
-            for column_name in data_objects.keys() {
-                if column_name == NAME_CAMEL {
-                    let column_config_map = data_objects.get(column_name).unwrap();
-                    let required = make_bool_str(column_config_map.get(REQUIRED).unwrap().clone());
-                    let indexed = make_bool_str(column_config_map.get(INDEXED).unwrap().clone());
-                    let many = make_bool_str(column_config_map.get(MANY).unwrap().clone());
-                    let column_id = column_config_map.get(ID).unwrap().clone();
-                    let column_config = ColumnConfig{
-                        id: Some(column_id.clone()),
-                        name: Some(column_config_map.get(NAME).unwrap().clone()),
-                        column_type: Some(column_config_map.get(COLUMN_TYPE).unwrap().clone()),
-                        default: Some(column_config_map.get(DEFAULT).unwrap().clone()),
-                        version: Some(column_config_map.get(VERSION).unwrap().clone()),
-                        required: Some(required),
-                        api_version: Some(column_config_map.get(API_VERSION).unwrap().clone()),
-                        indexed: Some(indexed),
-                        many: Some(many),
-                        options: None,
-                        formula: None,
-                        formula_format: None,
-                        formula_compiled: None,
-                        date_format: None,
-                        time_format: None,
-                        currency_symbol: None,
-                        number_decimals: None,
-                        linked_folder_id: None,
-                        delete_on_link_drop: None,
-                        related_column: None,
-                    };
-                    return Some(column_config);
-                }
+            for column_id in data_objects.keys() {
+                let column_config_map = data_objects.get(column_id).unwrap();
+                let required = make_bool_str(column_config_map.get(REQUIRED).unwrap().clone());
+                let indexed = make_bool_str(column_config_map.get(INDEXED).unwrap().clone());
+                let many = make_bool_str(column_config_map.get(MANY).unwrap().clone());
+                let column_id = column_config_map.get(ID).unwrap().clone();
+                let column_config = ColumnConfig{
+                    id: Some(column_id.clone()),
+                    name: Some(column_config_map.get(NAME).unwrap().clone()),
+                    column_type: Some(column_config_map.get(COLUMN_TYPE).unwrap().clone()),
+                    default: Some(column_config_map.get(DEFAULT).unwrap().clone()),
+                    version: Some(column_config_map.get(VERSION).unwrap().clone()),
+                    required: Some(required),
+                    api_version: Some(column_config_map.get(API_VERSION).unwrap().clone()),
+                    indexed: Some(indexed),
+                    many: Some(many),
+                    options: None,
+                    formula: None,
+                    formula_format: None,
+                    formula_compiled: None,
+                    date_format: None,
+                    time_format: None,
+                    currency_symbol: None,
+                    number_decimals: None,
+                    linked_folder_id: None,
+                    delete_on_link_drop: None,
+                    related_column: None,
+                };
+                return Some(column_config);
             }
         }
         return None
@@ -298,7 +300,7 @@ impl ConfigStorageColumn for ColumnConfig {
         context: &Context,
         db_data: &DbData
     ) -> Result<Vec<ColumnConfig>, PlanetError> {
-        eprintln!("parse_from_db...");
+        // eprintln!("parse_from_db...");
         // let select_data: Option<Vec<(String, String)>> = None;
         let db_data = db_data.clone();
         let mut columns: Vec<ColumnConfig> = Vec::new();
@@ -317,8 +319,12 @@ impl ConfigStorageColumn for ColumnConfig {
         if data_objects.is_some() {
             let data_objects = data_objects.unwrap();
 
-            for column_name in data_objects.keys() {
-                let column_config_map = data_objects.get(column_name).unwrap();
+            for column_id in data_objects.keys() {
+                let column_config_map = data_objects.get(column_id).unwrap();
+                let column_type = column_config_map.get(COLUMN_TYPE);
+                if !column_type.is_some() {
+                    continue
+                }
                 // Populate ColumnConfig with attributes from map, which would do simple columns
                 // Add to map_columns_by_id, already having ColumnConfig map
                 let required_wrap = column_config_map.get(REQUIRED);
@@ -428,13 +434,11 @@ impl ConfigStorageColumn for ColumnConfig {
                         column_config = obj.build_config(column_config_map)?;
                     },
                     COLUMN_TYPE_TEXT => {
-                        eprintln!("parse_from_db :: doing text...");
                         let mut obj = TextColumn::defaults(
                             &column_config,
                             None
                         );
                         column_config = obj.build_config(column_config_map)?;
-                        eprintln!("parse_from_db :: doing text : column_config: {:#?}", &column_config);
                     },
                     _ => {}
                 }
@@ -502,7 +506,7 @@ impl ConfigStorageColumn for ColumnConfig {
         }
 
         // }
-        eprintln!("parse_from_db :: !!!!!!!!!!!!!!! columns: {:#?}", &columns);
+        // eprintln!("parse_from_db :: !!!!!!!!!!!!!!! columns: {:#?}", &columns);
         return Ok(columns)
     }
     fn map_object_db(
@@ -652,6 +656,16 @@ fn validate_default_language(language: &String) -> Result<(), ValidationError> {
         return Err(ValidationError::new("Invalid Default Language"));
     }
     
+}
+
+fn validate_column_relevance(column_relevance: &BTreeMap<String, u8>) -> Result<(), ValidationError> {
+    let column_relevance = column_relevance.clone();
+    for (_, relevance) in column_relevance {
+        if relevance > 5 || relevance < 1 {
+            return Err(ValidationError::new("Invalid Text Search Relevance"));
+        }
+    }
+    return Ok(())    
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]

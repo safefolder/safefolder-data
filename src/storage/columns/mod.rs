@@ -31,15 +31,15 @@ Table fields
 * CurrencyColumn                  [done] - number
 * PercentColumn                   [done] - number
 * FormulaColumn                   [done] - formula
-
-* LinkColumn                      [doing] - reference
-* ReferenceColumn                 [doing] - A reference from a linked folder. Config with linked field. These
+* LinkColumn                      [done] - reference
+* ReferenceColumn                 [done] - A reference from a linked folder. Config with linked field. These
     are subqueries. We do subquery when get by id. Also when doing select and search operations.
+* LanguageColumn                  [done] - text
+
 -
 These are not complex:
 * GenerateIdColumn                [todo] - text : Random ids
 * GeneratedNumberColumn           [todo] - number: Sequential number - number : Sequence number.
-* LanguageColumn                  [todo] - text
 * PhoneColumn                     [todo]
 * EmailColumn                     [todo]
 * UrlColumn                       [todo]

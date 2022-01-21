@@ -1,5 +1,6 @@
 extern crate sled;
 extern crate slug;
+extern crate rust_stemmers;
 
 use std::str::FromStr;
 use std::{thread};
@@ -23,7 +24,7 @@ use crate::planet::{PlanetError};
 use crate::commands::folder::config::{DbFolderConfig};
 use crate::storage::constants::*;
 use crate::storage::columns::*;
-// use crate::functions::*;
+use crate::storage::columns::text::{get_stop_words_by_language, get_stemmer_by_language};
 
 pub trait FolderSchema {
     fn defaults(
@@ -54,20 +55,21 @@ pub trait FolderItem {
         &mut self, 
         folder_name: &String, 
         by: GetItemOption, 
-        properties: Option<Vec<String>>
+        columns: Option<Vec<String>>
     ) -> Result<DbData, PlanetError>;
     fn select(&mut self, 
         folder_name: &String, 
         r#where: Option<String>, 
         page: Option<usize>,
         number_items: Option<usize>,
-        properties: Option<Vec<String>>,
+        columns: Option<Vec<String>>,
     ) -> Result<SelectResult, PlanetError>;
     fn count(&mut self, 
         folder_name: &String, 
         r#where: Option<String>, 
     ) -> Result<SelectCountResult, PlanetError>;
     fn total_count(&mut self) -> Result<SelectCountResult, PlanetError>;
+    fn index(&mut self, db_item: &DbData) -> Result<DbData, PlanetError>;
 }
 
 // lifetimes: gb (global, for contexts), db, bs
@@ -266,7 +268,8 @@ pub struct DbFolder {
     pub space_id: Option<String>,
     pub site_id: Option<String>,
     pub box_id: Option<String>,
-    db: sled::Db,
+    db: sled::Tree,
+    // index: sled::Tree,
 }
 
 impl FolderSchema for DbFolder {
@@ -302,23 +305,36 @@ impl FolderSchema for DbFolder {
         match result {
             Ok(_) => {
                 let db = result.unwrap();
-                let db_folder: DbFolder= DbFolder{
-                    home_dir: Some(home_dir.to_string()),
-                    account_id: Some(account_id.to_string()),
-                    space_id: Some(space_id.to_string()),
-                    site_id: Some(site_id.to_string()),
-                    box_id: None,
-                    db: db,
-                };
-                Ok(db_folder)
+                let db_tree = db.open_tree(DB);
+                let index_tree = db.open_tree(INDEX);
+                if db_tree.is_ok() && index_tree.is_ok() {
+                    let db_folder: DbFolder= DbFolder{
+                        home_dir: Some(home_dir.to_string()),
+                        account_id: Some(account_id.to_string()),
+                        space_id: Some(space_id.to_string()),
+                        site_id: Some(site_id.to_string()),
+                        box_id: None,
+                        db: db_tree.unwrap(),
+                        // index: index_tree.unwrap(),
+                    };
+                    Ok(db_folder)    
+                } else {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!("Could not open folder database")),
+                        )
+                    )
+                }
             },
             Err(err) => {
                 eprintln!("{:?}", &err);
-                let planet_error = PlanetError::new(
-                    500, 
-                    Some(tr!("Could not open folder database")),
-                );
-                Err(planet_error)
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Could not open folder database")),
+                    )
+                )
             }
         }
     }
@@ -637,7 +653,8 @@ pub struct DbFolderItem {
     pub space_id: Option<String>,
     pub site_id: Option<String>,
     pub box_id: Option<String>,
-    pub db: Option<sled::Db>,
+    pub db: Option<sled::Tree>,
+    pub index: Option<sled::Tree>,
     pub db_partitions: Option<sled::Db>,
 }
 
@@ -755,7 +772,7 @@ impl DbFolderItem {
     fn open_partition_by_item(
         &mut self,
         item_id: &str,
-    ) -> Result<sled::Db, PlanetError> {
+    ) -> Result<(sled::Tree, sled::Tree), PlanetError> {
         let partition = self.get_partition(item_id);
         let partition = partition.unwrap();
         if partition > MAX_PARTITIONS {
@@ -766,14 +783,14 @@ impl DbFolderItem {
                 )
             )
         }
-        let db = self.open_partition(&partition)?;
-        return Ok(db)
+        let db_tuple = self.open_partition(&partition)?;
+        return Ok(db_tuple)
     }
 
     fn open_partition(
         &mut self,
         partition: &u16,
-    ) -> Result<sled::Db, PlanetError> {
+    ) -> Result<(sled::Tree, sled::Tree), PlanetError> {
         let mut path: String = String::from("");
         let folder_id = self.folder_id.clone().unwrap_or_default();
         let folder_id = folder_id.as_str();
@@ -789,7 +806,10 @@ impl DbFolderItem {
         let partition_str = format!("{:0>4}", partition_str);
         if self.db.is_some() {
             let db = self.db.clone().unwrap();
-            return Ok(db)
+            let index = self.index.clone().unwrap();
+            return Ok(
+                (db, index)
+            )
         }
         if account_id != "" && space_id != "" {
             println!("DbFolderItem.open_partition :: account_id and space_id have been informed");
@@ -818,12 +838,25 @@ impl DbFolderItem {
                 )
             )
         }
-        let db = result.unwrap();
-        self.db = Some(db.clone());
-        return Ok(db)
+        let db_main = result.unwrap();
+        let db = db_main.open_tree(DB);
+        let index = db_main.open_tree(INDEX);
+        if db.is_ok() && index.is_ok() {
+            let db_ = db.unwrap().clone();
+            let index_ = index.unwrap().clone();
+            self.db = Some(db_.clone());
+            self.index = Some(index_.clone());
+            return Ok(
+                (db_.clone(), index_.clone())
+            )
+        } else {
+            return Err(
+                PlanetError::new(500, Some(tr!("Could not open database partition")))
+            )
+        }
     }
 
-    fn close_partition(&self, db: &sled::Db) -> Result<usize, PlanetError> {
+    fn close_partition(&self, db: &sled::Tree) -> Result<usize, PlanetError> {
         let size = db.flush();
         if size.is_err() {
             let error = size.unwrap_err();
@@ -924,7 +957,99 @@ impl DbFolderItem {
         }
         return Ok(list_partitions)
     }
-
+    fn get_language_code(&mut self, item_db: &DbData) -> Result<String, PlanetError> {
+        let item_db = item_db.clone();
+        let data = item_db.data;
+        if data.is_none() {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Item has no data")),
+                )
+            )
+        }
+        let data = data.unwrap();
+        let db_folder = self.db_folder.clone();
+        let folder_id = self.folder_id.as_ref().unwrap();
+        let folder = db_folder.get(folder_id);
+        if folder.is_err() {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Folder by id: \"{}\" not found.", folder_id)),
+                )
+            )
+        }
+        let folder = folder.unwrap();
+        // eprintln!("DbFolderItem.get_language_code :: folder: {:#?}", &folder);
+        let data_objects = folder.data_objects.unwrap();
+        for (k, v) in data_objects {
+            let column_id = k;
+            let my_map = v;
+            let column_type = my_map.get(COLUMN_TYPE);
+            if column_type.is_some() {
+                let column_type = column_type.unwrap();
+                if column_type == COLUMN_TYPE_LANGUAGE {
+                    let language_code = data.get(&column_id).unwrap().clone();
+                    return Ok(language_code)
+                }
+            }
+        }
+        return Err(
+            PlanetError::new(
+                500, 
+                Some(tr!("Could not find language column.")),
+            )
+        )
+    }
+    fn get_relevance_by_column_id(&mut self, column_id: &String) -> Result<u8, PlanetError> {
+        let column_id = column_id.clone();
+        let db_folder = self.db_folder.clone();
+        let folder_id = self.folder_id.as_ref().unwrap();
+        let folder = db_folder.get(folder_id);
+        if folder.is_err() {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Folder by id: \"{}\" not found.", folder_id)),
+                )
+            )
+        }
+        let folder = folder.unwrap();
+        let data_objects = folder.data_objects;
+        let mut relevance_int: u8 = 1;
+        if data_objects.is_some() {
+            let data_objects = data_objects.unwrap();
+            let mut column_map_by_id: BTreeMap<String, String> = BTreeMap::new();
+            // Make map of column_id -> column_name
+            for (k, v) in data_objects.clone() {
+                let column_type = v.get(COLUMN_TYPE);
+                if !column_type.is_some() {
+                    continue
+                }
+                let column_id = k;
+                let column_name = v.get(NAME).unwrap().clone();
+                column_map_by_id.insert(column_id, column_name);
+            }
+            // Get column name for id
+            let column_name = column_map_by_id.get(&column_id);
+            if column_name.is_some() {
+                let column_name = column_name.unwrap();
+                let relevance_map = data_objects.get(
+                    TEXT_SEARCH_COLUMN_RELEVANCE
+                );
+                if relevance_map.is_some() {
+                    let relevance_map = relevance_map.unwrap();
+                    let relevance = relevance_map.get(column_name);
+                    if relevance.is_some() {
+                        let relevance = relevance.unwrap();
+                        relevance_int = FromStr::from_str(relevance).unwrap();
+                    }
+                }
+            }
+        }
+        return Ok(relevance_int)
+    }
 }
 
 impl FolderItem for DbFolderItem {
@@ -947,6 +1072,7 @@ impl FolderItem for DbFolderItem {
             db_folder: db_folder.clone(),
             folder_id: Some(folder_id.to_string()),
             db: None,
+            index: None,
             db_partitions: None,
         };
         Ok(db_row)
@@ -959,16 +1085,20 @@ impl FolderItem for DbFolderItem {
         let id = db_data.id.clone().unwrap();
         let id_db = xid::Id::from_str(id.as_str()).unwrap();
         let id_db = id_db.as_bytes();
-        let db = self.open_partition_by_item(&id)?;
+        let (db, _) = self.open_partition_by_item(&id)?;
         let response = &db.insert(id_db, encoded);
-        let _ = self.close_partition(&db);
         match response {
             Ok(_) => {
                 // Get item
-                let item_ = self.get(&folder_name, GetItemOption::ById(id), None);
+                let item_ = self.get(
+                    &folder_name, 
+                    GetItemOption::ById(id), 
+                    None
+                );
                 match item_ {
                     Ok(_) => {
                         let item = item_.unwrap();
+                        let _ = self.index(&item);
                         Ok(item)
                     },
                     Err(error) => {
@@ -982,6 +1112,143 @@ impl FolderItem for DbFolderItem {
         }
     }
 
+    fn index(&mut self, db_item: &DbData) -> Result<DbData, PlanetError> {
+        let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
+        let db_item = db_item.clone();
+        let index_tree = self.index.clone();
+        if index_tree.is_none() {
+            return Err(
+                PlanetError::new(500, Some(tr!("Index file is not open.")))
+            )
+        }
+        let index_tree = index_tree.unwrap();
+        let data_objects = db_item.clone().data_objects;
+        if data_objects.is_none() {
+            return Err(
+                PlanetError::new(500, Some(tr!("Could not insert data")))
+            )
+        }
+        let data_objects = data_objects.unwrap();
+        // eprintln!("DbFolderItem.index :: data_objects: {:#?}", &data_objects);
+        let map = data_objects.get(&TEXT.to_string());
+        let mut index_data: BTreeMap<String, String> = BTreeMap::new();
+        let language_code = self.get_language_code(&db_item).unwrap();
+        // eprintln!("DbFolderItem.index :: language_code: {:#?}", &language_code);
+        let stop_words = get_stop_words_by_language(&language_code);
+        let stemmer = get_stemmer_by_language(&language_code);
+        if map.is_some() {
+            let map = map.unwrap();
+            for (column_id, column_value) in map {
+                let mut processed_words: Vec<&str> = Vec::new();
+                // eprintln!("DbFolderItem.index :: column_id: {} column_value: {}", column_id, column_value);
+                let words: Vec<&str> = column_value.split(" ").collect();
+                // These words are not unique, can have n items for same word
+                for word in words {
+                    // eprintln!("DbFolderItem.index :: word: {}", word);
+                    let is_word_processed = processed_words.contains(&word);
+                    if !is_word_processed {
+                        let is_stop = stop_words.contains(&word.to_string());
+                        // eprintln!("DbFolderItem.index :: is_stop: {}", &is_stop);
+                        if !is_stop {
+                            let stem = stemmer.stem(word);
+                            let stem = stem.to_string();
+                            let index_stem = index_data.get(&stem);
+                            // {column_id}:{score},{column_id}:{score},...
+                            let mut items: Vec<&str> = Vec::new();
+                            if index_stem.is_some() {
+                                let index_stem = index_stem.unwrap();
+                                items = index_stem.split(",").collect();
+                            }
+                            // Calculate score
+                            // Get relevance from the column name and text_search_column_relevance
+                            // Relevance is 1-5
+                            let relevance = self.get_relevance_by_column_id(column_id).unwrap();
+                            let score = relevance.to_string();
+                            let item= format!("{}:{}", column_id, &score);
+                            let item= item.as_str();
+                            items.push(item);
+                            let items_string = items.join(",");
+                            index_data.insert(stem.clone(), items_string);
+                            processed_words.push(word);
+                        }
+                    }
+                }
+            }
+        }
+        if index_data.len() == 0 {
+            return Err(
+                PlanetError::new(500, Some(tr!("No data to be indexed.")))
+            )
+        }
+        // eprintln!("DbFolderItem.index :: index_data: {:#?}", &index_data);
+        // Write into disk the index data
+        let mut site_id_wrap: Option<&str> = None;
+        let mut space_id_wrap: Option<&str> = None;
+        let mut box_id_wrap: Option<&str> = None;
+        let site_id = self.site_id.clone().unwrap_or_default();
+        let space_id = self.space_id.clone().unwrap_or_default();
+        let box_id = self.box_id.clone().unwrap_or_default();
+        if site_id != String::from("") {
+            site_id_wrap = Some(site_id.as_str());
+        }
+        if space_id != String::from("") {
+            space_id_wrap = Some(space_id.as_str());
+        }
+        if box_id != String::from("") {
+            box_id_wrap = Some(box_id.as_str());
+        }
+        let routing_wrap = RoutingData::defaults(
+            self.account_id.clone(),
+            site_id_wrap, 
+            space_id_wrap, 
+            box_id_wrap,
+            None
+        );
+        let name = db_item.name.unwrap_or_default();
+        let db_index_data = DbData::defaults(
+            &name,
+            Some(index_data),
+            None,
+            None,
+            None,
+            routing_wrap,
+            None,
+        );
+        if db_index_data.is_err() {
+            let error = db_index_data.unwrap_err();
+            return Err(error)
+        }
+        let db_index_data = db_index_data.unwrap();
+        // eprintln!("DbFolderItem.index :: I will write into index: {:#?}", &db_index_data);
+        let id = db_item.id.clone().unwrap();
+        let id_db = xid::Id::from_str(id.as_str()).unwrap();
+        let id_db = id_db.as_bytes();
+        let encrypted_data = db_index_data.encrypt(&shared_key).unwrap();
+        let encoded: Vec<u8> = encrypted_data.serialize();
+        let response = index_tree.insert(id_db, encoded);
+        if response.is_err() {
+            return Err(
+                PlanetError::new(500, Some(tr!("Error writing into index.")))
+            )
+        }
+        // Get from index by id
+        let response = index_tree.get(&id_db);
+        let response = response.unwrap();
+        let item_db = response.unwrap().to_vec();
+        let item_ = EncryptedMessage::deserialize(item_db).unwrap();
+        let item_ = DbData::decrypt_owned(
+            &item_, 
+            &shared_key);
+        if item_.is_err() {
+            return Err(
+                PlanetError::new(500, Some(tr!("Error decrypting from indices.")))
+            )
+        }
+        let item_ = item_.unwrap();
+        // eprintln!("DbFolderItem.index :: I wrote into index: {:#?}", &item_);
+        return Ok(item_.clone())
+    }
+
     fn update(&mut self, db_data: &DbData) -> Result<DbData, PlanetError> {
         let db_data = db_data.clone();
         let id = db_data.id.clone().unwrap();
@@ -990,7 +1257,7 @@ impl FolderItem for DbFolderItem {
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let encrypted_data = db_data.encrypt(&shared_key).unwrap();
         let encoded: Vec<u8> = encrypted_data.serialize();
-        let db = self.open_partition_by_item(&id)?;
+        let (db, _) = self.open_partition_by_item(&id)?;
         let response = &db.insert(id_db, encoded);
         match response {
             Ok(_) => {
@@ -1030,7 +1297,7 @@ impl FolderItem for DbFolderItem {
         &mut self, 
         folder_name: &String, 
         by: GetItemOption, 
-        fields: Option<Vec<String>>
+        columns: Option<Vec<String>>
     ) -> Result<DbData, PlanetError> {
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let item_db: Vec<u8>;
@@ -1039,7 +1306,7 @@ impl FolderItem for DbFolderItem {
                 eprintln!("DbFolderItem.get :: id: {}", &id);
                 let id_db = xid::Id::from_str(&id).unwrap();
                 let id_db = id_db.as_bytes();
-                let db = self.open_partition_by_item(&id)?;
+                let (db, _) = self.open_partition_by_item(&id)?;
                 let db_result = db.get(&id_db);
                 if db_result.is_err() {
                     return Err(
@@ -1066,12 +1333,12 @@ impl FolderItem for DbFolderItem {
                 match item_ {
                     Ok(_) => {
                         let mut item = item_.unwrap();
-                        if fields.is_none() {
+                        if columns.is_none() {
                             let _ = self.close_partition(&db);
                             Ok(item)    
                         } else {
                             // eprintln!("get :: item: {:#?}", &item);
-                            // If fields is informed, then I need to remove from item.data fields not requested
+                            // If columns is informed, then I need to remove from item.data columns not requested
                             // data: Some(
                             //     {
                             //         "c49qh6osmpv69nnrt33g": "pepito",
@@ -1082,8 +1349,8 @@ impl FolderItem for DbFolderItem {
                             //         "c49qh6osmpv69nnrt340": "This is some description I want to include",
                             //     },
                             // ),
-                            let fields = fields.unwrap();
-                            item = self.filter_fields(&folder_name, &fields, &item)?;
+                            let columns = columns.unwrap();
+                            item = self.filter_fields(&folder_name, &columns, &item)?;
                             Ok(item)
                         }
                     },
@@ -1111,7 +1378,7 @@ impl FolderItem for DbFolderItem {
                         let mut this = this.lock().unwrap();
                         let shared_key = shared_key.lock().unwrap();
                         let name = name.lock().unwrap();
-                        let db = this.open_partition(&partition).unwrap();
+                        let (db, _) = this.open_partition(&partition).unwrap();
                         let mut my_wrap_db_data: Option<DbData> = None;
                         for db_result in db.iter() {
                             let (_, db_item) = db_result.unwrap();
@@ -1209,11 +1476,11 @@ impl FolderItem for DbFolderItem {
         // ).unwrap();
         // let field_config_map_wrap = Some(field_config_map.clone());
         // // eprintln!("DbFolderItem.select :: folder: {:#?}", &folder);
-        // let fields_wrap = fields.clone();
+        // let fields_wrap = columns.clone();
         // let has_fields = fields_wrap.is_some();
-        // let mut fields: Vec<String> = Vec::new();
+        // let mut columns: Vec<String> = Vec::new();
         // if fields_wrap.is_some() {
-        //     fields = fields_wrap.unwrap();
+        //     columns = fields_wrap.unwrap();
         // }
         
         // let t_total_1 = Instant::now();
@@ -1306,7 +1573,7 @@ impl FolderItem for DbFolderItem {
         //     let page_target = page_target as usize;
         //     if page_target == page && formula_matches {
         //         if &has_fields == &true {
-        //             let item_new = self.filter_fields(&folder_name, &fields, &item)?;
+        //             let item_new = self.filter_fields(&folder_name, &columns, &item)?;
         //             items.push(item_new);
         //         } else {
         //             items.push(item);
@@ -1345,8 +1612,8 @@ pub struct SelectCountResult {
 
 impl DbFolderItem {
 
-    pub fn filter_fields(&self, folder_name: &String, fields: &Vec<String>, item: &DbData) -> Result<DbData, PlanetError> {
-        let fields = fields.clone();
+    pub fn filter_fields(&self, folder_name: &String, columns: &Vec<String>, item: &DbData) -> Result<DbData, PlanetError> {
+        let columns = columns.clone();
         let mut item = item.clone();
         // field_id => field_name
         let field_id_map= DbFolder::get_field_id_map(
@@ -1359,7 +1626,7 @@ impl DbFolderItem {
         if db_data.is_some() {
             for (field_db_id, field_value) in db_data.unwrap() {
                 let field_db_name = &field_id_map.get(&field_db_id).unwrap().clone();
-                for column in &fields {
+                for column in &columns {
                     if column.to_lowercase() == field_db_name.to_lowercase() {
                         data_new.insert(field_db_id.clone(), field_value.clone());
                     }
@@ -1375,7 +1642,7 @@ impl DbFolderItem {
         if db_data_collections.is_some() {
             for (field_db_id, items) in db_data_collections.unwrap() {
                 let field_db_name = &field_id_map.get(&field_db_id).unwrap().clone();
-                for column in &fields {
+                for column in &columns {
                     if column.to_lowercase() == field_db_name.to_lowercase() {
                         data_collections_new.insert(field_db_id.clone(), items.clone());
                     }
@@ -1391,7 +1658,7 @@ impl DbFolderItem {
         if db_data_objects.is_some() {
             for (field_db_id, map) in db_data_objects.unwrap() {
                 let field_db_name = &field_id_map.get(&field_db_id).unwrap().clone();
-                for column in &fields {
+                for column in &columns {
                     if column.to_lowercase() == field_db_name.to_lowercase() {
                         data_objects_new.insert(field_db_id.clone(), map.clone());
                     }

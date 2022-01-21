@@ -22,8 +22,14 @@ pub const SELECT_DEFAULT_NUMBER_ITEMS: u32 = 20;
 pub const INDEX_PROFILE_IDX: &str = "idx";
 pub const INDEX_PROFILE_RAW: &str = "raw";
 
+pub const DB: &str = "db";
+pub const INDEX: &str = "index";
+pub const TEXT: &str = "text";
+pub const COLUMN_ID: &str = "column_id";
+pub const SCORE: &str = "score";
 pub const LANGUAGE_CODES: &str = "language_codes";
 pub const LANGUAGE_DEFAULT: &str = "language_default";
+pub const TEXT_SEARCH_COLUMN_RELEVANCE: &str = "text_search_column_relevance";
 pub const PROPERTIES: &str = "properties";
 pub const COLUMN_IDS: &str = "column_ids";
 pub const SELECT_OPTIONS: &str = "select_options";

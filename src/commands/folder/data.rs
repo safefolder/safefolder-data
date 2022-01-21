@@ -48,21 +48,26 @@ impl<'gb> InsertIntoFolder<'gb> {
     ) -> (BTreeMap<String, String>, BTreeMap<String, String>) {
         let mut insert_id_data_map: BTreeMap<String, String> = BTreeMap::new();
         let mut insert_id_data_objects_map: BTreeMap<String, String> = BTreeMap::new();
+        let mut folder_map_by_name: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
+        for (_, column) in folder_data {
+            let column_name = column.get(NAME);
+            if column_name.is_some() {
+                let column_name = column_name.unwrap();
+                folder_map_by_name.insert(column_name.clone(), column.clone());
+            }
+        }
         for (name, value) in insert_data_map.clone() {
-            let id_map = folder_data.get(&name);
-            if id_map.is_some() {
-                let id_map = id_map.unwrap();
-                let id = id_map.get(ID);
-                let column_type = id_map.get(COLUMN_TYPE);
-                if id.is_some() {
-                    let id = id.unwrap().clone();
-                    let column_type = column_type.unwrap().clone();
-                    if column_type == COLUMN_TYPE_LINK.to_string() {
-                        // column_id => remote folder item id
-                        insert_id_data_objects_map.insert(id, value);
-                    } else {
-                        insert_id_data_map.insert(id, value);
-                    }
+            let map = folder_map_by_name.get(&name);
+            if map.is_some() {
+                let map = map.unwrap();
+                let id = map.get(ID).unwrap().clone();
+                let column_type = map.get(COLUMN_TYPE);
+                let column_type = column_type.unwrap().clone();
+                if column_type == COLUMN_TYPE_LINK.to_string() {
+                    // column_id => remote folder item id
+                    insert_id_data_objects_map.insert(id, value);
+                } else {
+                    insert_id_data_map.insert(id, value);
                 }
             }
         }
@@ -166,7 +171,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                     return Err(errors);
                 }
                 let config_columns = config_columns.unwrap();
-                eprintln!("InsertIntoFolder.run :: config_columns: {:#?}", &config_columns);
+                // eprintln!("InsertIntoFolder.run :: config_columns: {:#?}", &config_columns);
 
                 let insert_data_map: BTreeMap<String, String> = self.config.data.clone().unwrap();
                 let insert_data_collections_map = self.config.data_collections.clone();
@@ -219,7 +224,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                 // Check name does not exist
                 // eprintln!("InsertIntoFolder.run :: name: {}", &name);
                 let name_exists = self.check_name_exists(&folder_name, &name, &mut db_row);
-                eprintln!("InsertIntoFolder.run :: record name_exists: {}", &name_exists);
+                // eprintln!("InsertIntoFolder.run :: record name_exists: {}", &name_exists);
                 if name_exists {
                     errors.push(
                         PlanetError::new(
@@ -252,8 +257,8 @@ impl<'gb> InsertIntoFolder<'gb> {
                 let mut data_collections: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
                 let mut column_config_map: BTreeMap<String, ColumnConfig> = BTreeMap::new();
                 for column in config_columns.clone() {
-                    let field_name = column.name.clone().unwrap();
-                    column_config_map.insert(field_name, column.clone());
+                    let column_name = column.name.clone().unwrap();
+                    column_config_map.insert(column_name, column.clone());
                 }
                 let mut links_map: HashMap<String, Vec<ColumnConfig>> = HashMap::new();
                 let mut links_data_map: HashMap<String, HashMap<String, Vec<String>>> = HashMap::new();
@@ -263,13 +268,11 @@ impl<'gb> InsertIntoFolder<'gb> {
                     let column_type = column.column_type.unwrap_or_default();
                     let column_type = column_type.as_str();
                     let column_name = column.name.unwrap();
-                    eprintln!("InsertIntoFolder.run :: \"{}\" column_type: {}", &column_name, &column_type);
                     // I always have a column id
                     let column_id = column.id.unwrap_or_default();
                     
                     let data_item = insert_id_data_map.get(&column_id);
                     if data_item.is_some() {
-                        eprintln!("InsertIntoFolder.run :: have data_item...");
                         let data_item = data_item.unwrap().clone();
                         let mut items = Vec::new();
                         items.push(data_item);
@@ -279,7 +282,6 @@ impl<'gb> InsertIntoFolder<'gb> {
                         &column_id
                     );
                     if data_objects_item.is_some() && column_data.is_none() {
-                        eprintln!("InsertIntoFolder.run :: have data_objects_item...");
                         let mut items = Vec::new();
                         items.push(data_objects_item.unwrap().clone());
                         column_data = Some(items);
@@ -288,19 +290,16 @@ impl<'gb> InsertIntoFolder<'gb> {
                         &column_id
                     );
                     if data_collections_item.is_some() && column_data.is_none() {
-                        eprintln!("InsertIntoFolder.run :: have data_collections_item...");
                         let data_collections_item = data_collections_item.unwrap().clone();
                         column_data = Some(data_collections_item);
                     }
                     // In case we don't have any value and is system generated we skip
-                    eprintln!("InsertIntoFolder.run :: before check .. column_data: {:?}", &column_data);
                     if column_data.is_none() &&
                         (
                             column_type != COLUMN_TYPE_FORMULA && 
                             column_type != COLUMN_TYPE_CREATED_TIME && 
                             column_type != COLUMN_TYPE_LAST_MODIFIED_TIME
                         ) {
-                            eprintln!("InsertIntoFolder.run :: \"{}\" I skip...", &column_name);
                         continue
                     }
                     let column_data_: Vec<String>;
@@ -312,7 +311,6 @@ impl<'gb> InsertIntoFolder<'gb> {
                         column_data_ = items;
                     }
                     let column_data = column_data_;
-                    eprintln!("InsertIntoFolder.run :: \"{}\" column_data: {:?}", &column_name, &column_data);
                     let mut column_data_wrap: Result<String, PlanetError> = Ok(String::from(""));
                     let mut skip_data_assign = false;
                     match column_type {
@@ -454,13 +452,13 @@ impl<'gb> InsertIntoFolder<'gb> {
                             );
                         }
                     };
-                    eprintln!("InsertIntoFolder.run :: \"{}\" skip_data_assign: {} data: {} objects: {} collections: {}", 
-                        &column_name,
-                        &skip_data_assign,
-                        &column_data_wrap.is_ok(),
-                        &data_objects.len(),
-                        &data_collections.len(),
-                    );
+                    // eprintln!("InsertIntoFolder.run :: \"{}\" skip_data_assign: {} data: {} objects: {} collections: {}", 
+                    //     &column_name,
+                    //     &skip_data_assign,
+                    //     &column_data_wrap.is_ok(),
+                    //     &data_objects.len(),
+                    //     &data_collections.len(),
+                    // );
                     if skip_data_assign == false {
                         let tuple = handle_field_response(
                             &column_data_wrap, &errors, &column_id, &data
@@ -470,7 +468,8 @@ impl<'gb> InsertIntoFolder<'gb> {
                     }
                 }
                 // text and language
-                let mut text: String = String::from("");
+                let mut text_map: BTreeMap<String, String> = BTreeMap::new();
+                let mut text_column_id: String = String::from("");
                 for column_config in config_columns {
                     let column_config_ = column_config.clone();
                     let column_type = &column_config.column_type.unwrap();
@@ -481,7 +480,12 @@ impl<'gb> InsertIntoFolder<'gb> {
                             &column_config_,
                             Some(column_config_map.clone()),
                         );
-                        let result_text = obj.validate(&data, &folder);
+                        text_column_id = column_id.clone();
+                        let result_text = obj.validate(
+                            &data, 
+                            &folder,
+                            &text_column_id
+                        );
                         if result_text.is_err() {
                             let error_message = result_text.clone().unwrap_err().message;
                             errors.push(
@@ -491,13 +495,15 @@ impl<'gb> InsertIntoFolder<'gb> {
                                 )
                             );
                         }
-                        text = result_text.unwrap();
-                        data.insert(column_id.clone(), text.clone());
+                        text_map = result_text.unwrap();
+                        data_objects.insert(TEXT.to_string(), text_map.clone());
                     } else if column_type == COLUMN_TYPE_LANGUAGE {
                         let obj = LanguageColumn::defaults(
                             &column_config_,
                         );
-                        let result_lang = obj.validate(&text, &folder);
+                        let text_map = text_map.clone();
+                        let text = text_map.get(&text_column_id).unwrap();
+                        let result_lang = obj.validate(text, &folder);
                         if result_lang.is_err() {
                             let error_message = result_lang.clone().unwrap_err().message;
                             errors.push(

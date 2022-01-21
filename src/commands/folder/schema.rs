@@ -64,15 +64,67 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                 // db folder options with language data
                 let db_folder: DbFolder = result.unwrap();
                 let mut data: BTreeMap<String, String> = BTreeMap::new();
-                let language = config.language.unwrap();
-                let language_default = language.default;
-                data.insert(String::from(LANGUAGE_DEFAULT), language_default);
-
                 // config data
                 let mut data_objects: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
                 let mut data_collections: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
                 let mut columns = config.columns.unwrap().clone();
                 let mut column_ids: Vec<BTreeMap<String, String>> = Vec::new();
+
+                // validate and clean defaults for language and text_search
+                // TODO: Place this into a validation operation for the entity
+                let language = config.language;
+                if language.is_some() {
+                    let language = language.unwrap();
+                    let language_default = language.default;
+                    data.insert(LANGUAGE_DEFAULT.to_string(), language_default);
+                } else {
+                    data.insert(LANGUAGE_DEFAULT.to_string(), LANGUAGE_ENGLISH.to_string());
+                }
+                let text_search = config.text_search;
+                if text_search.is_some() {
+                    let text_search = text_search.unwrap();
+                    let mut column_relevance = text_search.column_relevance;
+                    let mut my_map: BTreeMap<String, String> = BTreeMap::new();
+                    // Include Text rule if not found
+                    let mut has_text = false;
+                    for (column_relevance_item, _) in column_relevance.clone() {
+                        if column_relevance_item == String::from(TEXT_COLUMN) {
+                            has_text = true;
+                        }
+                    }
+                    if !has_text {
+                        let relevance: u8 = 1;
+                        column_relevance.insert(TEXT_COLUMN.to_string(), relevance);
+                    }
+                    for (column_relevance_item, relevance) in column_relevance {
+                        let mut has_column = false;
+                        for column in columns.clone().iter() {
+                            let column = column.clone();
+                            let column_name = column.name.unwrap_or_default();
+                            if column_name.to_lowercase() == column_relevance_item.to_lowercase() {
+                                has_column = true;
+                            }
+                        }
+                        if !has_column && column_relevance_item != TEXT_COLUMN.to_string() {
+                            return Err(
+                                PlanetError::new(
+                                    500, 
+                                    Some(
+                                        tr!("Configuration does not have field \"{}\"", &column_relevance_item)
+                                    ),
+                                )
+                            );
+                        } else {
+                            let relevance_string= relevance.to_string();
+                            my_map.insert(column_relevance_item.clone(), relevance_string);
+                        }
+                    }
+                    data_objects.insert(TEXT_SEARCH_COLUMN_RELEVANCE.to_string(), my_map);
+                } else {
+                    let mut my_map: BTreeMap<String, String> = BTreeMap::new();
+                    my_map.insert(TEXT_COLUMN.to_string(), String::from("1"));
+                    data_objects.insert(TEXT_SEARCH_COLUMN_RELEVANCE.to_string(), my_map);
+                }
 
                 // name column
                 let name_field_config = config.name.unwrap();
@@ -110,7 +162,7 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                 for column in columns.iter() {
                     // column simple attributes
                     let column_attrs = column.clone();
-                    let column_name = column_attrs.name.unwrap_or_default().clone();
+                    let column_id = &column_attrs.id.unwrap();
                     let map = column.map_object_db(
                         self.planet_context,
                         self.context,
@@ -118,7 +170,7 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                         &db_folder,
                         folder_name,
                     )?;
-                    data_objects.insert(String::from(column_name.clone()), map.clone());
+                    data_objects.insert(column_id.clone(), map.clone());
                     // column complex attributes like select_data
                     let map_list = &column.map_collections_db()?;
                     let map_list = map_list.clone();
@@ -129,7 +181,7 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                 // text column
                 let column_id = &generate_id().unwrap_or_default();
                 data_objects.insert(
-                    TEXT_COLUMN.to_string(), 
+                    column_id.clone(), 
                     create_minimum_column_map(
                         column_id,
                         &TEXT_COLUMN.to_string(),
@@ -142,7 +194,7 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                 // language column
                 let column_id = &generate_id().unwrap_or_default();
                 data_objects.insert(
-                    LANGUAGE_COLUMN.to_string(), 
+                    column_id.clone(), 
                     create_minimum_column_map(
                         column_id,
                         &LANGUAGE_COLUMN.to_string(),

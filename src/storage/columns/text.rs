@@ -1,3 +1,5 @@
+extern crate rust_stemmers;
+
 use std::collections::BTreeMap;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
@@ -6,6 +8,7 @@ use asciifolding::fold_to_ascii;
 use lazy_static::lazy_static;
 use regex::{Regex};
 use lingua::{Language, LanguageDetector, LanguageDetectorBuilder};
+use rust_stemmers::{Algorithm, Stemmer};
 
 use crate::planet::constants::ID;
 use crate::planet::{PlanetError};
@@ -541,98 +544,142 @@ impl TextColumn {
         let config = self.config.clone();
         return Ok(config)
     }
-    pub fn validate(&self, data_map: &BTreeMap<String, String>, folder: &DbData) -> Result<String, PlanetError> {
-        let mut data = String::from("");
+    pub fn validate(
+        &self, 
+        data_map: &BTreeMap<String, String>, 
+        folder: &DbData,
+        text_column_id: &String,
+    ) -> Result<BTreeMap<String, String>, PlanetError> {
+        let text_column_id = text_column_id.clone();
         let folder = folder.clone();
         let column_config_map = self.column_config_map.clone().unwrap();
+        let mut map: BTreeMap<String, String> = BTreeMap::new();
+        let mut text: String = String::from("");
         for (column_name, column_config) in column_config_map {
             let column_type = column_config.column_type.unwrap();
             let column_type = column_type.as_str();
             let column_id = column_config.id.unwrap();
-            let mut value_wrap: Option<&String> = None;
+            let mut value_wrap: Option<String> = None;
             match column_type {
                 COLUMN_TYPE_SMALL_TEXT => {
-                    value_wrap = data_map.get(&column_id);
+                    let wrap = data_map.get(&column_id);
+                    if wrap.is_some() {
+                        value_wrap = Some(wrap.unwrap().clone());
+                    }
                 },
                 COLUMN_TYPE_LONG_TEXT => {
-                    value_wrap = data_map.get(&column_id);
+                    let wrap = data_map.get(&column_id);
+                    if wrap.is_some() {
+                        value_wrap = Some(wrap.unwrap().clone());
+                    }
                 },
                 COLUMN_TYPE_NUMBER => {
-                    value_wrap = data_map.get(&column_id);
+                    let wrap = data_map.get(&column_id);
+                    if wrap.is_some() {
+                        value_wrap = Some(wrap.unwrap().clone());
+                    }
                 },
                 COLUMN_TYPE_SELECT => {
                     // Need to check from data_map the values sent, which can be a list separated by commas
-                    value_wrap = data_map.get(&column_id);
-                    if value_wrap.is_some() {
-                        let mut value_ids: Vec<&str> = Vec::new();
-                        let values = value_wrap.unwrap();
-                        if values.find(",").is_some() {
-                            value_ids = values.split(",").collect();
-                        } else {
-                            value_ids.push(values);
-                        }
-                        for data_collection in folder.data_collections.clone() {
-                            for (key, collection_value) in data_collection {
-                                if key.to_lowercase() != String::from(COLUMN_IDS) {
-                                    let key_items: Vec<&str> = key.split("__").collect();
-                                    let key_column_name = key_items[0];
-                                    let key_column_type = key_items[1];
-                                    if key_column_type == SELECT_OPTIONS && 
-                                       key_column_name.to_lowercase() == column_name.to_lowercase() {
-                                        for option_ in collection_value {
-                                            let option_key = option_.get(KEY).unwrap().clone();
-                                            let option_value = option_.get(VALUE).unwrap().clone();
-                                            for value_id in value_ids.clone() {
-                                                if option_key.as_str() == value_id {
-                                                    data = format!("{} {}", &data, option_value);
-                                                    value_wrap = None;
-                                                }    
+                    let wrap = data_map.get(&column_id);
+                    if wrap.is_some() {
+                        value_wrap = Some(wrap.unwrap().clone());
+                        if value_wrap.is_some() {
+                            let mut value_ids: Vec<&str> = Vec::new();
+                            let values = value_wrap.unwrap();
+                            if values.find(",").is_some() {
+                                value_ids = values.split(",").collect();
+                            } else {
+                                value_ids.push(values.as_str());
+                            }
+                            let mut value: String = String::from("");
+                            for data_collection in folder.data_collections.clone() {
+                                for (key, collection_value) in data_collection {
+                                    if key.to_lowercase() != String::from(COLUMN_IDS) {
+                                        let key_items: Vec<&str> = key.split("__").collect();
+                                        let key_column_name = key_items[0];
+                                        let key_column_type = key_items[1];
+                                        if key_column_type == SELECT_OPTIONS && 
+                                           key_column_name.to_lowercase() == column_name.to_lowercase() {
+                                            for option_ in collection_value {
+                                                let option_key = option_.get(KEY).unwrap().clone();
+                                                let option_value = option_.get(VALUE).unwrap().clone();
+                                                for value_id in value_ids.clone() {
+                                                    if option_key.as_str() == value_id {
+                                                        // data = format!("{} {}", &data, option_value);
+                                                        // value_wrap = Some(&option_value);
+                                                        value = format!("{} {}", &value, option_value);
+                                                    }    
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
-                        }    
+                            value_wrap = Some(value);
+                        }
+    
                     }
                 },
                 COLUMN_TYPE_DATE => {
-                    value_wrap = data_map.get(&column_id);
+                    let wrap = data_map.get(&column_id);
+                    if wrap.is_some() {
+                        value_wrap = Some(wrap.unwrap().clone());
+                    }
                 },
                 COLUMN_TYPE_DURATION => {
-                    value_wrap = data_map.get(&column_id);
+                    let wrap = data_map.get(&column_id);
+                    if wrap.is_some() {
+                        value_wrap = Some(wrap.unwrap().clone());
+                    }
                 },
                 COLUMN_TYPE_CURRENCY => {
-                    value_wrap = data_map.get(&column_id);
+                    let wrap = data_map.get(&column_id);
+                    if wrap.is_some() {
+                        value_wrap = Some(wrap.unwrap().clone());
+                    }
                 },
                 COLUMN_TYPE_PERCENTAGE => {
-                    value_wrap = data_map.get(&column_id);
+                    let wrap = data_map.get(&column_id);
+                    if wrap.is_some() {
+                        value_wrap = Some(wrap.unwrap().clone());
+                    }
                 },
                 _ => {},
             }
             if value_wrap.is_some() {
                 let value = Some(value_wrap.unwrap().clone());
                 if value.is_some() {
-                    let value = value.unwrap();
-                    data = format!("{} {}", &data, value);
-                }    
+                    // let mut data = String::from("");
+                    let mut value = value.unwrap();
+                    if value == String::from("") {
+                        continue
+                    }
+                    // Do ascii folding
+                    value = fold_to_ascii(value.as_str());
+                    // Through regex, parse only words and numbers, remove duplicate whitespace
+                    let expr = &RE_TEXT;
+                    let mut value_new = String::from("");
+                    let words = expr.captures_iter(value.as_str());
+                    for word in words {
+                        let word = word.get(0).unwrap().as_str();
+                        value_new = format!("{} {}", value_new, word);
+                    }
+                    let value_new = value_new.trim().to_string();
+                    value = value_new;
+                    // Convert to lower
+                    value = value.to_lowercase();
+                    map.insert(column_id, value.clone());
+                    text = format!("{} {}", &text, &value);
+                }
             } else {
                 continue
             }
         }
-        // Do ascii folding
-        data = fold_to_ascii(data.as_str());
-        // Through regex, parse only words and numbers, remove duplicate whitespace
-        let expr = &RE_TEXT;
-        let mut data_new = String::from("");
-        let words = expr.captures_iter(data.as_str());
-        for word in words {
-            let word = word.get(0).unwrap().as_str();
-            data_new = format!("{} {}", data_new, word);
-        }
-        data = data_new;
-        // Convert to lower
-        data = data.to_lowercase();
-        return Ok(data.clone())
+        // add text to map
+        let text = text.trim().to_string();
+        map.insert(text_column_id, text);
+        return Ok(map.clone())
     }
     pub fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
         let column_config = self.config.clone();
@@ -647,4 +694,74 @@ impl TextColumn {
         yaml_string.push_str(format!("  {field}: {value}\n", field=field, value=value).as_str());
         return yaml_string;
     }
+}
+
+pub fn get_stop_words_by_language(language_code: &str) -> Vec<String> {
+    let mut stop_words: Vec<String> = Vec::new();
+    match language_code {
+        LANGUAGE_CODE_ENGLISH => {
+            stop_words = stop_words::get(stop_words::LANGUAGE::English);
+        },
+        LANGUAGE_CODE_FRENCH => {
+            stop_words = stop_words::get(stop_words::LANGUAGE::French);
+        },
+        LANGUAGE_CODE_ITALIAN => {
+            stop_words = stop_words::get(stop_words::LANGUAGE::Italian);
+        },
+        LANGUAGE_CODE_GERMAN => {
+            stop_words = stop_words::get(stop_words::LANGUAGE::German);
+        },
+        LANGUAGE_CODE_SPANISH => {
+            stop_words = stop_words::get(stop_words::LANGUAGE::Spanish);
+        },
+        LANGUAGE_CODE_PORTUGUESE => {
+            stop_words = stop_words::get(stop_words::LANGUAGE::Portuguese);
+        },
+        LANGUAGE_CODE_DANISH => {
+            stop_words = stop_words::get(stop_words::LANGUAGE::Danish);
+        },
+        LANGUAGE_CODE_NORWEGIAN => {
+            stop_words = stop_words::get(stop_words::LANGUAGE::Norwegian);
+        },
+        LANGUAGE_CODE_SWEDISH => {
+            stop_words = stop_words::get(stop_words::LANGUAGE::Swedish);
+        },
+        _ => {}
+    }
+    return stop_words
+}
+
+pub fn get_stemmer_by_language(language_code: &str) -> Stemmer {
+    let mut stemmer: Stemmer = Stemmer::create(Algorithm::English);
+    match language_code {
+        LANGUAGE_CODE_ENGLISH => {
+            stemmer = Stemmer::create(Algorithm::English);
+        },
+        LANGUAGE_CODE_FRENCH => {
+            stemmer = Stemmer::create(Algorithm::French);
+        },
+        LANGUAGE_CODE_ITALIAN => {
+            stemmer = Stemmer::create(Algorithm::Italian);
+        },
+        LANGUAGE_CODE_GERMAN => {
+            stemmer = Stemmer::create(Algorithm::German);
+        },
+        LANGUAGE_CODE_SPANISH => {
+            stemmer = Stemmer::create(Algorithm::Spanish);
+        },
+        LANGUAGE_CODE_PORTUGUESE => {
+            stemmer = Stemmer::create(Algorithm::Portuguese);
+        },
+        LANGUAGE_CODE_DANISH => {
+            stemmer = Stemmer::create(Algorithm::Danish);
+        },
+        LANGUAGE_CODE_NORWEGIAN => {
+            stemmer = Stemmer::create(Algorithm::Norwegian);
+        },
+        LANGUAGE_CODE_SWEDISH => {
+            stemmer = Stemmer::create(Algorithm::Swedish);
+        },
+        _ => {}
+    }
+    return stemmer;
 }
