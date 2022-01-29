@@ -36,10 +36,10 @@ Table fields
     are subqueries. We do subquery when get by id. Also when doing select and search operations.
 * LanguageColumn                  [done] - text
 * TextColumn                      [done] - text
+* GenerateIdColumn                [done] - text : Random ids
 
 -
 These are not complex:
-* GenerateIdColumn                [todo] - text : Random ids
 * GeneratedNumberColumn           [todo] - number: Sequential number - number : Sequence number.
 * PhoneColumn                     [todo]
 * EmailColumn                     [todo]

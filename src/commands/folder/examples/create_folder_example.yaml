@@ -1,5 +1,5 @@
 ---
-command: CREATE FOLDER "Super Folder 12"
+command: CREATE FOLDER "Super Folder 13"
 name:
   column_type: Small Text
 text_search:
@@ -35,3 +35,5 @@ columns:
   - name: Percentage
     column_type: Percentage
     number_decimals: 1
+  - name: Generated Id
+    column_type: Generate Id

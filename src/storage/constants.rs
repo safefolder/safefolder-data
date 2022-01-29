@@ -79,6 +79,7 @@ pub const COLUMN_TYPE_LINK: &str = "Link";
 pub const COLUMN_TYPE_REFERENCE: &str = "Reference";
 pub const COLUMN_TYPE_LANGUAGE: &str = "Language";
 pub const COLUMN_TYPE_TEXT: &str = "Text";
+pub const COLUMN_TYPE_GENERATE_ID: &str = "Generate Id";
 
 // Date Format
 pub const DATE_FORMAT_FRIENDLY: &str = "Friendly";

@@ -272,6 +272,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                     let column_config = column.clone();
                     let column_type = column.column_type.unwrap_or_default();
                     let column_type = column_type.as_str();
+                    eprintln!("InsertIntoFolder.run :: column_type: {}", column_type);
                     let column_name = column.name.unwrap();
                     // I always have a column id
                     let column_id = column.id.unwrap_or_default();
@@ -303,7 +304,8 @@ impl<'gb> InsertIntoFolder<'gb> {
                         (
                             column_type != COLUMN_TYPE_FORMULA && 
                             column_type != COLUMN_TYPE_CREATED_TIME && 
-                            column_type != COLUMN_TYPE_LAST_MODIFIED_TIME
+                            column_type != COLUMN_TYPE_LAST_MODIFIED_TIME && 
+                            column_type != COLUMN_TYPE_GENERATE_ID
                         ) {
                         continue
                     }
@@ -448,6 +450,10 @@ impl<'gb> InsertIntoFolder<'gb> {
                                 my_map.insert(column_name.clone(), my_list);
                                 links_data_map.insert(column_id.clone(), my_map);
                             }
+                        },
+                        COLUMN_TYPE_GENERATE_ID => {
+                            let obj = GenerateIdColumn::defaults(&column_config);
+                            column_data_wrap = obj.validate(&column_data[0]);
                         },
                         _ => {
                             errors.push(
@@ -914,6 +920,10 @@ impl<'gb> Command<String> for GetFromFolder<'gb> {
                             },
                             COLUMN_TYPE_PERCENTAGE => {
                                 let obj = PercentageColumn::defaults(&field_config_);
+                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+                            },
+                            COLUMN_TYPE_GENERATE_ID => {
+                                let obj = GenerateIdColumn::defaults(&field_config_);
                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },
                             _ => {

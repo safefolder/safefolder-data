@@ -441,6 +441,12 @@ impl ConfigStorageColumn for ColumnConfig {
                         );
                         column_config = obj.build_config(column_config_map)?;
                     },
+                    COLUMN_TYPE_GENERATE_ID => {
+                        let mut obj = GenerateIdColumn::defaults(
+                            &column_config,
+                        );
+                        column_config = obj.build_config(column_config_map)?;
+                    },
                     _ => {}
                 }
                 let _ = &map_columns_by_id.insert(column_id, column_config.clone());
@@ -600,6 +606,9 @@ impl ConfigStorageColumn for ColumnConfig {
                     &properties_map,
                     &folder_name
                 )?;
+            },
+            COLUMN_TYPE_GENERATE_ID => {
+                map = GenerateIdColumn::defaults(&propertty_config_).update_config_map(&map)?;
             },
             _ => {}
         }

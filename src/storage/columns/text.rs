@@ -16,6 +16,7 @@ use crate::storage::folder::{DbData};
 use crate::commands::folder::config::ColumnConfig;
 use crate::storage::constants::*;
 use crate::planet::constants::*;
+use crate::storage::generate_id;
 use crate::storage::columns::*;
 
 lazy_static! {
@@ -682,6 +683,71 @@ impl TextColumn {
         return Ok(map.clone())
     }
     pub fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
+        let column_config = self.config.clone();
+        let column_name = column_config.name.unwrap();
+        let mut yaml_string = yaml_string.clone();
+        let field = &column_name.truecolor(
+            YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
+        );
+        let value = format!("{}", 
+            value.truecolor(YAML_COLOR_ORANGE[0], YAML_COLOR_ORANGE[1], YAML_COLOR_ORANGE[2]), 
+        );
+        yaml_string.push_str(format!("  {field}: {value}\n", field=field, value=value).as_str());
+        return yaml_string;
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct GenerateIdColumn {
+    pub config: ColumnConfig,
+}
+impl GenerateIdColumn {
+    pub fn defaults(
+        column_config: &ColumnConfig,
+    ) -> Self {
+        let column_config = column_config.clone();
+        let field_obj = Self{
+            config: column_config,
+        };
+        return field_obj
+    }
+}
+impl StorageColumn for GenerateIdColumn {
+    fn update_config_map(
+        &mut self, 
+        column_config_map: &BTreeMap<String, String>,
+    ) -> Result<BTreeMap<String, String>, PlanetError> {
+        let column_config_map = column_config_map.clone();
+        return Ok(column_config_map)
+    }
+    fn build_config(
+        &mut self, 
+        _: &BTreeMap<String, String>,
+    ) -> Result<ColumnConfig, PlanetError> {
+        let config = self.config.clone();
+        return Ok(config)
+    }
+    fn validate(
+        &self, 
+        _value: &String
+    ) -> Result<String, PlanetError> {
+        // let text_column_id = text_column_id.clone();
+        let id = generate_id();
+        if id.is_some() {
+            let id = id.unwrap();
+            return Ok(id)
+        } else {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!(
+                        "Error generating id value"
+                    )),
+                )                
+            )
+        }
+    }
+    fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
         let column_config = self.config.clone();
         let column_name = column_config.name.unwrap();
         let mut yaml_string = yaml_string.clone();
