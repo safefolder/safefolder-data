@@ -28,7 +28,7 @@ impl FormulaColumn {
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
         properties_map: &HashMap<String, ColumnConfig>,
-        db_folder: &DbFolder,
+        db_folder: &TreeFolder,
         table_name: &String,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
         let mut field_config_map = field_config_map.clone();

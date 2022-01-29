@@ -16,7 +16,8 @@ use crate::commands::folder::config::{
 use crate::commands::folder::{Command};
 use crate::commands::{CommandRunner};
 use crate::storage::{ConfigStorageColumn};
-use crate::storage::folder::{DbFolder, FolderSchema, DbData, RoutingData};
+use crate::storage::folder::{TreeFolder, FolderSchema, DbData, RoutingData};
+use crate::storage::space::{SpaceDatabase};
 use crate::planet::{
     PlanetContext, 
     PlanetError,
@@ -41,7 +42,18 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
         let account_id = self.context.account_id.unwrap_or_default();
         let space_id = self.context.space_id.unwrap_or_default();
         let site_id = self.context.site_id;
-        let result: Result<DbFolder, PlanetError> = DbFolder::defaults(
+        let result = SpaceDatabase::defaults(
+            site_id, 
+            space_id, 
+            Some(home_dir)
+        );
+        if result.is_err() {
+            let error = result.unwrap_err();
+            return Err(error)
+        }
+        let space_database = result.unwrap();
+        let result: Result<TreeFolder, PlanetError> = TreeFolder::defaults(
+            space_database.database,
             Some(home_dir),
             Some(account_id),
             Some(space_id),
@@ -62,7 +74,7 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                 let box_id = self.context.box_id;
 
                 // db folder options with language data
-                let db_folder: DbFolder = result.unwrap();
+                let db_folder: TreeFolder = result.unwrap();
                 let mut data: BTreeMap<String, String> = BTreeMap::new();
                 // config data
                 let mut data_objects: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();

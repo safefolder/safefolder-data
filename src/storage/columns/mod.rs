@@ -10,7 +10,7 @@ use colored::Colorize;
 use serde::{Deserialize, Serialize};
 
 use crate::planet::{PlanetError};
-use crate::storage::folder::{DbData, DbFolder};
+use crate::storage::folder::{DbData, TreeFolder};
 use crate::commands::folder::config::*;
 
 /*
@@ -112,7 +112,7 @@ pub trait FormulaStorageColumn {
         field_config_map: &BTreeMap<String, String>,
         field_name_map: &BTreeMap<String, String>,
         field_type_map: &BTreeMap<String, String>,
-        db_table: &DbFolder,
+        db_table: &TreeFolder,
         table_name: &String,
     ) -> Result<BTreeMap<String, String>, PlanetError>;
     fn build_config(

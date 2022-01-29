@@ -14,7 +14,7 @@ use tr::tr;
 use xlformula_engine::{calculate, parse_formula, NoReference, NoCustomFunction};
 
 use crate::storage::ConfigStorageColumn;
-use crate::storage::folder::{DbData, DbFolder};
+use crate::storage::folder::{DbData, TreeFolder};
 use crate::commands::folder::config::ColumnConfig;
 use crate::functions::constants::*;
 use crate::functions::text::*;
@@ -247,7 +247,7 @@ impl Formula {
         formula_format: &String,
         table: Option<DbData>,
         properties_map: Option<HashMap<String, ColumnConfig>>,
-        db_table: Option<DbFolder>,
+        db_table: Option<TreeFolder>,
         table_name: Option<String>,
         is_assign_function: bool,
         field_config_map: Option<BTreeMap<String, ColumnConfig>>,
@@ -277,8 +277,8 @@ impl Formula {
             let table = table.unwrap();
             let db_table = db_table.unwrap();
             let table_name = table_name.unwrap();
-            let field_type_map_ = DbFolder::get_field_type_map(&table)?;
-            let field_name_map_ = DbFolder::get_field_name_map(&db_table, &table_name)?;
+            let field_type_map_ = TreeFolder::get_field_type_map(&table)?;
+            let field_name_map_ = TreeFolder::get_field_name_map(&db_table, &table_name)?;
             for (column_name, column_type) in field_type_map_.clone() {
                 let mut column_config = ColumnConfig::defaults(None);
                 column_config.column_type = Some(column_type);
@@ -399,7 +399,7 @@ pub fn compile_assignment(
     formula_format: String,
     functions_map: Option<BTreeMap<String, CompiledFunction>>,
     properties_map: HashMap<String, ColumnConfig>,
-    db_table: Option<DbFolder>,
+    db_table: Option<TreeFolder>,
     table_name: Option<String>,
     field_config_map: &BTreeMap<String, ColumnConfig>
 ) -> Result<Option<AttributeAssign>, PlanetError> {
@@ -678,7 +678,7 @@ pub fn compile_function_text(
     function_text: &str,
     formula_format: &String,
     properties_map: &HashMap<String, ColumnConfig>,
-    db_table: Option<DbFolder>,
+    db_table: Option<TreeFolder>,
     table_name: Option<String>,
     field_config_map: Option<BTreeMap<String, ColumnConfig>>,
 ) -> Result<CompiledFunction, PlanetError> {

@@ -13,7 +13,7 @@ use crate::planet::{PlanetContext, PlanetError, Context};
 
 use crate::storage::constants::*;
 use crate::storage::*;
-use crate::storage::folder::{DbData, DbFolder};
+use crate::storage::folder::{DbData, TreeFolder};
 use crate::planet::make_bool_str;
 use crate::storage::columns::{
     text::*,
@@ -421,6 +421,7 @@ impl ConfigStorageColumn for ColumnConfig {
                             context,
                             &column_config,
                             None,
+                            None
                         );
                         column_config = obj.build_config(column_config_map)?;
                     },
@@ -514,7 +515,7 @@ impl ConfigStorageColumn for ColumnConfig {
         planet_context: &PlanetContext,
         context: &Context,
         properties_map: &HashMap<String, ColumnConfig>,
-        db_folder: &DbFolder,
+        db_folder: &TreeFolder,
         folder_name: &String,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
         // I use this operation when creating folders
@@ -581,10 +582,11 @@ impl ConfigStorageColumn for ColumnConfig {
                     context,
                     &propertty_config_,
                     Some(db_folder.clone()),
+                    None
                 ).update_config_map(
                     &map,
                     &properties_map,
-                    &folder_name
+                    &folder_name,
                 )?;
             },
             COLUMN_TYPE_REFERENCE => {

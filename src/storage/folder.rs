@@ -28,11 +28,12 @@ use crate::storage::columns::text::{get_stop_words_by_language, get_stemmer_by_l
 
 pub trait FolderSchema {
     fn defaults(
+        database: sled::Db,
         home_dir: Option<&str>,
         account_id: Option<&str>,
         space_id: Option<&str>,
         site_id: Option<&str>,
-    ) -> Result<DbFolder, PlanetError>;
+    ) -> Result<TreeFolder, PlanetError>;
     fn create(&self, db_data: &DbData) -> Result<DbData, PlanetError>;
     fn update(&self, db_data: &DbData) -> Result<DbData, PlanetError>;
     fn get(&self, id: &String) -> Result<DbData, PlanetError>;
@@ -41,14 +42,15 @@ pub trait FolderSchema {
 
 pub trait FolderItem {
     fn defaults(
+        database: sled::Db,
         home_dir: &str,
         account_id: &str,
         space_id: &str,
         site_id: &str,
         box_id: &str,
         folder_id: &str,
-        db_folder: &DbFolder,
-    ) -> Result<DbFolderItem, PlanetError>;
+        tree_folder: &TreeFolder,
+    ) -> Result<TreeFolderItem, PlanetError>;
     fn insert(&mut self, folder_name: &String, db_data: &DbData) -> Result<DbData, PlanetError>;
     fn update(&mut self, db_data: &DbData) -> Result<DbData, PlanetError>;
     fn get(
@@ -262,32 +264,43 @@ impl SerdeEncryptSharedKey for DbData {
 }
 
 #[derive(Debug, Clone)]
-pub struct DbFolder {
+pub struct TreeFolder {
     pub home_dir: Option<String>,
     pub account_id: Option<String>,
     pub space_id: Option<String>,
     pub site_id: Option<String>,
     pub box_id: Option<String>,
-    db: sled::Tree,
-    // index: sled::Tree,
+    pub tree: sled::Tree,
+    pub database: sled::Db,
 }
 
-impl FolderSchema for DbFolder {
+impl FolderSchema for TreeFolder {
 
     fn defaults(
+        database: sled::Db,
         home_dir: Option<&str>,
         account_id: Option<&str>,
         space_id: Option<&str>,
         site_id: Option<&str>,
-    ) -> Result<DbFolder, PlanetError> {
+    ) -> Result<TreeFolder, PlanetError> {
         let mut path: String = String::from("");
         let home_dir = home_dir.unwrap_or_default();
         let account_id = account_id.unwrap_or_default();
         let space_id = space_id.unwrap_or_default();
+        // I don't have paths in OS disk, only db and open tree in db
+        // folders.db -> db.open_tree("folders")
+        // 0001.db -> db.open_tree("box_{}_folder_{}_partition_{}_{db or index}")
+        // partition.db -> db.open_tree("box_{}_folder_{}_partitions")
+        // folders
+        // box/base/folder/c7c815is1s406kaf3j30/partitions
+        // box/base/folder/c7c815is1s406kaf3j30/partition_0001.db
+        // box/base_folder_c7c815is1s406kaf3j30/partition_0001.index
+        // folders.db
         if account_id != "" && space_id != "" {
             println!("DbFolder.open :: account_id and space_id have been informed");
         } else if site_id.is_none() && space_id == "private" {
-            path = format!("{home}/private/folders.db", home=&home_dir);
+            // path = format!("{home}/private/folders.db", home=&home_dir);
+            path =  format!("folders.db");
         } else {
             return Err(
                 PlanetError::new(
@@ -298,34 +311,24 @@ impl FolderSchema for DbFolder {
         }
         let site_id = site_id.unwrap_or_default();
         eprintln!("DbFolder.defaults :: path: {}", &path);
-        let config: sled::Config = sled::Config::default()
-            .use_compression(true)
-            .path(path);
-        let result: Result<sled::Db, sled::Error> = config.open();
+        // let config: sled::Config = sled::Config::default()
+        //     .use_compression(true)
+        //     .path(path);
+        // let result: Result<sled::Db, sled::Error> = config.open();
+        let result = database.open_tree(path);
         match result {
             Ok(_) => {
-                let db = result.unwrap();
-                let db_tree = db.open_tree(DB);
-                let index_tree = db.open_tree(INDEX);
-                if db_tree.is_ok() && index_tree.is_ok() {
-                    let db_folder: DbFolder= DbFolder{
-                        home_dir: Some(home_dir.to_string()),
-                        account_id: Some(account_id.to_string()),
-                        space_id: Some(space_id.to_string()),
-                        site_id: Some(site_id.to_string()),
-                        box_id: None,
-                        db: db_tree.unwrap(),
-                        // index: index_tree.unwrap(),
-                    };
-                    Ok(db_folder)    
-                } else {
-                    return Err(
-                        PlanetError::new(
-                            500, 
-                            Some(tr!("Could not open folder database")),
-                        )
-                    )
-                }
+                let db_tree = result.unwrap();
+                let db_folder: TreeFolder= TreeFolder{
+                    database: database.clone(),
+                    home_dir: Some(home_dir.to_string()),
+                    account_id: Some(account_id.to_string()),
+                    space_id: Some(space_id.to_string()),
+                    site_id: Some(site_id.to_string()),
+                    box_id: None,
+                    tree: db_tree,
+                };
+                Ok(db_folder)    
             },
             Err(err) => {
                 eprintln!("{:?}", &err);
@@ -342,7 +345,7 @@ impl FolderSchema for DbFolder {
     fn get_by_name(&self, folder_name: &str) -> Result<Option<DbData>, PlanetError> {
         // I travel folder for account_id if any, space id if any and folder name
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
-        let iter = self.db.iter();
+        let iter = self.tree.iter();
         let mut number_items = 0;
         let mut matched_item: Option<DbData> = None;
         let ctx_account_id = self.account_id.clone().unwrap_or_default();
@@ -406,7 +409,7 @@ impl FolderSchema for DbFolder {
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let id_db = xid::Id::from_str(id).unwrap();
         let id_db = id_db.as_bytes();
-        let item_db = self.db.get(&id_db).unwrap().unwrap().to_vec();
+        let item_db = self.tree.get(&id_db).unwrap().unwrap().to_vec();
         let item_ = EncryptedMessage::deserialize(item_db).unwrap();
         let item_ = DbData::decrypt_owned(
             &item_, 
@@ -447,7 +450,7 @@ impl FolderSchema for DbFolder {
         let id = db_data.id.clone().unwrap();
         let id_db = xid::Id::from_str(id.as_str()).unwrap();
         let id_db = id_db.as_bytes();
-        let response = &self.db.insert(id_db, encoded);
+        let response = &self.tree.insert(id_db, encoded);
         match response {
             Ok(_) => {
                 println!("DbFolder.create :: id: {:?} name: {}", &id, &folder_name);
@@ -498,7 +501,7 @@ impl FolderSchema for DbFolder {
         let encoded: Vec<u8> = encrypted_schema.serialize();
         let id_db = xid::Id::from_str(id_db.as_str()).unwrap();
         let id_db = id_db.as_bytes();
-        let response = &self.db.insert(id_db, encoded);
+        let response = &self.tree.insert(id_db, encoded);
         match response {
             Ok(_) => {
                 let _db_response = response.clone().unwrap();
@@ -514,12 +517,12 @@ impl FolderSchema for DbFolder {
     }
 }
 
-impl DbFolder {
+impl TreeFolder {
     pub fn get_field_id_map(
-        db_folder: &DbFolder,
+        tree_folder: &TreeFolder,
         folder_name: &String
     ) -> Result<BTreeMap<String, String>, PlanetError> {
-        let folder = db_folder.get_by_name(folder_name).unwrap().unwrap();
+        let folder = tree_folder.get_by_name(folder_name).unwrap().unwrap();
         let db_fields = folder.data_objects.unwrap();
         let mut field_id_map: BTreeMap<String, String> = BTreeMap::new();
         for db_field in db_fields.keys() {
@@ -531,10 +534,10 @@ impl DbFolder {
         Ok(field_id_map)
     }
     pub fn get_field_name_map(
-        db_folder: &DbFolder,
+        tree_folder: &TreeFolder,
         folder_name: &String
     ) -> Result<BTreeMap<String, String>, PlanetError> {
-        let folder = db_folder.get_by_name(folder_name)?;
+        let folder = tree_folder.get_by_name(folder_name)?;
         if folder.is_some() {
             let folder = folder.unwrap();
             let db_fields = folder.data_objects.unwrap();
@@ -645,8 +648,9 @@ pub enum GetItemOption {
 }
 
 #[derive(Debug, Clone)]
-pub struct DbFolderItem {
-    pub db_folder: DbFolder,
+pub struct TreeFolderItem {
+    pub database: sled::Db,
+    pub tree_folder: TreeFolder,
     pub folder_id: Option<String>,
     pub home_dir: Option<String>,
     pub account_id: Option<String>,
@@ -655,10 +659,10 @@ pub struct DbFolderItem {
     pub box_id: Option<String>,
     pub db: Option<sled::Tree>,
     pub index: Option<sled::Tree>,
-    pub db_partitions: Option<sled::Db>,
+    pub tree_partitions: Option<sled::Tree>,
 }
 
-impl DbFolderItem {
+impl TreeFolderItem {
 
     fn get_partition(
         &mut self,
@@ -674,10 +678,10 @@ impl DbFolderItem {
         let site_id = self.site_id.clone().unwrap_or_default();
         let site_id = site_id.as_str();
         let partition:u16;
-        let db = self.open_partitions()?;
+        let tree = self.open_partitions()?;
         let id_db = xid::Id::from_str(item_id).unwrap();
         let id_db = id_db.as_bytes();
-        let db_result = db.get(&id_db);
+        let db_result = tree.get(&id_db);
         if db_result.is_err() {
             return Err(
                 PlanetError::new(
@@ -689,7 +693,7 @@ impl DbFolderItem {
         let db_result = db_result.unwrap();
         if db_result.is_none() {
             // I need to assign a parition for this item_id, since none has been assigned, and write to db. Used for insert calls.
-            let number_parition_items = db.len();
+            let number_parition_items = tree.len();
             let number_parition_items = number_parition_items.to_u16().unwrap();
             partition = number_parition_items/ITEMS_PER_PARTITION + 1;
             // write to db partition
@@ -714,10 +718,9 @@ impl DbFolderItem {
             )?;
             let encrypted_data = db_data.encrypt(&shared_key).unwrap();
             let encoded: Vec<u8> = encrypted_data.serialize();
-            let response = db.insert(id_db, encoded);
+            let response = tree.insert(id_db, encoded);
             match response {
                 Ok(_) => {
-                    let _ = self.close_partitions(&db);
                     eprintln!("DbFolderItem.get_partition :: [not exist] partition: {}", &partition);
                     return Ok(partition)
                 },
@@ -747,7 +750,6 @@ impl DbFolderItem {
                     if partition_wrap.is_some() {
                         let partition_str = partition_wrap.unwrap().as_str();
                         partition = FromStr::from_str(partition_str).unwrap();
-                        let _ = self.close_partitions(&db);
                         return Ok(partition)
                     }
                 }
@@ -783,15 +785,16 @@ impl DbFolderItem {
                 )
             )
         }
-        let db_tuple = self.open_partition(&partition)?;
-        return Ok(db_tuple)
+        let tree_tuple = self.open_partition(&partition)?;
+        return Ok(tree_tuple)
     }
 
     fn open_partition(
         &mut self,
         partition: &u16,
     ) -> Result<(sled::Tree, sled::Tree), PlanetError> {
-        let mut path: String = String::from("");
+        let mut path_db: String = String::from("");
+        let mut path_index: String = String::from("");
         let folder_id = self.folder_id.clone().unwrap_or_default();
         let folder_id = folder_id.as_str();
         let account_id = self.account_id.clone().unwrap_or_default();
@@ -800,10 +803,13 @@ impl DbFolderItem {
         let space_id = space_id.as_str();
         let box_id = self.box_id.clone().unwrap_or_default();
         let box_id = box_id.as_str();
-        let home_dir = self.home_dir.clone().unwrap_or_default();
-        let home_dir = home_dir.as_str();
+        // let home_dir = self.home_dir.clone().unwrap_or_default();
+        // let home_dir = home_dir.as_str();
         let partition_str = partition.to_string();
         let partition_str = format!("{:0>4}", partition_str);
+        // box/base/folder/c7c815is1s406kaf3j30/partitions
+        // box/base/folder/c7c815is1s406kaf3j30/partition/0001.db
+        // box_base_folder/c7c815is1s406kaf3j30/partition/0001.index
         if self.db.is_some() {
             let db = self.db.clone().unwrap();
             let index = self.index.clone().unwrap();
@@ -815,32 +821,22 @@ impl DbFolderItem {
             println!("DbFolderItem.open_partition :: account_id and space_id have been informed");
         } else if space_id == "private" {
             // .achiever-planet/{table_file} : platform wide folder (slug with underscore)
-            path = format!(
-                "{home}/private/boxes/{box_id}/folders/{folder_id}/{partition_str}.db", 
-                home=&home_dir, 
+            path_db = format!(
+                "box/{box_id}/folder/{folder_id}/{partition_str}.db",
                 box_id=box_id,
                 folder_id=folder_id,
-                partition_str=partition_str,
+                partition_str=partition_str
+            );
+            path_index = format!(
+                "box/{box_id}/folder/{folder_id}/{partition_str}.index",
+                box_id=box_id,
+                folder_id=folder_id,
+                partition_str=partition_str
             );
         }
-        eprintln!("DbFolderItem.open_partition :: path: {:?}", path);
-        let config: sled::Config = sled::Config::default()
-            .use_compression(true)
-            .path(path);
-        let result: Result<sled::Db, sled::Error> = config.open();
-        if result.is_err() {
-            let error = result.unwrap_err();
-            let message = error.to_string();
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!("{}", message)),
-                )
-            )
-        }
-        let db_main = result.unwrap();
-        let db = db_main.open_tree(DB);
-        let index = db_main.open_tree(INDEX);
+        eprintln!("DbFolderItem.open_partition :: path_db: {:?} path_index: {:?}", &path_db, &path_index);
+        let db = self.database.open_tree(path_db);
+        let index = self.database.open_tree(path_index);
         if db.is_ok() && index.is_ok() {
             let db_ = db.unwrap().clone();
             let index_ = index.unwrap().clone();
@@ -856,29 +852,29 @@ impl DbFolderItem {
         }
     }
 
-    fn close_partition(&self, db: &sled::Tree) -> Result<usize, PlanetError> {
-        let size = db.flush();
-        if size.is_err() {
-            let error = size.unwrap_err();
-            let message = error.to_string();
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!("{}", message)),
-                )
-            )
-        }
-        let size = size.unwrap();
-        drop(db);
-        return Ok(size)
-    }
+    // fn close_partition(&self, db: &sled::Tree) -> Result<usize, PlanetError> {
+    //     let size = db.flush();
+    //     if size.is_err() {
+    //         let error = size.unwrap_err();
+    //         let message = error.to_string();
+    //         return Err(
+    //             PlanetError::new(
+    //                 500, 
+    //                 Some(tr!("{}", message)),
+    //             )
+    //         )
+    //     }
+    //     let size = size.unwrap();
+    //     drop(db);
+    //     return Ok(size)
+    // }
 
     fn open_partitions(
         &mut self,
-    ) -> Result<sled::Db, PlanetError> {
+    ) -> Result<sled::Tree, PlanetError> {
         let mut path: String = String::from("");
-        let home_dir = self.home_dir.clone().unwrap_or_default();
-        let home_dir = home_dir.as_str();
+        // let home_dir = self.home_dir.clone().unwrap_or_default();
+        // let home_dir = home_dir.as_str();
         let account_id = self.account_id.clone().unwrap_or_default();
         let account_id = account_id.as_str();
         let space_id = self.space_id.clone().unwrap_or_default();
@@ -887,26 +883,35 @@ impl DbFolderItem {
         let box_id = box_id.as_str();
         let folder_id = self.folder_id.clone().unwrap_or_default();
         let folder_id = folder_id.as_str();
-        if self.db_partitions.is_some() {
-            let db = self.db_partitions.clone().unwrap();
+        if self.tree_partitions.is_some() {
+            let db = self.tree_partitions.clone().unwrap();
             return Ok(db)
         }
+        // box/base/folder/c7c815is1s406kaf3j30/partitions
+        // box/base/folder/c7c815is1s406kaf3j30/partition/0001.db
+        // box_base_folder/c7c815is1s406kaf3j30/partition/0001.index
         if account_id != "" && space_id != "" {
             println!("DbFolderItem.open_partitions :: account_id and space_id have been informed");
         } else if space_id == "private" {
             // .achiever-planet/{table_file} : platform wide folder (slug with underscore)
+            // path = format!(
+            //     "{home}/private/boxes/{box_id}/folders/{folder_id}/partition.db", 
+            //     home=&home_dir, 
+            //     box_id=box_id,
+            //     folder_id=folder_id
+            // );
             path = format!(
-                "{home}/private/boxes/{box_id}/folders/{folder_id}/partition.db", 
-                home=&home_dir, 
+                "box/{box_id}/folder/{folder_id}/partitions",
                 box_id=box_id,
                 folder_id=folder_id
             );
         }
         eprintln!("DbFolderItem.open_partitions :: path: {:?}", path);
-        let config: sled::Config = sled::Config::default()
-            .use_compression(true)
-            .path(path);
-        let result: Result<sled::Db, sled::Error> = config.open();
+        let result = self.database.open_tree(path);
+        // let config: sled::Config = sled::Config::default()
+        //     .use_compression(true)
+        //     .path(path);
+        // let result: Result<sled::Db, sled::Error> = config.open();
         if result.is_err() {
             let error = result.unwrap_err();
             let message = error.to_string();
@@ -917,28 +922,28 @@ impl DbFolderItem {
                 )
             )
         }
-        let db = result.unwrap();
-        self.db_partitions = Some(db.clone());
-        return Ok(db)
+        let tree = result.unwrap();
+        self.tree_partitions = Some(tree.clone());
+        return Ok(tree)
     }
 
-    fn close_partitions(&self, db: &sled::Db) -> Result<usize, PlanetError> {
-        let size = db.flush();
-        if size.is_err() {
-            let error = size.unwrap_err();
-            let message = error.to_string();
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!("{}", message)),
-                )
-            )
-        }
-        let size = size.unwrap();
-        drop(db);
-        // thread::sleep(time::Duration::new(5, 0));
-        return Ok(size)
-    }
+    // fn close_partitions(&self, db: &sled::Db) -> Result<usize, PlanetError> {
+    //     let size = db.flush();
+    //     if size.is_err() {
+    //         let error = size.unwrap_err();
+    //         let message = error.to_string();
+    //         return Err(
+    //             PlanetError::new(
+    //                 500, 
+    //                 Some(tr!("{}", message)),
+    //             )
+    //         )
+    //     }
+    //     let size = size.unwrap();
+    //     drop(db);
+    //     // thread::sleep(time::Duration::new(5, 0));
+    //     return Ok(size)
+    // }
 
     fn get_partitions(&mut self) -> Result<Vec<u16>, PlanetError> {
         let mut list_partitions: Vec<u16> = Vec::new();
@@ -969,7 +974,7 @@ impl DbFolderItem {
             )
         }
         let data = data.unwrap();
-        let db_folder = self.db_folder.clone();
+        let db_folder = self.tree_folder.clone();
         let folder_id = self.folder_id.as_ref().unwrap();
         let folder = db_folder.get(folder_id);
         if folder.is_err() {
@@ -1004,7 +1009,7 @@ impl DbFolderItem {
     }
     fn get_relevance_by_column_id(&mut self, column_id: &String) -> Result<u8, PlanetError> {
         let column_id = column_id.clone();
-        let db_folder = self.db_folder.clone();
+        let db_folder = self.tree_folder.clone();
         let folder_id = self.folder_id.as_ref().unwrap();
         let folder = db_folder.get(folder_id);
         if folder.is_err() {
@@ -1052,28 +1057,30 @@ impl DbFolderItem {
     }
 }
 
-impl FolderItem for DbFolderItem {
+impl FolderItem for TreeFolderItem {
 
     fn defaults(
+        database: sled::Db,
         home_dir: &str,
         account_id: &str,
         space_id: &str,
         site_id: &str,
         box_id: &str,
         folder_id: &str,
-        db_folder: &DbFolder,
-    ) -> Result<DbFolderItem, PlanetError> {
-        let db_row: DbFolderItem = DbFolderItem{
+        tree_folder: &TreeFolder,
+    ) -> Result<TreeFolderItem, PlanetError> {
+        let db_row: TreeFolderItem = TreeFolderItem{
+            database: database,
             home_dir: Some(home_dir.to_string()),
             account_id: Some(account_id.to_string()),
             space_id: Some(space_id.to_string()),
             box_id: Some(box_id.to_string()),
             site_id: Some(site_id.to_string()),
-            db_folder: db_folder.clone(),
+            tree_folder: tree_folder.clone(),
             folder_id: Some(folder_id.to_string()),
             db: None,
             index: None,
-            db_partitions: None,
+            tree_partitions: None,
         };
         Ok(db_row)
     }
@@ -1334,7 +1341,6 @@ impl FolderItem for DbFolderItem {
                     Ok(_) => {
                         let mut item = item_.unwrap();
                         if columns.is_none() {
-                            let _ = self.close_partition(&db);
                             Ok(item)    
                         } else {
                             // eprintln!("get :: item: {:#?}", &item);
@@ -1362,7 +1368,7 @@ impl FolderItem for DbFolderItem {
             GetItemOption::ByName(name) => {
                 eprintln!("DbFolderItem.get :: by name, name: {}", &name);
                 let partitions = self.get_partitions()?;
-                let this: Arc<Mutex<DbFolderItem>> = Arc::new(Mutex::new(self.clone()));
+                let this: Arc<Mutex<TreeFolderItem>> = Arc::new(Mutex::new(self.clone()));
                 let mut handles= vec![];
                 // Threads to fetch name from all partitions
                 let wrap_db_data: Arc<Mutex<Option<DbData>>> = Arc::new(Mutex::new(None));
@@ -1398,7 +1404,6 @@ impl FolderItem for DbFolderItem {
                                 break;
                             }
                         }
-                        let _ = this.close_partition(&db);
                         if my_wrap_db_data.is_some() {
                             let mut wrap_db_data = wrap_db_data.lock().unwrap();
                             *wrap_db_data = my_wrap_db_data;
@@ -1446,7 +1451,6 @@ impl FolderItem for DbFolderItem {
         let t_1 = Instant::now();
         let db = self.open_partitions()?;
         let total = db.len();
-        let _ = self.close_partitions(&db);
         let result = SelectCountResult{
             time: t_1.elapsed().as_millis() as usize,
             total: total,
@@ -1610,14 +1614,14 @@ pub struct SelectCountResult {
     data_count: usize,
 }
 
-impl DbFolderItem {
+impl TreeFolderItem {
 
     pub fn filter_fields(&self, folder_name: &String, columns: &Vec<String>, item: &DbData) -> Result<DbData, PlanetError> {
         let columns = columns.clone();
         let mut item = item.clone();
         // field_id => field_name
-        let field_id_map= DbFolder::get_field_id_map(
-            &self.db_folder,
+        let field_id_map= TreeFolder::get_field_id_map(
+            &self.tree_folder,
             folder_name
         )?;
         // data

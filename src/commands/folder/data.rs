@@ -17,9 +17,10 @@ use crate::storage::constants::*;
 use crate::commands::folder::{Command};
 use crate::commands::{CommandRunner};
 use crate::planet::constants::{ID, NAME};
-use crate::storage::folder::{DbFolder, DbFolderItem, FolderItem, FolderSchema, DbData, GetItemOption};
+use crate::storage::folder::{TreeFolder, TreeFolderItem, FolderItem, FolderSchema, DbData, GetItemOption};
 use crate::storage::folder::*;
 use crate::storage::{ConfigStorageColumn, generate_id};
+use crate::storage::space::{SpaceDatabase};
 use crate::planet::{
     PlanetContext, 
     PlanetError,
@@ -35,7 +36,8 @@ use crate::storage::columns::reference::*;
 pub struct InsertIntoFolder<'gb> {
     pub planet_context: &'gb PlanetContext<'gb>,
     pub context: &'gb Context<'gb>,
-    pub db_folder: DbFolder,
+    pub db_folder: TreeFolder,
+    pub space_database: SpaceDatabase,
     pub config: InsertIntoFolderConfig,
 }
 
@@ -135,7 +137,10 @@ impl<'gb> InsertIntoFolder<'gb> {
         let space_id = self.context.space_id.unwrap_or_default();
         let site_id = self.context.site_id.unwrap_or_default();
         let box_id = self.context.box_id.unwrap_or_default();
-        let result: Result<DbFolderItem, PlanetError> = DbFolderItem::defaults(
+        let space_database = self.space_database.clone();
+
+        let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
+            space_database.database.clone(),
             home_dir,
             account_id,
             space_id,
@@ -146,7 +151,7 @@ impl<'gb> InsertIntoFolder<'gb> {
         );
         match result {
             Ok(_) => {
-                let mut db_row: DbFolderItem = result.unwrap();
+                let mut db_row: TreeFolderItem = result.unwrap();
 
                 // routing
                 let routing_wrap = RoutingData::defaults(
@@ -379,6 +384,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                                 self.context,
                                 &column_config,
                                 Some(self.db_folder.clone()),
+                                Some(self.space_database.clone())
                             );
                             let result = obj.validate(&column_data);
                             if result.is_err() {
@@ -538,7 +544,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                 }
                 let response = response.unwrap();
                 let id_record = response.clone().id.unwrap();
-                eprintln!("InsertIntoFolder.run :: time: {} µs", &t_1.elapsed().as_micros());
+                
                 // links
                 for (column_id, config_column_list) in links_map {
                     // Get db item for this link
@@ -556,7 +562,8 @@ impl<'gb> InsertIntoFolder<'gb> {
                             let main_data_map = main_data_map.unwrap();
                             for (_column_name, id_list) in main_data_map {
                                 for item_id in id_list {
-                                    let result: Result<DbFolderItem, PlanetError> = DbFolderItem::defaults(
+                                    let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
+                                        space_database.database.clone(),
                                         home_dir,
                                         account_id,
                                         space_id,
@@ -624,6 +631,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                         }
                     }
                 }
+                eprintln!("InsertIntoFolder.run :: time: {} ms", &t_1.elapsed().as_millis());
                 return Ok(response);
             },
             Err(error) => {
@@ -645,11 +653,32 @@ impl<'gb> InsertIntoFolder<'gb> {
                 let home_dir = runner.planet_context.home_path.unwrap_or_default();
                 let account_id = runner.context.account_id.unwrap_or_default();
                 let space_id = runner.context.space_id.unwrap_or_default();
-                let db_folder= DbFolder::defaults(
+                let site_id = runner.context.site_id;
+                let result = SpaceDatabase::defaults(
+                    site_id, 
+                    space_id, 
+                    Some(home_dir)
+                );
+                if result.clone().is_err() {
+                    let error = result.clone().unwrap_err();
+                    println!();
+                    println!("{}", tr!("I found these errors").red().bold());
+                    println!("{}", "--------------------".red());
+                    println!();
+                    println!(
+                        "{} {}", 
+                        String::from('.').blue(),
+                        error.message
+                    );
+                }
+                let space_database = result.unwrap();
+        
+                let db_folder= TreeFolder::defaults(
+                    space_database.database.clone(),
                     Some(home_dir),
                     Some(account_id),
                     Some(space_id),
-                    None,
+                    site_id,
                 ).unwrap();
         
                 let insert_into_table: InsertIntoFolder = InsertIntoFolder{
@@ -657,6 +686,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                     context: runner.context,
                     config: config.unwrap(),
                     db_folder: db_folder.clone(),
+                    space_database: space_database.clone()
                 };
                 let result: Result<_, Vec<PlanetError>> = insert_into_table.run();
                 match result {
@@ -703,7 +733,7 @@ impl<'gb> InsertIntoFolder<'gb> {
 }
 
 impl<'gb> InsertIntoFolder<'gb> {
-    pub fn check_name_exists(&self, folder_name: &String, name: &String, db_row: &mut DbFolderItem) -> bool {
+    pub fn check_name_exists(&self, folder_name: &String, name: &String, db_row: &mut TreeFolderItem) -> bool {
         let check: bool;
         let name = name.clone();
         let result = db_row.get(&folder_name, GetItemOption::ByName(name), None);
@@ -723,7 +753,8 @@ impl<'gb> InsertIntoFolder<'gb> {
 pub struct GetFromFolder<'gb> {
     pub planet_context: &'gb PlanetContext<'gb>,
     pub context: &'gb Context<'gb>,
-    pub db_folder: DbFolder,
+    pub db_folder: TreeFolder,
+    pub space_database: SpaceDatabase,
     pub config: GetFromFolderConfig,
 }
 
@@ -742,7 +773,9 @@ impl<'gb> Command<String> for GetFromFolder<'gb> {
         let space_id = self.context.space_id.unwrap_or_default();
         let site_id = self.context.site_id.unwrap_or_default();
         let box_id = self.context.box_id.unwrap_or_default();
-        let result: Result<DbFolderItem, PlanetError> = DbFolderItem::defaults(
+        let space_database = self.space_database.clone();
+        let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
+            space_database.database,
             home_dir,
             account_id,
             space_id,
@@ -754,7 +787,7 @@ impl<'gb> Command<String> for GetFromFolder<'gb> {
         match result {
             Ok(_) => {
                 // let data_config = self.config.data.clone();
-                let mut db_row: DbFolderItem = result.unwrap();
+                let mut db_row: TreeFolderItem = result.unwrap();
                 // I need to get SchemaData and schema for the folder
                 // I go through columns in order to build RowData                
                 let folder = self.db_folder.get_by_name(folder_name)?;
@@ -912,7 +945,26 @@ impl<'gb> Command<String> for GetFromFolder<'gb> {
                 let account_id = runner.context.account_id.unwrap_or_default();
                 let space_id = runner.context.space_id.unwrap_or_default();
                 let site_id = runner.context.site_id.unwrap_or_default();
-                let db_folder= DbFolder::defaults(
+                let result = SpaceDatabase::defaults(
+                    Some(site_id), 
+                    space_id, 
+                    Some(home_dir)
+                );
+                if result.is_err() {
+                    let error = result.clone().unwrap_err();
+                    println!();
+                    println!("{}", tr!("I found these errors").red().bold());
+                    println!("{}", "--------------------".red());
+                    println!();
+                    println!(
+                        "{} {}", 
+                        String::from('.').blue(),
+                        error.message
+                    );
+                }
+                let space_database = result.unwrap();
+                let db_folder= TreeFolder::defaults(
+                    space_database.database.clone(),
                     Some(home_dir),
                     Some(account_id),
                     Some(space_id),
@@ -923,6 +975,7 @@ impl<'gb> Command<String> for GetFromFolder<'gb> {
                     planet_context: runner.planet_context,
                     context: runner.context,
                     config: config.unwrap(),
+                    space_database: space_database.clone(),
                     db_folder: db_folder.clone(),
                 };
                 let result: Result<_, PlanetError> = insert_into_table.run();
@@ -969,7 +1022,8 @@ impl<'gb> Command<String> for GetFromFolder<'gb> {
 pub struct SelectFromFolder<'gb> {
     pub planet_context: &'gb PlanetContext<'gb>,
     pub context: &'gb Context<'gb>,
-    pub db_folder: DbFolder,
+    pub db_folder: TreeFolder,
+    pub space_database: SpaceDatabase,
     pub config: SelectFromFolderConfig,
 }
 
@@ -989,7 +1043,9 @@ impl<'gb> Command<String> for SelectFromFolder<'gb> {
         let space_id = self.context.space_id.unwrap_or_default();
         let site_id = self.context.site_id.unwrap_or_default();
         let box_id = self.context.box_id.unwrap_or_default();
-        let result: Result<DbFolderItem, PlanetError> = DbFolderItem::defaults(
+        let space_database = self.space_database.clone();
+        let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
+            space_database.database,
             home_dir,
             account_id,
             space_id,
@@ -1000,7 +1056,7 @@ impl<'gb> Command<String> for SelectFromFolder<'gb> {
         );
         match result {
             Ok(_) => {
-                let mut db_row: DbFolderItem = result.unwrap();
+                let mut db_row: TreeFolderItem = result.unwrap();
                 let config = self.config.clone();
                 let r#where = config.r#where;
                 let page = config.page;
@@ -1051,7 +1107,26 @@ impl<'gb> Command<String> for SelectFromFolder<'gb> {
                 let account_id = runner.context.account_id.unwrap_or_default();
                 let space_id = runner.context.space_id.unwrap_or_default();
                 let site_id = runner.context.site_id.unwrap_or_default();
-                let db_folder= DbFolder::defaults(
+                let result = SpaceDatabase::defaults(
+                    Some(site_id), 
+                    space_id, 
+                    Some(home_dir)
+                );
+                if result.is_err() {
+                    let error = result.clone().unwrap_err();
+                    println!();
+                    println!("{}", tr!("I found these errors").red().bold());
+                    println!("{}", "--------------------".red());
+                    println!();
+                    println!(
+                        "{} {}", 
+                        String::from('.').blue(),
+                        error.message
+                    );
+                }
+                let space_database = result.unwrap();
+                let db_folder= TreeFolder::defaults(
+                    space_database.database.clone(),
                     Some(home_dir),
                     Some(account_id),
                     Some(space_id),
@@ -1063,6 +1138,7 @@ impl<'gb> Command<String> for SelectFromFolder<'gb> {
                     context: runner.context,
                     config: config.unwrap(),
                     db_folder: db_folder.clone(),
+                    space_database: space_database.clone()
                 };
                 let result: Result<_, PlanetError> = select_from_table.run();
                 match result {

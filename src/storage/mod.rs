@@ -4,12 +4,13 @@ extern crate xid;
 pub mod folder;
 pub mod constants;
 pub mod columns;
+pub mod space;
 
 use std::collections::{BTreeMap,HashMap};
 
 use validator::{ValidationErrors};
 use crate::commands::folder::config::ColumnConfig;
-use crate::storage::folder::{DbData, DbFolder};
+use crate::storage::folder::{DbData, TreeFolder};
 use crate::planet::{PlanetError, Context, PlanetContext};
 use crate::planet::constants::*;
 
@@ -28,7 +29,7 @@ pub trait ConfigStorageColumn {
         planet_context: &PlanetContext,
         context: &Context,
         properties_map: &HashMap<String, ColumnConfig>,
-        db_folder: &DbFolder,
+        db_folder: &TreeFolder,
         folder_name: &String
     ) -> Result<BTreeMap<String, String>, PlanetError>;
     fn get_column_config_map(

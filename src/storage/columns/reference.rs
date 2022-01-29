@@ -8,6 +8,7 @@ use crate::storage::constants::*;
 use crate::planet::constants::*;
 use crate::storage::columns::*;
 use crate::storage::folder::*;
+use crate::storage::space::*;
 use crate::functions::Formula;
 
 #[derive(Debug, Clone)]
@@ -15,14 +16,16 @@ pub struct LinkColumn<'gb> {
     pub config: ColumnConfig,
     pub planet_context: &'gb PlanetContext<'gb>,
     pub context: &'gb Context<'gb>,
-    pub db_folder: Option<DbFolder>,
+    pub db_folder: Option<TreeFolder>,
+    pub space_database: Option<SpaceDatabase>,
 }
 impl<'gb> LinkColumn<'gb> {
     pub fn defaults(
         planet_context: &'gb PlanetContext, 
         context: &'gb Context, 
         column_config: &ColumnConfig,
-        db_folder: Option<DbFolder>,
+        db_folder: Option<TreeFolder>,
+        space_database: Option<SpaceDatabase>
     ) -> Self {
         let column_config = column_config.clone();
         let field_obj = Self{
@@ -30,6 +33,7 @@ impl<'gb> LinkColumn<'gb> {
             planet_context: planet_context,
             context: context,
             db_folder: db_folder,
+            space_database: space_database
         };
         return field_obj
     }
@@ -58,7 +62,7 @@ impl<'gb> ObjectStorageColumn<'gb> for LinkColumn<'gb> {
         }
         let linked_folder_id = linked_folder_id.unwrap();
         // Get folder config by folder id
-        // let db_folder = DbFolder::defaults(self.planet_context, self.context)?;
+        // let db_folder = TreeFolder::defaults(self.planet_context, self.context)?;
         let _ = self.db_folder.clone().unwrap().get(&linked_folder_id)?;
         field_config_map.insert(LINKED_FOLDER_ID.to_string(), linked_folder_id);
         // These are options, not required
@@ -139,7 +143,10 @@ impl<'gb> ObjectStorageColumn<'gb> for LinkColumn<'gb> {
         let space_id = self.context.space_id.unwrap_or_default();
         let site_id = self.context.site_id.unwrap_or_default();
         let box_id = self.context.box_id.unwrap_or_default();
-        let result: Result<DbFolderItem, PlanetError> = DbFolderItem::defaults(
+        let space_database = self.space_database.clone();
+        let space_database = space_database.unwrap();
+        let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
+            space_database.database.clone(),
             home_dir,
             account_id,
             space_id,
@@ -191,14 +198,14 @@ pub struct ReferenceColumn<'gb> {
     pub config: ColumnConfig,
     pub planet_context: &'gb PlanetContext<'gb>,
     pub context: &'gb Context<'gb>,
-    pub db_folder: Option<DbFolder>,
+    pub db_folder: Option<TreeFolder>,
 }
 impl<'gb> ReferenceColumn<'gb> {
     pub fn defaults(
         planet_context: &'gb PlanetContext, 
         context: &'gb Context, 
         column_config: &ColumnConfig,
-        db_folder: Option<DbFolder>,
+        db_folder: Option<TreeFolder>,
     ) -> Self {
         let column_config = column_config.clone();
         let field_obj = Self{
