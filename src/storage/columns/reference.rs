@@ -146,7 +146,7 @@ impl<'gb> ObjectStorageColumn<'gb> for LinkColumn<'gb> {
         let space_database = self.space_database.clone();
         let space_database = space_database.unwrap();
         let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
-            space_database.database.clone(),
+            space_database.connection_pool.clone(),
             home_dir,
             account_id,
             space_id,

@@ -42,18 +42,24 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
         let account_id = self.context.account_id.unwrap_or_default();
         let space_id = self.context.space_id.unwrap_or_default();
         let site_id = self.context.site_id;
+        // I will have:
+        // space database, workspace database (private space), site database and planet database
+        // I will open dbs and add into connection_pool
+        let t_2 = Instant::now();
         let result = SpaceDatabase::defaults(
             site_id, 
             space_id, 
-            Some(home_dir)
+            Some(home_dir),
+            Some(true)
         );
         if result.is_err() {
             let error = result.unwrap_err();
             return Err(error)
         }
         let space_database = result.unwrap();
+        eprintln!("CreateFolder.run :: time open connection spool : {} ms", &t_2.elapsed().as_millis());
         let result: Result<TreeFolder, PlanetError> = TreeFolder::defaults(
-            space_database.database,
+            space_database.connection_pool,
             Some(home_dir),
             Some(account_id),
             Some(space_id),
@@ -338,6 +344,7 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                 Ok(response_src)
                 },
             Err(error) => {
+                eprintln!("CreateFolder.run :: schema error...");
                 Err(error)
             }
         }

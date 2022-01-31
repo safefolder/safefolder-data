@@ -40,7 +40,7 @@ Table fields
 
 -
 These are not complex:
-* GeneratedNumberColumn           [todo] - number: Sequential number - number : Sequence number.
+* GenerateNumberColumn           [todo] - number: Sequential number - number : Sequence number.
 * PhoneColumn                     [todo]
 * EmailColumn                     [todo]
 * UrlColumn                       [todo]

@@ -183,6 +183,7 @@ pub struct ColumnConfig {
     pub linked_folder_id: Option<String>,
     pub delete_on_link_drop: Option<bool>,
     pub related_column: Option<String>,
+    pub sequence: Option<String>,
 }
 
 impl ConfigStorageColumn for ColumnConfig {
@@ -210,6 +211,7 @@ impl ConfigStorageColumn for ColumnConfig {
             linked_folder_id: None,
             delete_on_link_drop: None,
             related_column: None,
+            sequence: None,
         };
         if options.is_some() {
             object.options = Some(options.unwrap());
@@ -263,6 +265,7 @@ impl ConfigStorageColumn for ColumnConfig {
                     linked_folder_id: None,
                     delete_on_link_drop: None,
                     related_column: None,
+                    sequence: None,
                 };
                 return Some(column_config);
             }
@@ -447,7 +450,14 @@ impl ConfigStorageColumn for ColumnConfig {
                         );
                         column_config = obj.build_config(column_config_map)?;
                     },
+                    COLUMN_TYPE_GENERATE_NUMBER => {
+                        let mut obj = GenerateNumberColumn::defaults(
+                            &column_config,
+                        );
+                        column_config = obj.build_config(column_config_map)?;
+                    },
                     _ => {}
+
                 }
                 let _ = &map_columns_by_id.insert(column_id, column_config.clone());
                 let _ = &map_columns_by_name.insert(column_name.clone(), column_config.clone());
@@ -609,6 +619,9 @@ impl ConfigStorageColumn for ColumnConfig {
             },
             COLUMN_TYPE_GENERATE_ID => {
                 map = GenerateIdColumn::defaults(&propertty_config_).update_config_map(&map)?;
+            },
+            COLUMN_TYPE_GENERATE_NUMBER => {
+                map = GenerateNumberColumn::defaults(&propertty_config_).update_config_map(&map)?;
             },
             _ => {}
         }

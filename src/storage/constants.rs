@@ -24,12 +24,16 @@ pub const INDEX_PROFILE_RAW: &str = "raw";
 
 pub const DB: &str = "db";
 pub const INDEX: &str = "index";
+pub const PRIVATE: &str = "private";
+pub const WORKSPACE: &str = "workspace";
+pub const SITE: &str = "site";
 pub const TEXT: &str = "text";
 pub const COLUMN_ID: &str = "column_id";
 pub const SCORE: &str = "score";
 pub const LANGUAGE_CODES: &str = "language_codes";
 pub const LANGUAGE_DEFAULT: &str = "language_default";
 pub const TEXT_SEARCH_COLUMN_RELEVANCE: &str = "text_search_column_relevance";
+
 pub const PROPERTIES: &str = "properties";
 pub const COLUMN_IDS: &str = "column_ids";
 pub const SELECT_OPTIONS: &str = "select_options";
@@ -59,6 +63,7 @@ pub const RELATED_COLUMN: &str = "related_column";
 pub const LANGUAGE_COLUMN: &str = "Language";
 pub const TEXT_COLUMN: &str = "Text";
 pub const WHERE: &str = "where";
+pub const SEQUENCE: &str = "sequence";
 
 // Column Types
 pub const COLUMN_TYPE_SMALL_TEXT: &str = "Small Text";
@@ -80,6 +85,7 @@ pub const COLUMN_TYPE_REFERENCE: &str = "Reference";
 pub const COLUMN_TYPE_LANGUAGE: &str = "Language";
 pub const COLUMN_TYPE_TEXT: &str = "Text";
 pub const COLUMN_TYPE_GENERATE_ID: &str = "Generate Id";
+pub const COLUMN_TYPE_GENERATE_NUMBER: &str = "Generate Number";
 
 // Date Format
 pub const DATE_FORMAT_FRIENDLY: &str = "Friendly";

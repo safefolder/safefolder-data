@@ -140,7 +140,7 @@ impl<'gb> InsertIntoFolder<'gb> {
         let space_database = self.space_database.clone();
 
         let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
-            space_database.database.clone(),
+            space_database.connection_pool.clone(),
             home_dir,
             account_id,
             space_id,
@@ -569,7 +569,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                             for (_column_name, id_list) in main_data_map {
                                 for item_id in id_list {
                                     let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
-                                        space_database.database.clone(),
+                                        space_database.connection_pool.clone(),
                                         home_dir,
                                         account_id,
                                         space_id,
@@ -663,7 +663,8 @@ impl<'gb> InsertIntoFolder<'gb> {
                 let result = SpaceDatabase::defaults(
                     site_id, 
                     space_id, 
-                    Some(home_dir)
+                    Some(home_dir),
+                    Some(false)
                 );
                 if result.clone().is_err() {
                     let error = result.clone().unwrap_err();
@@ -680,7 +681,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                 let space_database = result.unwrap();
         
                 let db_folder= TreeFolder::defaults(
-                    space_database.database.clone(),
+                    space_database.connection_pool.clone(),
                     Some(home_dir),
                     Some(account_id),
                     Some(space_id),
@@ -781,7 +782,7 @@ impl<'gb> Command<String> for GetFromFolder<'gb> {
         let box_id = self.context.box_id.unwrap_or_default();
         let space_database = self.space_database.clone();
         let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
-            space_database.database,
+            space_database.connection_pool,
             home_dir,
             account_id,
             space_id,
@@ -958,7 +959,8 @@ impl<'gb> Command<String> for GetFromFolder<'gb> {
                 let result = SpaceDatabase::defaults(
                     Some(site_id), 
                     space_id, 
-                    Some(home_dir)
+                    Some(home_dir),
+                    Some(false)
                 );
                 if result.is_err() {
                     let error = result.clone().unwrap_err();
@@ -974,7 +976,7 @@ impl<'gb> Command<String> for GetFromFolder<'gb> {
                 }
                 let space_database = result.unwrap();
                 let db_folder= TreeFolder::defaults(
-                    space_database.database.clone(),
+                    space_database.connection_pool.clone(),
                     Some(home_dir),
                     Some(account_id),
                     Some(space_id),
@@ -1055,7 +1057,7 @@ impl<'gb> Command<String> for SelectFromFolder<'gb> {
         let box_id = self.context.box_id.unwrap_or_default();
         let space_database = self.space_database.clone();
         let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
-            space_database.database,
+            space_database.connection_pool,
             home_dir,
             account_id,
             space_id,
@@ -1120,7 +1122,8 @@ impl<'gb> Command<String> for SelectFromFolder<'gb> {
                 let result = SpaceDatabase::defaults(
                     Some(site_id), 
                     space_id, 
-                    Some(home_dir)
+                    Some(home_dir),
+                    Some(false)
                 );
                 if result.is_err() {
                     let error = result.clone().unwrap_err();
@@ -1136,7 +1139,7 @@ impl<'gb> Command<String> for SelectFromFolder<'gb> {
                 }
                 let space_database = result.unwrap();
                 let db_folder= TreeFolder::defaults(
-                    space_database.database.clone(),
+                    space_database.connection_pool.clone(),
                     Some(home_dir),
                     Some(account_id),
                     Some(space_id),

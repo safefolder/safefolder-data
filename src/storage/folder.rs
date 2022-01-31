@@ -6,7 +6,7 @@ use std::str::FromStr;
 use std::{thread};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use colored::Colorize;
 use rust_decimal::prelude::ToPrimitive;
 use validator::{Validate, ValidationErrors};
@@ -28,7 +28,7 @@ use crate::storage::columns::text::{get_stop_words_by_language, get_stemmer_by_l
 
 pub trait FolderSchema {
     fn defaults(
-        database: sled::Db,
+        connection_pool: HashMap<String, sled::Db>,
         home_dir: Option<&str>,
         account_id: Option<&str>,
         space_id: Option<&str>,
@@ -42,7 +42,7 @@ pub trait FolderSchema {
 
 pub trait FolderItem {
     fn defaults(
-        database: sled::Db,
+        connection_pool: HashMap<String, sled::Db>,
         home_dir: &str,
         account_id: &str,
         space_id: &str,
@@ -277,13 +277,12 @@ pub struct TreeFolder {
 impl FolderSchema for TreeFolder {
 
     fn defaults(
-        database: sled::Db,
+        connection_pool: HashMap<String, sled::Db>,
         home_dir: Option<&str>,
         account_id: Option<&str>,
         space_id: Option<&str>,
         site_id: Option<&str>,
     ) -> Result<TreeFolder, PlanetError> {
-        let mut path: String = String::from("");
         let home_dir = home_dir.unwrap_or_default();
         let account_id = account_id.unwrap_or_default();
         let space_id = space_id.unwrap_or_default();
@@ -296,25 +295,37 @@ impl FolderSchema for TreeFolder {
         // box/base/folder/c7c815is1s406kaf3j30/partition_0001.db
         // box/base_folder_c7c815is1s406kaf3j30/partition_0001.index
         // folders.db
-        if account_id != "" && space_id != "" {
-            println!("DbFolder.open :: account_id and space_id have been informed");
-        } else if site_id.is_none() && space_id == "private" {
-            // path = format!("{home}/private/folders.db", home=&home_dir);
-            path =  format!("folders.db");
-        } else {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!("Sites not yet supported, only private spaces")),
+        // If private space, I open workspace db, otherwise I open site db
+        let database: sled::Db;
+        if site_id.is_none() {
+            // I have private space, get workspace.db connection
+            let database_ = connection_pool.get(WORKSPACE);
+            if database_.is_none() {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Could not open private space workspace database.")),
+                    )
                 )
-            )
+            }
+            database = database_.unwrap().clone();
+        } else {
+            // I have site, get site.db connection
+            let site_id = site_id.unwrap();
+            let database_ = connection_pool.get(site_id);
+            if database_.is_none() {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Could not open site space \"{}\" workspace database.", site_id)),
+                    )
+                )
+            }
+            database = database_.unwrap().clone();
         }
+        let path =  format!("folders.db");
         let site_id = site_id.unwrap_or_default();
         eprintln!("DbFolder.defaults :: path: {}", &path);
-        // let config: sled::Config = sled::Config::default()
-        //     .use_compression(true)
-        //     .path(path);
-        // let result: Result<sled::Db, sled::Error> = config.open();
         let result = database.open_tree(path);
         match result {
             Ok(_) => {
@@ -1060,7 +1071,7 @@ impl TreeFolderItem {
 impl FolderItem for TreeFolderItem {
 
     fn defaults(
-        database: sled::Db,
+        connection_pool: HashMap<String, sled::Db>,
         home_dir: &str,
         account_id: &str,
         space_id: &str,
@@ -1069,6 +1080,13 @@ impl FolderItem for TreeFolderItem {
         folder_id: &str,
         tree_folder: &TreeFolder,
     ) -> Result<TreeFolderItem, PlanetError> {
+        // database for items is at space_id, for private space and for site spaces
+        let database_ = connection_pool.get(space_id);
+        if database_.is_none() {
+            return Err(PlanetError::new(500, 
+                Some(tr!("Could not get space database connection."))))
+        }
+        let database = database_.unwrap().clone();
         let db_row: TreeFolderItem = TreeFolderItem{
             database: database,
             home_dir: Some(home_dir.to_string()),

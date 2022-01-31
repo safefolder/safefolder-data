@@ -406,3 +406,62 @@ impl StorageColumn for PercentageColumn {
         return yaml_string;
     }
 }
+
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GenerateNumberColumn {
+    pub config: ColumnConfig
+}
+impl GenerateNumberColumn {
+    pub fn defaults(field_config: &ColumnConfig) -> Self {
+        let field_config = field_config.clone();
+        let field_obj = Self{
+            config: field_config
+        };
+        return field_obj
+    }
+}
+impl StorageColumn for GenerateNumberColumn {
+    fn update_config_map(
+        &mut self, 
+        field_config_map: &BTreeMap<String, String>,
+    ) -> Result<BTreeMap<String, String>, PlanetError> {
+        let mut field_config_map = field_config_map.clone();
+        field_config_map.insert(SEQUENCE.to_string(), String::from("1"));
+        return Ok(field_config_map)
+    }
+    fn build_config(
+        &mut self, 
+        field_config_map: &BTreeMap<String, String>,
+    ) -> Result<ColumnConfig, PlanetError> {
+        let mut config = self.config.clone();
+        let sequence = field_config_map.get(SEQUENCE);
+        if sequence.is_some() {
+            let sequence = sequence.unwrap().clone();
+            config.sequence = Some(sequence);
+        }
+        return Ok(config)
+    }
+    fn validate(&self, data: &String) -> Result<String, PlanetError> {
+        // How to do sequences????
+        // I keep sequences as standard in the folder config schemas.
+        // 1. Open folder config
+        // 2. Rotate the counter and update config
+        // sequences: {}
+        // What to store as key?? column_id???
+        return Ok(data.clone())
+    }
+    fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
+        let field_config = self.config.clone();
+        let field_name = field_config.name.unwrap();
+        let mut yaml_string = yaml_string.clone();
+        let field = &field_name.truecolor(
+            YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
+        );
+        let value = format!("{}", value.to_string().truecolor(
+            YAML_COLOR_YELLOW[0], YAML_COLOR_YELLOW[1], YAML_COLOR_YELLOW[2]
+        ));
+        yaml_string.push_str(format!("  {field}: {value}\n", field=field, value=value).as_str());
+        return yaml_string;
+    }
+}
