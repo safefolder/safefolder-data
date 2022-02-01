@@ -21,6 +21,7 @@ use crate::storage::columns::*;
 
 lazy_static! {
     pub static ref RE_TEXT: Regex = Regex::new(r#"[\w\d]+"#).unwrap();
+    pub static ref RE_PHONE: Regex = Regex::new(r#"^(\+\d{1,2}\s)?\(?\d{2,3}\)?[\s.-]\d{2,3}[\s.-]\d{2,4}([\s.-]\d{2,4})?$"#).unwrap();
 }
 
 
@@ -745,6 +746,71 @@ impl StorageColumn for GenerateIdColumn {
                     )),
                 )                
             )
+        }
+    }
+    fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
+        let column_config = self.config.clone();
+        let column_name = column_config.name.unwrap();
+        let mut yaml_string = yaml_string.clone();
+        let field = &column_name.truecolor(
+            YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
+        );
+        let value = format!("{}", 
+            value.truecolor(YAML_COLOR_ORANGE[0], YAML_COLOR_ORANGE[1], YAML_COLOR_ORANGE[2]), 
+        );
+        yaml_string.push_str(format!("  {field}: {value}\n", field=field, value=value).as_str());
+        return yaml_string;
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct PhoneColumn {
+    pub config: ColumnConfig,
+}
+impl PhoneColumn {
+    pub fn defaults(
+        column_config: &ColumnConfig,
+    ) -> Self {
+        let column_config = column_config.clone();
+        let field_obj = Self{
+            config: column_config,
+        };
+        return field_obj
+    }
+}
+impl StorageColumn for PhoneColumn {
+    fn update_config_map(
+        &mut self, 
+        column_config_map: &BTreeMap<String, String>,
+    ) -> Result<BTreeMap<String, String>, PlanetError> {
+        let column_config_map = column_config_map.clone();
+        return Ok(column_config_map)
+    }
+    fn build_config(
+        &mut self, 
+        _: &BTreeMap<String, String>,
+    ) -> Result<ColumnConfig, PlanetError> {
+        let config = self.config.clone();
+        return Ok(config)
+    }
+    fn validate(
+        &self, 
+        value: &String
+    ) -> Result<String, PlanetError> {
+        let config = self.config.clone();
+        let expr = &RE_PHONE;
+        let is_found = expr.is_match(value);
+        let column_name = config.name.unwrap_or_default();
+        if is_found == true {
+            return Ok(value.clone())
+        } else {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Error validating phone column \"{}\" with value \"{}\".", 
+                    &column_name, value))
+                )
+            );
         }
     }
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {

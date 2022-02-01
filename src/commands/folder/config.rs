@@ -458,6 +458,12 @@ impl ConfigStorageColumn for ColumnConfig {
                         );
                         column_config = obj.build_config(column_config_map)?;
                     },
+                    COLUMN_TYPE_PHONE => {
+                        let mut obj = PhoneColumn::defaults(
+                            &column_config,
+                        );
+                        column_config = obj.build_config(column_config_map)?;
+                    },
                     _ => {}
 
                 }
@@ -628,6 +634,9 @@ impl ConfigStorageColumn for ColumnConfig {
                     None,
                     None
                 ).update_config_map(&map)?;
+            },
+            COLUMN_TYPE_PHONE => {
+                map = PhoneColumn::defaults(&propertty_config_).update_config_map(&map)?;
             },
             _ => {}
         }

@@ -1,12 +1,13 @@
 ---
-command: INSERT INTO FOLDER "Super Folder 3"
+command: INSERT INTO FOLDER "Super Folder 4"
 name: Pepito Data 2
 data:
   My Field: pepito
   Description: This is some description I want to include for España canción with description repeated
   Is Published: true
   Counter: 34
-  Status: c7s1rgjin567s2jufgf0
-  Locations: c7s1rgjin567s2jufgg0,c7s1rgjin567s2jufgh0
+  Status: c7sigs3in56cdv6qvoh0
+  Locations: c7sigs3in56cdv6qvoi0,c7sigs3in56cdv6qvoj0
   Currency: 9876.347
   Percentage: 98.56
+  My Home Phone: 644 148 821ddddd

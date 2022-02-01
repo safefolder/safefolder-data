@@ -37,11 +37,11 @@ Table fields
 * LanguageColumn                  [done] - text
 * TextColumn                      [done] - text
 * GenerateIdColumn                [done] - text : Random ids
+* GenerateNumberColumn            [done] - number: Sequential number - number : Sequence number.
+* PhoneColumn                     [done]
 
 -
 These are not complex:
-* GenerateNumberColumn           [todo] - number: Sequential number - number : Sequence number.
-* PhoneColumn                     [todo]
 * EmailColumn                     [todo]
 * UrlColumn                       [todo]
 * RatingColumn                    [todo]

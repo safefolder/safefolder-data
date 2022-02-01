@@ -86,6 +86,7 @@ pub const COLUMN_TYPE_LANGUAGE: &str = "Language";
 pub const COLUMN_TYPE_TEXT: &str = "Text";
 pub const COLUMN_TYPE_GENERATE_ID: &str = "Generate Id";
 pub const COLUMN_TYPE_GENERATE_NUMBER: &str = "Generate Number";
+pub const COLUMN_TYPE_PHONE: &str = "Phone";
 
 // Date Format
 pub const DATE_FORMAT_FRIENDLY: &str = "Friendly";
