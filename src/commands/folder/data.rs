@@ -305,7 +305,8 @@ impl<'gb> InsertIntoFolder<'gb> {
                             column_type != COLUMN_TYPE_FORMULA && 
                             column_type != COLUMN_TYPE_CREATED_TIME && 
                             column_type != COLUMN_TYPE_LAST_MODIFIED_TIME && 
-                            column_type != COLUMN_TYPE_GENERATE_ID
+                            column_type != COLUMN_TYPE_GENERATE_ID && 
+                            column_type != COLUMN_TYPE_GENERATE_NUMBER
                         ) {
                         continue
                     }
@@ -453,6 +454,14 @@ impl<'gb> InsertIntoFolder<'gb> {
                         },
                         COLUMN_TYPE_GENERATE_ID => {
                             let obj = GenerateIdColumn::defaults(&column_config);
+                            column_data_wrap = obj.validate(&column_data[0]);
+                        },
+                        COLUMN_TYPE_GENERATE_NUMBER => {
+                            let obj = GenerateNumberColumn::defaults(
+                                &column_config,
+                                Some(folder.clone()),
+                                Some(self.db_folder.clone()),
+                            );
                             column_data_wrap = obj.validate(&column_data[0]);
                         },
                         _ => {
@@ -925,6 +934,14 @@ impl<'gb> Command<String> for GetFromFolder<'gb> {
                             },
                             COLUMN_TYPE_GENERATE_ID => {
                                 let obj = GenerateIdColumn::defaults(&field_config_);
+                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+                            },
+                            COLUMN_TYPE_GENERATE_NUMBER => {
+                                let obj = GenerateNumberColumn::defaults(
+                                    &field_config_,
+                                    Some(folder.clone()),
+                                    Some(self.db_folder.clone()),
+                                );
                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },
                             _ => {

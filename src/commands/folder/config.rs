@@ -453,6 +453,8 @@ impl ConfigStorageColumn for ColumnConfig {
                     COLUMN_TYPE_GENERATE_NUMBER => {
                         let mut obj = GenerateNumberColumn::defaults(
                             &column_config,
+                            None,
+                            None
                         );
                         column_config = obj.build_config(column_config_map)?;
                     },
@@ -621,7 +623,11 @@ impl ConfigStorageColumn for ColumnConfig {
                 map = GenerateIdColumn::defaults(&propertty_config_).update_config_map(&map)?;
             },
             COLUMN_TYPE_GENERATE_NUMBER => {
-                map = GenerateNumberColumn::defaults(&propertty_config_).update_config_map(&map)?;
+                map = GenerateNumberColumn::defaults(
+                    &propertty_config_,
+                    None,
+                    None
+                ).update_config_map(&map)?;
             },
             _ => {}
         }

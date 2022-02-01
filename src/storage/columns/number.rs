@@ -11,6 +11,7 @@ use crate::planet::{PlanetError};
 use crate::commands::folder::config::ColumnConfig;
 use crate::storage::constants::*;
 use crate::storage::columns::*;
+use crate::storage::folder::FolderSchema;
 
 lazy_static! {
     pub static ref RE_CURRENCY: Regex = Regex::new(r#"^(?P<symbol_pre>[^\d\.]*)*(?P<amount>\d+[\.\d+]*)(?P<symbol_post>[^\d\.]+)*$"#).unwrap();
@@ -408,15 +409,23 @@ impl StorageColumn for PercentageColumn {
 }
 
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone)]
 pub struct GenerateNumberColumn {
-    pub config: ColumnConfig
+    pub config: ColumnConfig,
+    pub folder: Option<DbData>,
+    pub db_folder: Option<TreeFolder>,
 }
 impl GenerateNumberColumn {
-    pub fn defaults(field_config: &ColumnConfig) -> Self {
+    pub fn defaults(
+        field_config: &ColumnConfig,
+        folder: Option<DbData>,
+        db_folder: Option<TreeFolder>
+    ) -> Self {
         let field_config = field_config.clone();
         let field_obj = Self{
-            config: field_config
+            config: field_config,
+            folder: folder,
+            db_folder: db_folder
         };
         return field_obj
     }
@@ -427,7 +436,7 @@ impl StorageColumn for GenerateNumberColumn {
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
         let mut field_config_map = field_config_map.clone();
-        field_config_map.insert(SEQUENCE.to_string(), String::from("1"));
+        field_config_map.insert(SEQUENCE.to_string(), String::from("0"));
         return Ok(field_config_map)
     }
     fn build_config(
@@ -442,14 +451,36 @@ impl StorageColumn for GenerateNumberColumn {
         }
         return Ok(config)
     }
-    fn validate(&self, data: &String) -> Result<String, PlanetError> {
-        // How to do sequences????
-        // I keep sequences as standard in the folder config schemas.
-        // 1. Open folder config
-        // 2. Rotate the counter and update config
-        // sequences: {}
-        // What to store as key?? column_id???
-        return Ok(data.clone())
+    fn validate(&self, _data: &String) -> Result<String, PlanetError> {
+        let config = self.config.clone();
+        let mut folder = self.folder.clone().unwrap();
+        let db_folder = self.db_folder.clone().unwrap();
+        let mut data_objects = folder.data_objects.unwrap();
+        let column_id = config.id.unwrap();
+        let column_name = config.name.unwrap();
+        let column = data_objects.get(&column_id);
+        if column.is_some() {
+            let mut column = column.unwrap().clone();
+            let sequence = column.get(SEQUENCE);
+            if sequence.is_some() {
+                let sequence = sequence.unwrap();
+                let mut sequence: usize = FromStr::from_str(sequence).unwrap();
+                sequence += 1;
+                column.insert(SEQUENCE.to_string(), sequence.to_string());
+                data_objects.insert(column_id, column.clone());
+                folder.data_objects = Some(data_objects);
+                let result = db_folder.update(&folder);
+                if result.is_ok() {
+                    return Ok(sequence.to_string())
+                }
+            }
+        }
+        return Err(
+            PlanetError::new(
+                500, 
+                Some(tr!("Error generating new number for column \"{}\".", &column_name)),
+            )
+        )
     }
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
         let field_config = self.config.clone();
