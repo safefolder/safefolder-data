@@ -39,10 +39,11 @@ Table fields
 * GenerateIdColumn                [done] - text : Random ids
 * GenerateNumberColumn            [done] - number: Sequential number - number : Sequence number.
 * PhoneColumn                     [done]
+* EmailColumn                     [done]
 
 -
 These are not complex:
-* EmailColumn                     [todo]
+
 * UrlColumn                       [todo]
 * RatingColumn                    [todo]
 

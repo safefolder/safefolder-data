@@ -23,6 +23,7 @@ lazy_static! {
     pub static ref RE_TEXT: Regex = Regex::new(r#"[\w\d]+"#).unwrap();
     pub static ref RE_PHONE: Regex = Regex::new(r#"^(\+\d{1,2}\s)?\(?\d{2,3}\)?[\s.-]\d{2,3}[\s.-]\d{2,4}([\s.-]\d{2,4})?$"#).unwrap();
     pub static ref RE_EMAIL: Regex = Regex::new(r#"^(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])$"#).unwrap();
+    pub static ref RE_URL: Regex = Regex::new(r#"^https?:[/][/](www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$"#).unwrap();
 }
 
 
@@ -886,6 +887,72 @@ impl StorageColumn for EmailColumn {
                 PlanetError::new(
                     500, 
                     Some(tr!("Error validating email column \"{}\" with value \"{}\".", 
+                    &column_name, value))
+                )
+            );
+        }
+    }
+    fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
+        let column_config = self.config.clone();
+        let column_name = column_config.name.unwrap();
+        let mut yaml_string = yaml_string.clone();
+        let field = &column_name.truecolor(
+            YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
+        );
+        let value = format!("{}", 
+            value.truecolor(YAML_COLOR_ORANGE[0], YAML_COLOR_ORANGE[1], YAML_COLOR_ORANGE[2]), 
+        );
+        yaml_string.push_str(format!("  {field}: {value}\n", field=field, value=value).as_str());
+        return yaml_string;
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct UrlColumn {
+    pub config: ColumnConfig,
+}
+impl UrlColumn {
+    pub fn defaults(
+        column_config: &ColumnConfig,
+    ) -> Self {
+        let column_config = column_config.clone();
+        let field_obj = Self{
+            config: column_config,
+        };
+        return field_obj
+    }
+}
+impl StorageColumn for UrlColumn {
+    fn update_config_map(
+        &mut self, 
+        column_config_map: &BTreeMap<String, String>,
+    ) -> Result<BTreeMap<String, String>, PlanetError> {
+        let column_config_map = column_config_map.clone();
+        return Ok(column_config_map)
+    }
+    fn build_config(
+        &mut self, 
+        _: &BTreeMap<String, String>,
+    ) -> Result<ColumnConfig, PlanetError> {
+        let config = self.config.clone();
+        return Ok(config)
+    }
+    fn validate(
+        &self, 
+        value: &String
+    ) -> Result<String, PlanetError> {
+        eprintln!("UrlColumn.validate :: url: {}", value);
+        let config = self.config.clone();
+        let expr = &RE_URL;
+        let is_found = expr.is_match(value);
+        let column_name = config.name.unwrap_or_default();
+        if is_found == true {
+            return Ok(value.clone())
+        } else {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Error validating url column \"{}\" with value \"{}\".", 
                     &column_name, value))
                 )
             );

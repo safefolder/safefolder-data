@@ -1,5 +1,5 @@
 ---
-command: CREATE FOLDER "Super Folder 5"
+command: CREATE FOLDER "Super Folder 6"
 name:
   column_type: Small Text
 text_search:
@@ -41,3 +41,5 @@ columns:
     column_type: Phone
   - name: My Email
     column_type: Email
+  - name: My Url
+    column_type: Url

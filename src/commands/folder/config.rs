@@ -470,6 +470,12 @@ impl ConfigStorageColumn for ColumnConfig {
                         );
                         column_config = obj.build_config(column_config_map)?;
                     },
+                    COLUMN_TYPE_URL => {
+                        let mut obj = UrlColumn::defaults(
+                            &column_config,
+                        );
+                        column_config = obj.build_config(column_config_map)?;
+                    },
                     _ => {}
 
                 }
@@ -646,6 +652,9 @@ impl ConfigStorageColumn for ColumnConfig {
             },
             COLUMN_TYPE_EMAIL => {
                 map = EmailColumn::defaults(&propertty_config_).update_config_map(&map)?;
+            },
+            COLUMN_TYPE_URL => {
+                map = UrlColumn::defaults(&propertty_config_).update_config_map(&map)?;
             },
             _ => {}
         }
