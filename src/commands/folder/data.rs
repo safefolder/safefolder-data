@@ -468,6 +468,10 @@ impl<'gb> InsertIntoFolder<'gb> {
                             let obj = PhoneColumn::defaults(&column_config);
                             column_data_wrap = obj.validate(&column_data[0]);
                         },
+                        COLUMN_TYPE_EMAIL => {
+                            let obj = EmailColumn::defaults(&column_config);
+                            column_data_wrap = obj.validate(&column_data[0]);
+                        },
                         _ => {
                             errors.push(
                                 PlanetError::new(
@@ -950,6 +954,10 @@ impl<'gb> Command<String> for GetFromFolder<'gb> {
                             },
                             COLUMN_TYPE_PHONE => {
                                 let obj = PhoneColumn::defaults(&field_config_);
+                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+                            },
+                            COLUMN_TYPE_EMAIL => {
+                                let obj = EmailColumn::defaults(&field_config_);
                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },
                             _ => {
