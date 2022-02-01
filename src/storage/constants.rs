@@ -64,6 +64,9 @@ pub const LANGUAGE_COLUMN: &str = "Language";
 pub const TEXT_COLUMN: &str = "Text";
 pub const WHERE: &str = "where";
 pub const SEQUENCE: &str = "sequence";
+pub const MAXIMUM: &str = "maximum";
+pub const MINIMUM: &str = "minmum";
+pub const MAX_LENGTH: &str = "max_length";
 
 // Column Types
 pub const COLUMN_TYPE_SMALL_TEXT: &str = "Small Text";
@@ -89,6 +92,7 @@ pub const COLUMN_TYPE_GENERATE_NUMBER: &str = "Generate Number";
 pub const COLUMN_TYPE_PHONE: &str = "Phone";
 pub const COLUMN_TYPE_EMAIL: &str = "Email";
 pub const COLUMN_TYPE_URL: &str = "Url";
+pub const COLUMN_TYPE_RATING: &str = "Rating";
 
 // Date Format
 pub const DATE_FORMAT_FRIENDLY: &str = "Friendly";

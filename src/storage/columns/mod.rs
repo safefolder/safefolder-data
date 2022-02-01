@@ -40,12 +40,11 @@ Table fields
 * GenerateNumberColumn            [done] - number: Sequential number - number : Sequence number.
 * PhoneColumn                     [done]
 * EmailColumn                     [done]
+* UrlColumn                       [done]
+* RatingColumn                    [done]
 
 -
 These are not complex:
-
-* UrlColumn                       [todo]
-* RatingColumn                    [todo]
 
 * SetColumn                       [todo] - For example, tags
 * ObjectColumn                    [todo]

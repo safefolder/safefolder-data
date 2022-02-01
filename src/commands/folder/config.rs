@@ -184,6 +184,9 @@ pub struct ColumnConfig {
     pub delete_on_link_drop: Option<bool>,
     pub related_column: Option<String>,
     pub sequence: Option<String>,
+    pub maximum: Option<String>,
+    pub minimum: Option<String>,
+    pub max_length: Option<String>,
 }
 
 impl ConfigStorageColumn for ColumnConfig {
@@ -212,6 +215,9 @@ impl ConfigStorageColumn for ColumnConfig {
             delete_on_link_drop: None,
             related_column: None,
             sequence: None,
+            maximum: None,
+            minimum: None,
+            max_length: None,
         };
         if options.is_some() {
             object.options = Some(options.unwrap());
@@ -266,6 +272,9 @@ impl ConfigStorageColumn for ColumnConfig {
                     delete_on_link_drop: None,
                     related_column: None,
                     sequence: None,
+                    maximum: None,
+                    minimum: None,
+                    max_length: None,
                 };
                 return Some(column_config);
             }
@@ -476,6 +485,12 @@ impl ConfigStorageColumn for ColumnConfig {
                         );
                         column_config = obj.build_config(column_config_map)?;
                     },
+                    COLUMN_TYPE_RATING => {
+                        let mut obj = RatingColumn::defaults(
+                            &column_config,
+                        );
+                        column_config = obj.build_config(column_config_map)?;
+                    },
                     _ => {}
 
                 }
@@ -655,6 +670,9 @@ impl ConfigStorageColumn for ColumnConfig {
             },
             COLUMN_TYPE_URL => {
                 map = UrlColumn::defaults(&propertty_config_).update_config_map(&map)?;
+            },
+            COLUMN_TYPE_RATING => {
+                map = RatingColumn::defaults(&propertty_config_).update_config_map(&map)?;
             },
             _ => {}
         }

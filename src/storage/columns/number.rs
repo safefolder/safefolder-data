@@ -496,3 +496,119 @@ impl StorageColumn for GenerateNumberColumn {
         return yaml_string;
     }
 }
+
+
+#[derive(Debug, Clone)]
+pub struct RatingColumn {
+    pub config: ColumnConfig,
+}
+impl RatingColumn {
+    pub fn defaults(
+        field_config: &ColumnConfig,
+    ) -> Self {
+        let field_config = field_config.clone();
+        let field_obj = Self{
+            config: field_config,
+        };
+        return field_obj
+    }
+}
+impl StorageColumn for RatingColumn {
+    fn update_config_map(
+        &mut self, 
+        field_config_map: &BTreeMap<String, String>,
+    ) -> Result<BTreeMap<String, String>, PlanetError> {
+        let mut field_config_map = field_config_map.clone();
+        let config = self.config.clone();
+        let maximum = config.maximum;
+        let minimum = config.minimum;
+        if maximum.is_some() {
+            let maximum = maximum.unwrap();
+            field_config_map.insert(MAXIMUM.to_string(), maximum);
+        } else {
+            let maximum: String = String::from("5");
+            field_config_map.insert(MAXIMUM.to_string(), maximum);
+        }
+        if minimum.is_some() {
+            let minimum = minimum.unwrap();
+            field_config_map.insert(MINIMUM.to_string(), minimum);
+        }
+        return Ok(field_config_map)
+    }
+    fn build_config(
+        &mut self, 
+        field_config_map: &BTreeMap<String, String>,
+    ) -> Result<ColumnConfig, PlanetError> {
+        let mut config = self.config.clone();
+        let minimum = field_config_map.get(MINIMUM);
+        let maximum = field_config_map.get(MAXIMUM);
+        if minimum.is_some() {
+            let minimum = minimum.unwrap();
+            config.minimum = Some(minimum.clone());
+        }
+        if maximum.is_some() {
+            let maximum = maximum.unwrap();
+            config.maximum = Some(maximum.clone());
+        }
+        return Ok(config)
+    }
+    fn validate(&self, data: &String) -> Result<String, PlanetError> {
+        let config = self.config.clone();
+        let minimum = config.minimum;
+        let maximum = config.maximum;
+        let data = data.clone();
+        let test = &data.parse::<f64>();
+        let column_name = config.name.unwrap_or_default();
+        if test.is_err() {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Column value {} for column \"{}\" is not a number.", &data, &column_name)),
+                )
+            )
+        }
+        let data_int: usize = FromStr::from_str(&data).unwrap();        
+        if minimum.is_some() {
+            let minimum = minimum.unwrap();
+            let minimum: usize = FromStr::from_str(&minimum).unwrap();
+            if data_int < minimum {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!(
+                            "Rating for column \"{}\" is lower than minimum, {}.", 
+                            &column_name, &minimum)),
+                    )
+                )
+            }
+        }
+        if maximum.is_some() {
+            let maximum = maximum.unwrap();
+            let maximum: usize = FromStr::from_str(&maximum).unwrap();
+            if data_int > maximum {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!(
+                            "Rating for column \"{}\" is higher than maximum, {}.", 
+                            &column_name, &maximum)),
+                    )
+                )
+            }
+        }
+        return Ok(data.clone())
+    }
+    fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
+        let field_config = self.config.clone();
+        let field_name = field_config.name.unwrap();
+        let mut yaml_string = yaml_string.clone();
+        let field = &field_name.truecolor(
+            YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
+        );
+        let value = format!("{}", value.to_string().truecolor(
+            YAML_COLOR_YELLOW[0], YAML_COLOR_YELLOW[1], YAML_COLOR_YELLOW[2]
+        ));
+        yaml_string.push_str(format!("  {field}: {value}\n", field=field, value=value).as_str());
+        return yaml_string;
+    }
+}
