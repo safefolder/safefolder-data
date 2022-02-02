@@ -147,6 +147,39 @@ impl StorageColumn for NumberColumn {
             let result = i32::from_str(value_str);
             match result {
                 Ok(_) => {
+                    let value_int = result.unwrap().to_usize().unwrap();
+                    let minimum = field_config.minimum;
+                    let maximum = field_config.maximum;
+                    if minimum.is_some() {
+                        let minimum = minimum.unwrap();
+                        let minimum: usize = FromStr::from_str(&minimum).unwrap();
+                        if value_int < minimum {
+                            return Err(
+                                PlanetError::new(
+                                    500, 
+                                    Some(tr!(
+                                        "Number value \"{}\" is smaller than minimum, \"{}\"", 
+                                        &value_int, &minimum
+                                    )),
+                                )
+                            );
+                        }
+                    }
+                    if maximum.is_some() {
+                        let maximum = maximum.unwrap();
+                        let maximum: usize = FromStr::from_str(&maximum).unwrap();
+                        if value_int > maximum {
+                            return Err(
+                                PlanetError::new(
+                                    500, 
+                                    Some(tr!(
+                                        "Number value \"{}\" is bigger than maximum, \"{}\"", 
+                                        &value_int, &maximum
+                                    )),
+                                )
+                            );
+                        }
+                    }
                     return Ok(data);
                 },
                 Err(_) => {
@@ -155,7 +188,7 @@ impl StorageColumn for NumberColumn {
                             500, 
                             Some(tr!("I could not process as number: \"{}\"", data)),
                         )
-                    );    
+                    );
                 }
             }
         }

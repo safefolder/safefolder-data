@@ -50,16 +50,16 @@ These are not complex:
 * ObjectColumn                    [todo]
 
 * SubFolderColumn                 [todo]: This links to another db file with some media data: photo, etc...
-    In this case we also map into table config, so I can easily have list of folders for this table. I only do
-    one level. Here I define background image for the folder.
+    In this case we also map into table config, so I can easily have list of folders for this table. I only 
+    do one level. Here I define background image for the folder.
 * StatsColumn                     [todo]: Statistics on linked fields with formula support: AVERAGE, 
     COUNT, COUNTA, COUNTALL, SUM, MAX, AND, OR, XOR, CONCATENATE. I execute these formulas once I post 
     processed the links and references. I would need to parse in a way to use those number functions.
 * FileColumn                      [todo] - Custom file and image management with IPFS. I add many.
 * CommandColumn                   [todo]: This does processing for complex cases, like image manipulation
 
-Above fields gives us what we need as EXCEL functions into the formula field. Formula can provide a combination 
-of these function fields, which are not needed.
+Above fields gives us what we need as EXCEL functions into the formula field. Formula can provide a 
+combination of these function fields, which are not needed.
 
 **xlformula_engine**
 let formula = parse_formula::parse_string_to_formula(&"=1+2", None::<NoCustomFunction>);
