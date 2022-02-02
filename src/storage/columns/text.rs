@@ -1,6 +1,7 @@
 extern crate rust_stemmers;
 
 use std::collections::BTreeMap;
+use std::str::FromStr;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use tr::tr;
@@ -72,6 +73,24 @@ impl StorageColumn for SmallTextColumn {
                     )),
                 )
             );
+        } else {
+            let max_length = config.max_length;
+            if max_length.is_some() {
+                let max_length = max_length.unwrap();
+                let max_length: usize = FromStr::from_str(&max_length).unwrap();
+                let text_length = data.len();
+                if text_length > max_length {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!(
+                                "Length of column \"{}\" is bigger than maximum length, \"{}\".",
+                                &name, &max_length
+                            )),
+                        )
+                    );
+                }
+            }
         }
         return Ok(data)
     }
