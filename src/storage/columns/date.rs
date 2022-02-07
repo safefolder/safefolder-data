@@ -121,10 +121,16 @@ impl StorageColumn for DateColumn {
         }
         return Ok(config)
     }
-    fn validate(&self, data: &String) -> Result<String, PlanetError> {
+    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, PlanetError> {
         let config = self.config.clone();
+        let date_string = data.clone();
+        let data = data.clone();
+        let set_validate = validate_set(&config, &date_string);
+        if set_validate.is_err() {
+            let error = set_validate.unwrap_err();
+            return Err(error)
+        }
         // date and/or time with different formats
-        let mut date_string = data.clone();
         let date_format = config.date_format;
         let time_format = config.time_format;
         let mut fmt: &str = "";
@@ -172,33 +178,37 @@ impl StorageColumn for DateColumn {
                 fmt = fmt_string.as_str();
             }
         }
-        // Check date_string with fmt
-        if !is_time {
-            if is_am {
-                // TODO: Check hours is 0-12 format
-                date_string = format!("{}{}00:00:00am+0000", &date_string, sep);
-                fmt_string = format!("{}{}%I:%M:%S%P%z", fmt, sep);
-                fmt = fmt_string.as_str();
-            } else {
-                date_string = format!("{}{}00:00:00+0000", &date_string, sep);
-                fmt_string = format!("{}{}%H:%M:%S%z", fmt, sep);
-                fmt = fmt_string.as_str();
+        let mut data_new: Vec<String> = Vec::new();
+        for mut date_string in data {
+            // Check date_string with fmt
+            if !is_time {
+                if is_am {
+                    // TODO: Check hours is 0-12 format
+                    date_string = format!("{}{}00:00:00am+0000", &date_string, sep);
+                    fmt_string = format!("{}{}%I:%M:%S%P%z", fmt, sep);
+                    fmt = fmt_string.as_str();
+                } else {
+                    date_string = format!("{}{}00:00:00+0000", &date_string, sep);
+                    fmt_string = format!("{}{}%H:%M:%S%z", fmt, sep);
+                    fmt = fmt_string.as_str();
+                }
             }
-        }
-        let date_obj = DateTime::parse_from_str(
-            &date_string, 
-            fmt
-        );
-        if date_obj.is_err() {
-            // Raise validation error
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!("Validation error on date \"{}\"", data.clone())),
-                )
+            let date_obj = DateTime::parse_from_str(
+                &date_string, 
+                fmt
             );
+            if date_obj.is_err() {
+                // Raise validation error
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Validation error on date \"{}\"", date_string.clone())),
+                    )
+                );
+            }
+            data_new.push(date_string);
         }
-        return Ok(data.clone())
+        return Ok(data_new)
     }
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
         let field_config = self.config.clone();
@@ -243,59 +253,69 @@ impl StorageColumn for DurationColumn {
         let config = self.config.clone();
         return Ok(config)
     }
-    fn validate(&self, data: &String) -> Result<String, PlanetError> {
+    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, PlanetError> {
         let data = data.clone();
+        let config = self.config.clone();
+        let set_validate = validate_set(&config, &data);
+        if set_validate.is_err() {
+            let error = set_validate.unwrap_err();
+            return Err(error)
+        }
         // validate HH:MM[:SS.SSS]
         let expr = &RE_DURATION;
-        let is_valid = expr.is_match(&data);
-        if !is_valid {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!("Duration format is not valid: \"{}\"", &data)),
-                )
-            );
-        }
-        let matches = expr.captures(&data).unwrap();
-        let hour = matches.name("hour");
-        let minute = matches.name("minute");
-        let second = matches.name("second");
-        let micro = matches.name("micro");
-        let hour_str = hour.unwrap().as_str();
-        let minute_str = minute.unwrap().as_str();
-        let mut second_str: &str;
-        let micro_str: &str;
-        let minute: i8 = FromStr::from_str(minute_str).unwrap();
-        if minute > 60 {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!("Minutes needs to be less than 60: \"{}\"", &data)),
-                )
-            );
-        }
-        if second.is_some() {
-            second_str = second.unwrap().as_str();
-            let second: i8 = FromStr::from_str(second_str).unwrap();
-            if second > 60 {
+        let mut data_new: Vec<String> = Vec::new();
+        for data_item in data {
+            let is_valid = expr.is_match(&data_item);
+            if !is_valid {
                 return Err(
                     PlanetError::new(
                         500, 
-                        Some(tr!("Seconds needs to be less than 60: \"{}\"", &data)),
+                        Some(tr!("Duration format is not valid: \"{}\"", &data_item)),
                     )
                 );
             }
+            let matches = expr.captures(&data_item).unwrap();
+            let hour = matches.name("hour");
+            let minute = matches.name("minute");
+            let second = matches.name("second");
+            let micro = matches.name("micro");
+            let hour_str = hour.unwrap().as_str();
+            let minute_str = minute.unwrap().as_str();
+            let mut second_str: &str;
+            let micro_str: &str;
+            let minute: i8 = FromStr::from_str(minute_str).unwrap();
+            if minute > 60 {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Minutes needs to be less than 60: \"{}\"", &data_item)),
+                    )
+                );
+            }
+            if second.is_some() {
+                second_str = second.unwrap().as_str();
+                let second: i8 = FromStr::from_str(second_str).unwrap();
+                if second > 60 {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!("Seconds needs to be less than 60: \"{}\"", &data_item)),
+                        )
+                    );
+                }
+            }
+            let mut data_final = format!("{}:{}", hour_str, minute_str);
+            if second.is_some() {
+                second_str = second.unwrap().as_str();
+                data_final = format!("{}:{}", &data_final, second_str);
+            }
+            if micro.is_some() {
+                micro_str = micro.unwrap().as_str();
+                data_final = format!("{}.{}", &data_final, micro_str);
+            }
+            data_new.push(data_final);
         }
-        let mut data_final = format!("{}:{}", hour_str, minute_str);
-        if second.is_some() {
-            second_str = second.unwrap().as_str();
-            data_final = format!("{}:{}", &data_final, second_str);
-        }
-        if micro.is_some() {
-            micro_str = micro.unwrap().as_str();
-            data_final = format!("{}.{}", &data_final, micro_str);
-        }
-        return Ok(data_final)
+        return Ok(data_new)
     }
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
         let field_config = self.config.clone();
@@ -340,11 +360,13 @@ impl StorageColumn for AuditDateColumn {
         let config = self.config.clone();
         return Ok(config)
     }
-    fn validate(&self, _: &String) -> Result<String, PlanetError> {
+    fn validate(&self, _: &Vec<String>) -> Result<Vec<String>, PlanetError> {
         let now = Utc::now();
         // 2021-12-18T12:14:15.528276533+00:00
         let now_str = now.to_rfc3339();
-        return Ok(now_str)
+        let mut list: Vec<String> = Vec::new();
+        list.push(now_str);
+        return Ok(list)
     }
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
         let field_config = self.config.clone();

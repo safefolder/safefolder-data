@@ -1,16 +1,20 @@
 ---
-command: INSERT INTO FOLDER "Super Folder 10"
-name: Pepito Data 4
+command: INSERT INTO FOLDER "Super Folder 13"
+name: Pepito Data 27
 data:
-  My Field: pepito
+  My Column: pepito
   Description: This is some description I want to include for España canción with description repeated
   Is Published: true
   Counter: 34
-  Status: c7sn3q3in565mbgebl80
-  Locations: c7sn3q3in565mbgebl90,c7sn3q3in565mbgebla0
+  Status: c7tc63bin566q9cuvjo0
+  Locations: c7tc63bin566q9cuvjp0,c7tc63bin566q9cuvjq0
   Currency: 9876.347
   Percentage: 98.56
   My Home Phone: 644 148 821
   My Email: me@jorgealegre.com
   My Url: https://jorgealegre.com
-  My Rating: pepe
+  My Rating: 3
+data_collections:
+  Statuses:
+    - published
+    - draft

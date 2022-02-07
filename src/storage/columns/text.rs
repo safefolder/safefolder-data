@@ -58,41 +58,50 @@ impl StorageColumn for SmallTextColumn {
         // No special attributes so far for small text field
         return Ok(config)
     }
-    fn validate(&self, data: &String) -> Result<String, PlanetError> {
+    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, PlanetError> {
         let data = data.clone();
         let config = self.config.clone();
+        let column_name = config.clone().name.unwrap_or_default();
+        let set_validate = validate_set(&config, &data);
+        if set_validate.is_err() {
+            let error = set_validate.unwrap_err();
+            return Err(error)
+        }
+        let mut data_new: Vec<String> = Vec::new();
         let required = config.required.unwrap();
-        let name = config.name.unwrap();
-        if data == String::from("") && required == true {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!(
-                        "Field {}{}{} is required", 
-                        String::from("\"").blue(), name.blue(), String::from("\"").blue()
-                    )),
-                )
-            );
-        } else {
-            let max_length = config.max_length;
-            if max_length.is_some() {
-                let max_length = max_length.unwrap();
-                let max_length: usize = FromStr::from_str(&max_length).unwrap();
-                let text_length = data.len();
-                if text_length > max_length {
-                    return Err(
-                        PlanetError::new(
-                            500, 
-                            Some(tr!(
-                                "Length of column \"{}\" is bigger than maximum length, \"{}\".",
-                                &name, &max_length
-                            )),
-                        )
-                    );
+        let max_length = config.max_length.as_ref();
+        for data_item in data {
+            if data_item == String::from("") && required == true {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!(
+                            "Field {}{}{} is required", 
+                            String::from("\"").blue(), &column_name.blue(), String::from("\"").blue()
+                        )),
+                    )
+                );
+            } else {
+                if max_length.is_some() {
+                    let max_length = max_length.unwrap();
+                    let max_length: usize = FromStr::from_str(&max_length).unwrap();
+                    let text_length = data_item.len();
+                    if text_length > max_length {
+                        return Err(
+                            PlanetError::new(
+                                500, 
+                                Some(tr!(
+                                    "Length of column \"{}\" is bigger than maximum length, \"{}\".",
+                                    &column_name, &max_length
+                                )),
+                            )
+                        );
+                    }
                 }
             }
+            data_new.push(data_item);
         }
-        return Ok(data)
+        return Ok(data_new)
     }
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
         let column_config = self.config.clone();
@@ -139,23 +148,32 @@ impl StorageColumn for LongTextColumn {
         // No special attributes so far for small text field
         return Ok(config)
     }
-    fn validate(&self, data: &String) -> Result<String, PlanetError> {
+    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, PlanetError> {
         let data = data.clone();
         let config = self.config.clone();
+        let set_validate = validate_set(&config, &data);
+        if set_validate.is_err() {
+            let error = set_validate.unwrap_err();
+            return Err(error)
+        }
         let required = config.required.unwrap();
         let name = config.name.unwrap();
-        if data == String::from("") && required == true {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!(
-                        "Field {}{}{} is required", 
-                        String::from("\"").blue(), name.blue(), String::from("\"").blue()
-                    )),
-                )
-            );
+        let mut data_new: Vec<String> = Vec::new();
+        for data_item in data {
+            if data_item == String::from("") && required == true {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!(
+                            "Field {}{}{} is required", 
+                            String::from("\"").blue(), name.blue(), String::from("\"").blue()
+                        )),
+                    )
+                );
+            }
+            data_new.push(data_item);
         }
-        return Ok(data)
+        return Ok(data_new)
     }
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
         let column_config = self.config.clone();
@@ -265,71 +283,81 @@ impl StorageColumn for SelectColumn {
         }
         return Ok(config)
     }
-    fn validate(&self, data: &String) -> Result<String, PlanetError> {
+    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, PlanetError> {
         let data = data.clone();
         // value represents the id for the option selected, like id->name
         let column_config = self.config.clone();
+        let set_validate = validate_set(&column_config, &data);
+        if set_validate.is_err() {
+            let error = set_validate.unwrap_err();
+            return Err(error)
+        }
         let required = column_config.required.unwrap();
         let name = column_config.name.unwrap();
         // let column_name = self.field.name.clone().unwrap_or_default();
-        if data == String::from("") && required == true {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!(
-                        "Field {}{}{} is required", 
-                        String::from("\"").blue(), &name.blue(), String::from("\"").blue()
-                    )),
-                )
-            );
-        } else {
-            // In case no many, just string with id. In case many, list of ids separated by commas
-            let value_id = data.clone();
-            let id_list: Vec<&str> = value_id.split(",").collect();
-            let column_config = self.config.clone();
-            // Check that value appears on the config for choices id -> value
-            // The option id is obtained from the folder config
-            let options = column_config.options.unwrap();
-            let options_name_map = &self.options_name_map.clone().unwrap();
-            let options_id_map = &self.options_id_map.clone().unwrap();
-            let mut verified = false;
-            if *&id_list.len() == 1 {
-                for select_option in options {
-                    let select_id = options_name_map.get(&select_option);
-                    if select_id.is_some() {
-                        let select_id = options_name_map.get(&select_option).unwrap().clone();
-                        if select_id == value_id {
-                            verified = true;
-                            break;
-                        }
-                    }
-                }
-            } else {
-                verified = true;
-                for item_select_id in id_list {
-                    let item_select_id = &item_select_id.to_string();
-                    let select_option = options_id_map.get(item_select_id);
-                    if select_option.is_none() {
-                        verified = false;
-                        break
-                    }
-                }
-            }
-            if verified == true {
-                return Ok(data.clone())
-            } else {
+        let mut data_new: Vec<String> = Vec::new();
+        for data_item in data {
+            if data_item == String::from("") && required == true {
                 return Err(
                     PlanetError::new(
                         500, 
                         Some(tr!(
-                            "Field {}{}{} is not configured with select id {}{}{}", 
-                            String::from("\"").blue(), &name.blue(), String::from("\"").blue(),
-                            String::from("\"").blue(), value_id, String::from("\"").blue(),
+                            "Field {}{}{} is required", 
+                            String::from("\"").blue(), &name.blue(), String::from("\"").blue()
                         )),
                     )
                 );
-            }            
+            } else {
+                // In case no many, just string with id. In case many, list of ids separated by commas
+                let value_id = data_item.clone();
+                let id_list: Vec<&str> = value_id.split(",").collect();
+                let column_config = self.config.clone();
+                // Check that value appears on the config for choices id -> value
+                // The option id is obtained from the folder config
+                let options = column_config.options.unwrap();
+                let options_name_map = &self.options_name_map.clone().unwrap();
+                let options_id_map = &self.options_id_map.clone().unwrap();
+                let mut verified = false;
+                if *&id_list.len() == 1 {
+                    for select_option in options {
+                        let select_id = options_name_map.get(&select_option);
+                        if select_id.is_some() {
+                            let select_id = options_name_map.get(&select_option).unwrap().clone();
+                            if select_id == value_id {
+                                verified = true;
+                                break;
+                            }
+                        }
+                    }
+                } else {
+                    verified = true;
+                    for item_select_id in id_list {
+                        let item_select_id = &item_select_id.to_string();
+                        let select_option = options_id_map.get(item_select_id);
+                        if select_option.is_none() {
+                            verified = false;
+                            break
+                        }
+                    }
+                }
+                if verified == true {
+                    // return Ok(data.clone())
+                    data_new.push(data_item.clone());
+                } else {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!(
+                                "Field {}{}{} is not configured with select id {}{}{}", 
+                                String::from("\"").blue(), &name.blue(), String::from("\"").blue(),
+                                String::from("\"").blue(), value_id, String::from("\"").blue(),
+                            )),
+                        )
+                    );
+                }            
+            }    
         }
+        return Ok(data_new)
     }
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
         let column_config = self.config.clone();
@@ -419,14 +447,24 @@ impl StorageColumn for AuditByColumn {
         let config = self.config.clone();
         return Ok(config)
     }
-    fn validate(&self, data: &String) -> Result<String, PlanetError> {
+    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, PlanetError> {
         // CreatedBy: I map into insert
         // LastModifiedBy: I map into insert and update
         // I save the user id
         // The user id should not come from the payload, but from the auth system
         // TODO: Check user_id exists on folder of users, or any other mean of storage
-        let user_id = data.clone();
-        return Ok(user_id)
+        let config = self.config.clone();
+        let set_validate = validate_set(&config, &data);
+        if set_validate.is_err() {
+            let error = set_validate.unwrap_err();
+            return Err(error)
+        }
+        let mut data_new: Vec<String> = Vec::new();
+        for data_item in data {
+            let user_id = data_item.clone();
+            data_new.push(user_id);
+        }
+        return Ok(data_new)
     }
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
         let column_config = self.config.clone();
@@ -763,13 +801,14 @@ impl StorageColumn for GenerateIdColumn {
     }
     fn validate(
         &self, 
-        _value: &String
-    ) -> Result<String, PlanetError> {
-        // let text_column_id = text_column_id.clone();
+        _value: &Vec<String>
+    ) -> Result<Vec<String>, PlanetError> {
         let id = generate_id();
         if id.is_some() {
             let id = id.unwrap();
-            return Ok(id)
+            let mut ids: Vec<String> = Vec::new();
+            ids.push(id);
+            return Ok(ids)
         } else {
             return Err(
                 PlanetError::new(
@@ -828,23 +867,33 @@ impl StorageColumn for PhoneColumn {
     }
     fn validate(
         &self, 
-        value: &String
-    ) -> Result<String, PlanetError> {
+        value: &Vec<String>
+    ) -> Result<Vec<String>, PlanetError> {
         let config = self.config.clone();
-        let expr = &RE_PHONE;
-        let is_found = expr.is_match(value);
-        let column_name = config.name.unwrap_or_default();
-        if is_found == true {
-            return Ok(value.clone())
-        } else {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!("Error validating phone column \"{}\" with value \"{}\".", 
-                    &column_name, value))
-                )
-            );
+        let data = value.clone();
+        let set_validate = validate_set(&config, &data);
+        if set_validate.is_err() {
+            let error = set_validate.unwrap_err();
+            return Err(error)
         }
+        let column_name = config.name.unwrap_or_default();
+        let mut data_new: Vec<String> = Vec::new();
+        for data_item in data {
+            let expr = &RE_PHONE;
+            let is_found = expr.is_match(&data_item);
+            if is_found == true {
+                data_new.push(data_item);
+            } else {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Error validating phone column \"{}\" with value \"{}\".", 
+                        &column_name, &data_item))
+                    )
+                );
+            }    
+        }
+        return Ok(data_new)
     }
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
         let column_config = self.config.clone();
@@ -893,23 +942,34 @@ impl StorageColumn for EmailColumn {
     }
     fn validate(
         &self, 
-        value: &String
-    ) -> Result<String, PlanetError> {
+        value: &Vec<String>
+    ) -> Result<Vec<String>, PlanetError> {
         let config = self.config.clone();
-        let expr = &RE_EMAIL;
-        let is_found = expr.is_match(value);
-        let column_name = config.name.unwrap_or_default();
-        if is_found == true {
-            return Ok(value.clone())
-        } else {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!("Error validating email column \"{}\" with value \"{}\".", 
-                    &column_name, value))
-                )
-            );
+        let data = value.clone();
+        let set_validate = validate_set(&config, &data);
+        if set_validate.is_err() {
+            let error = set_validate.unwrap_err();
+            return Err(error)
         }
+        let column_name = config.name.unwrap_or_default();
+        let mut data_new: Vec<String> = Vec::new();
+        for data_item in data {
+            let expr = &RE_EMAIL;
+            let is_found = expr.is_match(&data_item);
+            if is_found == true {
+                // return Ok(value.clone())
+                data_new.push(data_item);
+            } else {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Error validating email column \"{}\" with value \"{}\".", 
+                        &column_name, &data_item))
+                    )
+                );
+            }    
+        }
+        return Ok(data_new)
     }
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
         let column_config = self.config.clone();
@@ -958,24 +1018,33 @@ impl StorageColumn for UrlColumn {
     }
     fn validate(
         &self, 
-        value: &String
-    ) -> Result<String, PlanetError> {
-        eprintln!("UrlColumn.validate :: url: {}", value);
+        value: &Vec<String>
+    ) -> Result<Vec<String>, PlanetError> {
         let config = self.config.clone();
-        let expr = &RE_URL;
-        let is_found = expr.is_match(value);
-        let column_name = config.name.unwrap_or_default();
-        if is_found == true {
-            return Ok(value.clone())
-        } else {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!("Error validating url column \"{}\" with value \"{}\".", 
-                    &column_name, value))
-                )
-            );
+        let data = value.clone();
+        let set_validate = validate_set(&config, &data);
+        if set_validate.is_err() {
+            let error = set_validate.unwrap_err();
+            return Err(error)
         }
+        let mut data_new: Vec<String> = Vec::new();
+        let column_name = config.name.unwrap_or_default();
+        for data_item in data {
+            let expr = &RE_URL;
+            let is_found = expr.is_match(&data_item);
+            if is_found == true {
+                data_new.push(data_item);
+            } else {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Error validating url column \"{}\" with value \"{}\".", 
+                        &column_name, &data_item))
+                    )
+                );
+            }
+        }
+        return Ok(data_new)
     }
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
         let column_config = self.config.clone();

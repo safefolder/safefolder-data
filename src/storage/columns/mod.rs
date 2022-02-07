@@ -3,14 +3,17 @@ pub mod number;
 pub mod formula;
 pub mod date;
 pub mod reference;
+pub mod structure;
 
 use std::collections::{BTreeMap, HashMap};
+use std::str::FromStr;
 use tr::tr;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
 
 use crate::planet::{PlanetError};
 use crate::storage::folder::{DbData, TreeFolder};
+use crate::planet::constants::*;
 use crate::commands::folder::config::*;
 
 /*
@@ -84,8 +87,64 @@ pub trait StorageColumn {
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError>;
-    fn validate(&self, data: &String) -> Result<String, PlanetError>;
+    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, PlanetError>;
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String;
+}
+
+pub fn validate_set(config: &ColumnConfig, data: &Vec<String>) -> Result<(), PlanetError> {
+    let config = config.clone();
+    let column_name = config.name.unwrap_or_default();
+    let is_set = config.is_set;
+    let set_maximum = config.set_maximum;
+    let set_minimum = config.set_minimum;
+    let number_items = data.len();
+    if is_set.is_some() {
+        let is_set = is_set.unwrap().to_lowercase();
+        // validate when is not a set and I have many items
+        if is_set != String::from(TRUE) && number_items > 1 {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!(
+                        "Column data for \"{}\" is not a set and number items is higher than 1.", 
+                        &column_name
+                    ))
+                )
+            );
+        }
+        // validate maximum and minimum for set
+        if set_maximum.is_some() {
+            let set_maximum = set_maximum.unwrap();
+            let set_maximum: usize = FromStr::from_str(&set_maximum).unwrap();
+            if number_items > set_maximum {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!(
+                            "Number items in \"{}\" is higher than maximum, \"{}\".",
+                            &column_name, &set_maximum
+                        ))
+                    )
+                );
+            }
+        }
+        if set_minimum.is_some() {
+            let set_minimum = set_minimum.unwrap();
+            let set_minimum: usize = FromStr::from_str(&set_minimum).unwrap();
+            if number_items < set_minimum {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!(
+                            "Number items in \"{}\" is lower than minimum, \"{}\".",
+                            &column_name, &set_minimum
+                        ))
+                    )
+                );
+            }
+        }
+    }
+    return Ok(())
 }
 
 pub trait ObjectStorageColumn<'gb> {

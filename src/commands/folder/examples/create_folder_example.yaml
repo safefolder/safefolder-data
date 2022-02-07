@@ -1,5 +1,5 @@
 ---
-command: CREATE FOLDER "Super Folder 10"
+command: CREATE FOLDER "Super Folder 13"
 name:
   column_type: Small Text
 text_search:
@@ -47,3 +47,8 @@ columns:
     column_type: Rating
     maximum: 7
     minimum: 3
+  - name: Statuses
+    column_type: Small Text
+    is_set: true
+    set_minimum: 1
+    set_maximum: 8

@@ -16,7 +16,7 @@ use crate::commands::folder::config::*;
 use crate::storage::constants::*;
 use crate::commands::folder::{Command};
 use crate::commands::{CommandRunner};
-use crate::planet::constants::{ID, NAME};
+use crate::planet::constants::{ID, NAME, VALUE, FALSE};
 use crate::storage::folder::{TreeFolder, TreeFolderItem, FolderItem, FolderSchema, DbData, GetItemOption};
 use crate::storage::folder::*;
 use crate::storage::{ConfigStorageColumn, generate_id};
@@ -84,9 +84,17 @@ impl<'gb> InsertIntoFolder<'gb> {
         let mut insert_id_data_collections_map: BTreeMap<String, Vec<String>> = BTreeMap::new();
         if insert_data_collections_map.is_some() {
             // I receive a map of list of ids
+            let mut folder_map_by_name: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
+            for (_, column) in folder_data {
+                let column_name = column.get(NAME);
+                if column_name.is_some() {
+                    let column_name = column_name.unwrap();
+                    folder_map_by_name.insert(column_name.clone(), column.clone());
+                }
+            }
             let insert_data_collections_map = insert_data_collections_map.unwrap();
             for (name, id_list) in insert_data_collections_map {
-                let id_map = folder_data.get(&name);
+                let id_map = folder_map_by_name.get(&name);
                 if id_map.is_some() {
                     let id_map = id_map.unwrap();
                     let id = id_map.get(ID);
@@ -197,7 +205,9 @@ impl<'gb> InsertIntoFolder<'gb> {
                 // process insert config data_collections
                 // User authentication
                 // TODO: Complete when implement the permission system exchange token by user_id
-                let user_id = generate_id().unwrap();
+                let user_id_string = generate_id().unwrap();
+                let mut user_id: Vec<String> = Vec::new();
+                user_id.push(user_id_string);
                 
                 // let insert_data_collections_map = self.config.data_collections.clone().unwrap();
                 // eprintln!("InsertIntoFolder.run :: insert_data__collections_map: {:#?}", &insert_data_collections_map);
@@ -267,12 +277,18 @@ impl<'gb> InsertIntoFolder<'gb> {
                 }
                 let mut links_map: HashMap<String, Vec<ColumnConfig>> = HashMap::new();
                 let mut links_data_map: HashMap<String, HashMap<String, Vec<String>>> = HashMap::new();
+                // eprintln!("InsertIntoFolder.run :: insert_id_data_map: {:#?}", &insert_id_data_map);
                 for column in config_columns.clone() {
                     let mut column_data: Option<Vec<String>> = None;
                     let column_config = column.clone();
                     let column_type = column.column_type.unwrap_or_default();
                     let column_type = column_type.as_str();
-                    eprintln!("InsertIntoFolder.run :: column_type: {}", column_type);
+                    let mut is_set: String = FALSE.to_string();
+                    let is_set_wrap = column_config.clone().is_set;
+                    if is_set_wrap.is_some() {
+                        is_set = is_set_wrap.unwrap();
+                    }                    
+                    eprintln!("InsertIntoFolder.run :: column_type: {} is_set: {}", column_type, &is_set);
                     let column_name = column.name.unwrap();
                     // I always have a column id
                     let column_id = column.id.unwrap_or_default();
@@ -299,6 +315,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                         let data_collections_item = data_collections_item.unwrap().clone();
                         column_data = Some(data_collections_item);
                     }
+                    // eprintln!("InsertIntoFolder.run :: column_data: {:?}", &column_data);
                     // In case we don't have any value and is system generated we skip
                     if column_data.is_none() &&
                         (
@@ -319,31 +336,32 @@ impl<'gb> InsertIntoFolder<'gb> {
                         column_data_ = items;
                     }
                     let column_data = column_data_;
-                    let mut column_data_wrap: Result<String, PlanetError> = Ok(String::from(""));
+                    let mut column_data_wrap: Result<Vec<String>, PlanetError> = Ok(Vec::new());
+                    // let mut column_data_wrap: Result<Vec<String>, PlanetError> = Ok(String::from(""));
                     let mut skip_data_assign = false;
                     match column_type {
                         COLUMN_TYPE_SMALL_TEXT => {
                             let obj = SmallTextColumn::defaults(&column_config);
-                            column_data_wrap = obj.validate(&column_data[0]);
+                            column_data_wrap = obj.validate(&column_data);
                         },
                         COLUMN_TYPE_LONG_TEXT => {
                             let obj = LongTextColumn::defaults(&column_config);
-                            column_data_wrap = obj.validate(&column_data[0]);
+                            column_data_wrap = obj.validate(&column_data);
                         },
                         COLUMN_TYPE_CHECKBOX => {
                             let obj = CheckBoxColumn::defaults(&column_config);
-                            column_data_wrap = obj.validate(&column_data[0]);
+                            column_data_wrap = obj.validate(&column_data);
                         },
                         COLUMN_TYPE_NUMBER => {
                             let obj = NumberColumn::defaults(&column_config);
-                            column_data_wrap = obj.validate(&column_data[0]);
+                            column_data_wrap = obj.validate(&column_data);
                         },
                         COLUMN_TYPE_SELECT => {
                             let obj = SelectColumn::defaults(
                                 &column_config, 
                                 Some(&folder)
                             );
-                            column_data_wrap = obj.validate(&column_data[0]);
+                            column_data_wrap = obj.validate(&column_data);
                         },
                         COLUMN_TYPE_FORMULA => {
                             let obj = FormulaColumn::defaults(&column_config);
@@ -351,19 +369,19 @@ impl<'gb> InsertIntoFolder<'gb> {
                         },
                         COLUMN_TYPE_DATE => {
                             let obj = DateColumn::defaults(&column_config);
-                            column_data_wrap = obj.validate(&column_data[0]);
+                            column_data_wrap = obj.validate(&column_data);
                         },
                         COLUMN_TYPE_DURATION => {
                             let obj = DurationColumn::defaults(&column_config);
-                            column_data_wrap = obj.validate(&column_data[0]);
+                            column_data_wrap = obj.validate(&column_data);
                         },
                         COLUMN_TYPE_CREATED_TIME => {
                             let obj = AuditDateColumn::defaults(&column_config);
-                            column_data_wrap = obj.validate(&column_data[0]);
+                            column_data_wrap = obj.validate(&column_data);
                         },
                         COLUMN_TYPE_LAST_MODIFIED_TIME => {
                             let obj = AuditDateColumn::defaults(&column_config);
-                            column_data_wrap = obj.validate(&column_data[0]);
+                            column_data_wrap = obj.validate(&column_data);
                         },
                         COLUMN_TYPE_CREATED_BY => {
                             let obj = AuditByColumn::defaults(&column_config);
@@ -375,11 +393,11 @@ impl<'gb> InsertIntoFolder<'gb> {
                         },
                         COLUMN_TYPE_CURRENCY => {
                             let obj = CurrencyColumn::defaults(&column_config);
-                            column_data_wrap = obj.validate(&column_data[0]);
+                            column_data_wrap = obj.validate(&column_data);
                         },
                         COLUMN_TYPE_PERCENTAGE => {
                             let obj = PercentageColumn::defaults(&column_config);
-                            column_data_wrap = obj.validate(&column_data[0]);
+                            column_data_wrap = obj.validate(&column_data);
                         },
                         COLUMN_TYPE_LINK => {
                             let obj = LinkColumn::defaults(
@@ -454,7 +472,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                         },
                         COLUMN_TYPE_GENERATE_ID => {
                             let obj = GenerateIdColumn::defaults(&column_config);
-                            column_data_wrap = obj.validate(&column_data[0]);
+                            column_data_wrap = obj.validate(&column_data);
                         },
                         COLUMN_TYPE_GENERATE_NUMBER => {
                             let obj = GenerateNumberColumn::defaults(
@@ -462,23 +480,23 @@ impl<'gb> InsertIntoFolder<'gb> {
                                 Some(folder.clone()),
                                 Some(self.db_folder.clone()),
                             );
-                            column_data_wrap = obj.validate(&column_data[0]);
+                            column_data_wrap = obj.validate(&column_data);
                         },
                         COLUMN_TYPE_PHONE => {
                             let obj = PhoneColumn::defaults(&column_config);
-                            column_data_wrap = obj.validate(&column_data[0]);
+                            column_data_wrap = obj.validate(&column_data);
                         },
                         COLUMN_TYPE_EMAIL => {
                             let obj = EmailColumn::defaults(&column_config);
-                            column_data_wrap = obj.validate(&column_data[0]);
+                            column_data_wrap = obj.validate(&column_data);
                         },
                         COLUMN_TYPE_URL => {
                             let obj = UrlColumn::defaults(&column_config);
-                            column_data_wrap = obj.validate(&column_data[0]);
+                            column_data_wrap = obj.validate(&column_data);
                         },
                         COLUMN_TYPE_RATING => {
                             let obj = RatingColumn::defaults(&column_config);
-                            column_data_wrap = obj.validate(&column_data[0]);
+                            column_data_wrap = obj.validate(&column_data);
                         },
                         _ => {
                             errors.push(
@@ -498,10 +516,11 @@ impl<'gb> InsertIntoFolder<'gb> {
                     // );
                     if skip_data_assign == false {
                         let tuple = handle_field_response(
-                            &column_data_wrap, &errors, &column_id, &data
+                            &column_data_wrap, &errors, &column_id, &data, &data_collections, &is_set
                         );
                         data = tuple.0;
-                        errors = tuple.1;
+                        data_collections = tuple.1;
+                        errors = tuple.2;
                     }
                 }
                 // text and language
@@ -1244,21 +1263,42 @@ impl<'gb> Command<String> for SelectFromFolder<'gb> {
 }
 
 fn handle_field_response(
-    column_data: &Result<String, PlanetError>, 
+    column_data: &Result<Vec<String>, PlanetError>, 
     errors: &Vec<PlanetError>, 
     column_id: &String,
-    data: &BTreeMap<String, String>
-) -> (BTreeMap<String, String>, Vec<PlanetError>) {
+    data: &BTreeMap<String, String>,
+    data_collections: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
+    is_set: &String
+) -> (
+    BTreeMap<String, String>, 
+    BTreeMap<String, Vec<BTreeMap<String, String>>>,
+    Vec<PlanetError>
+) {
     let column_data = column_data.clone();
     let mut errors = errors.clone();
     let mut data = data.clone();
+    let mut data_collections = data_collections.clone();
     let column_id = column_id.clone();
+    let is_set = is_set.clone();
     if column_data.is_err() {
         let err = column_data.unwrap_err();
         errors.push(err);
     } else {
-        let column_data = column_data.unwrap();
-        data.insert(column_id, column_data);
+        let column_data = column_data.unwrap().clone();
+        if is_set == FALSE.to_string() {
+            // into data
+            let column_value = column_data[0].clone();
+            data.insert(column_id.clone(), column_value);
+        } else {
+            // into data_collections, I have a set
+            let mut list: Vec<BTreeMap<String, String>> = Vec::new();
+            for item in column_data {
+                let mut map: BTreeMap<String, String> = BTreeMap::new();
+                map.insert(VALUE.to_string(), item);
+                list.push(map);
+            }
+            data_collections.insert(column_id.clone(), list);
+        }
     }
-    return (data, errors)
+    return (data, data_collections, errors)
 }

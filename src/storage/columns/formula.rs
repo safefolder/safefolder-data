@@ -86,7 +86,7 @@ impl FormulaColumn {
     pub fn validate(&self, 
         data_map: &BTreeMap<String, String>,
         field_config_map: &BTreeMap<String, ColumnConfig>,
-    ) -> Result<String, PlanetError> {
+    ) -> Result<Vec<String>, PlanetError> {
         let config = self.config.clone();
         let field_config_map = field_config_map.clone();
         let data_map = data_map.clone();
@@ -98,7 +98,9 @@ impl FormulaColumn {
                 formula_compiled_str.as_str()
             ).unwrap();
             let formula_result = execute_formula(&formula_compiled, &data_map, &field_config_map)?;
-            return Ok(formula_result);
+            let mut list: Vec<String> = Vec::new();
+            list.push(formula_result);
+            return Ok(list);
         } else {
             return Err(
                 PlanetError::new(

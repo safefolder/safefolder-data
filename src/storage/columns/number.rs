@@ -47,37 +47,46 @@ impl StorageColumn for CheckBoxColumn {
         // No special attributes so far for small text field
         return Ok(config)
     }
-    fn validate(&self, data: &String) -> Result<String, PlanetError> {
+    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, PlanetError> {
         let data = data.clone();
-
         let field_config = self.config.clone();
+        let set_validate = validate_set(&field_config, &data);
+        if set_validate.is_err() {
+            let error = set_validate.unwrap_err();
+            return Err(error)
+        }
         let required = field_config.required.unwrap();
         let name = field_config.name.unwrap();
-        // eprintln!("CheckBoxColumn.is_valid :: value: {:?}", &value);
-        if data == String::from("") && required == true {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!(
-                        "Field {}{}{} is required", 
-                        String::from("\"").blue(), name.blue(), String::from("\"").blue()
-                    )),
-                )
-            );
-        } else {
-            let value_str = data.as_str();
-            // eprintln!("CheckBoxColumn.is_valid :: value_str: {:?}", &value_str);
-            if value_str == "true" || value_str == "false" {
-                return Ok(data);
-            } else {
+        let mut data_new: Vec<String> = Vec::new();
+        for data_item in data {
+            // eprintln!("CheckBoxColumn.is_valid :: value: {:?}", &value);
+            if data_item == String::from("") && required == true {
                 return Err(
                     PlanetError::new(
                         500, 
-                        Some(tr!("Checkbox value needs to be \"true\" or \"false\"")),
+                        Some(tr!(
+                            "Field {}{}{} is required", 
+                            String::from("\"").blue(), name.blue(), String::from("\"").blue()
+                        )),
                     )
                 );
+            } else {
+                let value_str = data_item.as_str();
+                // eprintln!("CheckBoxColumn.is_valid :: value_str: {:?}", &value_str);
+                if value_str == "true" || value_str == "false" {
+                    // return Ok(data);
+                    data_new.push(data_item);
+                } else {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!("Checkbox value needs to be \"true\" or \"false\"")),
+                        )
+                    );
+                }
             }
         }
+        return Ok(data_new)
     }
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
         let field_config = self.config.clone();
@@ -127,71 +136,80 @@ impl StorageColumn for NumberColumn {
         // No special attributes so far for small text field
         return Ok(config)
     }
-    fn validate(&self, data: &String) -> Result<String, PlanetError> {
+    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, PlanetError> {
         let data = data.clone();
         let field_config = self.config.clone();
-        let required = field_config.required.unwrap();
-        let name = field_config.name.unwrap();
-        if data == String::from("") && required == true {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!(
-                        "Field {}{}{} is required", 
-                        String::from("\"").blue(), name.blue(), String::from("\"").blue()
-                    )),
-                )
-            );
-        } else {
-            let value_str = data.as_str();
-            let result = i32::from_str(value_str);
-            match result {
-                Ok(_) => {
-                    let value_int = result.unwrap().to_usize().unwrap();
-                    let minimum = field_config.minimum;
-                    let maximum = field_config.maximum;
-                    if minimum.is_some() {
-                        let minimum = minimum.unwrap();
-                        let minimum: usize = FromStr::from_str(&minimum).unwrap();
-                        if value_int < minimum {
-                            return Err(
-                                PlanetError::new(
-                                    500, 
-                                    Some(tr!(
-                                        "Number value \"{}\" is smaller than minimum, \"{}\"", 
-                                        &value_int, &minimum
-                                    )),
-                                )
-                            );
+        let set_validate = validate_set(&field_config, &data);
+        if set_validate.is_err() {
+            let error = set_validate.unwrap_err();
+            return Err(error)
+        }
+        let required = *&field_config.required.unwrap();
+        let name = &field_config.clone().name.unwrap().clone();
+        let mut data_new: Vec<String> = Vec::new();
+        let minimum = field_config.minimum.as_ref();
+        let maximum = field_config.maximum.as_ref();
+        for data_item in data {
+            if data_item == String::from("") && required == true {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!(
+                            "Field {}{}{} is required", 
+                            String::from("\"").blue(), name.blue(), String::from("\"").blue()
+                        )),
+                    )
+                );
+            } else {
+                let value_str = data_item.as_str();
+                let result = i32::from_str(value_str);
+                match result {
+                    Ok(_) => {
+                        let value_int = result.unwrap().to_usize().unwrap();
+                        if minimum.is_some() {
+                            let minimum = minimum.unwrap();
+                            let minimum: usize = FromStr::from_str(&minimum).unwrap();
+                            if value_int < minimum {
+                                return Err(
+                                    PlanetError::new(
+                                        500, 
+                                        Some(tr!(
+                                            "Number value \"{}\" is smaller than minimum, \"{}\"", 
+                                            &value_int, &minimum
+                                        )),
+                                    )
+                                );
+                            }
                         }
-                    }
-                    if maximum.is_some() {
-                        let maximum = maximum.unwrap();
-                        let maximum: usize = FromStr::from_str(&maximum).unwrap();
-                        if value_int > maximum {
-                            return Err(
-                                PlanetError::new(
-                                    500, 
-                                    Some(tr!(
-                                        "Number value \"{}\" is bigger than maximum, \"{}\"", 
-                                        &value_int, &maximum
-                                    )),
-                                )
-                            );
+                        if maximum.is_some() {
+                            let maximum = maximum.unwrap();
+                            let maximum: usize = FromStr::from_str(&maximum).unwrap();
+                            if value_int > maximum {
+                                return Err(
+                                    PlanetError::new(
+                                        500, 
+                                        Some(tr!(
+                                            "Number value \"{}\" is bigger than maximum, \"{}\"", 
+                                            &value_int, &maximum
+                                        )),
+                                    )
+                                );
+                            }
                         }
+                        data_new.push(data_item);
+                    },
+                    Err(_) => {
+                        return Err(
+                            PlanetError::new(
+                                500, 
+                                Some(tr!("I could not process as number: \"{}\"", &data_item)),
+                            )
+                        );
                     }
-                    return Ok(data);
-                },
-                Err(_) => {
-                    return Err(
-                        PlanetError::new(
-                            500, 
-                            Some(tr!("I could not process as number: \"{}\"", data)),
-                        )
-                    );
                 }
             }
         }
+        return Ok(data_new)
     }
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
         let field_config = self.config.clone();
@@ -262,16 +280,27 @@ impl StorageColumn for CurrencyColumn {
         }
         return Ok(config)
     }
-    fn validate(&self, data: &String) -> Result<String, PlanetError> {
-        let mut data = data.clone();
+    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, PlanetError> {
+        let data = data.clone();
         let config = self.config.clone();
+        let set_validate = validate_set(&config, &data);
+        if set_validate.is_err() {
+            let error = set_validate.unwrap_err();
+            return Err(error)
+        }
+        let column_name = config.name.unwrap_or_default();
         let number_decimals = config.number_decimals;
         let currency_symbol = config.currency_symbol;
         if number_decimals.is_none() {
             return Err(
                 PlanetError::new(
                     500, 
-                    Some(tr!("Field not configured for currency \"{}\"", data.clone())),
+                    Some(
+                        tr!(
+                            "Column \"{}\" not configured for currency, number decimals not configured.", 
+                            &column_name
+                        )
+                    ),
                 )
             );
         }
@@ -279,63 +308,65 @@ impl StorageColumn for CurrencyColumn {
         let number_decimals: u32 = number_decimals.to_u32().unwrap();
         let currency_symbol = currency_symbol.unwrap();
         let currency_symbol = currency_symbol.as_str();
+        let mut data_new: Vec<String> = Vec::new();
         let expr = &RE_CURRENCY;
-        let match_data = data.clone();
-        let is_valid = expr.is_match(&match_data);
-        if !is_valid {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!("Validation error on currency \"{}\"", data.clone())),
-                )
-            );
-        }
-        let captures = expr.captures(&match_data).unwrap();
-        let amount_wrap = captures.name("amount");
-        let symbol_pre_wrap = captures.name("symbol_pre");
-        let symbol_post_wrap = captures.name("symbol_post");
-        let mut amount_string: String = String::from("");
-        // eprintln!("CurrencyColumn.validate :: before symbol replace: {}", &data);
-        if symbol_pre_wrap.is_some() || symbol_post_wrap.is_some() {
-            // I have symbol on sent data
-            if symbol_pre_wrap.is_some() {
-                let symbol_pre = symbol_pre_wrap.unwrap().as_str();
-                // eprintln!("CurrencyColumn.validate :: [regex] symbol_pre: {}", symbol_pre);
-                data = data.clone().replace(symbol_pre, "");
-            }
-            if symbol_post_wrap.is_some() {
-                let symbol_post = symbol_post_wrap.unwrap().as_str();
-                // eprintln!("CurrencyColumn.validate :: [regex] symbol_post: {}", symbol_post);
-                data = data.clone().replace(symbol_post, "");
-            }
-        }
-        data = data.trim().to_string();
-        // eprintln!("CurrencyColumn.validate :: after symbol replace: {}", &data);
-        if amount_wrap.is_some() {
-            // Might be 7658.45 or 7658 or $7658. Need to get number without the currency symbol
-            let amount_str = amount_wrap.unwrap().as_str();
-            // eprintln!("CurrencyColumn.validate :: [regex] amount_str: {}", amount_str);
-            // 79876.45
-            // format amount to have number decimals from config
-            let amount = Decimal::from_str(amount_str);
-            if amount.is_err() {
+        for mut data_item in data {
+            let match_data = data_item.clone();
+            let is_valid = expr.is_match(&match_data);
+            if !is_valid {
                 return Err(
                     PlanetError::new(
                         500, 
-                        Some(tr!("Validation error on currency \"{}\"", data.clone())),
+                        Some(tr!("Validation error on currency \"{}\"", data_item.clone())),
                     )
                 );
             }
-            let amount = amount.unwrap().round_dp(number_decimals);
-            // amount_string = amount.to_string();
-            let number_decimals = number_decimals.to_usize().unwrap();
-            amount_string = format!("{:.1$}", &amount, number_decimals);
+            let captures = expr.captures(&match_data).unwrap();
+            let amount_wrap = captures.name("amount");
+            let symbol_pre_wrap = captures.name("symbol_pre");
+            let symbol_post_wrap = captures.name("symbol_post");
+            let mut amount_string: String = String::from("");
+            // eprintln!("CurrencyColumn.validate :: before symbol replace: {}", &data);
+            if symbol_pre_wrap.is_some() || symbol_post_wrap.is_some() {
+                // I have symbol on sent data
+                if symbol_pre_wrap.is_some() {
+                    let symbol_pre = symbol_pre_wrap.unwrap().as_str();
+                    // eprintln!("CurrencyColumn.validate :: [regex] symbol_pre: {}", symbol_pre);
+                    data_item = data_item.clone().replace(symbol_pre, "");
+                }
+                if symbol_post_wrap.is_some() {
+                    let symbol_post = symbol_post_wrap.unwrap().as_str();
+                    // eprintln!("CurrencyColumn.validate :: [regex] symbol_post: {}", symbol_post);
+                    data_item = data_item.clone().replace(symbol_post, "");
+                }
+            }
+            data_item = data_item.trim().to_string();
+            // eprintln!("CurrencyColumn.validate :: after symbol replace: {}", &data);
+            if amount_wrap.is_some() {
+                // Might be 7658.45 or 7658 or $7658. Need to get number without the currency symbol
+                let amount_str = amount_wrap.unwrap().as_str();
+                // eprintln!("CurrencyColumn.validate :: [regex] amount_str: {}", amount_str);
+                // 79876.45
+                // format amount to have number decimals from config
+                let amount = Decimal::from_str(amount_str);
+                if amount.is_err() {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!("Validation error on currency \"{}\"", data_item.clone())),
+                        )
+                    );
+                }
+                let amount = amount.unwrap().round_dp(number_decimals);
+                // amount_string = amount.to_string();
+                let number_decimals = number_decimals.to_usize().unwrap();
+                amount_string = format!("{:.1$}", &amount, number_decimals);
+            }
+            // eprintln!("CurrencyColumn.validate :: amount_string: {}", &amount_string);
+            // data needs to have right number of decimals and the currency symbol
+            data_new.push(format!("{}{}", currency_symbol, &amount_string));
         }
-        // eprintln!("CurrencyColumn.validate :: amount_string: {}", &amount_string);
-        // data needs to have right number of decimals and the currency symbol
-        
-        data = format!("{}{}", currency_symbol, &amount_string);
-        return Ok(data)
+        return Ok(data_new)
     }
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
         let field_config = self.config.clone();
@@ -396,35 +427,44 @@ impl StorageColumn for PercentageColumn {
         }
         return Ok(config)
     }
-    fn validate(&self, data: &String) -> Result<String, PlanetError> {
-        let mut data = data.clone();
+    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, PlanetError> {
+        let data = data.clone();
         let config = self.config.clone();
+        let set_validate = validate_set(&config, &data);
+        if set_validate.is_err() {
+            let error = set_validate.unwrap_err();
+            return Err(error)
+        }
+        let column_name = config.name.unwrap_or_default();
         let number_decimals = config.number_decimals;
         if number_decimals.is_none() {
             return Err(
                 PlanetError::new(
                     500, 
-                    Some(tr!("Field not configured for percentage \"{}\"", data.clone())),
+                    Some(tr!("Column not configured for percentage \"{}\"", &column_name)),
                 )
             );            
         }
         let number_decimals = number_decimals.unwrap();
         let number_decimals: u32 = number_decimals.to_u32().unwrap();
-        let amount_str = data.as_str();
-        // format amount to have number decimals from config
-        let amount = Decimal::from_str(amount_str);
-        if amount.is_err() {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!("Validation error on percentage \"{}\"", data.clone())),
-                )
-            );
+        let mut data_new: Vec<String> = Vec::new();
+        for data_item in data {
+            let amount_str = data_item.as_str();
+            // format amount to have number decimals from config
+            let amount = Decimal::from_str(amount_str);
+            if amount.is_err() {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Validation error on percentage \"{}\"", data_item.clone())),
+                    )
+                );
+            }
+            let amount = amount.unwrap().round_dp(number_decimals);
+            let number_decimals = number_decimals.to_usize().unwrap();
+            data_new.push(format!("{:.1$}", &amount, number_decimals));
         }
-        let amount = amount.unwrap().round_dp(number_decimals);
-        let number_decimals = number_decimals.to_usize().unwrap();
-        data = format!("{:.1$}", &amount, number_decimals);
-        return Ok(data)
+        return Ok(data_new)
     }
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
         let field_config = self.config.clone();
@@ -484,7 +524,7 @@ impl StorageColumn for GenerateNumberColumn {
         }
         return Ok(config)
     }
-    fn validate(&self, _data: &String) -> Result<String, PlanetError> {
+    fn validate(&self, _data: &Vec<String>) -> Result<Vec<String>, PlanetError> {
         let config = self.config.clone();
         let mut folder = self.folder.clone().unwrap();
         let db_folder = self.db_folder.clone().unwrap();
@@ -504,7 +544,9 @@ impl StorageColumn for GenerateNumberColumn {
                 folder.data_objects = Some(data_objects);
                 let result = db_folder.update(&folder);
                 if result.is_ok() {
-                    return Ok(sequence.to_string())
+                    let mut sequence_list: Vec<String> = Vec::new();
+                    sequence_list.push(sequence.to_string());
+                    return Ok(sequence_list)
                 }
             }
         }
@@ -585,51 +627,61 @@ impl StorageColumn for RatingColumn {
         }
         return Ok(config)
     }
-    fn validate(&self, data: &String) -> Result<String, PlanetError> {
+    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, PlanetError> {
         let config = self.config.clone();
-        let minimum = config.minimum;
-        let maximum = config.maximum;
         let data = data.clone();
-        let test = &data.parse::<f64>();
+        let set_validate = validate_set(&config, &data);
+        if set_validate.is_err() {
+            let error = set_validate.unwrap_err();
+            return Err(error)
+        }
         let column_name = config.name.unwrap_or_default();
-        if test.is_err() {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!("Column value {} for column \"{}\" is not a number.", &data, &column_name)),
-                )
-            )
-        }
-        let data_int: usize = FromStr::from_str(&data).unwrap();        
-        if minimum.is_some() {
-            let minimum = minimum.unwrap();
-            let minimum: usize = FromStr::from_str(&minimum).unwrap();
-            if data_int < minimum {
+        let minimum = config.minimum.as_ref();
+        let maximum = config.maximum.as_ref();
+        let mut data_new: Vec<String> = Vec::new();
+        for data_item in data {
+            let test = &data_item.parse::<f64>();
+            if test.is_err() {
                 return Err(
                     PlanetError::new(
                         500, 
-                        Some(tr!(
-                            "Rating for column \"{}\" is lower than minimum, {}.", 
-                            &column_name, &minimum)),
+                        Some(tr!("Column value {} for column \"{}\" is not a number.", 
+                        &data_item, &column_name)),
                     )
                 )
             }
-        }
-        if maximum.is_some() {
-            let maximum = maximum.unwrap();
-            let maximum: usize = FromStr::from_str(&maximum).unwrap();
-            if data_int > maximum {
-                return Err(
-                    PlanetError::new(
-                        500, 
-                        Some(tr!(
-                            "Rating for column \"{}\" is higher than maximum, {}.", 
-                            &column_name, &maximum)),
+            let data_int: usize = FromStr::from_str(&data_item).unwrap();
+            if minimum.is_some() {
+                let minimum = minimum.unwrap();
+                let minimum: usize = FromStr::from_str(&minimum).unwrap();
+                if data_int < minimum {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!(
+                                "Rating for column \"{}\" is lower than minimum, {}.", 
+                                &column_name, &minimum)),
+                        )
                     )
-                )
+                }
             }
+            if maximum.is_some() {
+                let maximum = maximum.unwrap();
+                let maximum: usize = FromStr::from_str(&maximum).unwrap();
+                if data_int > maximum {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!(
+                                "Rating for column \"{}\" is higher than maximum, {}.", 
+                                &column_name, &maximum)),
+                        )
+                    )
+                }
+            }
+            data_new.push(data_item);
         }
-        return Ok(data.clone())
+        return Ok(data_new)
     }
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
         let field_config = self.config.clone();

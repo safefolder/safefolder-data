@@ -21,6 +21,7 @@ use crate::storage::columns::{
     number::*,
     formula::*,
     reference::*,
+    structure::*,
     StorageColumn,
     ObjectStorageColumn,
 };
@@ -186,7 +187,10 @@ pub struct ColumnConfig {
     pub sequence: Option<String>,
     pub maximum: Option<String>,
     pub minimum: Option<String>,
+    pub set_maximum: Option<String>,
+    pub set_minimum: Option<String>,
     pub max_length: Option<String>,
+    pub is_set: Option<String>,
 }
 
 impl ConfigStorageColumn for ColumnConfig {
@@ -217,7 +221,10 @@ impl ConfigStorageColumn for ColumnConfig {
             sequence: None,
             maximum: None,
             minimum: None,
+            set_maximum: None,
+            set_minimum: None,
             max_length: None,
+            is_set: None,
         };
         if options.is_some() {
             object.options = Some(options.unwrap());
@@ -274,7 +281,10 @@ impl ConfigStorageColumn for ColumnConfig {
                     sequence: None,
                     maximum: None,
                     minimum: None,
+                    set_maximum: None,
+                    set_minimum: None,
                     max_length: None,
+                    is_set: None,
                 };
                 return Some(column_config);
             }
@@ -371,13 +381,23 @@ impl ConfigStorageColumn for ColumnConfig {
                 
                 column_config.id = Some(column_id.clone());
                 column_config.name = Some(column_name.clone());
-                column_config.column_type = Some(column_config_map.get(COLUMN_TYPE).unwrap().clone());                
+                column_config.column_type = Some(column_config_map.get(COLUMN_TYPE).unwrap().clone());
                 column_config.required = Some(required);
                 column_config.api_version = Some(column_config_map.get(API_VERSION).unwrap().clone());
                 column_config.indexed = Some(indexed);
                 column_config.many = Some(many);
                 // eprintln!("parse_from_db :: column_type_str: {}", column_type_str);
-                
+
+                let is_set = column_config_map.get(IS_SET);
+                if is_set.is_some() {
+                    let is_set = is_set.unwrap().clone();
+                    if is_set == String::from("true") || is_set == String::from("1") {
+                        // Update with SetColumn properties / attributes, and later on the item column config
+                        let mut obj = SetColumn::defaults(&column_config);
+                        column_config = obj.build_config(column_config_map)?;
+                    }
+                }
+
                 match column_type_str {
                     COLUMN_TYPE_SMALL_TEXT => {
                         let mut obj = SmallTextColumn::defaults(&column_config);
@@ -492,7 +512,6 @@ impl ConfigStorageColumn for ColumnConfig {
                         column_config = obj.build_config(column_config_map)?;
                     },
                     _ => {}
-
                 }
                 let _ = &map_columns_by_id.insert(column_id, column_config.clone());
                 let _ = &map_columns_by_name.insert(column_name.clone(), column_config.clone());
@@ -590,6 +609,15 @@ impl ConfigStorageColumn for ColumnConfig {
         map.insert(String::from(API_VERSION), column_config.api_version.unwrap_or_default());
         map.insert(String::from(INDEXED), indexed.to_string());
         map.insert(String::from(MANY), many.to_string());
+
+        let is_set = column_config.is_set;
+        if is_set.is_some() {
+            let is_set = is_set.unwrap().clone();
+            if is_set == String::from("true") || is_set == String::from("1") {
+                // Update with SetColumn properties / attributes, and later on the item column config
+                map = SetColumn::defaults(&propertty_config_).update_config_map(&map)?;
+            }
+        }
 
         match column_type_str {
             COLUMN_TYPE_SMALL_TEXT => {
