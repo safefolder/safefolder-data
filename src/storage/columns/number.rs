@@ -31,7 +31,7 @@ impl CheckBoxColumn {
     }
 }
 impl StorageColumn for CheckBoxColumn {
-    fn update_config_map(
+    fn create_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
@@ -39,7 +39,7 @@ impl StorageColumn for CheckBoxColumn {
         // No special attributes so far for small text field
         return Ok(field_config_map)
     }
-    fn build_config(
+    fn get_config(
         &mut self, 
         _: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {
@@ -120,7 +120,7 @@ impl NumberColumn {
     }
 }
 impl StorageColumn for NumberColumn {
-    fn update_config_map(
+    fn create_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
@@ -128,7 +128,7 @@ impl StorageColumn for NumberColumn {
         // No special attributes so far for small text field
         return Ok(field_config_map)
     }
-    fn build_config(
+    fn get_config(
         &mut self, 
         _: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {
@@ -240,7 +240,7 @@ impl CurrencyColumn {
     }
 }
 impl StorageColumn for CurrencyColumn {
-    fn update_config_map(
+    fn create_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
@@ -262,7 +262,7 @@ impl StorageColumn for CurrencyColumn {
         }
         return Ok(field_config_map)
     }
-    fn build_config(
+    fn get_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {
@@ -397,7 +397,7 @@ impl PercentageColumn {
     }
 }
 impl StorageColumn for PercentageColumn {
-    fn update_config_map(
+    fn create_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
@@ -414,7 +414,7 @@ impl StorageColumn for PercentageColumn {
         field_config_map.insert(NUMBER_DECIMALS.to_string(), number_decimals_string);
         return Ok(field_config_map)
     }
-    fn build_config(
+    fn get_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {
@@ -504,7 +504,7 @@ impl GenerateNumberColumn {
     }
 }
 impl StorageColumn for GenerateNumberColumn {
-    fn update_config_map(
+    fn create_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
@@ -512,7 +512,7 @@ impl StorageColumn for GenerateNumberColumn {
         field_config_map.insert(SEQUENCE.to_string(), String::from("0"));
         return Ok(field_config_map)
     }
-    fn build_config(
+    fn get_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {
@@ -589,7 +589,7 @@ impl RatingColumn {
     }
 }
 impl StorageColumn for RatingColumn {
-    fn update_config_map(
+    fn create_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
@@ -610,7 +610,7 @@ impl StorageColumn for RatingColumn {
         }
         return Ok(field_config_map)
     }
-    fn build_config(
+    fn get_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {

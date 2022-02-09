@@ -1,3 +1,4 @@
+use serde_yaml;
 use std::collections::BTreeMap;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
@@ -21,7 +22,7 @@ impl SetColumn {
     }
 }
 impl StorageColumn for SetColumn {
-    fn update_config_map(
+    fn create_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
@@ -40,7 +41,7 @@ impl StorageColumn for SetColumn {
         field_config_map.insert(IS_SET.to_string(), String::from("true"));
         return Ok(field_config_map)
     }
-    fn build_config(
+    fn get_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {
@@ -63,6 +64,69 @@ impl StorageColumn for SetColumn {
         // How to validate max and min???
         // Do later
         return Ok(data)
+    }
+    fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
+        let field_config = self.config.clone();
+        let field_name = field_config.name.unwrap();
+        let mut yaml_string = yaml_string.clone();
+        let field = &field_name.truecolor(
+            YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
+        );
+        let value = format!("{}", value.to_string().truecolor(
+            YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
+        ));
+        let value = format!("{}", value.to_string().truecolor(
+            YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
+        ));
+        yaml_string.push_str(format!("  {field}: {value}\n", field=field, value=value).as_str());
+        return yaml_string;
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ObjectColumn {
+    pub config: ColumnConfig
+}
+impl ObjectColumn {
+    pub fn defaults(field_config: &ColumnConfig) -> Self {
+        let field_config = field_config.clone();
+        let field_obj = Self{
+            config: field_config
+        };
+        return field_obj
+    }
+}
+impl StorageColumn for ObjectColumn {
+    fn create_config(
+        &mut self, 
+        field_config_map: &BTreeMap<String, String>,
+    ) -> Result<BTreeMap<String, String>, PlanetError> {
+        return Ok(field_config_map.clone())
+    }
+    fn get_config(
+        &mut self, 
+        _field_config_map: &BTreeMap<String, String>,
+    ) -> Result<ColumnConfig, PlanetError> {
+        let config = self.config.clone();
+        return Ok(config)
+    }
+    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, PlanetError> {
+        let data = data.clone();
+        for data_item in data.clone() {
+            eprintln!("ObjectColumn.validate :: data_item: {}", &data_item);
+            let result: Result<HashMap<String, String>, serde_yaml::Error> = serde_yaml::from_str(&data_item);
+            if result.is_err() {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Object could not be parsed. Structure needs to be a map of 
+                        string to string in YAML format"))
+                    )
+                )
+            }
+            eprintln!("ObjectColumn.validate :: object: {:#?}", result.unwrap());
+        }
+        return Ok(data.clone())
     }
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
         let field_config = self.config.clone();

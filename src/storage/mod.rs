@@ -18,12 +18,11 @@ pub trait ConfigStorageColumn {
         options: Option<Vec<String>>
     ) -> ColumnConfig;
     fn version() -> Option<String>;
-    fn api_version() -> Option<String>;
     fn is_valid(&self) -> Result<(), ValidationErrors>;
     fn generate_id() -> Option<String> {
         return generate_id();
     }
-    fn map_object_db(
+    fn create_config(
         &self, 
         planet_context: &PlanetContext,
         context: &Context,
@@ -37,7 +36,7 @@ pub trait ConfigStorageColumn {
         folder: &DbData
     ) -> Result<BTreeMap<String, ColumnConfig>, PlanetError>;
     fn map_collections_db(&self) -> Result<BTreeMap<String, Vec<BTreeMap<String, String>>>, PlanetError>;
-    fn parse_from_db(
+    fn get_config(
         planet_context: &PlanetContext,
         context: &Context,
         db_data: &DbData

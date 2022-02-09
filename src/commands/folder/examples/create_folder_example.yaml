@@ -1,5 +1,5 @@
 ---
-command: CREATE FOLDER "Super Folder 13"
+command: CREATE FOLDER "Super Folder 2"
 name:
   column_type: Small Text
 text_search:
@@ -52,3 +52,6 @@ columns:
     is_set: true
     set_minimum: 1
     set_maximum: 8
+  - name: Meta
+    column_type: Object
+    is_set: true

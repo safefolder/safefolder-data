@@ -45,16 +45,16 @@ Table fields
 * EmailColumn                     [done]
 * UrlColumn                       [done]
 * RatingColumn                    [done]
+* SetColumn                       [done] - For example, tags
+* ObjectColumn                    [doing] - I may need this so commands can store unstructured data. I 
+    serialize as YAML format.
 
 -
 These are not complex:
 
-* SetColumn                       [todo] - For example, tags
-* ObjectColumn                    [todo]
-
-* SubFolderColumn                 [todo]: This links to another db file with some media data: photo, etc...
-    In this case we also map into table config, so I can easily have list of folders for this table. I only 
-    do one level. Here I define background image for the folder.
+* SubFolderColumn                 [doing]: This links to another db file with some media data: photo, etc...
+    In this case we also map into table config, so I can easily have list of folders for this table.
+    Here I define background image for the folder.
 * StatsColumn                     [todo]: Statistics on linked fields with formula support: AVERAGE, 
     COUNT, COUNTA, COUNTALL, SUM, MAX, AND, OR, XOR, CONCATENATE. I execute these formulas once I post 
     processed the links and references. I would need to parse in a way to use those number functions.
@@ -79,11 +79,11 @@ Then on the app, we have a visual way to add functions, helper content, etc...
 */
 
 pub trait StorageColumn {
-    fn update_config_map(
+    fn create_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, PlanetError>;
-    fn build_config(
+    fn get_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError>;
@@ -148,13 +148,13 @@ pub fn validate_set(config: &ColumnConfig, data: &Vec<String>) -> Result<(), Pla
 }
 
 pub trait ObjectStorageColumn<'gb> {
-    fn update_config_map(
+    fn create_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
         properties_map: &HashMap<String, ColumnConfig>,
         table_name: &String,
     ) -> Result<BTreeMap<String, String>, PlanetError>;
-    fn build_config(
+    fn get_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError>;
@@ -166,7 +166,7 @@ pub trait ObjectStorageColumn<'gb> {
 }
 
 pub trait FormulaStorageColumn {
-    fn update_config_map(
+    fn create_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
         field_name_map: &BTreeMap<String, String>,
@@ -174,7 +174,7 @@ pub trait FormulaStorageColumn {
         db_table: &TreeFolder,
         table_name: &String,
     ) -> Result<BTreeMap<String, String>, PlanetError>;
-    fn build_config(
+    fn get_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError>;

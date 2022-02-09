@@ -70,6 +70,7 @@ pub const SET_MAXIMUM: &str = "set_maximum";
 pub const SET_MINIMUM: &str = "set_minmum";
 pub const MAX_LENGTH: &str = "max_length";
 pub const IS_SET: &str = "is_set";
+pub const OBJECT_SCHEMA: &str = "object_schema";
 
 // Column Types
 pub const COLUMN_TYPE_SMALL_TEXT: &str = "Small Text";
@@ -97,6 +98,7 @@ pub const COLUMN_TYPE_EMAIL: &str = "Email";
 pub const COLUMN_TYPE_URL: &str = "Url";
 pub const COLUMN_TYPE_RATING: &str = "Rating";
 pub const COLUMN_TYPE_SET: &str = "Set";
+pub const COLUMN_TYPE_OBJECT: &str = "Object";
 
 // Date Format
 pub const DATE_FORMAT_FRIENDLY: &str = "Friendly";

@@ -39,7 +39,7 @@ impl<'gb> LinkColumn<'gb> {
     }
 }
 impl<'gb> ObjectStorageColumn<'gb> for LinkColumn<'gb> {
-    fn update_config_map(
+    fn create_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
         _: &HashMap<String, ColumnConfig>,
@@ -84,7 +84,7 @@ impl<'gb> ObjectStorageColumn<'gb> for LinkColumn<'gb> {
         }
         return Ok(field_config_map)
     }
-    fn build_config(
+    fn get_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {
@@ -218,7 +218,7 @@ impl<'gb> ReferenceColumn<'gb> {
     }
 }
 impl<'gb> ObjectStorageColumn<'gb> for ReferenceColumn<'gb> {
-    fn update_config_map(
+    fn create_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
         properties_map: &HashMap<String, ColumnConfig>,
@@ -248,7 +248,7 @@ impl<'gb> ObjectStorageColumn<'gb> for ReferenceColumn<'gb> {
                 )
             );
         }
-        //eprintln!("Reference.update_config_map :: related_column: {}", &related_column);
+        //eprintln!("Reference.create_config :: related_column: {}", &related_column);
         let related = properties_map.get(&related_column);
         if related.is_some() {
             let related = related.unwrap().clone();
@@ -284,10 +284,10 @@ impl<'gb> ObjectStorageColumn<'gb> for ReferenceColumn<'gb> {
             let formula_serialized = serde_yaml::to_string(&formula_compiled).unwrap();
             field_config_map.insert(String::from(FORMULA_COMPILED), formula_serialized);
         }
-        //eprintln!("Reference.update_config_map :: end field_config_map: {:#?}", &field_config_map);
+        //eprintln!("Reference.create_config :: end field_config_map: {:#?}", &field_config_map);
         return Ok(field_config_map)
     }
-    fn build_config(
+    fn get_config(
         &mut self, 
         _: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {

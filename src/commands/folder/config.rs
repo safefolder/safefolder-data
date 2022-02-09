@@ -168,9 +168,6 @@ pub struct ColumnConfig {
     #[serde(default="ColumnConfig::version")]
     pub version: Option<String>,
     pub required: Option<bool>,
-    #[validate(required)]
-    #[serde(default="ColumnConfig::api_version")]
-    pub api_version: Option<String>,
     pub indexed: Option<bool>,
     pub many: Option<bool>,
     pub options: Option<Vec<String>>,
@@ -204,7 +201,6 @@ impl ConfigStorageColumn for ColumnConfig {
             default: Some(String::from("")),
             version: Some(String::from(FIELD_VERSION)),
             required: Some(false),
-            api_version: Some(String::from(FIELD_API_VERSION)),
             indexed: Some(true),
             options: None,
             many: None,
@@ -234,9 +230,6 @@ impl ConfigStorageColumn for ColumnConfig {
     fn version() -> Option<String> {
         return Some(String::from(FIELD_VERSION));
     }
-    fn api_version() -> Option<String> {
-        return Some(String::from(FIELD_API_VERSION));
-    }
     /// Checks that ColumnConfig passes validations
     fn is_valid(&self) -> Result<(), ValidationErrors> {
         match self.validate() {
@@ -264,7 +257,6 @@ impl ConfigStorageColumn for ColumnConfig {
                     default: Some(column_config_map.get(DEFAULT).unwrap().clone()),
                     version: Some(column_config_map.get(VERSION).unwrap().clone()),
                     required: Some(required),
-                    api_version: Some(column_config_map.get(API_VERSION).unwrap().clone()),
                     indexed: Some(indexed),
                     many: Some(many),
                     options: None,
@@ -296,7 +288,7 @@ impl ConfigStorageColumn for ColumnConfig {
         context: &Context,
         table: &DbData
     ) -> Result<BTreeMap<String, ColumnConfig>, PlanetError> {
-        let columns = ColumnConfig::parse_from_db(
+        let columns = ColumnConfig::get_config(
             planet_context,
             context,
             table
@@ -317,12 +309,12 @@ impl ConfigStorageColumn for ColumnConfig {
             )
         )
     }
-    fn parse_from_db(
+    fn get_config(
         planet_context: &PlanetContext,
         context: &Context,
         db_data: &DbData
     ) -> Result<Vec<ColumnConfig>, PlanetError> {
-        // eprintln!("parse_from_db...");
+        // eprintln!("get_config...");
         // let select_data: Option<Vec<(String, String)>> = None;
         let db_data = db_data.clone();
         let mut columns: Vec<ColumnConfig> = Vec::new();
@@ -330,9 +322,9 @@ impl ConfigStorageColumn for ColumnConfig {
         let data_collections = db_data.data_collections;
         // let data = db_data.data;
         let data_objects = db_data.data_objects;
-        // eprintln!("parse_from_db :: data: {:#?}", &data);
-        // eprintln!("parse_from_db :: data_objects: {:#?}", &data_objects);
-        // eprintln!("parse_from_db :: data_collections: {:#?}", &data_collections);
+        // eprintln!("get_config :: data: {:#?}", &data);
+        // eprintln!("get_config :: data_objects: {:#?}", &data_objects);
+        // eprintln!("get_config :: data_collections: {:#?}", &data_collections);
 
         // 1. Go through data_objects and make map column names column_name -> ColumnConfig. Also
         //   vector for order in 
@@ -383,10 +375,9 @@ impl ConfigStorageColumn for ColumnConfig {
                 column_config.name = Some(column_name.clone());
                 column_config.column_type = Some(column_config_map.get(COLUMN_TYPE).unwrap().clone());
                 column_config.required = Some(required);
-                column_config.api_version = Some(column_config_map.get(API_VERSION).unwrap().clone());
                 column_config.indexed = Some(indexed);
                 column_config.many = Some(many);
-                // eprintln!("parse_from_db :: column_type_str: {}", column_type_str);
+                // eprintln!("get_config :: column_type_str: {}", column_type_str);
 
                 let is_set = column_config_map.get(IS_SET);
                 if is_set.is_some() {
@@ -394,58 +385,58 @@ impl ConfigStorageColumn for ColumnConfig {
                     if is_set == String::from("true") || is_set == String::from("1") {
                         // Update with SetColumn properties / attributes, and later on the item column config
                         let mut obj = SetColumn::defaults(&column_config);
-                        column_config = obj.build_config(column_config_map)?;
+                        column_config = obj.get_config(column_config_map)?;
                     }
                 }
 
                 match column_type_str {
                     COLUMN_TYPE_SMALL_TEXT => {
                         let mut obj = SmallTextColumn::defaults(&column_config);
-                        column_config = obj.build_config(column_config_map)?;
+                        column_config = obj.get_config(column_config_map)?;
                     },
                     COLUMN_TYPE_LONG_TEXT => {
                         let mut obj = LongTextColumn::defaults(&column_config);
-                        column_config = obj.build_config(column_config_map)?;
+                        column_config = obj.get_config(column_config_map)?;
                     },
                     COLUMN_TYPE_NUMBER => {
                         let mut obj = NumberColumn::defaults(&column_config);
-                        column_config = obj.build_config(column_config_map)?;
+                        column_config = obj.get_config(column_config_map)?;
                     },
                     COLUMN_TYPE_CHECKBOX => {
                         let mut obj = CheckBoxColumn::defaults(&column_config);
-                        column_config = obj.build_config(column_config_map)?;
+                        column_config = obj.get_config(column_config_map)?;
                     },
                     COLUMN_TYPE_DATE => {
                         let mut obj = DateColumn::defaults(&column_config);
-                        column_config = obj.build_config(column_config_map)?;
+                        column_config = obj.get_config(column_config_map)?;
                     },
                     COLUMN_TYPE_FORMULA => {
                         let mut obj = FormulaColumn::defaults(&column_config);
-                        column_config = obj.build_config(column_config_map)?;
+                        column_config = obj.get_config(column_config_map)?;
                     },
                     COLUMN_TYPE_SELECT => {
                         let mut obj = SelectColumn::defaults(&column_config, None);
-                        column_config = obj.build_config(column_config_map)?;
+                        column_config = obj.get_config(column_config_map)?;
                     },
                     COLUMN_TYPE_DURATION => {
                         let mut obj = DurationColumn::defaults(&column_config);
-                        column_config = obj.build_config(column_config_map)?;
+                        column_config = obj.get_config(column_config_map)?;
                     },
                     COLUMN_TYPE_CREATED_TIME => {
                         let mut obj = AuditDateColumn::defaults(&column_config);
-                        column_config = obj.build_config(column_config_map)?;
+                        column_config = obj.get_config(column_config_map)?;
                     },
                     COLUMN_TYPE_LAST_MODIFIED_TIME => {
                         let mut obj = AuditDateColumn::defaults(&column_config);
-                        column_config = obj.build_config(column_config_map)?;
+                        column_config = obj.get_config(column_config_map)?;
                     },
                     COLUMN_TYPE_CURRENCY => {
                         let mut obj = CurrencyColumn::defaults(&column_config);
-                        column_config = obj.build_config(column_config_map)?;
+                        column_config = obj.get_config(column_config_map)?;
                     },
                     COLUMN_TYPE_PERCENTAGE => {
                         let mut obj = PercentageColumn::defaults(&column_config);
-                        column_config = obj.build_config(column_config_map)?;
+                        column_config = obj.get_config(column_config_map)?;
                     },
                     COLUMN_TYPE_LINK => {
                         let mut obj = LinkColumn::defaults(
@@ -455,7 +446,7 @@ impl ConfigStorageColumn for ColumnConfig {
                             None,
                             None
                         );
-                        column_config = obj.build_config(column_config_map)?;
+                        column_config = obj.get_config(column_config_map)?;
                     },
                     COLUMN_TYPE_REFERENCE => {
                         let mut obj = ReferenceColumn::defaults(
@@ -464,20 +455,20 @@ impl ConfigStorageColumn for ColumnConfig {
                             &column_config,
                             None,
                         );
-                        column_config = obj.build_config(column_config_map)?;
+                        column_config = obj.get_config(column_config_map)?;
                     },
                     COLUMN_TYPE_TEXT => {
                         let mut obj = TextColumn::defaults(
                             &column_config,
                             None
                         );
-                        column_config = obj.build_config(column_config_map)?;
+                        column_config = obj.get_config(column_config_map)?;
                     },
                     COLUMN_TYPE_GENERATE_ID => {
                         let mut obj = GenerateIdColumn::defaults(
                             &column_config,
                         );
-                        column_config = obj.build_config(column_config_map)?;
+                        column_config = obj.get_config(column_config_map)?;
                     },
                     COLUMN_TYPE_GENERATE_NUMBER => {
                         let mut obj = GenerateNumberColumn::defaults(
@@ -485,31 +476,37 @@ impl ConfigStorageColumn for ColumnConfig {
                             None,
                             None
                         );
-                        column_config = obj.build_config(column_config_map)?;
+                        column_config = obj.get_config(column_config_map)?;
                     },
                     COLUMN_TYPE_PHONE => {
                         let mut obj = PhoneColumn::defaults(
                             &column_config,
                         );
-                        column_config = obj.build_config(column_config_map)?;
+                        column_config = obj.get_config(column_config_map)?;
                     },
                     COLUMN_TYPE_EMAIL => {
                         let mut obj = EmailColumn::defaults(
                             &column_config,
                         );
-                        column_config = obj.build_config(column_config_map)?;
+                        column_config = obj.get_config(column_config_map)?;
                     },
                     COLUMN_TYPE_URL => {
                         let mut obj = UrlColumn::defaults(
                             &column_config,
                         );
-                        column_config = obj.build_config(column_config_map)?;
+                        column_config = obj.get_config(column_config_map)?;
                     },
                     COLUMN_TYPE_RATING => {
                         let mut obj = RatingColumn::defaults(
                             &column_config,
                         );
-                        column_config = obj.build_config(column_config_map)?;
+                        column_config = obj.get_config(column_config_map)?;
+                    },
+                    COLUMN_TYPE_OBJECT => {
+                        let mut obj = ObjectColumn::defaults(
+                            &column_config,
+                        );
+                        column_config = obj.get_config(column_config_map)?;
                     },
                     _ => {}
                 }
@@ -526,7 +523,7 @@ impl ConfigStorageColumn for ColumnConfig {
             let data_collections = data_collections.unwrap();
             for data_collection_field in data_collections.keys() {
                 let data_collection_field = data_collection_field.clone();
-                // eprintln!("parse_from_db :: data_collection_field: {:?}", &data_collection_field);
+                // eprintln!("get_config :: data_collection_field: {:?}", &data_collection_field);
                 let data_collection_field_str = &data_collection_field.as_str();
                 let index = &data_collection_field_str.find("__");
                 if index.is_none() {
@@ -537,17 +534,17 @@ impl ConfigStorageColumn for ColumnConfig {
                 let pieces: Vec<&str> = pieces.clone().collect();
                 let column_name = pieces[0];
                 let attr_name = pieces[1];
-                // eprintln!("parse_from_db :: column_name: {:?} attr_name: {:?}", &column_name, &attr_name);
+                // eprintln!("get_config :: column_name: {:?} attr_name: {:?}", &column_name, &attr_name);
                 if &data_collection_field != COLUMN_IDS {
                     // select_options, and other structures
                     let field_list = 
                         data_collections.get(&data_collection_field).unwrap().clone();
-                    // eprintln!("parse_from_db :: field_list: {:?}", &field_list);
+                    // eprintln!("get_config :: field_list: {:?}", &field_list);
                     // I need to get the Status column config, get by name
-                    // eprintln!("parse_from_db :: data_collection_field: {}", &data_collection_field);
+                    // eprintln!("get_config :: data_collection_field: {}", &data_collection_field);
                     // data_collection_field: Status__select_options
                     if *&attr_name.to_lowercase() == SELECT_OPTIONS.to_lowercase() {
-                        // eprintln!("parse_from_db :: I get into the options process",);
+                        // eprintln!("get_config :: I get into the options process",);
                         let mut propertty_config_ = map_columns_by_name.get(column_name).unwrap().clone();
                         let column_id = &propertty_config_.id.clone().unwrap();
                         let column_id = column_id.clone();
@@ -556,7 +553,7 @@ impl ConfigStorageColumn for ColumnConfig {
                             let field_value = field_item.get(VALUE).unwrap().clone();
                             field_options.push(field_value);
                         }
-                        // eprintln!("parse_from_db :: options: {:#?}", &field_options);
+                        // eprintln!("get_config :: options: {:#?}", &field_options);
                         propertty_config_.options = Some(field_options);
                         map_columns_by_id.insert(column_id, propertty_config_);
                     }
@@ -569,7 +566,7 @@ impl ConfigStorageColumn for ColumnConfig {
             let data_collections_2 = data_collections_2.unwrap().clone();
             let field_ids = data_collections_2.get(COLUMN_IDS).unwrap();
             for field_id_data in field_ids.iter() {
-                // eprintln!("parse_from_db :: field_id_data: {:#?}", &field_id_data);
+                // eprintln!("get_config :: field_id_data: {:#?}", &field_id_data);
                 let column_id = &field_id_data.get(ID).unwrap().clone();
                 let column_config = map_columns_by_id.get(column_id).unwrap().clone();
                 let _ = &columns.push(column_config);
@@ -577,10 +574,10 @@ impl ConfigStorageColumn for ColumnConfig {
         }
 
         // }
-        // eprintln!("parse_from_db :: !!!!!!!!!!!!!!! columns: {:#?}", &columns);
+        // eprintln!("get_config :: !!!!!!!!!!!!!!! columns: {:#?}", &columns);
         return Ok(columns)
     }
-    fn map_object_db(
+    fn create_config(
         &self, 
         planet_context: &PlanetContext,
         context: &Context,
@@ -606,7 +603,6 @@ impl ConfigStorageColumn for ColumnConfig {
         map.insert(String::from(DEFAULT), column_config.default.unwrap_or_default());
         map.insert(String::from(VERSION), column_config.version.unwrap_or_default());
         map.insert(String::from(REQUIRED), required.to_string());
-        map.insert(String::from(API_VERSION), column_config.api_version.unwrap_or_default());
         map.insert(String::from(INDEXED), indexed.to_string());
         map.insert(String::from(MANY), many.to_string());
 
@@ -615,25 +611,25 @@ impl ConfigStorageColumn for ColumnConfig {
             let is_set = is_set.unwrap().clone();
             if is_set == String::from("true") || is_set == String::from("1") {
                 // Update with SetColumn properties / attributes, and later on the item column config
-                map = SetColumn::defaults(&propertty_config_).update_config_map(&map)?;
+                map = SetColumn::defaults(&propertty_config_).create_config(&map)?;
             }
         }
 
         match column_type_str {
             COLUMN_TYPE_SMALL_TEXT => {
-                map = SmallTextColumn::defaults(&propertty_config_).update_config_map(&map)?;
+                map = SmallTextColumn::defaults(&propertty_config_).create_config(&map)?;
             },
             COLUMN_TYPE_LONG_TEXT => {
-                map = LongTextColumn::defaults(&propertty_config_).update_config_map(&map)?;
+                map = LongTextColumn::defaults(&propertty_config_).create_config(&map)?;
             },
             COLUMN_TYPE_SELECT => {
-                map = SelectColumn::defaults(&propertty_config_, None).update_config_map(&map)?;
+                map = SelectColumn::defaults(&propertty_config_, None).create_config(&map)?;
             },
             COLUMN_TYPE_DATE => {
-                map = DateColumn::defaults(&propertty_config_).update_config_map(&map)?;
+                map = DateColumn::defaults(&propertty_config_).create_config(&map)?;
             },
             COLUMN_TYPE_FORMULA => {
-                map = FormulaColumn::defaults(&propertty_config_).update_config_map(
+                map = FormulaColumn::defaults(&propertty_config_).create_config(
                     &map,
                     &properties_map,
                     &db_folder,
@@ -641,19 +637,19 @@ impl ConfigStorageColumn for ColumnConfig {
                 )?;
             },
             COLUMN_TYPE_DURATION => {
-                map = DurationColumn::defaults(&propertty_config_).update_config_map(&map)?;
+                map = DurationColumn::defaults(&propertty_config_).create_config(&map)?;
             },
             COLUMN_TYPE_CREATED_TIME => {
-                map = AuditDateColumn::defaults(&propertty_config_).update_config_map(&map)?;
+                map = AuditDateColumn::defaults(&propertty_config_).create_config(&map)?;
             },
             COLUMN_TYPE_LAST_MODIFIED_TIME => {
-                map = AuditDateColumn::defaults(&propertty_config_).update_config_map(&map)?;
+                map = AuditDateColumn::defaults(&propertty_config_).create_config(&map)?;
             },
             COLUMN_TYPE_CURRENCY => {
-                map = CurrencyColumn::defaults(&propertty_config_).update_config_map(&map)?;
+                map = CurrencyColumn::defaults(&propertty_config_).create_config(&map)?;
             },
             COLUMN_TYPE_PERCENTAGE => {
-                map = PercentageColumn::defaults(&propertty_config_).update_config_map(&map)?;
+                map = PercentageColumn::defaults(&propertty_config_).create_config(&map)?;
             },
             COLUMN_TYPE_LINK => {
                 map = LinkColumn::defaults(
@@ -662,7 +658,7 @@ impl ConfigStorageColumn for ColumnConfig {
                     &propertty_config_,
                     Some(db_folder.clone()),
                     None
-                ).update_config_map(
+                ).create_config(
                     &map,
                     &properties_map,
                     &folder_name,
@@ -674,33 +670,36 @@ impl ConfigStorageColumn for ColumnConfig {
                     context,
                     &propertty_config_,
                     Some(db_folder.clone()),
-                ).update_config_map(
+                ).create_config(
                     &map,
                     &properties_map,
                     &folder_name
                 )?;
             },
             COLUMN_TYPE_GENERATE_ID => {
-                map = GenerateIdColumn::defaults(&propertty_config_).update_config_map(&map)?;
+                map = GenerateIdColumn::defaults(&propertty_config_).create_config(&map)?;
             },
             COLUMN_TYPE_GENERATE_NUMBER => {
                 map = GenerateNumberColumn::defaults(
                     &propertty_config_,
                     None,
                     None
-                ).update_config_map(&map)?;
+                ).create_config(&map)?;
             },
             COLUMN_TYPE_PHONE => {
-                map = PhoneColumn::defaults(&propertty_config_).update_config_map(&map)?;
+                map = PhoneColumn::defaults(&propertty_config_).create_config(&map)?;
             },
             COLUMN_TYPE_EMAIL => {
-                map = EmailColumn::defaults(&propertty_config_).update_config_map(&map)?;
+                map = EmailColumn::defaults(&propertty_config_).create_config(&map)?;
             },
             COLUMN_TYPE_URL => {
-                map = UrlColumn::defaults(&propertty_config_).update_config_map(&map)?;
+                map = UrlColumn::defaults(&propertty_config_).create_config(&map)?;
             },
             COLUMN_TYPE_RATING => {
-                map = RatingColumn::defaults(&propertty_config_).update_config_map(&map)?;
+                map = RatingColumn::defaults(&propertty_config_).create_config(&map)?;
+            },
+            COLUMN_TYPE_OBJECT => {
+                map = ObjectColumn::defaults(&propertty_config_).create_config(&map)?;
             },
             _ => {}
         }
@@ -972,10 +971,8 @@ pub fn create_minimum_column_map(
     column_type: &String,
 ) -> BTreeMap<String, String> {
     let mut map: BTreeMap<String, String> = BTreeMap::new();
-    let api_version = ColumnConfig::api_version().unwrap();
     map.insert(String::from(ID), column_id.clone());
     map.insert(String::from(NAME), column_name.clone());
     map.insert(String::from(COLUMN_TYPE), column_type.clone());
-    map.insert(String::from(API_VERSION), api_version);
     return map
 }

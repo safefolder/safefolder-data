@@ -24,7 +24,7 @@ impl FormulaColumn {
     }
 }
 impl FormulaColumn {
-    pub fn update_config_map(
+    pub fn create_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
         properties_map: &HashMap<String, ColumnConfig>,
@@ -59,7 +59,7 @@ impl FormulaColumn {
         }
         return Ok(field_config_map)
     }
-    pub fn build_config(
+    pub fn get_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {

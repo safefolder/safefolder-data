@@ -181,7 +181,7 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                     // column simple attributes
                     let column_attrs = column.clone();
                     let column_id = &column_attrs.id.unwrap();
-                    let map = column.map_object_db(
+                    let map = column.create_config(
                         self.planet_context,
                         self.context,
                         &columns_map,

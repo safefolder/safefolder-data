@@ -42,7 +42,7 @@ impl SmallTextColumn {
     }
 }
 impl StorageColumn for SmallTextColumn {
-    fn update_config_map(
+    fn create_config(
         &mut self, 
         column_config_map: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
@@ -50,7 +50,7 @@ impl StorageColumn for SmallTextColumn {
         // No special attributes so far for small text field
         return Ok(column_config_map)
     }
-    fn build_config(
+    fn get_config(
         &mut self, 
         _: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {
@@ -132,7 +132,7 @@ impl LongTextColumn {
     }
 }
 impl StorageColumn for LongTextColumn {
-    fn update_config_map(
+    fn create_config(
         &mut self, 
         column_config_map: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
@@ -140,7 +140,7 @@ impl StorageColumn for LongTextColumn {
         // No special attributes so far for small text field
         return Ok(column_config_map)
     }
-    fn build_config(
+    fn get_config(
         &mut self, 
         _: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {
@@ -249,7 +249,7 @@ impl SelectColumn {
     }
 }
 impl StorageColumn for SelectColumn {
-    fn update_config_map(
+    fn create_config(
         &mut self, 
         column_config_map: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
@@ -267,7 +267,7 @@ impl StorageColumn for SelectColumn {
         }
         return Ok(column_config_map)
     }
-    fn build_config(
+    fn get_config(
         &mut self, 
         column_config_map: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {
@@ -433,14 +433,14 @@ impl AuditByColumn {
     }
 }
 impl StorageColumn for AuditByColumn {
-    fn update_config_map(
+    fn create_config(
         &mut self, 
         column_config_map: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
         let column_config_map = column_config_map.clone();
         return Ok(column_config_map)
     }
-    fn build_config(
+    fn get_config(
         &mut self, 
         _: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {
@@ -497,14 +497,14 @@ impl LanguageColumn {
     }
 }
 impl LanguageColumn {
-    pub fn update_config_map(
+    pub fn create_config(
         &mut self, 
         column_config_map: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
         let column_config_map = column_config_map.clone();
         return Ok(column_config_map)
     }
-    pub fn build_config(
+    pub fn get_config(
         &mut self, 
         _: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {
@@ -591,14 +591,14 @@ impl TextColumn {
     }
 }
 impl TextColumn {
-    pub fn update_config_map(
+    pub fn create_config(
         &mut self, 
         column_config_map: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
         let column_config_map = column_config_map.clone();
         return Ok(column_config_map)
     }
-    pub fn build_config(
+    pub fn get_config(
         &mut self, 
         _: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {
@@ -785,14 +785,14 @@ impl GenerateIdColumn {
     }
 }
 impl StorageColumn for GenerateIdColumn {
-    fn update_config_map(
+    fn create_config(
         &mut self, 
         column_config_map: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
         let column_config_map = column_config_map.clone();
         return Ok(column_config_map)
     }
-    fn build_config(
+    fn get_config(
         &mut self, 
         _: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {
@@ -851,14 +851,14 @@ impl PhoneColumn {
     }
 }
 impl StorageColumn for PhoneColumn {
-    fn update_config_map(
+    fn create_config(
         &mut self, 
         column_config_map: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
         let column_config_map = column_config_map.clone();
         return Ok(column_config_map)
     }
-    fn build_config(
+    fn get_config(
         &mut self, 
         _: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {
@@ -926,14 +926,14 @@ impl EmailColumn {
     }
 }
 impl StorageColumn for EmailColumn {
-    fn update_config_map(
+    fn create_config(
         &mut self, 
         column_config_map: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
         let column_config_map = column_config_map.clone();
         return Ok(column_config_map)
     }
-    fn build_config(
+    fn get_config(
         &mut self, 
         _: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {
@@ -1002,14 +1002,14 @@ impl UrlColumn {
     }
 }
 impl StorageColumn for UrlColumn {
-    fn update_config_map(
+    fn create_config(
         &mut self, 
         column_config_map: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
         let column_config_map = column_config_map.clone();
         return Ok(column_config_map)
     }
-    fn build_config(
+    fn get_config(
         &mut self, 
         _: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {

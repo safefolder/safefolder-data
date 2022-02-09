@@ -32,6 +32,7 @@ use crate::storage::columns::number::*;
 use crate::storage::columns::date::*;
 use crate::storage::columns::formula::*;
 use crate::storage::columns::reference::*;
+use crate::storage::columns::structure::*;
 
 pub struct InsertIntoFolder<'gb> {
     pub planet_context: &'gb PlanetContext<'gb>,
@@ -173,7 +174,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                 // eprintln!("InsertIntoFolder.run :: folder: {:#?}", &folder);
 
                 // I need a way to get list of instance ColumnConfig (columns)
-                let config_columns = ColumnConfig::parse_from_db(
+                let config_columns = ColumnConfig::get_config(
                     self.planet_context,
                     self.context,
                     &folder
@@ -498,6 +499,10 @@ impl<'gb> InsertIntoFolder<'gb> {
                             let obj = RatingColumn::defaults(&column_config);
                             column_data_wrap = obj.validate(&column_data);
                         },
+                        COLUMN_TYPE_OBJECT => {
+                            let obj = ObjectColumn::defaults(&column_config);
+                            column_data_wrap = obj.validate(&column_data);
+                        },                        
                         _ => {
                             errors.push(
                                 PlanetError::new(
@@ -853,7 +858,7 @@ impl<'gb> Command<String> for GetFromFolder<'gb> {
                 let folder = folder.unwrap();
                 let data_collections = folder.clone().data_collections;
                 let field_ids = data_collections.unwrap().get(COLUMN_IDS).unwrap().clone();
-                let config_columns = ColumnConfig::parse_from_db(
+                let config_columns = ColumnConfig::get_config(
                     self.planet_context,
                     self.context,
                     &folder
@@ -993,6 +998,10 @@ impl<'gb> Command<String> for GetFromFolder<'gb> {
                             },
                             COLUMN_TYPE_RATING => {
                                 let obj = RatingColumn::defaults(&field_config_);
+                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+                            },
+                            COLUMN_TYPE_OBJECT => {
+                                let obj = ObjectColumn::defaults(&field_config_);
                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
                             },
                             _ => {
@@ -1275,6 +1284,7 @@ fn handle_field_response(
     Vec<PlanetError>
 ) {
     let column_data = column_data.clone();
+    // eprintln!("handle_field_response :: column_data: {:?}", column_data);
     let mut errors = errors.clone();
     let mut data = data.clone();
     let mut data_collections = data_collections.clone();
@@ -1287,8 +1297,16 @@ fn handle_field_response(
         let column_data = column_data.unwrap().clone();
         if is_set == FALSE.to_string() {
             // into data
-            let column_value = column_data[0].clone();
-            data.insert(column_id.clone(), column_value);
+            if column_data.clone().len() == 0 {
+                let error = PlanetError::new(
+                    500, 
+                    Some(tr!("Content is empty, no data."))
+                );
+                errors.push(error);
+            } else {
+                let column_value = column_data[0].clone();
+                data.insert(column_id.clone(), column_value);    
+            }
         } else {
             // into data_collections, I have a set
             let mut list: Vec<BTreeMap<String, String>> = Vec::new();

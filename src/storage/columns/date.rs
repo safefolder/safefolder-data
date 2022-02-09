@@ -30,7 +30,7 @@ impl DateColumn {
     }
 }
 impl StorageColumn for DateColumn {
-    fn update_config_map(
+    fn create_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
@@ -70,7 +70,7 @@ impl StorageColumn for DateColumn {
         }
         return Ok(field_config_map)
     }
-    fn build_config(
+    fn get_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {
@@ -239,14 +239,14 @@ impl DurationColumn {
     }
 }
 impl StorageColumn for DurationColumn {
-    fn update_config_map(
+    fn create_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
         let field_config_map = field_config_map.clone();
         return Ok(field_config_map)
     }
-    fn build_config(
+    fn get_config(
         &mut self, 
         _: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {
@@ -346,14 +346,14 @@ impl AuditDateColumn {
     }
 }
 impl StorageColumn for AuditDateColumn {
-    fn update_config_map(
+    fn create_config(
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
         let field_config_map = field_config_map.clone();
         return Ok(field_config_map)
     }
-    fn build_config(
+    fn get_config(
         &mut self, 
         _: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {
