@@ -16,7 +16,7 @@ use crate::commands::folder::config::*;
 use crate::storage::constants::*;
 use crate::commands::folder::{Command};
 use crate::commands::{CommandRunner};
-use crate::planet::constants::{ID, NAME, VALUE, FALSE};
+use crate::planet::constants::{ID, NAME, VALUE, FALSE, COLUMNS};
 use crate::storage::folder::{TreeFolder, TreeFolderItem, FolderItem, FolderSchema, DbData, GetItemOption};
 use crate::storage::folder::*;
 use crate::storage::{ConfigStorageColumn, generate_id};
@@ -47,18 +47,26 @@ impl<'gb> InsertIntoFolder<'gb> {
     fn get_insert_id_data_map(
         &self,
         insert_data_map: &BTreeMap<String, String>,
-        folder_data: &BTreeMap<String, BTreeMap<String, String>>,
+        folder_data: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
     ) -> (BTreeMap<String, String>, BTreeMap<String, String>) {
         let mut insert_id_data_map: BTreeMap<String, String> = BTreeMap::new();
         let mut insert_id_data_objects_map: BTreeMap<String, String> = BTreeMap::new();
         let mut folder_map_by_name: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
-        for (_, column) in folder_data {
-            let column_name = column.get(NAME);
-            if column_name.is_some() {
-                let column_name = column_name.unwrap();
+        let columns = folder_data.get(COLUMNS);
+        if columns.is_some() {
+            let columns = columns.unwrap();
+            for column in columns {
+                let column_name = column.get(NAME).unwrap();
                 folder_map_by_name.insert(column_name.clone(), column.clone());
             }
         }
+        // for (_, column) in folder_data {
+        //     let column_name = column.get(NAME);
+        //     if column_name.is_some() {
+        //         let column_name = column_name.unwrap();
+        //         folder_map_by_name.insert(column_name.clone(), column.clone());
+        //     }
+        // }
         for (name, value) in insert_data_map.clone() {
             let map = folder_map_by_name.get(&name);
             if map.is_some() {
@@ -80,19 +88,27 @@ impl<'gb> InsertIntoFolder<'gb> {
     fn get_insert_id_data_collections_map(
         &self,
         insert_data_collections_map: Option<BTreeMap<String, Vec<String>>>,
-        folder_data: &BTreeMap<String, BTreeMap<String, String>>,
+        folder_data: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
     ) -> BTreeMap<String, Vec<String>> {
         let mut insert_id_data_collections_map: BTreeMap<String, Vec<String>> = BTreeMap::new();
         if insert_data_collections_map.is_some() {
             // I receive a map of list of ids
             let mut folder_map_by_name: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
-            for (_, column) in folder_data {
-                let column_name = column.get(NAME);
-                if column_name.is_some() {
-                    let column_name = column_name.unwrap();
+            let columns = folder_data.get(COLUMNS);
+            if columns.is_some() {
+                let columns = columns.unwrap();
+                for column in columns {
+                    let column_name = column.get(NAME).unwrap();
                     folder_map_by_name.insert(column_name.clone(), column.clone());
                 }
             }
+            // for (_, column) in folder_data {
+            //     let column_name = column.get(NAME);
+            //     if column_name.is_some() {
+            //         let column_name = column_name.unwrap();
+            //         folder_map_by_name.insert(column_name.clone(), column.clone());
+            //     }
+            // }
             let insert_data_collections_map = insert_data_collections_map.unwrap();
             for (name, id_list) in insert_data_collections_map {
                 let id_map = folder_map_by_name.get(&name);
@@ -190,7 +206,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                 let insert_data_map: BTreeMap<String, String> = self.config.data.clone().unwrap();
                 let insert_data_collections_map = self.config.data_collections.clone();
                 // I need to have {id} -> Value
-                let folder_data = folder.clone().data_objects.unwrap();
+                let folder_data = folder.clone().data_collections.unwrap();
 
                 // get id => value for data, data_objects and data_collections
                 let (
@@ -338,7 +354,6 @@ impl<'gb> InsertIntoFolder<'gb> {
                     }
                     let column_data = column_data_;
                     let mut column_data_wrap: Result<Vec<String>, PlanetError> = Ok(Vec::new());
-                    // let mut column_data_wrap: Result<Vec<String>, PlanetError> = Ok(String::from(""));
                     let mut skip_data_assign = false;
                     match column_type {
                         COLUMN_TYPE_SMALL_TEXT => {

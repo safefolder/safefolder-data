@@ -528,26 +528,38 @@ impl StorageColumn for GenerateNumberColumn {
         let config = self.config.clone();
         let mut folder = self.folder.clone().unwrap();
         let db_folder = self.db_folder.clone().unwrap();
-        let mut data_objects = folder.data_objects.unwrap();
+        let mut data_collections = folder.data_collections.unwrap();
         let column_id = config.id.unwrap();
         let column_name = config.name.unwrap();
-        let column = data_objects.get(&column_id);
-        if column.is_some() {
-            let mut column = column.unwrap().clone();
-            let sequence = column.get(SEQUENCE);
-            if sequence.is_some() {
-                let sequence = sequence.unwrap();
-                let mut sequence: usize = FromStr::from_str(sequence).unwrap();
-                sequence += 1;
-                column.insert(SEQUENCE.to_string(), sequence.to_string());
-                data_objects.insert(column_id, column.clone());
-                folder.data_objects = Some(data_objects);
-                let result = db_folder.update(&folder);
-                if result.is_ok() {
-                    let mut sequence_list: Vec<String> = Vec::new();
-                    sequence_list.push(sequence.to_string());
-                    return Ok(sequence_list)
+        let columns = data_collections.get(COLUMNS);
+        let mut columns_new: Vec<BTreeMap<String, String>> = Vec::new();
+        let mut sequence_list: Vec<String> = Vec::new();
+        if columns.is_some() {
+            let columns = columns.unwrap().clone();
+            for mut column in columns {
+                let column_target_id = column.get(ID);
+                if column_target_id.is_some() {
+                    let column_target_id = column_target_id.unwrap().clone();
+                    if column_id == column_target_id {
+                        let sequence = column.get(SEQUENCE);
+                        if sequence.is_some() {
+                            let sequence = sequence.unwrap();
+                            let mut sequence: usize = FromStr::from_str(sequence).unwrap();
+                            sequence += 1;
+                            column.insert(SEQUENCE.to_string(), sequence.to_string());
+                            columns_new.push(column);
+                            sequence_list.push(sequence.to_string());
+                        }            
+                    } else {
+                        columns_new.push(column);
+                    }
                 }
+            }
+            data_collections.insert(COLUMNS.to_string(), columns_new.clone());
+            folder.data_collections = Some(data_collections.clone());
+            let result = db_folder.update(&folder);
+            if result.is_ok() {
+                return Ok(sequence_list)
             }
         }
         return Err(

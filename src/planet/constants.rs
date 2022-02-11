@@ -26,6 +26,9 @@ pub const PARTITION: &str = "partition";
 pub const ITEMS_PER_PARTITION: u16 = 1000;
 pub const MAX_PARTITIONS: u16 = 1000;
 pub const MAX_ITEMS_PER_PARTITION: u32 = 1000000;
+pub const PARENT_ID: &str = "parent_id";
+pub const SUB_FOLDERS: &str = "sub_folders";
+pub const COLUMNS: &str = "columns";
 
 // Languages
 pub const LANGUAGE_SPANISH: &str = "spanish";

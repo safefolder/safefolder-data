@@ -213,7 +213,8 @@ impl SelectColumn {
             for data_collection in folder.data_collections.clone() {
                 // key for ordering: field_ids
                 for key in data_collection.keys() {
-                    if key.to_lowercase() != String::from(COLUMN_IDS) {
+                    let has_select_sep = key.find("__");
+                    if has_select_sep.is_some() {
                         // key: Status__select_options
                         let key_items: Vec<&str> = key.split("__").collect();
                         let key_field_name = key_items[0];
@@ -656,7 +657,8 @@ impl TextColumn {
                             let mut value: String = String::from("");
                             for data_collection in folder.data_collections.clone() {
                                 for (key, collection_value) in data_collection {
-                                    if key.to_lowercase() != String::from(COLUMN_IDS) {
+                                    let has_select_sep = &key.find("__").clone();
+                                    if has_select_sep.is_some() {
                                         let key_items: Vec<&str> = key.split("__").collect();
                                         let key_column_name = key_items[0];
                                         let key_column_type = key_items[1];

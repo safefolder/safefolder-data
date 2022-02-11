@@ -998,16 +998,20 @@ impl TreeFolderItem {
         }
         let folder = folder.unwrap();
         // eprintln!("DbFolderItem.get_language_code :: folder: {:#?}", &folder);
-        let data_objects = folder.data_objects.unwrap();
-        for (k, v) in data_objects {
-            let column_id = k;
-            let my_map = v;
-            let column_type = my_map.get(COLUMN_TYPE);
-            if column_type.is_some() {
-                let column_type = column_type.unwrap();
-                if column_type == COLUMN_TYPE_LANGUAGE {
-                    let language_code = data.get(&column_id).unwrap().clone();
-                    return Ok(language_code)
+        let data_collections = folder.data_collections.unwrap();
+        let columns = data_collections.get(COLUMNS);
+        if columns.is_some() {
+            let columns = columns.unwrap();
+            for column in columns {
+                let column_type = column.get(COLUMN_TYPE);
+                let column_id = column.get(ID);
+                if column_type.is_some() {
+                    let column_type = column_type.unwrap();
+                    let column_id = column_id.unwrap();
+                    if column_type == COLUMN_TYPE_LANGUAGE {
+                        let language_code = data.get(column_id).unwrap().clone();
+                        return Ok(language_code)
+                    }
                 }
             }
         }

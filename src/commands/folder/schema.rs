@@ -86,7 +86,9 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                 let mut data_objects: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
                 let mut data_collections: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
                 let mut columns = config.columns.unwrap().clone();
+                let sub_folders = config.sub_folders;
                 let mut column_ids: Vec<BTreeMap<String, String>> = Vec::new();
+                let mut columns_list: Vec<BTreeMap<String, String>> = Vec::new();
 
                 // validate and clean defaults for language and text_search
                 // TODO: Place this into a validation operation for the entity
@@ -177,10 +179,9 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                         );
                     }
                 }
+                
                 for column in columns.iter() {
                     // column simple attributes
-                    let column_attrs = column.clone();
-                    let column_id = &column_attrs.id.unwrap();
                     let map = column.create_config(
                         self.planet_context,
                         self.context,
@@ -188,18 +189,50 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                         &db_folder,
                         folder_name,
                     )?;
-                    data_objects.insert(column_id.clone(), map.clone());
-                    // column complex attributes like select_data
                     let map_list = &column.map_collections_db()?;
                     let map_list = map_list.clone();
-                    // data_collections = map_list.clone();
                     data_collections.extend(map_list);
+                    columns_list.push(map);
+                }
+                // Sub folders
+                if sub_folders.is_some() {
+                    let sub_folders = sub_folders.unwrap();
+                    let mut my_map: HashMap<String, String> = HashMap::new();
+                    for sub_folder in sub_folders.clone() {
+                        let sub_folder_name = sub_folder.name.unwrap_or_default();
+                        let sub_folder_id = sub_folder.id.unwrap_or_default();
+                        my_map.insert(sub_folder_name, sub_folder_id);
+                    }
+                    // resolve parent id by parent name
+                    let mut list: Vec<BTreeMap<String, String>> = Vec::new();
+                    for sub_folder in sub_folders.clone() {
+                        let parent = sub_folder.parent.clone().unwrap_or_default();
+                        let parent_id = my_map.get(&parent);
+                        let mut sub_folder_db_map: BTreeMap<String, String> = BTreeMap::new();
+                        sub_folder_db_map.insert(NAME.to_string(), sub_folder.name.unwrap_or_default());
+                        sub_folder_db_map.insert(ID.to_string(), sub_folder.id.unwrap_or_default());
+                        sub_folder_db_map.insert(
+                            VERSION.to_string(), 
+                            sub_folder.version.unwrap_or_default()
+                        );
+                        if parent_id.is_some() {
+                            let parent_id = parent_id.unwrap();
+                            sub_folder_db_map.insert(
+                                PARENT_ID.to_string(), 
+                                parent_id.clone()
+                            );
+                        }
+                        list.push(sub_folder_db_map);
+                    }
+                    data_collections.insert(
+                        SUB_FOLDERS.to_string(),
+                        list
+                    );
                 }
                 // eprintln!("CreateFolder.run :: data_objects_new: {:#?}", &data_objects_new);
                 // text column
                 let column_id = &generate_id().unwrap_or_default();
-                data_objects.insert(
-                    column_id.clone(), 
+                columns_list.push(
                     create_minimum_column_map(
                         column_id,
                         &TEXT_COLUMN.to_string(),
@@ -211,18 +244,14 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                 column_ids.push(column_id_map);
                 // language column
                 let column_id = &generate_id().unwrap_or_default();
-                data_objects.insert(
-                    column_id.clone(), 
+                columns_list.push(
                     create_minimum_column_map(
                         column_id,
                         &LANGUAGE_COLUMN.to_string(),
                         &COLUMN_TYPE_LANGUAGE.to_string(),
                     )
                 );
-                let mut column_id_map: BTreeMap<String, String> = BTreeMap::new();
-                column_id_map.insert(String::from(ID), column_id.clone());
-                column_ids.push(column_id_map);
-                data_collections.insert(String::from(COLUMN_IDS), column_ids);
+                data_collections.insert(COLUMNS.to_string(), columns_list);
                 // routing
                 let routing_wrap = RoutingData::defaults(
                     account_id, 
@@ -253,10 +282,7 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                     None,
                 )?;
                 // Onl output TEMP the choices data to include in insert
-                let mut mine = db_data.clone().data_collections.unwrap();
-                mine.remove("column_ids");
-                eprintln!("CreateFolder.run :: db_data: {:#?}", mine);
-                eprintln!("CreateFolder.run :: db_data all: {:#?}", db_data.clone());
+                eprintln!("CreateFolder.run :: db_data: {:#?}", db_data.clone());
 
                 let response: DbData = db_folder.create(&db_data)?;
                 let response_src = response.clone();

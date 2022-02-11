@@ -1,5 +1,5 @@
 ---
-command: CREATE FOLDER "Super Folder 2"
+command: CREATE FOLDER "Super Folder 13"
 name:
   column_type: Small Text
 text_search:
@@ -55,3 +55,8 @@ columns:
   - name: Meta
     column_type: Object
     is_set: true
+sub_folders:
+  - name: My Folder
+  - name: Another Folder
+  - name: My Embedded Folder
+    parent: Another Folder
