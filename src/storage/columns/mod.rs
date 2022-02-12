@@ -46,18 +46,18 @@ Table fields
 * UrlColumn                       [done]
 * RatingColumn                    [done]
 * SetColumn                       [done] - For example, tags
-* ObjectColumn                    [doing] - I may need this so commands can store unstructured data. I 
+* ObjectColumn                    [done] - I may need this so commands can store unstructured data. I 
     serialize as YAML format.
+* SubFolder                       [done]: This links to another db file with some media data: photo, etc...
+    In this case we also map into table config, so I can easily have list of folders for this table.
+    Here I define background image for the folder.
+* StatsColumn                     [doing]: Statistics on linked fields with formula support: AVERAGE, 
+COUNT, COUNTA, COUNTALL, SUM, MAX, AND, OR, XOR, CONCATENATE. I execute these formulas once I post 
+processed the links and references. I would need to parse in a way to use those number functions.
 
 -
 These are not complex:
 
-* SubFolderColumn                 [doing]: This links to another db file with some media data: photo, etc...
-    In this case we also map into table config, so I can easily have list of folders for this table.
-    Here I define background image for the folder.
-* StatsColumn                     [todo]: Statistics on linked fields with formula support: AVERAGE, 
-    COUNT, COUNTA, COUNTALL, SUM, MAX, AND, OR, XOR, CONCATENATE. I execute these formulas once I post 
-    processed the links and references. I would need to parse in a way to use those number functions.
 * FileColumn                      [todo] - Custom file and image management with IPFS. I add many.
 * CommandColumn                   [todo]: This does processing for complex cases, like image manipulation
 

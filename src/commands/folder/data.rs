@@ -60,13 +60,6 @@ impl<'gb> InsertIntoFolder<'gb> {
                 folder_map_by_name.insert(column_name.clone(), column.clone());
             }
         }
-        // for (_, column) in folder_data {
-        //     let column_name = column.get(NAME);
-        //     if column_name.is_some() {
-        //         let column_name = column_name.unwrap();
-        //         folder_map_by_name.insert(column_name.clone(), column.clone());
-        //     }
-        // }
         for (name, value) in insert_data_map.clone() {
             let map = folder_map_by_name.get(&name);
             if map.is_some() {
@@ -102,13 +95,6 @@ impl<'gb> InsertIntoFolder<'gb> {
                     folder_map_by_name.insert(column_name.clone(), column.clone());
                 }
             }
-            // for (_, column) in folder_data {
-            //     let column_name = column.get(NAME);
-            //     if column_name.is_some() {
-            //         let column_name = column_name.unwrap();
-            //         folder_map_by_name.insert(column_name.clone(), column.clone());
-            //     }
-            // }
             let insert_data_collections_map = insert_data_collections_map.unwrap();
             for (name, id_list) in insert_data_collections_map {
                 let id_map = folder_map_by_name.get(&name);
@@ -208,6 +194,42 @@ impl<'gb> InsertIntoFolder<'gb> {
                 // I need to have {id} -> Value
                 let folder_data = folder.clone().data_collections.unwrap();
 
+                // Validate sub_folder id exists in config for the folder and attach to DbData
+                let sub_folders_config = self.config.clone().sub_folders;
+                let mut sub_folders_wrap: Option<Vec<SubFolderItem>> = None;
+                if sub_folders_config.is_some() {
+                    let sub_folders_config = sub_folders_config.unwrap();
+                    let mut sub_folders: Vec<SubFolderItem> = Vec::new();
+                    for item in sub_folders_config {
+                        let item_id = item.id.unwrap();
+                        let check = TreeFolder::has_sub_folder_id(
+                            &folder.clone(), 
+                            &item_id
+                        );
+                        eprintln!("InsertIntoFolder.run :: item_id: {} check: {}", &item_id, &check);
+                        if check {
+                            let sub_folder = SubFolderItem{
+                                id: Some(item_id),
+                                is_reference: item.is_reference,
+                                data: None,
+                            };
+                            sub_folders.push(sub_folder);    
+                        } else {
+                            errors.push(
+                                PlanetError::new(
+                                    500, 
+                                    Some(tr!(
+                                        "Sub folder id \"{}\" does not exist in folder.", &item_id
+                                    )),
+                                )
+                            );
+                        }
+                    }
+                    if sub_folders.len() > 0 {
+                        sub_folders_wrap = Some(sub_folders);
+                    }
+                }
+
                 // get id => value for data, data_objects and data_collections
                 let (
                     insert_id_data_map, 
@@ -277,6 +299,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                     None,
                     routing_wrap,
                     None,
+                    sub_folders_wrap,
                 );
                 if db_data.is_err() {
                     let error = db_data.unwrap_err();

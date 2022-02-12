@@ -775,11 +775,18 @@ fn validate_column_relevance(column_relevance: &BTreeMap<String, u8>) -> Result<
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
+pub struct SubFolderDataConfig {
+    pub id: Option<String>,
+    pub is_reference: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Validate, Clone)]
 pub struct InsertIntoFolderConfig {
     #[validate(required, regex="RE_COMMAND_INSERT_INTO_FOLDER")]
     pub command: Option<String>,
     #[validate(required)]
     pub name: Option<String>,
+    pub sub_folders: Option<Vec<SubFolderDataConfig>>,
     #[validate(required)]
     pub data: Option<BTreeMap<String, String>>,
     pub data_collections: Option<BTreeMap<String, Vec<String>>>,
@@ -793,6 +800,7 @@ impl InsertIntoFolderConfig {
             name: name,
             data: Some(BTreeMap::new()),
             data_collections: None,
+            sub_folders: None,
         };
         return config
     }

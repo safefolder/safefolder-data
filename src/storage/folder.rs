@@ -130,6 +130,14 @@ pub struct NameTree {
 // data has field_id -> value, so if we change column name would not be affected
 
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
+pub struct SubFolderItem {
+    #[validate(required)]
+    pub id: Option<String>,
+    pub is_reference: Option<bool>,
+    pub data: Option<BTreeMap<String, String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Validate, Clone)]
 pub struct DbData {
     #[validate(required)]
     pub id: Option<String>,
@@ -143,6 +151,7 @@ pub struct DbData {
     pub data: Option<BTreeMap<String, String>>,
     pub data_collections: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     pub data_objects: Option<BTreeMap<String, BTreeMap<String, String>>>,
+    pub sub_folders: Option<Vec<SubFolderItem>>,
 }
 impl DbData {
     pub fn defaults(
@@ -152,7 +161,8 @@ impl DbData {
         data_objects: Option<BTreeMap<String, BTreeMap<String, String>>>, 
         options: Option<BTreeMap<String, String>>, 
         routing: Option<RoutingData>, 
-        context: Option<BTreeMap<String, String>>
+        context: Option<BTreeMap<String, String>>,
+        sub_folders: Option<Vec<SubFolderItem>>,
     ) -> Result<DbData, PlanetError> {
         let slug = slugify(name);
         let mut routing_map_: Option<BTreeMap<String, String>> = None;
@@ -190,6 +200,7 @@ impl DbData {
             data_collections: data_collections,
             data_objects: data_objects,
             context: context,
+            sub_folders: sub_folders,
         };
         let validate: Result<(), ValidationErrors> = db_data.validate();
         match validate {
@@ -272,6 +283,27 @@ pub struct TreeFolder {
     pub box_id: Option<String>,
     pub tree: sled::Tree,
     pub database: sled::Db,
+}
+
+impl TreeFolder {
+    pub fn has_sub_folder_id(folder: &DbData, sub_folder_id: &String) -> bool {
+        let folder = folder.clone();
+        let data_collections = folder.data_collections;
+        if data_collections.is_some() {
+            let data_collections = data_collections.unwrap();
+            let sub_folders = data_collections.get(SUB_FOLDERS);
+            if sub_folders.is_some() {
+                let sub_folders = sub_folders.unwrap();
+                for sub_folder in sub_folders {
+                    let db_sub_folder_id = sub_folder.get(ID).unwrap().clone();
+                    if db_sub_folder_id == *sub_folder_id {
+                        return true
+                    }
+                }
+            }
+        }
+        return false
+    }
 }
 
 impl FolderSchema for TreeFolder {
@@ -725,7 +757,8 @@ impl TreeFolderItem {
                 None, 
                 None, 
                 routing_wrap, 
-                None
+                None,
+                None,
             )?;
             let encrypted_data = db_data.encrypt(&shared_key).unwrap();
             let encoded: Vec<u8> = encrypted_data.serialize();
@@ -832,6 +865,8 @@ impl TreeFolderItem {
             println!("DbFolderItem.open_partition :: account_id and space_id have been informed");
         } else if space_id == "private" {
             // .achiever-planet/{table_file} : platform wide folder (slug with underscore)
+            // box/{box_id}/folder/{folder_id}/0001.db
+            // box/{box_id}/folder/{folder_id}/{sub_folder_id}/0001.db
             path_db = format!(
                 "box/{box_id}/folder/{folder_id}/{partition_str}.db",
                 box_id=box_id,
@@ -1241,6 +1276,7 @@ impl FolderItem for TreeFolderItem {
             None,
             None,
             routing_wrap,
+            None,
             None,
         );
         if db_index_data.is_err() {
