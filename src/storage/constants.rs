@@ -71,6 +71,7 @@ pub const SET_MINIMUM: &str = "set_minmum";
 pub const MAX_LENGTH: &str = "max_length";
 pub const IS_SET: &str = "is_set";
 pub const OBJECT_SCHEMA: &str = "object_schema";
+pub const STATS_FUNCTION: &str = "stats_function";
 
 // Column Types
 pub const COLUMN_TYPE_SMALL_TEXT: &str = "Small Text";
@@ -99,9 +100,22 @@ pub const COLUMN_TYPE_URL: &str = "Url";
 pub const COLUMN_TYPE_RATING: &str = "Rating";
 pub const COLUMN_TYPE_SET: &str = "Set";
 pub const COLUMN_TYPE_OBJECT: &str = "Object";
+pub const COLUMN_TYPE_STATS: &str = "Stats";
 
 // Date Format
 pub const DATE_FORMAT_FRIENDLY: &str = "Friendly";
 pub const DATE_FORMAT_US: &str = "US";
 pub const DATE_FORMAT_EUROPEAN: &str = "European";
 pub const DATE_FORMAT_ISO: &str = "ISO";
+
+// Stats Functions
+pub const STATS_FUNCTION_COUNT: &str = "COUNT";
+pub const STATS_FUNCTION_COUNTA: &str = "COUNTA";
+pub const STATS_FUNCTION_COUNTALL: &str = "COUNTALL";
+pub const STATS_FUNCTION_MAX: &str = "MAX";
+pub const STATS_FUNCTION_MIN: &str = "MIN";
+pub const STATS_FUNCTION_AVG: &str = "AVG";
+pub const STATS_FUNCTION_SUM: &str = "SUM";
+pub const STATS_FUNCTION_AND: &str = "AND";
+pub const STATS_FUNCTION_OR: &str = "OR";
+pub const STATS_FUNCTION_XOR: &str = "XOR";

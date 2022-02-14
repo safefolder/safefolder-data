@@ -210,6 +210,7 @@ pub struct ColumnConfig {
     pub set_minimum: Option<String>,
     pub max_length: Option<String>,
     pub is_set: Option<String>,
+    pub stats_function: Option<String>,
 }
 
 impl ConfigStorageColumn for ColumnConfig {
@@ -243,6 +244,7 @@ impl ConfigStorageColumn for ColumnConfig {
             set_minimum: None,
             max_length: None,
             is_set: None,
+            stats_function: None,
         };
         if options.is_some() {
             object.options = Some(options.unwrap());
@@ -301,6 +303,7 @@ impl ConfigStorageColumn for ColumnConfig {
                     set_minimum: None,
                     max_length: None,
                     is_set: None,
+                    stats_function: None,
                 };
                 return Some(column_config);
             }

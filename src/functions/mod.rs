@@ -247,8 +247,8 @@ impl Formula {
         formula_format: &String,
         table: Option<DbData>,
         properties_map: Option<HashMap<String, ColumnConfig>>,
-        db_table: Option<TreeFolder>,
-        table_name: Option<String>,
+        db_folder: Option<TreeFolder>,
+        folder_name: Option<String>,
         is_assign_function: bool,
         field_config_map: Option<BTreeMap<String, ColumnConfig>>,
     ) -> Result<Self, PlanetError> {
@@ -263,8 +263,8 @@ impl Formula {
             field_config_map = field_config_map_.unwrap();
         }
         // let field_name_map_i = field_name_map.clone();
-        let db_table_i = db_table.clone();
-        let table_name_i = table_name.clone();
+        let db_table_i = db_folder.clone();
+        let table_name_i = folder_name.clone();
         // eprintln!("Formula :: formula_origin: {:?}", &formula_origin);
         // eprintln!("Formula :: formula_format: {:?}", &formula_format);
         let formula_map= compile_formula(formula_origin.clone()).unwrap();
@@ -275,8 +275,8 @@ impl Formula {
         let mut properties_map_: HashMap<String, ColumnConfig> = HashMap::new();
         if table.is_some() {
             let table = table.unwrap();
-            let db_table = db_table.unwrap();
-            let table_name = table_name.unwrap();
+            let db_table = db_folder.unwrap();
+            let table_name = folder_name.unwrap();
             let field_type_map_ = TreeFolder::get_field_type_map(&table)?;
             let field_name_map_ = TreeFolder::get_field_name_map(&db_table, &table_name)?;
             for (column_name, column_type) in field_type_map_.clone() {

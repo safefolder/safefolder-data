@@ -12,6 +12,7 @@ use crate::commands::folder::config::ColumnConfig;
 use crate::storage::constants::*;
 use crate::storage::columns::*;
 use crate::storage::folder::FolderSchema;
+use crate::functions::{execute_formula, Formula};
 
 lazy_static! {
     pub static ref RE_CURRENCY: Regex = Regex::new(r#"^(?P<symbol_pre>[^\d\.]*)*(?P<amount>\d+[\.\d+]*)(?P<symbol_post>[^\d\.]+)*$"#).unwrap();
@@ -692,6 +693,242 @@ impl StorageColumn for RatingColumn {
                 }
             }
             data_new.push(data_item);
+        }
+        return Ok(data_new)
+    }
+    fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
+        let field_config = self.config.clone();
+        let field_name = field_config.name.unwrap();
+        let mut yaml_string = yaml_string.clone();
+        let field = &field_name.truecolor(
+            YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
+        );
+        let value = format!("{}", value.to_string().truecolor(
+            YAML_COLOR_YELLOW[0], YAML_COLOR_YELLOW[1], YAML_COLOR_YELLOW[2]
+        ));
+        yaml_string.push_str(format!("  {field}: {value}\n", field=field, value=value).as_str());
+        return yaml_string;
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct StatsColumn {
+    pub config: ColumnConfig,
+    pub allowed_functions: [String; 10],
+    pub field_config_map: Option<BTreeMap<String, ColumnConfig>>,
+    pub folder_name: Option<String>,
+    pub db_folder: Option<TreeFolder>,
+    pub properties_map: Option<HashMap<String, ColumnConfig>>,
+    pub data_map: Option<BTreeMap<String, String>>,
+}
+impl StatsColumn {
+    pub fn defaults(
+        field_config: &ColumnConfig,
+        field_config_map: Option<BTreeMap<String, ColumnConfig>>,
+        folder_name: Option<String>,
+        db_folder: Option<TreeFolder>,
+        properties_map: Option<HashMap<String, ColumnConfig>>,
+        data_map: Option<BTreeMap<String, String>>,
+    ) -> Self {
+        let field_config = field_config.clone();
+        let field_obj = Self{
+            config: field_config,
+            allowed_functions: [
+                STATS_FUNCTION_COUNT.to_string(),
+                STATS_FUNCTION_COUNTA.to_string(),
+                STATS_FUNCTION_COUNTALL.to_string(),
+                STATS_FUNCTION_MAX.to_string(),
+                STATS_FUNCTION_MIN.to_string(),
+                STATS_FUNCTION_AVG.to_string(),
+                STATS_FUNCTION_SUM.to_string(),
+                STATS_FUNCTION_AND.to_string(),
+                STATS_FUNCTION_OR.to_string(),
+                STATS_FUNCTION_XOR.to_string(),
+            ],
+            field_config_map: field_config_map,
+            folder_name: folder_name,
+            db_folder: db_folder,
+            properties_map: properties_map,
+            data_map: data_map,
+        };
+        return field_obj
+    }
+}
+impl StorageColumn for StatsColumn {
+    fn create_config(
+        &mut self, 
+        field_config_map: &BTreeMap<String, String>,
+    ) -> Result<BTreeMap<String, String>, PlanetError> {
+        let mut field_config_map = field_config_map.clone();
+        let config = self.config.clone();
+        let stats_function = config.stats_function;
+        if stats_function.is_some() {
+            let stats_function = stats_function.unwrap();
+            let check = self.allowed_functions.contains(&stats_function);
+            if check {
+                field_config_map.insert(STATS_FUNCTION.to_string(), stats_function);
+            } else {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!(
+                            "Stats function \"{}\" not allowed", &stats_function
+                        )),
+                    )
+                )
+            }
+        }
+        let related_column = config.related_column;
+        if related_column.is_some() {
+            let related_column = related_column.unwrap();
+            field_config_map.insert(RELATED_COLUMN.to_string(), related_column);
+        } else {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!(
+                        "You need to define a related column where to apply the statistics."
+                    )),
+                )
+            )
+        }
+        return Ok(field_config_map)
+    }
+    fn get_config(
+        &mut self, 
+        field_config_map: &BTreeMap<String, String>,
+    ) -> Result<ColumnConfig, PlanetError> {
+        let mut config = self.config.clone();
+        let stats_function = field_config_map.get(STATS_FUNCTION);
+        if stats_function.is_some() {
+            let stats_function = stats_function.unwrap();
+            let check = self.allowed_functions.contains(stats_function);
+            if check {
+                config.stats_function = Some(stats_function.clone());
+            } else {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!(
+                            "Stats function \"{}\" not allowed", &stats_function
+                        )),
+                    )
+                )
+            }
+        }
+        let related_column = field_config_map.get(RELATED_COLUMN);
+        if related_column.is_some() {
+            let related_column = related_column.unwrap();
+            config.related_column = Some(related_column.clone());
+        } else {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!(
+                        "You need to define a related column where to apply the statistics."
+                    )),
+                )
+            )
+        }
+        return Ok(config)
+    }
+    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, PlanetError> {
+        let config = self.config.clone();
+        let stats_function = config.stats_function;
+        let related_column = self.config.related_column.clone().unwrap();
+        let data_map = self.data_map.clone().unwrap();
+        let field_config_map = self.field_config_map.clone();
+        if field_config_map.is_none() {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!(
+                        "Init error for \"field_config_map\"."
+                    )),
+                )
+            )
+        }
+        let field_config_map = field_config_map.unwrap();
+        let has_column = data_map.get(&related_column).is_some();
+        if !has_column {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!(
+                        "Column object data has no column values for \"{}\".", &related_column
+                    )),
+                )
+            )
+        }
+        let folder_name = self.folder_name.clone().unwrap();
+        let db_folder = self.db_folder.clone().unwrap();
+        let properties_map = self.properties_map.clone().unwrap();
+        
+        let mut data_new: Vec<String> = Vec::new();
+        if stats_function.is_some() {
+            let stats_function = stats_function.unwrap();
+            let stats_function = stats_function.as_str();
+            for _data_item in data {
+                let formula: String;
+                let mut formula_format = String::from(FORMULA_FORMAT_NUMBER);
+                match stats_function {
+                    STATS_FUNCTION_COUNT => {
+                        formula = format!("COUNT({{{}}})", &related_column);
+                    },
+                    STATS_FUNCTION_COUNTA => {
+                        formula = format!("COUNTA({{{}}})", &related_column);
+                    },
+                    STATS_FUNCTION_COUNTALL => {
+                        formula = format!("COUNTALL({{{}}})", &related_column);
+                    },
+                    STATS_FUNCTION_MAX => {
+                        formula = format!("MAX({{{}}})", &related_column);
+                    },
+                    STATS_FUNCTION_MIN => {
+                        formula = format!("MIN({{{}}})", &related_column);
+                    },
+                    STATS_FUNCTION_AVG => {
+                        formula = format!("AVG({{{}}})", &related_column);
+                    },
+                    STATS_FUNCTION_SUM => {
+                        formula = format!("SUM({{{}}})", &related_column);
+                    },
+                    STATS_FUNCTION_AND => {
+                        formula_format = String::from(FORMULA_FORMAT_CHECK);
+                        formula = format!("AND({{{}}})", &related_column);
+                    },
+                    STATS_FUNCTION_OR => {
+                        formula_format = String::from(FORMULA_FORMAT_CHECK);
+                        formula = format!("OR({{{}}})", &related_column);
+                    },
+                    STATS_FUNCTION_XOR => {
+                        formula_format = String::from(FORMULA_FORMAT_CHECK);
+                        formula = format!("XOR({{{}}})", &related_column);
+                    },
+                    _ => {
+                        return Err(
+                            PlanetError::new(
+                                500, 
+                                Some(tr!(
+                                    "Stats function \"{}\" not allowed", &stats_function
+                                )),
+                            )
+                        )
+                    }
+                }
+                let formula_compiled = Formula::defaults(
+                    &formula,
+                    &formula_format,
+                    None,
+                    Some(properties_map.clone()),
+                    Some(db_folder.clone()),
+                    Some(folder_name.clone()),
+                    false,
+                    None
+                )?;
+                let formula_result = execute_formula(&formula_compiled, &data_map, &field_config_map)?;
+                data_new.push(formula_result);
+            }
         }
         return Ok(data_new)
     }
