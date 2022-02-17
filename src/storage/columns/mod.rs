@@ -4,6 +4,7 @@ pub mod formula;
 pub mod date;
 pub mod reference;
 pub mod structure;
+pub mod media;
 
 use std::collections::{BTreeMap, HashMap};
 use std::str::FromStr;
@@ -51,14 +52,13 @@ Table fields
 * SubFolder                       [done]: This links to another db file with some media data: photo, etc...
     In this case we also map into table config, so I can easily have list of folders for this table.
     Here I define background image for the folder.
-* StatsColumn                     [doing]: Statistics on linked fields with formula support: AVERAGE, 
+* StatsColumn                     [done]: Statistics on linked fields with formula support: AVERAGE, 
 COUNT, COUNTA, COUNTALL, SUM, MAX, AND, OR, XOR, CONCATENATE. I execute these formulas once I post 
 processed the links and references. I would need to parse in a way to use those number functions.
+* FileColumn                      [doing] - Custom file and image management with IPFS. I add many.
 
 -
-These are not complex:
 
-* FileColumn                      [todo] - Custom file and image management with IPFS. I add many.
 * CommandColumn                   [todo]: This does processing for complex cases, like image manipulation
 
 Above fields gives us what we need as EXCEL functions into the formula field. Formula can provide a 
@@ -88,6 +88,18 @@ pub trait StorageColumn {
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError>;
     fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, PlanetError>;
+    fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String;
+}
+
+pub trait StorageColumnBasic {
+    fn create_config(
+        &mut self, 
+        field_config_map: &BTreeMap<String, String>,
+    ) -> Result<BTreeMap<String, String>, PlanetError>;
+    fn get_config(
+        &mut self, 
+        field_config_map: &BTreeMap<String, String>,
+    ) -> Result<ColumnConfig, PlanetError>;
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String;
 }
 

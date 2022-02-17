@@ -21,8 +21,10 @@ use crate::storage::columns::{
     number::*,
     formula::*,
     reference::*,
+    media::*,
     structure::*,
     StorageColumn,
+    StorageColumnBasic,
     ObjectStorageColumn,
 };
 use crate::planet::constants::*;
@@ -211,6 +213,8 @@ pub struct ColumnConfig {
     pub max_length: Option<String>,
     pub is_set: Option<String>,
     pub stats_function: Option<String>,
+    pub content_types: Option<Vec<String>>,
+    pub mode: Option<String>,
 }
 
 impl ConfigStorageColumn for ColumnConfig {
@@ -245,6 +249,8 @@ impl ConfigStorageColumn for ColumnConfig {
             max_length: None,
             is_set: None,
             stats_function: None,
+            content_types: None,
+            mode: None,
         };
         if options.is_some() {
             object.options = Some(options.unwrap());
@@ -304,6 +310,8 @@ impl ConfigStorageColumn for ColumnConfig {
                     max_length: None,
                     is_set: None,
                     stats_function: None,
+                    content_types: None,
+                    mode: None,
                 };
                 return Some(column_config);
             }
@@ -537,6 +545,12 @@ impl ConfigStorageColumn for ColumnConfig {
                             );
                             column_config = obj.get_config(column_config_map)?;
                         },
+                        COLUMN_TYPE_FILE => {
+                            let mut obj = FileColumn::defaults(
+                                &column_config,
+                            );
+                            column_config = obj.get_config(column_config_map)?;
+                        },
                         _ => {}
                     }
                     let _ = &map_columns_by_id.insert(column_id, column_config.clone());
@@ -707,6 +721,9 @@ impl ConfigStorageColumn for ColumnConfig {
             },
             COLUMN_TYPE_OBJECT => {
                 map = ObjectColumn::defaults(&propertty_config_).create_config(&map)?;
+            },
+            COLUMN_TYPE_FILE => {
+                map = FileColumn::defaults(&propertty_config_).create_config(&map)?;
             },
             _ => {}
         }

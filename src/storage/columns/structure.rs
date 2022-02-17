@@ -1,4 +1,5 @@
-use serde_yaml;
+use yaml_rust;
+use json;
 use std::collections::BTreeMap;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
@@ -101,30 +102,72 @@ impl StorageColumn for ObjectColumn {
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
+        let config = self.config.clone();
+        let mut field_config_map = field_config_map.clone();
+        let mode = config.mode;
+        if mode.is_some() {
+            let mode = mode.unwrap();
+            field_config_map.insert(MODE.to_string(), mode);
+        } else {
+            field_config_map.insert(MODE.to_string(), MODE_YAML.to_string());
+        }
         return Ok(field_config_map.clone())
     }
     fn get_config(
         &mut self, 
-        _field_config_map: &BTreeMap<String, String>,
+        field_config_map: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {
-        let config = self.config.clone();
+        let mut config = self.config.clone();
+        let mode = field_config_map.get(MODE);
+        if mode.is_some() {
+            let mode = mode.unwrap();
+            config.mode = Some(mode.clone());
+        } else {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Mode is required for object columns. Default mode is YAML."))
+                )
+            )
+        }
         return Ok(config)
     }
     fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, PlanetError> {
+        let config = self.config.clone();
+        let mode = config.mode;
+        if mode.is_none() {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Mode is required for object columns. Default mode is YAML."))
+                )
+            )
+        }
+        let mode = mode.unwrap();
         let data = data.clone();
         for data_item in data.clone() {
-            eprintln!("ObjectColumn.validate :: data_item: {}", &data_item);
-            let result: Result<HashMap<String, String>, serde_yaml::Error> = serde_yaml::from_str(&data_item);
-            if result.is_err() {
-                return Err(
-                    PlanetError::new(
-                        500, 
-                        Some(tr!("Object could not be parsed. Structure needs to be a map of 
-                        string to string in YAML format"))
+            // Check weather use json or yaml from config
+            if mode == MODE_YAML.to_string() {
+                let result = yaml_rust::YamlLoader::load_from_str(&data_item);
+                if result.is_err() {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!("Validation error for object format. Expected format is YAML."))
+                        )
                     )
-                )
+                }
+            } else if mode == MODE_JSON.to_string() {
+                let result = json::parse(&data_item);
+                if result.is_err() {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!("Validation error for object format. Expected format is JSON."))
+                        )
+                    )
+                }
             }
-            eprintln!("ObjectColumn.validate :: object: {:#?}", result.unwrap());
         }
         return Ok(data.clone())
     }
