@@ -126,3 +126,34 @@ pub const STATS_FUNCTION_XOR: &str = "XOR";
 // Modes
 pub const MODE_YAML: &str = "yaml";
 pub const MODE_JSON: &str = "json";
+
+// File Properties
+            // Title
+            // File Name
+            // Created Time
+            // Last Modified Time
+            // Path: Relative to achiever planet home, which differs in platforms.
+            // File Type: Title for file type, like "Microsoft Word", etc...
+            // Content Type: application/pdf, etc...
+            // Creator
+            // Tags : Into data_collections, {Column}__tags
+            // Width
+            // Height
+            // Size
+
+pub const FILE_PROP_TITLE: &str = "Title";
+pub const FILE_PROP_FILE_NAME: &str = "File Name";
+pub const FILE_PROP_CREATED_TIME: &str = "Created Time";
+pub const FILE_PROP_LAST_MODIFIED_TIME: &str = "Last Modified Time";
+pub const FILE_PROP_PATH: &str = "Path";
+pub const FILE_PROP_FILE_TYPE: &str = "File Type";
+pub const FILE_PROP_CONTENT_TYPE: &str = "Content Type";
+pub const FILE_PROP_CREATOR: &str = "Creator";
+pub const FILE_PROP_TAGS: &str = "Tags";
+pub const FILE_PROP_IMAGE_WIDTH: &str = "Image Width";
+pub const FILE_PROP_IMAGE_HEIGHT: &str = "Image Height";
+pub const FILE_PROP_SIZE: &str = "Size";
+pub const FILE_PROP_SUBJECT: &str = "Subject";
+pub const FILE_PROP_DESCRIPTION: &str = "Description";
+pub const FILE_PROP_CATEGORY: &str = "Category";
+pub const FILE_PROP_METADATA: &str = "Metadata";

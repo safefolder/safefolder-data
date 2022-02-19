@@ -49,3 +49,7 @@ pub const LANGUAGE_CODE_PORTUGUESE: &str = "pt";
 pub const LANGUAGE_CODE_NORWEGIAN: &str = "no";
 pub const LANGUAGE_CODE_SWEDISH: &str = "sw";
 pub const LANGUAGE_CODE_DANISH: &str = "da";
+
+// Tika Local Server
+pub const TIKA_HOST: &str = "localhost";
+pub const TIKA_PORT: &str = "9998";

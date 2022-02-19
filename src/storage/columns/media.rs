@@ -1,53 +1,20 @@
 extern crate rust_stemmers;
+extern crate dirs;
 
 use std::collections::{BTreeMap, HashMap};
+// use std::env;
 use colored::Colorize;
 use std::fs::File;
 use mime_guess;
-// use json;
+use json;
+use reqwest::blocking::Client;
 use serde_yaml;
+// use std::process::Command;
 
 use crate::planet::{PlanetError};
 use crate::commands::folder::config::ColumnConfig;
 use crate::storage::constants::*;
 use crate::storage::columns::*;
-
-// #[derive(Debug, Clone)]
-// pub struct FileVersionData {
-//     pub id: String,
-//     pub name: Option<String>,
-//     pub file_type: String,
-//     pub content_type: String,
-//     pub size: Option<usize>,
-//     pub width: Option<usize>,
-//     pub height: Option<usize>,
-//     pub properties: Option<BTreeMap<String, String>>,
-// }
-
-// I would need to adapt to achiever data structure. I can work with data_objects and store an object
-// versions can be serialized in YAML format, and make it work with write and later read doing the serial work
-// meta can be serialized json object, maybe yaml???
-
-// file type is the human version of mime content types, making a map
-
-// #[derive(Debug, Clone)]
-// pub struct FileData {
-//     pub id: String,
-//     pub file_name: String,
-//     pub versions: Option<Vec<FileVersionData>>,
-//     pub title: Option<String>,
-//     pub content_type: String,
-//     pub file_type: String,
-//     pub tags: Option<Vec<String>>,
-//     pub description: Option<String>,
-//     pub created_time: Option<String>,
-//     pub last_modified_time: Option<String>,
-//     pub size: Option<usize>,
-//     pub width: Option<usize>,
-//     pub height: Option<usize>,
-//     pub meta: Option<json::JsonValue>,
-//     pub properties: Option<BTreeMap<String, String>>,
-// }
 
 #[derive(Debug, Clone)]
 pub struct FileColumn {
@@ -65,31 +32,28 @@ impl FileColumn {
     }
     pub fn validate(
         &self, 
-        paths: &Vec<String>
-    ) -> Result<Vec<String>, PlanetError> {
-        // Column Type Yaml???? It would store and serialize automatically, YAMLColumn, JSONColumn.
-        // I return data_objects and data_collections
-        // data_objects...
-        // - {Column}: All data, basic properties, meta.
-        // data_collections
-        // - {Column}__versions: All versions for the case of images, with image manipulation, or versions of 
-        //      docs modified. I place here the thumb version 300x??? landscape or ???x300 portrait for views.
-        // - {Column}__tags : All tags coming from the file, with object and "value" key, being value the tag.
-        // Files are stored by id into the "{space}/files" directory. originals and versions.
-        //          {file_id}.achieverenc
-        // Transaction support, removing the file from OS in case we can't write into database.
-        // I need a way to roll back the column file write
+        paths: &Vec<String>,
+        data_objects: &BTreeMap<String, BTreeMap<String, String>>,
+        data_collections: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
+    ) -> Result<(
+            Vec<String>,
+            BTreeMap<String, BTreeMap<String, String>>, 
+            BTreeMap<String, Vec<BTreeMap<String, String>>>
+        ), PlanetError> {
+        let mut data_collections = data_collections.clone();
+        let mut data_objects = data_objects.clone();
         let paths = paths.clone();
         let config = self.config.clone();
+        let column_id = &config.id.unwrap();
         let content_types_wrap = config.content_types;
         let mut content_types: Vec<String> = Vec::new();
         if content_types_wrap.is_some() {
             content_types = content_types_wrap.unwrap();
         }
+        let mut document_texts: Vec<String> = Vec::new();
         for path in paths.clone() {
             let path_fields: Vec<&str> = path.split("/").collect();
             let file_name = path_fields.last().unwrap().clone();
-            eprint!("FileColumn.validate :: file_name: {}", file_name);
             // 1. Check path exists, raise error if does not exist
             let file = File::open(path.clone());
             if file.is_err() {
@@ -98,51 +62,216 @@ impl FileColumn {
                     PlanetError::new(
                         500, 
                         Some(tr!(
-                            "Could not open File at \"{}\". Error: {:?}.", &path, &error
+                            "Could not open File at \"{}\". Error: \"{}\".", &path, &error
                         )),
                     )
                 );
             }
-            let _file = file.unwrap();
+            let file = file.unwrap();
             // 2. Validate file is allowed in config content types. Some crate??? Using file name????
+            let mime_guess = mime_guess::from_path(file_name);
+            let content_type_wrap = mime_guess.first();
+            let mut content_type: String = String::from("");
+            if content_type_wrap.is_some() {
+                let content_type_ = content_type_wrap.unwrap();
+                content_type = content_type_.to_string();
+            }
             if content_types.len() > 0 {
-                let mime_guess = mime_guess::from_path(file_name);
-                let content_type = mime_guess.first();
-                if content_type.is_some() {
-                    let content_type = content_type.unwrap();
-                    let content_type = content_type.to_string();
-                    let check = content_types.contains(&content_type);
-                    if !check {
-                        return Err(
-                            PlanetError::new(
-                                500, 
-                                Some(tr!(
-                                    "File with path \"{}\" has content type not supported: \"{}\"", 
-                                    &path, &content_type
-                                )),
-                            )
-                        );
-                    }
+                let check = content_types.contains(&content_type);
+                if !check {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!(
+                                "File with path \"{}\" has content type not supported: \"{}\"", 
+                                &path, &content_type
+                            )),
+                        )
+                    );
                 }
             }
-            // 3. Proccess with Tika to get text and metadata
-            // I return list of parsed data for all contents related to the file, like images in a word document
-            // Title
-            // File Name
-            // Created Time
-            // Last Modified Time
-            // Path: Relative to achiever planet home, which differs in platforms.
-            // File Type: Title for file type, like "Microsoft Word", etc...
-            // Content Type: application/pdf, etc...
-            // Creator
-            // Tags : Into data_collections, {Column}__tags
-            // Width
-            // Height
-            // Size
-            // 4. Generate thumb image version in case image
-            // 5. Populate data_objects and data_collections
+            let metadata = &file.metadata().unwrap();
+            let file_size = metadata.len();
+            if metadata.is_dir() {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!(
+                            "Path \"\" is location of a directory instead of a file.", &path
+                        )),
+                    )
+                );
+            }
+            let client = Client::new();
+            let url = format!("http://{host}:{port}/rmeta/text", host=TIKA_HOST, port=TIKA_PORT);
+            let res = client.put(&url)
+            .body(file)
+            .send();
+            if res.is_ok() {
+                let response = res.unwrap();
+                let response = response.text().unwrap();
+                let json_document = json::parse(&response);
+                let mut my_map: BTreeMap<String, String> = BTreeMap::new();
+                if json_document.is_ok() {
+                    let json_document = json_document.unwrap();
+                    let main_document = &json_document[0];
+                    let title = &main_document["dc:title"];
+                    let created_time = &main_document["dcterms:created"];
+                    let last_modified_time = &main_document["dcterms:modified"];
+                    let content_type = &main_document["Content-Type"];
+                    let creator = &main_document["dc:creator"];
+                    let subject = &main_document["dc:subject"];
+                    let description = &main_document["dc:description"];
+                    let category = &main_document["cp:category"];
+                    let image_width = &main_document["Image Width"];
+                    let image_height = &main_document["Image Height"];
+                    let text = &main_document["X-TIKA:content"];
+                    // file type
+                    if !title.is_null() {
+                        my_map.insert(
+                            FILE_PROP_TITLE.to_string(), 
+                            title.to_string()
+                        );
+                    }
+                    my_map.insert(
+                        FILE_PROP_FILE_NAME.to_string(), 
+                        file_name.to_string()
+                    );
+                    my_map.insert(
+                        FILE_PROP_SIZE.to_string(), 
+                        file_size.to_string()
+                    );
+                    if !created_time.is_null() {
+                        my_map.insert(
+                            FILE_PROP_CREATED_TIME.to_string(), 
+                            created_time.to_string()
+                        );
+                    }
+                    if !last_modified_time.is_null() {
+                        my_map.insert(
+                            FILE_PROP_LAST_MODIFIED_TIME.to_string(), 
+                            last_modified_time.to_string()
+                        );
+                    }
+                    if !content_type.is_null() {
+                        my_map.insert(
+                            FILE_PROP_CONTENT_TYPE.to_string(), 
+                            content_type.to_string()
+                        );
+                    }
+                    if !creator.is_null() {
+                        my_map.insert(
+                            FILE_PROP_CREATOR.to_string(), 
+                            creator.to_string()
+                        );
+                    }
+                    if !category.is_null() {
+                        my_map.insert(
+                            FILE_PROP_CATEGORY.to_string(), 
+                            category.to_string()
+                        );
+                    }
+                    if !subject.is_null() {
+                        if subject.is_string() {
+                            my_map.insert(
+                                FILE_PROP_SUBJECT.to_string(), 
+                                subject.to_string()
+                            );
+                        } else {
+                            my_map.insert(
+                                FILE_PROP_SUBJECT.to_string(), 
+                                subject[0].to_string()
+                            );
+                            let keywords = subject[1].to_string();
+                            let check = keywords.contains(",");
+                            if check {
+                                let keyword_list: Vec<&str> = keywords.split(",").collect();
+                                let mut list: Vec<BTreeMap<String, String>> = Vec::new();
+                                for keyword in keyword_list {
+                                    let keyword = keyword.trim();
+                                    let mut my_map: BTreeMap<String, String> = BTreeMap::new();
+                                    my_map.insert(VALUE.to_string(), keyword.to_string());
+                                    list.push(my_map);
+                                }
+                                let key = format!("{}__tags", column_id);
+                                data_collections.insert(key, list);
+                            } else {
+                                let keyword = keywords;
+                                let mut list: Vec<BTreeMap<String, String>> = Vec::new();
+                                let mut my_map: BTreeMap<String, String> = BTreeMap::new();
+                                my_map.insert(VALUE.to_string(), keyword.to_string());
+                                list.push(my_map);
+                                let key = format!("{}__tags", column_id);
+                                data_collections.insert(key, list);
+                            }
+                            my_map.insert(
+                                FILE_PROP_SUBJECT.to_string(), 
+                                subject[0].to_string()
+                            );
+                        }
+                    }
+                    if !image_width.is_null() {
+                        let width_str = image_width.to_string();
+                        let fields: Vec<&str> = width_str.split(" pixels").collect();
+                        my_map.insert(
+                            FILE_PROP_IMAGE_WIDTH.to_string(), 
+                            fields[0].to_string()
+                        );
+                    }
+                    if !image_height.is_null() {
+                        let height_str = image_height.to_string();
+                        let fields: Vec<&str> = height_str.split(" pixels").collect();
+                        my_map.insert(
+                            FILE_PROP_IMAGE_HEIGHT.to_string(), 
+                            fields[0].to_string()
+                        );
+                    }
+                    if !description.is_null() {
+                        my_map.insert(
+                            FILE_PROP_DESCRIPTION.to_string(), 
+                            description.to_string()
+                        );
+                    }
+                    if !text.is_null() {
+                        let mut text = text.to_string();
+                        text = text.replace("\n", "");
+                        text = text.replace("\t", "");
+                        text = text.replace("\r", "");
+                        document_texts.push(text);
+                    }
+                    my_map.insert(
+                        FILE_PROP_METADATA.to_string(), 
+                        response
+                    );
+                    data_objects.insert(column_id.clone(), my_map);
+                } else {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!(
+                                "Error processing metadata response."
+                            )),
+                        )
+                    );
+                }
+            } else {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!(
+                            "Error getting file metadata."
+                        )),
+                    )
+                );
+            }    
         }
-        return Ok(paths.clone())
+        return Ok(
+            (
+                document_texts.clone(),
+                data_objects.clone(),
+                data_collections.clone()
+            )
+        )
     }
 }
 impl StorageColumnBasic for FileColumn {
@@ -204,6 +333,7 @@ pub fn get_file_types() -> HashMap<String, String> {
     let mut map: HashMap<String, String> = HashMap::new();
     map.insert(String::from("application/vnd.hzn-3d-crossword"), String::from("3D Crossword Plugin"));
     // TODO: continue with all mime types
+    // https://www.freeformatter.com/mime-types-list.html#mime-types-list
     return map
 }
 

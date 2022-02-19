@@ -80,8 +80,8 @@ use planet::constants::*;
 // }
 
 
-#[tokio::main]
-async fn main() {
+// #[tokio::main]
+fn main() {
     // achiever run command ...
     // achiever run action ...
     // achiever run journey ...

@@ -33,6 +33,7 @@ use crate::storage::columns::date::*;
 use crate::storage::columns::formula::*;
 use crate::storage::columns::reference::*;
 use crate::storage::columns::structure::*;
+use crate::storage::columns::media::*;
 
 pub struct InsertIntoFolder<'gb> {
     pub planet_context: &'gb PlanetContext<'gb>,
@@ -540,7 +541,22 @@ impl<'gb> InsertIntoFolder<'gb> {
                         COLUMN_TYPE_OBJECT => {
                             let obj = ObjectColumn::defaults(&column_config);
                             column_data_wrap = obj.validate(&column_data);
-                        },                        
+                        },
+                        COLUMN_TYPE_FILE => {
+                            let obj = FileColumn::defaults(&column_config);
+                            let fields = obj.validate(
+                                &column_data,
+                                &data_objects,
+                                &data_collections
+                            );
+                            if fields.is_ok() {
+                                let fields = fields.unwrap();
+                                column_data_wrap = Ok(fields.0);
+                                data_objects = fields.1;
+                                data_collections = fields.2;
+                            }
+                            // skip_data_assign = true;
+                        },
                         _ => {
                             errors.push(
                                 PlanetError::new(

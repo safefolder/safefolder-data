@@ -21,7 +21,7 @@ use crate::storage::generate_id;
 use crate::storage::columns::*;
 
 lazy_static! {
-    pub static ref RE_TEXT: Regex = Regex::new(r#"[\w\d]+"#).unwrap();
+    pub static ref RE_TEXT: Regex = Regex::new(r#"[a-zA-Z0-9]+"#).unwrap();
     pub static ref RE_PHONE: Regex = Regex::new(r#"^(\+\d{1,2}\s)?\(?\d{2,3}\)?[\s.-]\d{2,3}[\s.-]\d{2,4}([\s.-]\d{2,4})?$"#).unwrap();
     pub static ref RE_EMAIL: Regex = Regex::new(r#"^(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])$"#).unwrap();
     pub static ref RE_URL: Regex = Regex::new(r#"^https?:[/][/](www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$"#).unwrap();
@@ -715,6 +715,12 @@ impl TextColumn {
                     }
                 },
                 COLUMN_TYPE_EMAIL => {
+                    let wrap = data_map.get(&column_id);
+                    if wrap.is_some() {
+                        value_wrap = Some(wrap.unwrap().clone());
+                    }
+                },
+                COLUMN_TYPE_FILE => {
                     let wrap = data_map.get(&column_id);
                     if wrap.is_some() {
                         value_wrap = Some(wrap.unwrap().clone());
