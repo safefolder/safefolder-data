@@ -548,6 +548,8 @@ impl ConfigStorageColumn for ColumnConfig {
                         COLUMN_TYPE_FILE => {
                             let mut obj = FileColumn::defaults(
                                 &column_config,
+                                None,
+                                None,
                             );
                             column_config = obj.get_config(column_config_map)?;
                         },
@@ -723,7 +725,11 @@ impl ConfigStorageColumn for ColumnConfig {
                 map = ObjectColumn::defaults(&propertty_config_).create_config(&map)?;
             },
             COLUMN_TYPE_FILE => {
-                map = FileColumn::defaults(&propertty_config_).create_config(&map)?;
+                map = FileColumn::defaults(
+                    &propertty_config_,
+                    None,
+                    None
+                ).create_config(&map)?;
             },
             _ => {}
         }

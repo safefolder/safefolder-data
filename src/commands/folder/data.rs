@@ -298,7 +298,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                     None,
                     None,
                     None,
-                    routing_wrap,
+                    routing_wrap.clone(),
                     None,
                     sub_folders_wrap,
                 );
@@ -543,11 +543,17 @@ impl<'gb> InsertIntoFolder<'gb> {
                             column_data_wrap = obj.validate(&column_data);
                         },
                         COLUMN_TYPE_FILE => {
-                            let obj = FileColumn::defaults(&column_config);
+                            let obj = FileColumn::defaults(
+                                &column_config,
+                                Some(db_row.clone()),
+                                Some(self.space_database.clone())
+                            );
                             let fields = obj.validate(
                                 &column_data,
                                 &data_objects,
-                                &data_collections
+                                &data_collections,
+                                routing_wrap.clone(),
+                                &home_dir.to_string()
                             );
                             if fields.is_ok() {
                                 let fields = fields.unwrap();

@@ -40,6 +40,7 @@ pub const SELECT_OPTIONS: &str = "select_options";
 pub const KEY: &str = "key";
 pub const NAME_CAMEL: &str = "Name";
 pub const FOLDER_NAME: &str = "folder_name";
+pub const MAX_FILE_DB: u64 = 1000000;
 
 // FileConfig fields
 pub const COLUMN_TYPE: &str = "column_type";
@@ -128,19 +129,6 @@ pub const MODE_YAML: &str = "yaml";
 pub const MODE_JSON: &str = "json";
 
 // File Properties
-            // Title
-            // File Name
-            // Created Time
-            // Last Modified Time
-            // Path: Relative to achiever planet home, which differs in platforms.
-            // File Type: Title for file type, like "Microsoft Word", etc...
-            // Content Type: application/pdf, etc...
-            // Creator
-            // Tags : Into data_collections, {Column}__tags
-            // Width
-            // Height
-            // Size
-
 pub const FILE_PROP_TITLE: &str = "Title";
 pub const FILE_PROP_FILE_NAME: &str = "File Name";
 pub const FILE_PROP_CREATED_TIME: &str = "Created Time";

@@ -2,31 +2,38 @@ extern crate rust_stemmers;
 extern crate dirs;
 
 use std::collections::{BTreeMap, HashMap};
-// use std::env;
 use colored::Colorize;
 use std::fs::File;
 use mime_guess;
 use json;
 use reqwest::blocking::Client;
 use serde_yaml;
-// use std::process::Command;
 
 use crate::planet::{PlanetError};
 use crate::commands::folder::config::ColumnConfig;
 use crate::storage::constants::*;
 use crate::storage::columns::*;
+use crate::storage::folder::{DbFile, RoutingData, TreeFolderItem};
+use crate::storage::generate_id;
+use crate::storage::space::SpaceDatabase;
 
 #[derive(Debug, Clone)]
 pub struct FileColumn {
     pub config: ColumnConfig,
+    pub db_folder_item: Option<TreeFolderItem>,
+    pub space_database: Option<SpaceDatabase>,
 }
 impl FileColumn {
     pub fn defaults(
         column_config: &ColumnConfig,
+        db_folder_item: Option<TreeFolderItem>,
+        space_database: Option<SpaceDatabase>
     ) -> Self {
         let column_config = column_config.clone();
         let field_obj = Self{
             config: column_config,
+            db_folder_item: db_folder_item,
+            space_database: space_database
         };
         return field_obj
     }
@@ -35,11 +42,14 @@ impl FileColumn {
         paths: &Vec<String>,
         data_objects: &BTreeMap<String, BTreeMap<String, String>>,
         data_collections: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
+        routing: Option<RoutingData>,
+        home_dir: &String,
     ) -> Result<(
             Vec<String>,
             BTreeMap<String, BTreeMap<String, String>>, 
             BTreeMap<String, Vec<BTreeMap<String, String>>>
         ), PlanetError> {
+        let mut db_folder_item = self.db_folder_item.clone().unwrap();
         let mut data_collections = data_collections.clone();
         let mut data_objects = data_objects.clone();
         let paths = paths.clone();
@@ -90,6 +100,8 @@ impl FileColumn {
                     );
                 }
             }
+            // TODO: generate file type from custom map
+            let file_type: String = String::from("");
             let metadata = &file.metadata().unwrap();
             let file_size = metadata.len();
             if metadata.is_dir() {
@@ -107,6 +119,7 @@ impl FileColumn {
             let res = client.put(&url)
             .body(file)
             .send();
+            let mut file_id: Option<String> = None;
             if res.is_ok() {
                 let response = res.unwrap();
                 let response = response.text().unwrap();
@@ -126,7 +139,16 @@ impl FileColumn {
                     let image_width = &main_document["Image Width"];
                     let image_height = &main_document["Image Height"];
                     let text = &main_document["X-TIKA:content"];
+                    let id = generate_id();
                     // file type
+                    if id.is_some() {
+                        let id = id.unwrap();
+                        file_id = Some(id.clone());
+                        my_map.insert(
+                            ID.to_string(), 
+                            id
+                        );    
+                    }
                     if !title.is_null() {
                         my_map.insert(
                             FILE_PROP_TITLE.to_string(), 
@@ -259,11 +281,51 @@ impl FileColumn {
                     PlanetError::new(
                         500, 
                         Some(tr!(
-                            "Error getting file metadata."
+                            "Error processing file metadata."
                         )),
                     )
                 );
-            }    
+            }
+            // Write file into database or home OS dir
+            if file_id.is_some() {
+                let file_id = file_id.unwrap();
+                let mut file = File::open(path.clone()).unwrap();
+                let size = file.metadata().unwrap().len();
+                let db_file = DbFile::defaults(
+                    &file_id, 
+                    &file_name.to_string(), 
+                    &mut file,
+                    &content_type,
+                    &file_type,
+                    routing.clone(),
+                    home_dir
+                );
+                if size < MAX_FILE_DB {
+                    let db_file = db_file.unwrap();
+                    let result = db_folder_item.write_file(&db_file);
+                    if result.is_err() {
+                        return Err(
+                            PlanetError::new(
+                                500, 
+                                Some(tr!(
+                                    "Error writing into file database."
+                                )),
+                            )
+                        );
+                    }
+                } else {
+                    // File into OS home directory for space
+                }
+            } else {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!(
+                            "Error generating file id."
+                        )),
+                    )
+                );
+            }
         }
         return Ok(
             (

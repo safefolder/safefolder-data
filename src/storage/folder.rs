@@ -2,6 +2,7 @@ extern crate sled;
 extern crate slug;
 extern crate rust_stemmers;
 
+use std::io::Read;
 use std::str::FromStr;
 use std::{thread};
 use std::sync::{Arc, Mutex};
@@ -17,6 +18,8 @@ use serde_encrypt::{
     AsSharedKey, EncryptedMessage,
 };
 use slug::slugify;
+use sled::Tree;
+use std::fs::File;
 
 use crate::planet::constants::*;
 use crate::storage::{generate_id};
@@ -135,6 +138,116 @@ pub struct SubFolderItem {
     pub id: Option<String>,
     pub is_reference: Option<bool>,
     pub data: Option<BTreeMap<String, String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Validate, Clone)]
+pub struct DbFile {
+    #[validate(required)]
+    pub id: Option<String>,
+    #[validate(required)]
+    pub name: Option<String>,
+    pub size: Option<u64>,
+    pub content_type: Option<String>,
+    pub file_type: Option<String>,
+    pub routing: Option<BTreeMap<String, String>>,
+    pub options: Option<BTreeMap<String, String>>,
+    pub context: Option<BTreeMap<String, String>>,
+    pub content: Option<Vec<u8>>,
+    pub path: Option<String>,
+}
+impl DbFile {
+    pub fn defaults(
+        file_id: &String,
+        name: &String, 
+        file: &mut File,
+        content_type: &String,
+        file_type: &String,
+        routing: Option<RoutingData>,
+        home_dir: &String
+        ) -> Result<Self, PlanetError> {
+        let metadata = file.metadata();
+        let size = metadata.unwrap().len();
+        let mut content: Option<Vec<u8>> = None;
+        let mut path: Option<String> = None;
+        let mut routing_map: BTreeMap<String, String> = BTreeMap::new();
+        if routing.is_some() {
+            let routing = routing.unwrap();
+            let account_id = routing.account_id.clone().clone();
+            let site_id = routing.site_id.clone();
+            let space_id = routing.space_id.clone();
+            let box_id = routing.box_id.clone();
+            let ipfs_cid = routing.ipfs_cid.clone().unwrap_or_default();
+            if account_id.is_some() {
+                routing_map.insert(String::from(ACCOUNT_ID), account_id.unwrap().to_string());
+            }
+            if site_id.is_some() {
+                routing_map.insert(String::from(SITE_ID), site_id.unwrap());
+            }
+
+            if space_id.is_some() {
+                routing_map.insert(String::from(SPACE_ID), space_id.unwrap());
+            }
+            if box_id.is_some() {
+                routing_map.insert(String::from(BOX_ID), box_id.unwrap());
+            }            
+            routing_map.insert(String::from(IPFS_CID), ipfs_cid);
+        }
+        if size > MAX_FILE_DB {
+            // .achiever-planet/private/files/{file_id}.achieverenc
+            // .achiever-planet/sites/{site_id}/spaces/{space_id}/files/{file_id}.achieverenc
+            let space_id = routing_map.get(SPACE_ID);
+            let site_id = routing_map.get(SITE_ID);
+            if space_id.is_some() && site_id.is_some() {
+                let space_id = space_id.unwrap();
+                let site_id = site_id.unwrap();
+                let path_string: String;
+                if space_id == PRIVATE {
+                    path_string = format!(
+                        "{home}/private/files/{file_id}.achieverenc", 
+                        home=&home_dir, 
+                        file_id=file_id
+                    );
+                } else {
+                    path_string = format!(
+                        "{home}/sites/{site_id}/spaces/{space_id}/files/{file_id}.achieverenc", 
+                        home=&home_dir, 
+                        file_id=file_id,
+                        site_id=site_id,
+                        space_id=space_id
+                    );
+                }
+                path = Some(path_string);
+            }
+        } else {
+            // I place file in the file database
+            let mut contents = vec![0; size as usize];
+            let response = file.read(&mut contents);
+            if response.is_err() {
+                let error = response.unwrap_err();
+                eprintln!("{:?}", error);
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Error reading file.")),
+                    )
+                );
+            }
+            content = Some(contents);
+        }
+        let obj = Self{
+            id: Some(file_id.clone()),
+            name: Some(name.clone()),
+            routing: Some(routing_map),
+            options: None,
+            context: None,
+            content: content,
+            path: path,
+            size: Some(size),
+            content_type: Some(content_type.clone()),
+            file_type: Some(file_type.clone()),
+        };
+        return Ok(obj)
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
@@ -271,6 +384,10 @@ impl SchemaData {
 }
 
 impl SerdeEncryptSharedKey for DbData {
+    type S = BincodeSerializer<Self>;  // you can specify serializer implementation (or implement it by yourself).
+}
+
+impl SerdeEncryptSharedKey for DbFile {
     type S = BincodeSerializer<Self>;  // you can specify serializer implementation (or implement it by yourself).
 }
 
@@ -702,6 +819,7 @@ pub struct TreeFolderItem {
     pub box_id: Option<String>,
     pub db: Option<sled::Tree>,
     pub index: Option<sled::Tree>,
+    pub files_db: Option<sled::Tree>,
     pub tree_partitions: Option<sled::Tree>,
 }
 
@@ -1105,6 +1223,81 @@ impl TreeFolderItem {
         }
         return Ok(relevance_int)
     }
+    pub fn write_file(&mut self, db_file: &DbFile) -> Result<(), PlanetError> {
+        // box/base/folder/c7c815is1s406kaf3j30/files.db
+        let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
+        let db_file = db_file.clone();
+        if db_file.content.is_some() {
+            // I write into database
+            let encrypted_data = db_file.encrypt(&shared_key).unwrap();
+            let encoded = encrypted_data.serialize();
+            let id = db_file.id.clone().unwrap();
+            let id_db = xid::Id::from_str(id.as_str()).unwrap();
+            let id_db = id_db.as_bytes();
+            let mut path_db: String = String::from("");
+            let folder_id = self.folder_id.clone().unwrap_or_default();
+            let folder_id = folder_id.as_str();
+            let account_id = self.account_id.clone().unwrap_or_default();
+            let account_id = account_id.as_str();
+            let space_id = self.space_id.clone().unwrap_or_default();
+            let space_id = space_id.as_str();
+            let box_id = self.box_id.clone().unwrap_or_default();
+            let box_id = box_id.as_str();
+            let file_name = db_file.name.unwrap_or_default();
+            if account_id != "" && space_id != "" {
+                println!("DbFolderItem.write_file :: account_id and space_id have been informed");
+            } else if space_id == "private" {
+                path_db = format!(
+                    "box/{box_id}/folder/{folder_id}/files.db",
+                    box_id=box_id,
+                    folder_id=folder_id,
+                );
+            }
+            let db: Tree;
+            if self.files_db.is_some() {
+                db = self.files_db.clone().unwrap();
+            } else {
+                let db_ = self.database.open_tree(path_db);
+                if db_.is_err() {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!("Could not find language column.")),
+                        )
+                    )
+                }
+                db = db_.unwrap();
+                self.files_db = Some(db.clone());
+            }
+            let response = &db.insert(id_db, encoded);
+            match response {
+                Ok(_) => {
+                    return Ok(
+                        ()
+                    )
+                },
+                Err(_) => {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(
+                                tr!(
+                                    "Could not write file \"{}\" into file database.", &file_name
+                                )
+                            )
+                        )
+                    )
+                }
+            }    
+        } else {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("File is too big to write into file database.")),
+                )
+            )
+        }
+    }
 }
 
 impl FolderItem for TreeFolderItem {
@@ -1138,6 +1331,7 @@ impl FolderItem for TreeFolderItem {
             db: None,
             index: None,
             tree_partitions: None,
+            files_db: None,
         };
         Ok(db_row)
     }
