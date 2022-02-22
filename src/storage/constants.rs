@@ -1,9 +1,11 @@
 
 pub const FIELD_VERSION: &str = "v1";
 pub const SUB_FOLDER_VERSION: &str = "v1";
+
 pub const CHILD_PRIVATE_KEY_STR: &str = "xprv9zcbcQgMpVAa742DEAUFDLW7KxE5xRgqKVgQ9zpf4diT73KnEjWUZZ2bs42aX4RgvbXLC91TTc2t7caNcfkg5i1GFg2KY57RNrGeMkZHJdi";
 pub const CHILD_PUBLIC_KEY_STR: &str = "xpub6Dbx1vDFerisKY6gLC1FaUSqsz4aMtQggibzxPEGcyFRyqevnGpj7MM5iKoduqYcV9QHiLQafLcr9QYZ8M9Sb1XhkZ2xs73skyCTzsQ7Q7M";
 pub const CHILD_PRIVATE_KEY_ARRAY: [u8; 32] = [5, 184, 20, 127, 179, 211, 242, 67, 135, 53, 134, 91, 9, 210, 7, 179, 187, 140, 129, 89, 76, 7, 225, 55, 201, 108, 208, 42, 131, 42, 104, 170];
+pub const CHILD_NONCE: [u8; 7] = [196, 252, 232, 26, 189, 44, 173];
 
 pub const FORMULA_FORMAT_TEXT: &str = "Text";
 pub const FORMULA_FORMAT_NUMBER: &str = "Number";
@@ -25,6 +27,7 @@ pub const INDEX_PROFILE_RAW: &str = "raw";
 pub const DB: &str = "db";
 pub const INDEX: &str = "index";
 pub const PRIVATE: &str = "private";
+pub const BASE: &str = "base";
 pub const WORKSPACE: &str = "workspace";
 pub const SITE: &str = "site";
 pub const TEXT: &str = "text";

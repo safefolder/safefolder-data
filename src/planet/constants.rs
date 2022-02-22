@@ -53,3 +53,6 @@ pub const LANGUAGE_CODE_DANISH: &str = "da";
 // Tika Local Server
 pub const TIKA_HOST: &str = "localhost";
 pub const TIKA_PORT: &str = "9998";
+
+// Paths
+pub const HOME_DIR_FOLDER: &str = "achiever-planet";

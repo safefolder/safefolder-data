@@ -46,6 +46,7 @@ impl FileColumn {
         home_dir: &String,
     ) -> Result<(
             Vec<String>,
+            Vec<String>,
             BTreeMap<String, BTreeMap<String, String>>, 
             BTreeMap<String, Vec<BTreeMap<String, String>>>
         ), PlanetError> {
@@ -61,6 +62,7 @@ impl FileColumn {
             content_types = content_types_wrap.unwrap();
         }
         let mut document_texts: Vec<String> = Vec::new();
+        let mut file_ids: Vec<String> = Vec::new();
         for path in paths.clone() {
             let path_fields: Vec<&str> = path.split("/").collect();
             let file_name = path_fields.last().unwrap().clone();
@@ -261,6 +263,8 @@ impl FileColumn {
                         text = text.replace("\r", "");
                         document_texts.push(text);
                     }
+                    // let text = &main_document["X-TIKA:content"];
+                    // main_document.remove("X-TIKA:content");
                     my_map.insert(
                         FILE_PROP_METADATA.to_string(), 
                         response
@@ -300,10 +304,20 @@ impl FileColumn {
                     routing.clone(),
                     home_dir
                 );
+                if db_file.is_err() {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!(
+                                "Error writing into file database."
+                            )),
+                        )
+                    );                    
+                }
+                let mut db_file = db_file.unwrap();
                 if size < MAX_FILE_DB {
-                    let db_file = db_file.unwrap();
-                    let result = db_folder_item.write_file(&db_file);
-                    if result.is_err() {
+                    let file_id = db_folder_item.write_file(&db_file);
+                    if file_id.is_err() {
                         return Err(
                             PlanetError::new(
                                 500, 
@@ -313,8 +327,15 @@ impl FileColumn {
                             )
                         );
                     }
+                    let file_id = file_id.unwrap();
+                    file_ids.push(file_id.clone());
                 } else {
                     // File into OS home directory for space
+                    let file_id = db_file.write_file(&mut file, &db_folder_item);
+                    if file_id.is_ok() {
+                        let file_id = file_id.unwrap();
+                        file_ids.push(file_id);
+                    }
                 }
             } else {
                 return Err(
@@ -329,6 +350,7 @@ impl FileColumn {
         }
         return Ok(
             (
+                file_ids.clone(),
                 document_texts.clone(),
                 data_objects.clone(),
                 data_collections.clone()

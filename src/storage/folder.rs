@@ -2,7 +2,7 @@ extern crate sled;
 extern crate slug;
 extern crate rust_stemmers;
 
-use std::io::Read;
+use std::io::{Read, Write};
 use std::str::FromStr;
 use std::{thread};
 use std::sync::{Arc, Mutex};
@@ -19,7 +19,10 @@ use serde_encrypt::{
 };
 use slug::slugify;
 use sled::Tree;
-use std::fs::File;
+use std::fs::{File, remove_file, create_dir_all};
+use chacha20poly1305::{ChaCha20Poly1305}; // Or `XChaCha20Poly1305`
+use chacha20poly1305::aead::{NewAead, stream};
+use anyhow::{anyhow};
 
 use crate::planet::constants::*;
 use crate::storage::{generate_id};
@@ -28,6 +31,7 @@ use crate::commands::folder::config::{DbFolderConfig};
 use crate::storage::constants::*;
 use crate::storage::columns::*;
 use crate::storage::columns::text::{get_stop_words_by_language, get_stemmer_by_language};
+
 
 pub trait FolderSchema {
     fn defaults(
@@ -203,9 +207,10 @@ impl DbFile {
                 let path_string: String;
                 if space_id == PRIVATE {
                     path_string = format!(
-                        "{home}/private/files/{file_id}.achieverenc", 
+                        "{home}/{private}/files/{file_id}.achieverenc", 
                         home=&home_dir, 
-                        file_id=file_id
+                        file_id=file_id,
+                        private=PRIVATE
                     );
                 } else {
                     path_string = format!(
@@ -247,6 +252,227 @@ impl DbFile {
             file_type: Some(file_type.clone()),
         };
         return Ok(obj)
+    }
+    pub fn write_file(
+        &mut self,
+        file: &mut File,
+        db_folder_item: &TreeFolderItem
+    ) -> Result<String, PlanetError> {
+        let path = self.path.clone();
+        let mut db_folder_item = db_folder_item.clone();
+        if path.is_none() {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("No path defined for file.")),
+                )
+            );
+        }
+        let path = path.unwrap();
+        let cipher = ChaCha20Poly1305::new(CHILD_PRIVATE_KEY_ARRAY.as_ref().into());
+        let mut stream_encryptor = stream::EncryptorBE32::from_aead(
+            cipher, CHILD_NONCE.as_ref().into()
+        );
+        const BUFFER_LEN: usize = 500;
+        let mut buffer = [0u8; BUFFER_LEN];
+        let mut enc_file = File::create(&path).unwrap();
+        loop {
+            let read_count = file.read(&mut buffer).unwrap();
+            if read_count == BUFFER_LEN {
+                let ciphertext = stream_encryptor
+                    .encrypt_next(buffer.as_slice())
+                    .map_err(|err| anyhow!("Encrypting large file: {}", err));
+                if ciphertext.is_err() {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!("Problem encrypting file.")),
+                        )
+                    );
+                }
+                let ciphertext = ciphertext.unwrap();
+                enc_file.write(&ciphertext).unwrap();
+            } else {
+                let ciphertext = stream_encryptor
+                    .encrypt_last(&buffer[..read_count])
+                    .map_err(|err| anyhow!("Encrypting large file: {}", err));
+                if ciphertext.is_err() {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!("Problem encrypting file.")),
+                        )
+                    );
+                }
+                let ciphertext = ciphertext.unwrap();
+                enc_file.write(&ciphertext).unwrap();
+                break;
+            }
+        }
+        // Write into file database with the path
+        let file_id = db_folder_item.write_file(&self);
+        if file_id.is_ok() {
+            let file_id = file_id.unwrap();
+            return Ok(file_id.clone())
+        } else {
+            // remove file from path
+            let _ = remove_file(&path);
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Could not write file path into file database.")),
+                )
+            );
+        }
+    }
+    pub fn get_home_path(&mut self) -> Result<String, PlanetError> {
+        let routing = self.routing.clone();
+        if routing.is_none() {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Cannot export file if no routing is found.")),
+                )
+            );
+        }
+        // let _ = create_dir_all(&path);
+        let routing = routing.unwrap();
+        let space_id = routing.get(SPACE_ID).unwrap();
+        let site_id = routing.get(SITE_ID);
+        let box_id = routing.get(BOX_ID);
+        let sys_home_dir = dirs::home_dir().unwrap();
+        let home_dir = sys_home_dir.as_os_str().to_str().unwrap().to_string();
+        let file_name = self.name.clone().unwrap();
+        let path: String;
+        if space_id.as_str() == PRIVATE {
+            let path_dir = format!(
+                "{home_dir}/{home_dir_folder}/{private}",
+                home_dir=home_dir,
+                home_dir_folder=HOME_DIR_FOLDER,
+                private=PRIVATE,
+            );
+            let _ = create_dir_all(&path_dir);
+            path = format!(
+                "{path_dir}/{file_name}",
+                path_dir=path_dir,
+                file_name=&file_name,
+            );
+        } else {
+            let site_id = site_id.unwrap();
+            let box_id = box_id.unwrap();
+            if box_id.as_str() == BASE {
+                let path_dir = format!(
+                    "{home_dir}/{home_dir_folder}/sites/{site_id}/spaces/{space_id}",
+                    home_dir=home_dir,
+                    home_dir_folder=HOME_DIR_FOLDER,
+                    site_id=site_id,
+                    space_id=space_id,
+                );
+                let _ = create_dir_all(&path_dir);
+                path = format!(
+                    "{path_dir}/{file_name}",
+                    path_dir=path_dir,
+                    file_name=&file_name,
+                );
+            } else {
+                let path_dir = format!(
+                    "{home_dir}/{home_dir_folder}/sites/{site_id}/boxes/{box_id}/spaces/{space_id}",
+                    home_dir=home_dir,
+                    home_dir_folder=HOME_DIR_FOLDER,
+                    site_id=site_id,
+                    space_id=space_id,
+                    box_id = box_id,
+                );
+                let _ = create_dir_all(&path_dir);
+                path = format!(
+                    "{path_dir}/{file_name}",
+                    path_dir=path_dir,
+                    file_name=&file_name,
+                );
+            }
+        }
+        return Ok(path.clone())
+    }
+    pub fn export_file(
+        &mut self,
+    ) -> Result<(), PlanetError> {
+        let path = self.get_home_path();
+        if path.is_err() {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Error obtainning path for exported file.")),
+                )
+            );
+        }
+        let path = path.unwrap();
+        let path_encrypted = self.path.clone();
+        if path_encrypted.is_none() {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("No path defined for file.")),
+                )
+            );
+        }
+        let path_encrypted = path_encrypted.unwrap();
+        let cipher = ChaCha20Poly1305::new(CHILD_PRIVATE_KEY_ARRAY.as_ref().into());
+        let mut stream_decryptor = stream::DecryptorBE32::from_aead(
+            cipher, 
+            CHILD_NONCE.as_ref().into()
+        );
+        const BUFFER_LEN: usize = 500 + 16;
+        let mut buffer = [0u8; BUFFER_LEN];
+        let encrypted_file = File::open(path_encrypted);
+        if encrypted_file.is_err() {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Could not open encrypted file.")),
+                )
+            );
+        }
+        let mut encrypted_file = encrypted_file.unwrap();
+        let mut file = File::create(path).unwrap();
+        loop {
+            let read_count = encrypted_file.read(&mut buffer).unwrap();
+    
+            if read_count == BUFFER_LEN {
+                let plaintext = stream_decryptor
+                    .decrypt_next(buffer.as_slice())
+                    .map_err(|err| anyhow!("Decrypting large file: {}", err));
+                if plaintext.is_err() {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!("Problem decrypting file.")),
+                        )
+                    );
+                }
+                let plaintext = plaintext.unwrap();
+                let _ = file.write(&plaintext);
+            } else if read_count == 0 {
+                break;
+            } else {
+                let plaintext = stream_decryptor
+                    .decrypt_last(&buffer[..read_count])
+                    .map_err(|err| anyhow!("Decrypting large file: {}", err));
+                if plaintext.is_err() {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!("Problem decrypting file.")),
+                        )
+                    );
+                }
+                let plaintext = plaintext.unwrap();
+                let _ = file.write(&plaintext);
+                break;
+            }
+        }
+        return Ok(
+            ()
+        )
     }
 }
 
@@ -1223,7 +1449,7 @@ impl TreeFolderItem {
         }
         return Ok(relevance_int)
     }
-    pub fn write_file(&mut self, db_file: &DbFile) -> Result<(), PlanetError> {
+    pub fn write_file(&mut self, db_file: &DbFile) -> Result<String, PlanetError> {
         // box/base/folder/c7c815is1s406kaf3j30/files.db
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let db_file = db_file.clone();
@@ -1272,9 +1498,7 @@ impl TreeFolderItem {
             let response = &db.insert(id_db, encoded);
             match response {
                 Ok(_) => {
-                    return Ok(
-                        ()
-                    )
+                    return Ok(id.clone())
                 },
                 Err(_) => {
                     return Err(
@@ -1297,6 +1521,100 @@ impl TreeFolderItem {
                 )
             )
         }
+    }
+    pub fn export_file(&mut self, id: &String) -> Result<usize, PlanetError> {
+        let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
+        let folder_id = self.folder_id.clone().unwrap_or_default();
+        let folder_id = folder_id.as_str();
+        let account_id = self.account_id.clone().unwrap_or_default();
+        let account_id = account_id.as_str();
+        let space_id = self.space_id.clone().unwrap_or_default();
+        let space_id = space_id.as_str();
+        let box_id = self.box_id.clone().unwrap_or_default();
+        let box_id = box_id.as_str();
+        let mut path_db: String = String::from("");
+        if account_id != "" && space_id != "" {
+            println!("DbFolderItem.write_file :: account_id and space_id have been informed");
+        } else if space_id == "private" {
+            path_db = format!(
+                "box/{box_id}/folder/{folder_id}/files.db",
+                box_id=box_id,
+                folder_id=folder_id,
+            );
+        }
+        let db: Tree;
+        if self.files_db.is_some() {
+            db = self.files_db.clone().unwrap();
+        } else {
+            let db_ = self.database.open_tree(path_db);
+            if db_.is_err() {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Could not find language column.")),
+                    )
+                )
+            }
+            db = db_.unwrap();
+            self.files_db = Some(db.clone());
+        }
+        let id_db = xid::Id::from_str(&id).unwrap();
+        let id_db = id_db.as_bytes();
+        let result = db.get(id_db);
+        let file_size: usize;
+        match result {
+            Ok(_) => {
+                let result = result.unwrap();
+                if result.is_none() {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!("Item not found in file database.")),
+                        )
+                    )
+                }
+                let item_db = result.unwrap().to_vec();
+                let item_ = EncryptedMessage::deserialize(
+                    item_db
+                ).unwrap();
+                let item_ = DbFile::decrypt_owned(
+                    &item_, 
+                    &shared_key
+                );
+                if item_.is_err() {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!("Error decrypting file.")),
+                        )
+                    )
+                }
+                let mut file = item_.unwrap();
+                let content = file.clone().content.unwrap();
+                let path = file.get_home_path();
+                let path = path.unwrap();
+                let mut file = File::create(path).unwrap();
+                let result = file.write(&content);
+                if result.is_err() {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!("Error writing into home directory.")),
+                        )
+                    )
+                }
+                file_size = result.unwrap();
+            },
+            Err(_) => {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Could not find item in file database.")),
+                    )
+                )
+            }
+        }
+        return Ok(file_size)
     }
 }
 

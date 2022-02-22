@@ -558,8 +558,8 @@ impl<'gb> InsertIntoFolder<'gb> {
                             if fields.is_ok() {
                                 let fields = fields.unwrap();
                                 column_data_wrap = Ok(fields.0);
-                                data_objects = fields.1;
-                                data_collections = fields.2;
+                                data_objects = fields.2;
+                                data_collections = fields.3;
                             }
                             // skip_data_assign = true;
                         },
