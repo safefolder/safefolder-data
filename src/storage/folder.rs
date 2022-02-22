@@ -309,7 +309,7 @@ impl DbFile {
                 break;
             }
         }
-        // Write into file database with the path
+        // Write into file database the path to encrypted file
         let file_id = db_folder_item.write_file(&self);
         if file_id.is_ok() {
             let file_id = file_id.unwrap();
@@ -1453,74 +1453,65 @@ impl TreeFolderItem {
         // box/base/folder/c7c815is1s406kaf3j30/files.db
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let db_file = db_file.clone();
-        if db_file.content.is_some() {
-            // I write into database
-            let encrypted_data = db_file.encrypt(&shared_key).unwrap();
-            let encoded = encrypted_data.serialize();
-            let id = db_file.id.clone().unwrap();
-            let id_db = xid::Id::from_str(id.as_str()).unwrap();
-            let id_db = id_db.as_bytes();
-            let mut path_db: String = String::from("");
-            let folder_id = self.folder_id.clone().unwrap_or_default();
-            let folder_id = folder_id.as_str();
-            let account_id = self.account_id.clone().unwrap_or_default();
-            let account_id = account_id.as_str();
-            let space_id = self.space_id.clone().unwrap_or_default();
-            let space_id = space_id.as_str();
-            let box_id = self.box_id.clone().unwrap_or_default();
-            let box_id = box_id.as_str();
-            let file_name = db_file.name.unwrap_or_default();
-            if account_id != "" && space_id != "" {
-                println!("DbFolderItem.write_file :: account_id and space_id have been informed");
-            } else if space_id == "private" {
-                path_db = format!(
-                    "box/{box_id}/folder/{folder_id}/files.db",
-                    box_id=box_id,
-                    folder_id=folder_id,
-                );
-            }
-            let db: Tree;
-            if self.files_db.is_some() {
-                db = self.files_db.clone().unwrap();
-            } else {
-                let db_ = self.database.open_tree(path_db);
-                if db_.is_err() {
-                    return Err(
-                        PlanetError::new(
-                            500, 
-                            Some(tr!("Could not find language column.")),
-                        )
+        let encrypted_data = db_file.encrypt(&shared_key).unwrap();
+        let encoded = encrypted_data.serialize();
+        let id = db_file.id.clone().unwrap();
+        let id_db = xid::Id::from_str(id.as_str()).unwrap();
+        let id_db = id_db.as_bytes();
+        let mut path_db: String = String::from("");
+        let folder_id = self.folder_id.clone().unwrap_or_default();
+        let folder_id = folder_id.as_str();
+        let account_id = self.account_id.clone().unwrap_or_default();
+        let account_id = account_id.as_str();
+        let space_id = self.space_id.clone().unwrap_or_default();
+        let space_id = space_id.as_str();
+        let box_id = self.box_id.clone().unwrap_or_default();
+        let box_id = box_id.as_str();
+        let file_name = db_file.name.unwrap_or_default();
+        if account_id != "" && space_id != "" {
+            println!("DbFolderItem.write_file :: account_id and space_id have been informed");
+        } else if space_id == "private" {
+            path_db = format!(
+                "box/{box_id}/folder/{folder_id}/files.db",
+                box_id=box_id,
+                folder_id=folder_id,
+            );
+        }
+        let db: Tree;
+        if self.files_db.is_some() {
+            db = self.files_db.clone().unwrap();
+        } else {
+            let db_ = self.database.open_tree(path_db);
+            if db_.is_err() {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Could not find language column.")),
                     )
-                }
-                db = db_.unwrap();
-                self.files_db = Some(db.clone());
+                )
             }
-            let response = &db.insert(id_db, encoded);
-            match response {
-                Ok(_) => {
-                    return Ok(id.clone())
-                },
-                Err(_) => {
-                    return Err(
-                        PlanetError::new(
-                            500, 
-                            Some(
-                                tr!(
-                                    "Could not write file \"{}\" into file database.", &file_name
-                                )
+            db = db_.unwrap();
+            self.files_db = Some(db.clone());
+        }
+        let response = &db.insert(id_db, encoded);
+        match response {
+            Ok(_) => {
+                eprintln!("TreeFolderItem.write_file :: Wrote OK!");
+                return Ok(id.clone())
+            },
+            Err(_) => {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(
+                            tr!(
+                                "Could not write file \"{}\" into file database.", &file_name
                             )
                         )
                     )
-                }
-            }    
-        } else {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!("File is too big to write into file database.")),
                 )
-            )
-        }
+            }
+        }    
     }
     pub fn export_file(&mut self, id: &String) -> Result<usize, PlanetError> {
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);

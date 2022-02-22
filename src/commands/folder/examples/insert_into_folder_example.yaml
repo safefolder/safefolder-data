@@ -1,6 +1,6 @@
 ---
 command: INSERT INTO FOLDER "Super Folder 14"
-name: Pepito Data 95
+name: Pepito Data 117
 data:
   My Column: pepito
   Description: This is some description I want to include for España canción with description repeated
@@ -14,7 +14,7 @@ data:
   My Email: me@jorgealegre.com
   My Url: https://jorgealegre.com
   My Rating: 3
-  File: /Users/jorgealegre/Downloads/f3336de0d3ca4cb881b65ddd92451a2d_listado_de_facturas_expedidas_20220221_110646669.pdf
+  File: /Users/jorgealegre/Downloads/f3336de0d3ca4cb881b65ddd92451a2d_desglose_del_libro_diario_20220221_110431967.pdf
 data_collections:
   Statuses:
     - published

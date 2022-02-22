@@ -335,6 +335,16 @@ impl FileColumn {
                     if file_id.is_ok() {
                         let file_id = file_id.unwrap();
                         file_ids.push(file_id);
+                        let mine = db_file.export_file();
+                    } else {
+                        return Err(
+                            PlanetError::new(
+                                500, 
+                                Some(tr!(
+                                    "Error writing big file into file database."
+                                )),
+                            )
+                        );        
                     }
                 }
             } else {
