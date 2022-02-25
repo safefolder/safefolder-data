@@ -16,7 +16,7 @@ use crate::commands::folder::config::{
 use crate::commands::folder::{Command};
 use crate::commands::{CommandRunner};
 use crate::storage::{ConfigStorageColumn};
-use crate::storage::folder::{TreeFolder, FolderSchema, DbData, RoutingData};
+use crate::storage::folder::{TreeFolder, FolderSchema, DbData, RoutingData, build_value_list};
 use crate::storage::space::{SpaceDatabase};
 use crate::planet::{
     PlanetContext, 
@@ -81,10 +81,8 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
 
                 // db folder options with language data
                 let db_folder: TreeFolder = result.unwrap();
-                let mut data: BTreeMap<String, String> = BTreeMap::new();
+                let mut data: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
                 // config data
-                let mut data_objects: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
-                let mut data_collections: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
                 let mut columns = config.columns.unwrap().clone();
                 let sub_folders = config.sub_folders;
                 let mut column_ids: Vec<BTreeMap<String, String>> = Vec::new();
@@ -96,9 +94,9 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                 if language.is_some() {
                     let language = language.unwrap();
                     let language_default = language.default;
-                    data.insert(LANGUAGE_DEFAULT.to_string(), language_default);
+                    data.insert(LANGUAGE_DEFAULT.to_string(), build_value_list(&language_default));
                 } else {
-                    data.insert(LANGUAGE_DEFAULT.to_string(), LANGUAGE_ENGLISH.to_string());
+                    data.insert(LANGUAGE_DEFAULT.to_string(), build_value_list(&LANGUAGE_ENGLISH.to_string()));
                 }
                 let text_search = config.text_search;
                 if text_search.is_some() {
@@ -139,11 +137,15 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                             my_map.insert(column_relevance_item.clone(), relevance_string);
                         }
                     }
-                    data_objects.insert(TEXT_SEARCH_COLUMN_RELEVANCE.to_string(), my_map);
+                    let mut my_list: Vec<BTreeMap<String, String>> = Vec::new();
+                    my_list.push(my_map);
+                    data.insert(TEXT_SEARCH_COLUMN_RELEVANCE.to_string(), my_list);
                 } else {
                     let mut my_map: BTreeMap<String, String> = BTreeMap::new();
                     my_map.insert(TEXT_COLUMN.to_string(), String::from("1"));
-                    data_objects.insert(TEXT_SEARCH_COLUMN_RELEVANCE.to_string(), my_map);
+                    let mut my_list: Vec<BTreeMap<String, String>> = Vec::new();
+                    my_list.push(my_map);
+                    data.insert(TEXT_SEARCH_COLUMN_RELEVANCE.to_string(), my_list);
                 }
 
                 // name column
@@ -191,7 +193,7 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                     )?;
                     let map_list = &column.map_collections_db()?;
                     let map_list = map_list.clone();
-                    data_collections.extend(map_list);
+                    data.extend(map_list);
                     columns_list.push(map);
                 }
                 // Sub folders
@@ -224,7 +226,7 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                         }
                         list.push(sub_folder_db_map);
                     }
-                    data_collections.insert(
+                    data.insert(
                         SUB_FOLDERS.to_string(),
                         list
                     );
@@ -251,7 +253,7 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                         &COLUMN_TYPE_LANGUAGE.to_string(),
                     )
                 );
-                data_collections.insert(COLUMNS.to_string(), columns_list);
+                data.insert(COLUMNS.to_string(), columns_list);
                 // routing
                 let routing_wrap = RoutingData::defaults(
                     account_id, 
@@ -260,23 +262,13 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                     box_id,
                     None,
                 );
-                let mut data_wrap: Option<BTreeMap<String, String>> = None;
-                let mut data_collections_wrap: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>> = None;
-                let mut data_objects_wrap: Option<BTreeMap<String, BTreeMap<String, String>>> = None;
+                let mut data_wrap: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>> = None;
                 if data.len() > 0 {
                     data_wrap = Some(data);
-                }
-                if data_collections.len() > 0 {
-                    data_collections_wrap = Some(data_collections);
-                }
-                if data_objects.len() > 0 {
-                    data_objects_wrap = Some(data_objects);
                 }
                 let db_data: DbData = DbData::defaults(
                     &folder_name, 
                     data_wrap,
-                    data_collections_wrap,
-                    data_objects_wrap,
                     None,
                     routing_wrap,
                     None,
@@ -294,66 +286,76 @@ impl<'gb> Command<DbData> for CreateFolder<'gb> {
                 //
                 // Related folders, I need to update their config, like Links
                 //
-                let columns = response.data_objects.unwrap();
+                let columns = response.data.unwrap();
                 let mut linked_folder_ids: Vec<String> = Vec::new();
                 let mut map_column_names: BTreeMap<String, String> = BTreeMap::new();
                 let mut map_column_ids: BTreeMap<String, String> = BTreeMap::new();
                 for (_, v) in columns {
-                    let column_type = v.get(COLUMN_TYPE);
-                    let column_name = v.get(NAME);
-                    let column_id = v.get(ID);
-                    if column_type.is_some() {
-                        let column_type = column_type.unwrap();
-                        let column_name = column_name.unwrap();
-                        let column_id = column_id.unwrap();
-                        if column_type == COLUMN_TYPE_LINK {
-                            let linked_folder_id = v.get(LINKED_FOLDER_ID);
-                            if linked_folder_id.is_some() {
-                                let linked_folder_id = linked_folder_id.unwrap();
-                                let has_id = linked_folder_ids.contains(linked_folder_id);
-                                if !has_id {
-                                    linked_folder_ids.push(linked_folder_id.clone());
-                                    map_column_names.insert(
-                                        linked_folder_id.clone(), column_name.clone()
-                                    );
-                                    map_column_ids.insert(
-                                        linked_folder_id.clone(), column_id.clone()
-                                    );
+                    if v.len() == 1 {
+                        let v = &v[0];
+                        let column_type = v.get(COLUMN_TYPE);
+                        let column_name = v.get(NAME);
+                        let column_id = v.get(ID);
+                        if column_type.is_some() {
+                            let column_type = column_type.unwrap();
+                            let column_name = column_name.unwrap();
+                            let column_id = column_id.unwrap();
+                            if column_type == COLUMN_TYPE_LINK {
+                                let linked_folder_id = v.get(LINKED_FOLDER_ID);
+                                if linked_folder_id.is_some() {
+                                    let linked_folder_id = linked_folder_id.unwrap();
+                                    let has_id = linked_folder_ids.contains(linked_folder_id);
+                                    if !has_id {
+                                        linked_folder_ids.push(linked_folder_id.clone());
+                                        map_column_names.insert(
+                                            linked_folder_id.clone(), column_name.clone()
+                                        );
+                                        map_column_ids.insert(
+                                            linked_folder_id.clone(), column_id.clone()
+                                        );
+                                    }
                                 }
                             }
-                        }
+                        }    
                     }
                 }
                 // Get each folder from db_folder instance and update with link to this created table
-                let local_column_map = db_data.data_objects.unwrap();
+                let local_column_map = db_data.data.unwrap();
                 for link_folder_id in linked_folder_ids {
                     let linked_folder = db_folder.get(&link_folder_id);
                     if linked_folder.is_ok() {
                         let mut linked_folder = linked_folder.unwrap();
-                        let mut map = linked_folder.data_objects.unwrap();
+                        let data = linked_folder.clone().data;
+                        let mut map = linked_folder.clone().data.unwrap();
                         let column_name = map_column_names.get(&link_folder_id).unwrap();
-                        let mut remote_column_map: BTreeMap<String, String> = local_column_map.get(
+                        let remote_column_map = local_column_map.get(
                             column_name
                         ).unwrap().clone();
                         // Update Column map with columns for local column, Link with link_folder_id being 
                         // this local Column
-                        remote_column_map.insert(String::from(LINKED_FOLDER_ID), folder_id.clone());
-                        remote_column_map.insert(String::from(NAME), folder_name.clone());
-                        remote_column_map.insert(String::from(MANY), String::from(TRUE));
-                        map.insert(folder_name.clone(), remote_column_map);
-                        linked_folder.data_objects = Some(map);
-                        let mut column_ids_map = linked_folder.data_collections.unwrap();
-                        let mut column_ids = column_ids_map.get(
-                            COLUMN_IDS
-                        ).unwrap().clone();
-                        let column_id = map_column_ids.get(&link_folder_id.clone()).unwrap();
-                        let mut element: BTreeMap<String, String> = BTreeMap::new();
-                        element.insert(String::from(ID),column_id.clone());
-                        column_ids.push(element);
-                        column_ids_map.insert(String::from(COLUMN_IDS), column_ids);
-                        linked_folder.data_collections = Some(column_ids_map);
-                        eprintln!("CreateFolder.run :: linked_folder: {:#?}", &linked_folder);
-                        db_folder.update(&linked_folder)?;
+                        if remote_column_map.len() == 1 {
+                            let mut remote_column_map = remote_column_map[0].clone();
+                            remote_column_map.insert(String::from(LINKED_FOLDER_ID), folder_id.clone());
+                            remote_column_map.insert(String::from(NAME), folder_name.clone());
+                            remote_column_map.insert(String::from(MANY), String::from(TRUE));
+                            let mut my_list: Vec<BTreeMap<String, String>> = Vec::new();
+                            my_list.push(remote_column_map.clone());
+                            map.insert(folder_name.clone(), my_list);
+                            let mut column_ids_map = linked_folder.data.unwrap();
+                            let mut column_ids = column_ids_map.get(
+                                COLUMN_IDS
+                            ).unwrap().clone();
+                            let column_id = map_column_ids.get(&link_folder_id.clone()).unwrap();
+                            let mut element: BTreeMap<String, String> = BTreeMap::new();
+                            element.insert(String::from(ID),column_id.clone());
+                            column_ids.push(element);
+                            column_ids_map.insert(String::from(COLUMN_IDS), column_ids);
+                            let mut new_data = data.unwrap();
+                            new_data.extend(column_ids_map);
+                            linked_folder.data = Some(new_data);
+                            eprintln!("CreateFolder.run :: linked_folder: {:#?}", &linked_folder);
+                            db_folder.update(&linked_folder)?;
+                        }
                     }
                 }
 

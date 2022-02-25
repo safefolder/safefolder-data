@@ -78,7 +78,7 @@ pub trait FolderItem {
         r#where: Option<String>, 
     ) -> Result<SelectCountResult, PlanetError>;
     fn total_count(&mut self) -> Result<SelectCountResult, PlanetError>;
-    fn index(&mut self, db_item: &DbData) -> Result<DbData, PlanetError>;
+    fn index(&mut self, db_item: &DbData, text_map: &BTreeMap<String, String>) -> Result<DbData, PlanetError>;
 }
 
 // lifetimes: gb (global, for contexts), db, bs
@@ -487,17 +487,13 @@ pub struct DbData {
     pub routing: Option<BTreeMap<String, String>>,
     pub options: Option<BTreeMap<String, String>>,
     pub context: Option<BTreeMap<String, String>>,
-    pub data: Option<BTreeMap<String, String>>,
-    pub data_collections: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
-    pub data_objects: Option<BTreeMap<String, BTreeMap<String, String>>>,
+    pub data: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     pub sub_folders: Option<Vec<SubFolderItem>>,
 }
 impl DbData {
     pub fn defaults(
         name: &String, 
-        data: Option<BTreeMap<String, String>>, 
-        data_collections: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>, 
-        data_objects: Option<BTreeMap<String, BTreeMap<String, String>>>, 
+        data: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>, 
         options: Option<BTreeMap<String, String>>, 
         routing: Option<RoutingData>, 
         context: Option<BTreeMap<String, String>>,
@@ -536,8 +532,6 @@ impl DbData {
             routing: routing_map_,
             options: options,
             data: data,
-            data_collections: data_collections,
-            data_objects: data_objects,
             context: context,
             sub_folders: sub_folders,
         };
@@ -631,10 +625,10 @@ pub struct TreeFolder {
 impl TreeFolder {
     pub fn has_sub_folder_id(folder: &DbData, sub_folder_id: &String) -> bool {
         let folder = folder.clone();
-        let data_collections = folder.data_collections;
-        if data_collections.is_some() {
-            let data_collections = data_collections.unwrap();
-            let sub_folders = data_collections.get(SUB_FOLDERS);
+        let data = folder.data;
+        if data.is_some() {
+            let data = data.unwrap();
+            let sub_folders = data.get(SUB_FOLDERS);
             if sub_folders.is_some() {
                 let sub_folders = sub_folders.unwrap();
                 for sub_folder in sub_folders {
@@ -904,37 +898,44 @@ impl FolderSchema for TreeFolder {
 }
 
 impl TreeFolder {
-    pub fn get_field_id_map(
+    pub fn get_column_id_map(
         tree_folder: &TreeFolder,
         folder_name: &String
     ) -> Result<BTreeMap<String, String>, PlanetError> {
         let folder = tree_folder.get_by_name(folder_name).unwrap().unwrap();
-        let db_fields = folder.data_objects.unwrap();
-        let mut field_id_map: BTreeMap<String, String> = BTreeMap::new();
-        for db_field in db_fields.keys() {
-            let field_config = db_fields.get(db_field).unwrap();
-            let field_id = field_config.get(ID).unwrap().clone();
-            let field_name = db_field.clone();
-            field_id_map.insert(field_id, field_name);
+        let db_columns = folder.data.unwrap();
+        let mut column_id_map: BTreeMap<String, String> = BTreeMap::new();
+        for db_column in db_columns.keys() {
+            let column_config = db_columns.get(db_column).unwrap();
+            if column_config.len() == 1 {
+                // We only take items with 1 element, since we know here we have the config map, which is what we need
+                let column_config = &column_config[0];
+                let column_id = column_config.get(ID).unwrap().clone();
+                let column_name = db_column.clone();
+                column_id_map.insert(column_id, column_name);    
+            }
         }
-        Ok(field_id_map)
+        Ok(column_id_map)
     }
-    pub fn get_field_name_map(
+    pub fn get_column_name_map(
         tree_folder: &TreeFolder,
         folder_name: &String
     ) -> Result<BTreeMap<String, String>, PlanetError> {
         let folder = tree_folder.get_by_name(folder_name)?;
         if folder.is_some() {
             let folder = folder.unwrap();
-            let db_fields = folder.data_objects.unwrap();
-            let mut field_id_map: BTreeMap<String, String> = BTreeMap::new();
-            for db_field in db_fields.keys() {
-                let field_config = db_fields.get(db_field).unwrap();
-                let field_id = field_config.get(ID).unwrap().clone();
-                let field_name = db_field.clone();
-                field_id_map.insert(field_name, field_id);
+            let db_columns = folder.data.unwrap();
+            let mut column_id_map: BTreeMap<String, String> = BTreeMap::new();
+            for db_column in db_columns.keys() {
+                let column_config = db_columns.get(db_column).unwrap();
+                if column_config.len() == 1 {
+                    let column_config = &column_config[0];
+                    let column_id = column_config.get(ID).unwrap().clone();
+                    let column_name = db_column.clone();
+                    column_id_map.insert(column_name, column_id);    
+                }
             }
-            Ok(field_id_map)
+            Ok(column_id_map)
         } else {
             return Err(PlanetError::new(
                 500, 
@@ -943,37 +944,41 @@ impl TreeFolder {
         }
     }
     // Get field_name -> field_type map
-    pub fn get_field_type_map(
+    pub fn get_column_type_map(
         folder: &DbData,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
-        let db_fields = folder.data_objects.clone().unwrap();
-        let mut field_type_map: BTreeMap<String, String> = BTreeMap::new();
-        for db_field in db_fields.keys() {
-            let field_name = db_field.clone();
-            let field_map = db_fields.get(&field_name);
-            if field_map.is_some() {
-                let field_type = field_map.unwrap().get("field_type");
-                if field_type.is_some() {
-                    let field_type = field_type.unwrap().clone();
-                    field_type_map.insert(field_name, field_type);
+        let db_columns = folder.data.clone().unwrap();
+        let mut column_type_map: BTreeMap<String, String> = BTreeMap::new();
+        for db_column in db_columns.keys() {
+            let column_name = db_column.clone();
+            let column_map = db_columns.get(&column_name);
+            if column_map.is_some() {
+                let column_map = column_map.unwrap();
+                if column_map.len() == 1 {
+                    let column_map = &column_map[0];
+                    let column_type = column_map.get(COLUMN_TYPE);
+                    if column_type.is_some() {
+                        let column_type = column_type.unwrap().clone();
+                        column_type_map.insert(column_name, column_type);
+                    }    
                 }
             }
         }
-        Ok(field_type_map)
+        Ok(column_type_map)
     }
-    pub fn get_item_data_by_field_names(
+    pub fn get_item_data_by_column_names(
         item_data_id: Option<BTreeMap<String, String>>,
-        field_id_map: BTreeMap<String, String>
+        column_id_map: BTreeMap<String, String>
     ) -> BTreeMap<String, String> {
         let mut item_data: BTreeMap<String, String> = BTreeMap::new();
         if item_data_id.is_some() {
             let item_data_id = item_data_id.unwrap();
-            for field_id in item_data_id.keys() {
-                let has_name = field_id_map.get(field_id);                    
+            for column_id in item_data_id.keys() {
+                let has_name = column_id_map.get(column_id);
                 if has_name.is_some() {
-                    let field_name = has_name.unwrap().clone();
-                    let field_value = item_data_id.get(field_id).unwrap().clone();
-                    item_data.insert(field_name, field_value);
+                    let column_name = has_name.unwrap().clone();
+                    let column_value = item_data_id.get(column_id).unwrap().clone();
+                    item_data.insert(column_name, column_value);
                 }
             }    
         }
@@ -1084,21 +1089,19 @@ impl TreeFolderItem {
             let number_parition_items = number_parition_items.to_u16().unwrap();
             partition = number_parition_items/ITEMS_PER_PARTITION + 1;
             // write to db partition
-            let mut data: BTreeMap<String, String> = BTreeMap::new();
+            let mut data: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
             let item_id_string = item_id.to_string();
-            data.insert(PARTITION.to_string(), partition.to_string());
+            data.insert(PARTITION.to_string(), build_value_list(&partition.to_string()));
             let routing_wrap = RoutingData::defaults(
                 Some(account_id.to_string()),
                 Some(site_id), 
                 Some(space_id), 
                 Some(box_id),
                 None
-            );    
+            );
             let db_data = DbData::defaults(
                 &item_id_string, 
                 Some(data), 
-                None, 
-                None, 
                 None, 
                 routing_wrap, 
                 None,
@@ -1106,6 +1109,7 @@ impl TreeFolderItem {
             )?;
             let encrypted_data = db_data.encrypt(&shared_key).unwrap();
             let encoded: Vec<u8> = encrypted_data.serialize();
+            eprintln!("TreeFolderItem.get_partition :: db_data: {:#?}", &db_data);
             let response = tree.insert(id_db, encoded);
             match response {
                 Ok(_) => {
@@ -1118,7 +1122,7 @@ impl TreeFolderItem {
                             500, 
                             Some(tr!("Could not write partition")),
                         )
-                    )        
+                    )
                 }
             }
         }
@@ -1136,9 +1140,14 @@ impl TreeFolderItem {
                     let data = data.unwrap();
                     let partition_wrap = data.get(PARTITION);
                     if partition_wrap.is_some() {
-                        let partition_str = partition_wrap.unwrap().as_str();
-                        partition = FromStr::from_str(partition_str).unwrap();
-                        return Ok(partition)
+                        let partition_wrap = &partition_wrap.unwrap()[0];
+                        let partition_str = partition_wrap.get(VALUE);
+                        if partition_str.is_some() {
+                            let partition_str = partition_str.unwrap();
+                            let partition_str = partition_str.as_str();
+                            partition = FromStr::from_str(partition_str).unwrap();
+                            return Ok(partition)    
+                        }
                     }
                 }
                 return Err(
@@ -1242,23 +1251,6 @@ impl TreeFolderItem {
         }
     }
 
-    // fn close_partition(&self, db: &sled::Tree) -> Result<usize, PlanetError> {
-    //     let size = db.flush();
-    //     if size.is_err() {
-    //         let error = size.unwrap_err();
-    //         let message = error.to_string();
-    //         return Err(
-    //             PlanetError::new(
-    //                 500, 
-    //                 Some(tr!("{}", message)),
-    //             )
-    //         )
-    //     }
-    //     let size = size.unwrap();
-    //     drop(db);
-    //     return Ok(size)
-    // }
-
     fn open_partitions(
         &mut self,
     ) -> Result<sled::Tree, PlanetError> {
@@ -1298,10 +1290,6 @@ impl TreeFolderItem {
         }
         eprintln!("DbFolderItem.open_partitions :: path: {:?}", path);
         let result = self.database.open_tree(path);
-        // let config: sled::Config = sled::Config::default()
-        //     .use_compression(true)
-        //     .path(path);
-        // let result: Result<sled::Db, sled::Error> = config.open();
         if result.is_err() {
             let error = result.unwrap_err();
             let message = error.to_string();
@@ -1316,24 +1304,6 @@ impl TreeFolderItem {
         self.tree_partitions = Some(tree.clone());
         return Ok(tree)
     }
-
-    // fn close_partitions(&self, db: &sled::Db) -> Result<usize, PlanetError> {
-    //     let size = db.flush();
-    //     if size.is_err() {
-    //         let error = size.unwrap_err();
-    //         let message = error.to_string();
-    //         return Err(
-    //             PlanetError::new(
-    //                 500, 
-    //                 Some(tr!("{}", message)),
-    //             )
-    //         )
-    //     }
-    //     let size = size.unwrap();
-    //     drop(db);
-    //     // thread::sleep(time::Duration::new(5, 0));
-    //     return Ok(size)
-    // }
 
     fn get_partitions(&mut self) -> Result<Vec<u16>, PlanetError> {
         let mut list_partitions: Vec<u16> = Vec::new();
@@ -1377,10 +1347,11 @@ impl TreeFolderItem {
         }
         let folder = folder.unwrap();
         // eprintln!("DbFolderItem.get_language_code :: folder: {:#?}", &folder);
-        let data_collections = folder.data_collections.unwrap();
-        let columns = data_collections.get(COLUMNS);
+        let data_config = folder.data.unwrap();
+        let columns = data_config.get(COLUMNS);
         if columns.is_some() {
             let columns = columns.unwrap();
+            // eprintln!("TreeFolderItem.get_language_code :: columns: {:#?}", columns);
             for column in columns {
                 let column_type = column.get(COLUMN_TYPE);
                 let column_id = column.get(ID);
@@ -1388,8 +1359,17 @@ impl TreeFolderItem {
                     let column_type = column_type.unwrap();
                     let column_id = column_id.unwrap();
                     if column_type == COLUMN_TYPE_LANGUAGE {
-                        let language_code = data.get(column_id).unwrap().clone();
-                        return Ok(language_code)
+                        // eprintln!("TreeFolderItem.get_language_code :: column_id: {}", column_id);
+                        let language_code = data.get(column_id);
+                        // eprintln!("TreeFolderItem.get_language_code :: language_code: {:?}", &language_code);
+                        if language_code.is_some() {
+                            let language_code = language_code.unwrap();
+                            let language_code = get_value_list(&language_code);
+                            if language_code.is_some() {
+                                let language_code = language_code.unwrap();
+                                return Ok(language_code)
+                            }
+                        }
                     }
                 }
             }
@@ -1415,34 +1395,40 @@ impl TreeFolderItem {
             )
         }
         let folder = folder.unwrap();
-        let data_objects = folder.data_objects;
+        let data = folder.data;
         let mut relevance_int: u8 = 1;
-        if data_objects.is_some() {
-            let data_objects = data_objects.unwrap();
+        if data.is_some() {
+            let data = data.unwrap();
             let mut column_map_by_id: BTreeMap<String, String> = BTreeMap::new();
             // Make map of column_id -> column_name
-            for (k, v) in data_objects.clone() {
-                let column_type = v.get(COLUMN_TYPE);
-                if !column_type.is_some() {
-                    continue
+            for (k, v) in data.clone() {
+                if v.len() == 1 {
+                    let v = &v[0];
+                    let column_type = v.get(COLUMN_TYPE);
+                    if !column_type.is_some() {
+                        continue
+                    }
+                    let column_id = k;
+                    let column_name = v.get(NAME).unwrap().clone();
+                    column_map_by_id.insert(column_id, column_name);
                 }
-                let column_id = k;
-                let column_name = v.get(NAME).unwrap().clone();
-                column_map_by_id.insert(column_id, column_name);
             }
             // Get column name for id
             let column_name = column_map_by_id.get(&column_id);
             if column_name.is_some() {
                 let column_name = column_name.unwrap();
-                let relevance_map = data_objects.get(
+                let relevance_map = data.get(
                     TEXT_SEARCH_COLUMN_RELEVANCE
                 );
                 if relevance_map.is_some() {
                     let relevance_map = relevance_map.unwrap();
-                    let relevance = relevance_map.get(column_name);
-                    if relevance.is_some() {
-                        let relevance = relevance.unwrap();
-                        relevance_int = FromStr::from_str(relevance).unwrap();
+                    if relevance_map.len() == 1 {
+                        let relevance_map = &relevance_map[0];
+                        let relevance = relevance_map.get(column_name);
+                        if relevance.is_some() {
+                            let relevance = relevance.unwrap();
+                            relevance_int = FromStr::from_str(relevance).unwrap();
+                        }    
                     }
                 }
             }
@@ -1647,6 +1633,19 @@ impl FolderItem for TreeFolderItem {
 
     fn insert(&mut self, folder_name: &String, db_data: &DbData) -> Result<DbData, PlanetError> {
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
+        let mut db_data = db_data.clone();
+        let data = db_data.data.clone();
+        let mut text_data: BTreeMap<String, String> = BTreeMap::new();
+        if data.is_some() {
+            let mut data = data.unwrap();
+            let my_text_data = data.get(TEXT);
+            if my_text_data.is_some() {
+                text_data = my_text_data.unwrap()[0].clone();
+            }
+            data.remove(TEXT);
+            db_data.data = Some(data.clone());
+        }
+        eprintln!("TreeFolderItem.insert :: db_data: {:#?}", &db_data);
         let encrypted_data = db_data.encrypt(&shared_key).unwrap();
         let encoded: Vec<u8> = encrypted_data.serialize();
         let id = db_data.id.clone().unwrap();
@@ -1665,8 +1664,13 @@ impl FolderItem for TreeFolderItem {
                 match item_ {
                     Ok(_) => {
                         let item = item_.unwrap();
-                        let _ = self.index(&item);
-                        Ok(item)
+                        let index_response = self.index(&item, &text_data);
+                        if index_response.is_err() {
+                            let error = index_response.unwrap_err();
+                            return Err(error)
+                        } else {
+                            Ok(item)
+                        }
                     },
                     Err(error) => {
                         Err(error)
@@ -1679,7 +1683,7 @@ impl FolderItem for TreeFolderItem {
         }
     }
 
-    fn index(&mut self, db_item: &DbData) -> Result<DbData, PlanetError> {
+    fn index(&mut self, db_item: &DbData, text_map: &BTreeMap<String, String>) -> Result<DbData, PlanetError> {
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let db_item = db_item.clone();
         let index_tree = self.index.clone();
@@ -1689,57 +1693,76 @@ impl FolderItem for TreeFolderItem {
             )
         }
         let index_tree = index_tree.unwrap();
-        let data_objects = db_item.clone().data_objects;
-        if data_objects.is_none() {
+        let data = db_item.clone().data;
+        if data.is_none() {
             return Err(
                 PlanetError::new(500, Some(tr!("Could not insert data")))
             )
         }
-        let data_objects = data_objects.unwrap();
-        // eprintln!("DbFolderItem.index :: data_objects: {:#?}", &data_objects);
-        let map = data_objects.get(&TEXT.to_string());
-        let mut index_data: BTreeMap<String, String> = BTreeMap::new();
-        let language_code = self.get_language_code(&db_item).unwrap();
+        // let data = data.unwrap();
+        // eprintln!("DbFolderItem.index :: data: {:#?}", &data);
+        let mut my_list: Vec<BTreeMap<String, String>> = Vec::new();
+        my_list.push(text_map.clone());
+        let map = Some(my_list);
+        // let map = data.get(&TEXT.to_string());
+        let mut index_data: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
+        let language_code = self.get_language_code(&db_item);
+        if language_code.is_err() {
+            let error = language_code.unwrap_err();
+            eprintln!("DbFolderItem.index :: error: {:#?}", &error);
+            return Err(error)
+        }
+        let language_code = language_code.unwrap();
         // eprintln!("DbFolderItem.index :: language_code: {:#?}", &language_code);
         let stop_words = get_stop_words_by_language(&language_code);
         let stemmer = get_stemmer_by_language(&language_code);
         if map.is_some() {
             let map = map.unwrap();
-            for (column_id, column_value) in map {
-                let mut processed_words: Vec<&str> = Vec::new();
-                // eprintln!("DbFolderItem.index :: column_id: {} column_value: {}", column_id, column_value);
-                let words: Vec<&str> = column_value.split(" ").collect();
-                // These words are not unique, can have n items for same word
-                for word in words {
-                    // eprintln!("DbFolderItem.index :: word: {}", word);
-                    let is_word_processed = processed_words.contains(&word);
-                    if !is_word_processed {
-                        let is_stop = stop_words.contains(&word.to_string());
-                        // eprintln!("DbFolderItem.index :: is_stop: {}", &is_stop);
-                        if !is_stop {
-                            let stem = stemmer.stem(word);
-                            let stem = stem.to_string();
-                            let index_stem = index_data.get(&stem);
-                            // {column_id}:{score},{column_id}:{score},...
-                            let mut items: Vec<&str> = Vec::new();
-                            if index_stem.is_some() {
-                                let index_stem = index_stem.unwrap();
-                                items = index_stem.split(",").collect();
+            if map.len() == 1 {
+                let map = &map[0];
+                for (column_id, column_value) in map {
+                    let mut processed_words: Vec<&str> = Vec::new();
+                    // eprintln!("DbFolderItem.index :: column_id: {} column_value: {}", column_id, column_value);
+                    let words: Vec<&str> = column_value.split(" ").collect();
+                    // These words are not unique, can have n items for same word
+                    for word in words {
+                        // eprintln!("DbFolderItem.index :: word: {}", word);
+                        let is_word_processed = processed_words.contains(&word);
+                        if !is_word_processed {
+                            let is_stop = stop_words.contains(&word.to_string());
+                            // eprintln!("DbFolderItem.index :: is_stop: {}", &is_stop);
+                            if !is_stop {
+                                let stem = stemmer.stem(word);
+                                let stem = stem.to_string();
+                                let index_stem_ = index_data.get(&stem);
+
+                                // {column_id}:{score},{column_id}:{score},...
+                                let mut items: Vec<&str> = Vec::new();
+                                let index_stem: String;
+                                if index_stem_.is_some() {
+                                    let index_stem_ = index_stem_.unwrap();
+                                    let index_stem_ = get_value_list(&index_stem_);
+                                    if index_stem_.is_some() {
+                                        index_stem = index_stem_.unwrap();
+                                        items = index_stem.split(",").collect();
+                                    }
+                                }
+                                // Calculate score
+                                // Get relevance from the column name and text_search_column_relevance
+                                // Relevance is 1-5
+                                let relevance = self.get_relevance_by_column_id(&column_id).unwrap();
+                                let score = relevance.to_string();
+                                let item= format!("{}:{}", column_id, &score);
+                                let item= item.as_str();
+                                items.push(item);
+                                let items_string = items.join(",");
+                                let items_list = build_value_list(&items_string);
+                                index_data.insert(stem.clone(), items_list);
+                                processed_words.push(word);
                             }
-                            // Calculate score
-                            // Get relevance from the column name and text_search_column_relevance
-                            // Relevance is 1-5
-                            let relevance = self.get_relevance_by_column_id(column_id).unwrap();
-                            let score = relevance.to_string();
-                            let item= format!("{}:{}", column_id, &score);
-                            let item= item.as_str();
-                            items.push(item);
-                            let items_string = items.join(",");
-                            index_data.insert(stem.clone(), items_string);
-                            processed_words.push(word);
                         }
                     }
-                }
+                }    
             }
         }
         if index_data.len() == 0 {
@@ -1776,8 +1799,6 @@ impl FolderItem for TreeFolderItem {
             &name,
             Some(index_data),
             None,
-            None,
-            None,
             routing_wrap,
             None,
             None,
@@ -1787,7 +1808,7 @@ impl FolderItem for TreeFolderItem {
             return Err(error)
         }
         let db_index_data = db_index_data.unwrap();
-        // eprintln!("DbFolderItem.index :: I will write into index: {:#?}", &db_index_data);
+        eprintln!("DbFolderItem.index :: I will write into index: {:#?}", &db_index_data);
         let id = db_item.id.clone().unwrap();
         let id_db = xid::Id::from_str(id.as_str()).unwrap();
         let id_db = id_db.as_bytes();
@@ -2177,23 +2198,29 @@ pub struct SelectCountResult {
 
 impl TreeFolderItem {
 
-    pub fn filter_fields(&self, folder_name: &String, columns: &Vec<String>, item: &DbData) -> Result<DbData, PlanetError> {
+    pub fn filter_fields(
+        &self, 
+        folder_name: &String, 
+        columns: &Vec<String>, 
+        item: &DbData
+    ) -> Result<DbData, PlanetError> {
         let columns = columns.clone();
         let mut item = item.clone();
-        // field_id => field_name
-        let field_id_map= TreeFolder::get_field_id_map(
+        // column_id => column_name
+        let column_id_map= TreeFolder::get_column_id_map(
             &self.tree_folder,
             folder_name
         )?;
         // data
-        let mut data_new: BTreeMap<String, String> = BTreeMap::new();
+        let mut data_new: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
         let db_data = item.data;
         if db_data.is_some() {
-            for (field_db_id, field_value) in db_data.unwrap() {
-                let field_db_name = &field_id_map.get(&field_db_id).unwrap().clone();
+            let db_data = db_data.unwrap();
+            for (column_db_id, column_value) in db_data {
+                let column_db_name = &column_id_map.get(&column_db_id).unwrap().clone();
                 for column in &columns {
-                    if column.to_lowercase() == field_db_name.to_lowercase() {
-                        data_new.insert(field_db_id.clone(), field_value.clone());
+                    if column.to_lowercase() == column_db_name.to_lowercase() {
+                        data_new.insert(column_db_id.clone(), column_value.clone());
                     }
                 }
             }
@@ -2202,37 +2229,37 @@ impl TreeFolderItem {
             item.data = None;
         }
         // data_collections
-        let mut data_collections_new: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
-        let db_data_collections = item.data_collections;
-        if db_data_collections.is_some() {
-            for (field_db_id, items) in db_data_collections.unwrap() {
-                let field_db_name = &field_id_map.get(&field_db_id).unwrap().clone();
-                for column in &columns {
-                    if column.to_lowercase() == field_db_name.to_lowercase() {
-                        data_collections_new.insert(field_db_id.clone(), items.clone());
-                    }
-                }
-            }
-            item.data_collections = Some(data_collections_new);
-        } else {
-            item.data_collections = None;
-        }
-        // data_objects
-        let mut data_objects_new: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
-        let db_data_objects = item.data_objects;
-        if db_data_objects.is_some() {
-            for (field_db_id, map) in db_data_objects.unwrap() {
-                let field_db_name = &field_id_map.get(&field_db_id).unwrap().clone();
-                for column in &columns {
-                    if column.to_lowercase() == field_db_name.to_lowercase() {
-                        data_objects_new.insert(field_db_id.clone(), map.clone());
-                    }
-                }
-            }
-            item.data_objects = Some(data_objects_new);
-        } else {
-            item.data_objects = None;
-        }
+        // let mut data_collections_new: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
+        // let db_data_collections = item.data_collections;
+        // if db_data_collections.is_some() {
+        //     for (field_db_id, items) in db_data_collections.unwrap() {
+        //         let field_db_name = &field_id_map.get(&field_db_id).unwrap().clone();
+        //         for column in &columns {
+        //             if column.to_lowercase() == field_db_name.to_lowercase() {
+        //                 data_collections_new.insert(field_db_id.clone(), items.clone());
+        //             }
+        //         }
+        //     }
+        //     item.data_collections = Some(data_collections_new);
+        // } else {
+        //     item.data_collections = None;
+        // }
+        // // data_objects
+        // let mut data_objects_new: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
+        // let db_data_objects = item.data_objects;
+        // if db_data_objects.is_some() {
+        //     for (field_db_id, map) in db_data_objects.unwrap() {
+        //         let field_db_name = &field_id_map.get(&field_db_id).unwrap().clone();
+        //         for column in &columns {
+        //             if column.to_lowercase() == field_db_name.to_lowercase() {
+        //                 data_objects_new.insert(field_db_id.clone(), map.clone());
+        //             }
+        //         }
+        //     }
+        //     item.data_objects = Some(data_objects_new);
+        // } else {
+        //     item.data_objects = None;
+        // }
         return Ok(item);
     }
 }
@@ -2241,4 +2268,24 @@ pub struct DbQuery {
     pub sql_where: String,
     pub page: u8,
     pub number_items: u8,
+}
+
+pub fn build_value_list(value: &String) -> Vec<BTreeMap<String, String>> {
+    let mut my_map: BTreeMap<String, String> = BTreeMap::new();
+    my_map.insert(VALUE.to_string(), value.clone());
+    let mut my_list: Vec<BTreeMap<String, String>> = Vec::new();
+    my_list.push(my_map);
+    return my_list
+}
+
+pub fn get_value_list(list: &Vec<BTreeMap<String, String>>) -> Option<String> {
+    if list.len() == 1 {
+        let map = &list[0];
+        let value = map.get(VALUE);
+        if value.is_some() {
+            let value = value.unwrap();
+            return Some(value.clone())
+        }
+    }
+    return None
 }

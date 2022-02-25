@@ -529,10 +529,10 @@ impl StorageColumn for GenerateNumberColumn {
         let config = self.config.clone();
         let mut folder = self.folder.clone().unwrap();
         let db_folder = self.db_folder.clone().unwrap();
-        let mut data_collections = folder.data_collections.unwrap();
+        let mut data = folder.data.unwrap();
         let column_id = config.id.unwrap();
         let column_name = config.name.unwrap();
-        let columns = data_collections.get(COLUMNS);
+        let columns = data.get(COLUMNS);
         let mut columns_new: Vec<BTreeMap<String, String>> = Vec::new();
         let mut sequence_list: Vec<String> = Vec::new();
         if columns.is_some() {
@@ -556,8 +556,8 @@ impl StorageColumn for GenerateNumberColumn {
                     }
                 }
             }
-            data_collections.insert(COLUMNS.to_string(), columns_new.clone());
-            folder.data_collections = Some(data_collections.clone());
+            data.insert(COLUMNS.to_string(), columns_new.clone());
+            folder.data = Some(data.clone());
             let result = db_folder.update(&folder);
             if result.is_ok() {
                 return Ok(sequence_list)
@@ -719,7 +719,7 @@ pub struct StatsColumn {
     pub folder_name: Option<String>,
     pub db_folder: Option<TreeFolder>,
     pub properties_map: Option<HashMap<String, ColumnConfig>>,
-    pub data_map: Option<BTreeMap<String, String>>,
+    pub data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
 }
 impl StatsColumn {
     pub fn defaults(
@@ -728,7 +728,7 @@ impl StatsColumn {
         folder_name: Option<String>,
         db_folder: Option<TreeFolder>,
         properties_map: Option<HashMap<String, ColumnConfig>>,
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     ) -> Self {
         let field_config = field_config.clone();
         let field_obj = Self{

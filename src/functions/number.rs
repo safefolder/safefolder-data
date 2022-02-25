@@ -52,14 +52,14 @@ pub trait RoundNumberFunction {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Ceiling {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Ceiling {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -138,14 +138,14 @@ impl NumberFunction for Ceiling {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Floor {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>
 }
 impl Floor {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -224,14 +224,14 @@ impl NumberFunction for Floor {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Count {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>
 }
 impl Count {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -298,14 +298,14 @@ impl NumberFunction for Count {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CountA {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>
 }
 impl CountA {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -378,14 +378,14 @@ impl NumberFunction for CountA {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CountAll {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl CountAll {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -444,14 +444,14 @@ impl NumberFunction for CountAll {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Even {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>
 }
 impl Even {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -532,14 +532,14 @@ impl NumberFunction for Even {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Exp {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Exp {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -608,14 +608,14 @@ impl NumberFunction for Exp {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Int {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>
 }
 impl Int {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -686,14 +686,14 @@ impl NumberFunction for Int {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Log {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>
 }
 impl Log {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -785,14 +785,14 @@ impl NumberFunction for Log {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Mod {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Mod {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -878,14 +878,14 @@ impl NumberFunction for Mod {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Power {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>
 }
 impl Power {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -973,14 +973,14 @@ impl NumberFunction for Power {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Round {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>
 }
 impl Round {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -1101,14 +1101,14 @@ impl RoundNumberFunction for Round {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Sqrt {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Sqrt {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -1178,14 +1178,14 @@ impl NumberFunction for Sqrt {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Value {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Value {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -1278,14 +1278,14 @@ impl NumberFunction for Value {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Boolean {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Boolean {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();

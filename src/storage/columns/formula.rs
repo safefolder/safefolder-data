@@ -84,7 +84,7 @@ impl FormulaColumn {
         return Ok(config)
     }
     pub fn validate(&self, 
-        data_map: &BTreeMap<String, String>,
+        data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Result<Vec<String>, PlanetError> {
         let config = self.config.clone();

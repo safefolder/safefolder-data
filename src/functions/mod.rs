@@ -14,7 +14,7 @@ use tr::tr;
 use xlformula_engine::{calculate, parse_formula, NoReference, NoCustomFunction};
 
 use crate::storage::ConfigStorageColumn;
-use crate::storage::folder::{DbData, TreeFolder};
+use crate::storage::folder::{DbData, TreeFolder, get_value_list};
 use crate::commands::folder::config::ColumnConfig;
 use crate::functions::constants::*;
 use crate::functions::text::*;
@@ -141,7 +141,7 @@ impl FunctionAttribute {
         };
         return obj
     }
-    pub fn replace(&self, data_map: &BTreeMap<String, String>) -> Self {
+    pub fn replace(&self, data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>) -> Self {
         // data_map :: {id} => Value
         let mut item = self.id.clone();
         let remove_quotes = self.remove_quotes.unwrap();
@@ -158,19 +158,25 @@ impl FunctionAttribute {
                 let item_value = data_map.get(&item);
                 if item_value.is_some() {
                     let item_value = item_value.unwrap().clone();
-                    item_string = item_value;
-                    obj.item_processed = Some(item_string);
+                    let item_value = get_value_list(&item_value);
+                    if item_value.is_some() {
+                        item_string = item_value.unwrap();
+                        obj.item_processed = Some(item_string);
+                    }
                 }
             } else {
-                item_string = item.to_string();    
+                item_string = item.to_string();
                 obj.item_processed = Some(item_string);
             }
         } else {
             let item_value = data_map.get(&item);
             if item_value.is_some() {
                 let item_value = item_value.unwrap().clone();
-                item_string = item_value;
-                obj.item_processed = Some(item_string);
+                let item_value = get_value_list(&item_value);
+                if item_value.is_some() {
+                    item_string = item_value.unwrap();
+                    obj.item_processed = Some(item_string);
+                }
             }
         }        
         return obj;
@@ -277,8 +283,8 @@ impl Formula {
             let table = table.unwrap();
             let db_table = db_folder.unwrap();
             let table_name = folder_name.unwrap();
-            let field_type_map_ = TreeFolder::get_field_type_map(&table)?;
-            let field_name_map_ = TreeFolder::get_field_name_map(&db_table, &table_name)?;
+            let field_type_map_ = TreeFolder::get_column_type_map(&table)?;
+            let field_name_map_ = TreeFolder::get_column_name_map(&db_table, &table_name)?;
             for (column_name, column_type) in field_type_map_.clone() {
                 let mut column_config = ColumnConfig::defaults(None);
                 column_config.column_type = Some(column_type);
@@ -921,8 +927,13 @@ impl FunctionParse {
 
 pub fn prepare_function_parse(
     function_parse: &FunctionParse, 
-    data_map: Option<BTreeMap<String, String>>,
-) -> (Option<String>, String, Vec<FunctionAttributeItem>, FunctionResult, BTreeMap<String, String>) {
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
+) -> (
+    Option<String>, 
+    String, Vec<FunctionAttributeItem>, 
+    FunctionResult, 
+    BTreeMap<String, Vec<BTreeMap<String, String>>>
+) {
     let mut function = function_parse.clone();
     let function_text_wrap = function.text;
     let mut function_text: String = String::from("");
@@ -930,7 +941,7 @@ pub fn prepare_function_parse(
         function_text = function_text_wrap.clone().unwrap();
     }
     let data_map_wrap = data_map;
-    let mut data_map: BTreeMap<String, String> = BTreeMap::new();
+    let mut data_map: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
     if data_map_wrap.is_some() {
         data_map = data_map_wrap.unwrap();
     }
@@ -952,7 +963,7 @@ pub fn prepare_function_parse(
 
 pub fn process_function(
     function_parse: &FunctionParse, 
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     field_config_map: Option<BTreeMap<String, ColumnConfig>>,
 ) -> Result<FunctionParse, PlanetError> {
     // let list_items = Some(expr.captures_iter(function_text));
@@ -1239,7 +1250,7 @@ impl FunctionAttributeItem {
     }
     pub fn get_value(
         &self, 
-        data_map: &BTreeMap<String, String>,
+        data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>
     ) -> Result<String, PlanetError> {
         let data_map = data_map.clone();
@@ -1285,7 +1296,7 @@ impl FunctionAttributeItem {
         }
         return Ok(value)
     }
-    pub fn check_assignment(&self, data_map: &BTreeMap<String, String>) -> bool {
+    pub fn check_assignment(&self, data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>) -> bool {
         let attr_type = self.attr_type.clone();
         let assignment = self.assignment.clone();
         let mut check = false;
@@ -1299,7 +1310,7 @@ impl FunctionAttributeItem {
 
 pub fn execute_formula(
     formula: &Formula, 
-    data_map: &BTreeMap<String, String>,
+    data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
     field_config_map: &BTreeMap<String, ColumnConfig>,
 ) -> Result<String, PlanetError> {
     // 23 + LOG(34)
@@ -1511,7 +1522,7 @@ pub fn parse_assign_operator(
 pub fn check_assignment(
     attr_assignment: AttributeAssign,
     attr_type: AttributeType,
-    db_data_map: &BTreeMap<String, String>,
+    db_data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
 ) -> Result<bool, PlanetError> {
     //eprintln!("check_assignment...");
     //eprintln!("check_assignment :: db_data_map: {:#?}", db_data_map);
@@ -1520,47 +1531,51 @@ pub fn check_assignment(
     let column_id = attr_assignment.name;
     let column_id = column_id.as_str();
     let db_value = db_data_map.get(column_id).unwrap();
-    let op = attr_assignment.op;
-    let mut value = attr_assignment.value;
-    let check: bool;
-    // We have case when we try to compare dates, but is not supported, functions would need to be used.
-    // Greater and smaller is used for numbers
-    // TODO: Match for bool {Column} = true. How???? TRUE() right?
-    match attr_type {
-        AttributeType::Text | AttributeType::Date => {
-            match op {
-                FormulaOperator::Eq => {
-                    value = value.replace("\"", "");
-                    check = check_string_equal(&db_value, &value)?;
-                },
-                _ => {
-                    return Err(
-                        PlanetError::new(
-                            500, 
-                            Some(tr!("Assignment for string only support equal operator.")),
-                        )
-                    );
-                },
-            }    
-        },
-        AttributeType::Number => {
-            let value = value.as_str();
-            let value: f64 = FromStr::from_str(value).unwrap();
-            let db_value: f64 = FromStr::from_str(db_value).unwrap();
-            //eprintln!("check_assignment :: db_value: {}", &db_value);
-            //eprintln!("check_assignment :: op: {:?}", &op);
-            //eprintln!("check_assignment :: value: {:?}", &value);
-            check = check_float_compare(&value, &db_value, op)?;
-        },
-        _ => {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!("Assignment type not supported. We only support 
-                    Text, Number, Bool and Date")),
-                )
-            );
-        }
+    let db_value = get_value_list(db_value);
+    let mut check: bool = false;
+    if db_value.is_some() {
+        let db_value = db_value.unwrap();
+        let op = attr_assignment.op;
+        let mut value = attr_assignment.value;
+        // We have case when we try to compare dates, but is not supported, functions would need to be used.
+        // Greater and smaller is used for numbers
+        // TODO: Match for bool {Column} = true. How???? TRUE() right?
+        match attr_type {
+            AttributeType::Text | AttributeType::Date => {
+                match op {
+                    FormulaOperator::Eq => {
+                        value = value.replace("\"", "");
+                        check = check_string_equal(&db_value, &value)?;
+                    },
+                    _ => {
+                        return Err(
+                            PlanetError::new(
+                                500, 
+                                Some(tr!("Assignment for string only support equal operator.")),
+                            )
+                        );
+                    },
+                }    
+            },
+            AttributeType::Number => {
+                let value = value.as_str();
+                let value: f64 = FromStr::from_str(value).unwrap();
+                let db_value: f64 = FromStr::from_str(&db_value).unwrap();
+                //eprintln!("check_assignment :: db_value: {}", &db_value);
+                //eprintln!("check_assignment :: op: {:?}", &op);
+                //eprintln!("check_assignment :: value: {:?}", &value);
+                check = check_float_compare(&value, &db_value, op)?;
+            },
+            _ => {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Assignment type not supported. We only support 
+                        Text, Number, Bool and Date")),
+                    )
+                );
+            }
+        }    
     }
     return Ok(check)
 }

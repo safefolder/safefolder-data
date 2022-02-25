@@ -20,14 +20,14 @@ pub trait StructureFunction {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct If {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl If {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -133,14 +133,14 @@ impl StructureFunction for If {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct And {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl And {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -233,14 +233,14 @@ impl StructureFunction for And {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Or {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Or {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -333,14 +333,14 @@ impl StructureFunction for Or {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Not {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Not {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -433,14 +433,14 @@ impl StructureFunction for Not {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Xor {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Xor {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -535,7 +535,7 @@ impl StructureFunction for Xor {
 }
 
 pub fn and(
-    data_map: &BTreeMap<String, String>, 
+    data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>, 
     attributes: &Vec<FunctionAttributeItem>
 ) -> Result<bool, PlanetError> {
     // AND({My Field}="pepito", {Status}="c4vhm0gsmpv7omu4aqg0")
@@ -563,7 +563,7 @@ pub fn and(
 }
 
 pub fn or(
-    data_map: &BTreeMap<String, String>, 
+    data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>, 
     attributes: &Vec<FunctionAttributeItem>
 ) -> Result<bool, PlanetError> {
     let mut check = false;
@@ -583,7 +583,7 @@ pub fn or(
 }
 
 pub fn not(
-    data_map: &BTreeMap<String, String>, 
+    data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>, 
     attributes: &Vec<FunctionAttributeItem>
 ) -> Result<bool, PlanetError> {
     let mut check_all = true;
@@ -603,7 +603,7 @@ pub fn not(
 }
 
 pub fn xor(
-    data_map: &BTreeMap<String, String>, 
+    data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>, 
     attributes: &Vec<FunctionAttributeItem>
 ) -> Result<bool, PlanetError> {
     // Only 1 of the items needs to be true

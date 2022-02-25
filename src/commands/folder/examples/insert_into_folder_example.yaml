@@ -1,24 +1,36 @@
 ---
-command: INSERT INTO FOLDER "Super Folder 14"
-name: Pepito Data 118
+command: INSERT INTO FOLDER "Super Folder 1"
+name: Pepito Data 26
 data:
-  My Column: pepito
-  Description: This is some description I want to include for España canción with description repeated
-  Is Published: true
-  Counter: 34
-  Status: c877qhbin56288s3igcg
-  Locations: c877qhbin56288s3igdg,c877qhbin56288s3igeg
-  Currency: 9876.347
-  Percentage: 98.56
-  My Home Phone: 644 148 821
-  My Email: me@jorgealegre.com
-  My Url: https://jorgealegre.com
-  My Rating: 3
-  File: /Users/jorgealegre/Downloads/f3336de0d3ca4cb881b65ddd92451a2d_listado_de_facturas_expedidas_20220221_110646669.pdf
-data_collections:
+  My Column:
+    - value: pepito
+  Description:
+    - value: This is some description I want to include for España canción with description repeated
+  Is Published:
+    - value: true
+  Counter:
+    - value: 34
+  Status:
+    - value: c8b6febin565d993a7b0
+  Locations:
+    - value: c8b6febin565d993a7c0,c8b6febin565d993a7d0
+  Currency:
+    - value: 9876.347
+  Percentage:
+    - value: 98.56
+  My Home Phone:
+    - value: 644 148 821
+  My Email:
+    - value: me@jorgealegre.com
+  My Url:
+   - value: https://jorgealegre.com
+  My Rating:
+    - value: 3
+  File:
+    - value: /Users/jorgealegre/Downloads/f3336de0d3ca4cb881b65ddd92451a2d_listado_de_facturas_expedidas_20220221_110646669.pdf
   Statuses:
-    - published
-    - draft
+    - value: published
+    - value: draft  
   Meta:
-    - "---\nName: Jorge"
-    - "---\nName: James"
+    - value: "---\nName: Jorge"
+    - value: "---\nName: James"

@@ -6,6 +6,7 @@ use lazy_static::lazy_static;
 use crate::planet::PlanetError;
 
 use crate::functions::*;
+use crate::storage::folder::*;
 
 lazy_static! {
     pub static ref RE_CONCAT_ATTRS: Regex = Regex::new(r#"("[\w\s-]+")|(\d+)|(\{[\w\s]+\})|([A-Z]+\(["\w\s-]+\))"#).unwrap();
@@ -31,14 +32,14 @@ pub trait TextFunction {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Concat {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Concat {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -100,14 +101,14 @@ impl TextFunction for Concat {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Trim {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Trim {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -180,14 +181,14 @@ impl TextFunction for Trim {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Format {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Format {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -260,8 +261,12 @@ impl TextFunction for Format {
             let item_value = data_map.get(&column_attribute);
             if item_value.is_some() {
                 let item_value = item_value.unwrap();
-                let replace_value = format!("{}{}{}", String::from("{"), &column_attribute, String::from("}"));
-                attribute_new = attribute_new.replace(&replace_value, item_value);
+                let item_value = get_value_list(item_value);
+                if item_value.is_some() {
+                    let item_value = item_value.unwrap();
+                    let replace_value = format!("{}{}{}", String::from("{"), &column_attribute, String::from("}"));
+                    attribute_new = attribute_new.replace(&replace_value, &item_value);
+                }
             }
         }
         return Ok(attribute_new)
@@ -271,14 +276,14 @@ impl TextFunction for Format {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct JoinList {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl JoinList {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -371,9 +376,13 @@ impl TextFunction for JoinList {
             let sep = separator_value.clone().unwrap();
             if array_items.is_some() {
                 let array_items = array_items.unwrap();
-                let items = array_items.split(",");
-                let items: Vec<&str> = items.collect();
-                replacement_string = items.join(&sep);
+                let array_items = get_value_list(array_items);
+                if array_items.is_some() {
+                    let array_items = array_items.unwrap();
+                    let items = array_items.split(",");
+                    let items: Vec<&str> = items.collect();
+                    replacement_string = items.join(&sep);    
+                }
             }
         }
         return Ok(replacement_string)
@@ -383,14 +392,14 @@ impl TextFunction for JoinList {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Length {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Length {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -463,14 +472,14 @@ impl TextFunction for Length {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Lower {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Lower {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -543,14 +552,14 @@ impl TextFunction for Lower {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Upper {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Upper {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -623,14 +632,14 @@ impl TextFunction for Upper {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Replace {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Replace {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -720,14 +729,14 @@ impl TextFunction for Replace {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Mid {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Mid {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -812,14 +821,14 @@ impl TextFunction for Mid {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Rept {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Rept {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();
@@ -892,14 +901,14 @@ impl TextFunction for Rept {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Substitute {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Substitute {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
         let field_config_map = field_config_map.clone();

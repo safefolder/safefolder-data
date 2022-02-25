@@ -271,10 +271,10 @@ impl ConfigStorageColumn for ColumnConfig {
     }
     fn get_name_column(db_data: &DbData) -> Option<ColumnConfig> {
         let db_data = db_data.clone();
-        let data_collections = db_data.data_collections;
-        if data_collections.is_some() {
-            let data_collections = data_collections.unwrap();
-            let columns = data_collections.get(COLUMNS);
+        let data = db_data.data;
+        if data.is_some() {
+            let data = data.unwrap();
+            let columns = data.get(COLUMNS);
             if columns.is_some() {
                 let column_config_map = columns.unwrap();
                 let column_config_map = column_config_map.clone()[0].clone();
@@ -354,7 +354,7 @@ impl ConfigStorageColumn for ColumnConfig {
         let db_data = db_data.clone();
         let mut columns: Vec<ColumnConfig> = Vec::new();
         // I use data_collections, where we store the columns
-        let data_collections = db_data.data_collections.clone();
+        let data = db_data.data.clone();
         // let data = db_data.data;
         // let data_objects = db_data.data_objects;
         // eprintln!("get_config :: data: {:#?}", &data);
@@ -365,9 +365,9 @@ impl ConfigStorageColumn for ColumnConfig {
         //   vector for order in 
         let mut map_columns_by_id: BTreeMap<String, ColumnConfig> = BTreeMap::new();
         let mut map_columns_by_name: BTreeMap<String, ColumnConfig> = BTreeMap::new();
-        if data_collections.is_some() {
-            let data_collections = data_collections.unwrap();
-            let column_list = &data_collections.get(COLUMNS);
+        if data.is_some() {
+            let data = data.unwrap();
+            let column_list = &data.get(COLUMNS);
             if column_list.is_some() {
                 let column_list = column_list.unwrap();
                 for column_config_map in column_list {
@@ -560,21 +560,20 @@ impl ConfigStorageColumn for ColumnConfig {
                     columns.push(column_config.clone());
                 }
             }
-            for data_collection_field in data_collections.keys() {
-                let data_collection_field = data_collection_field.clone();
+            for data_collection_column in data.keys() {
+                let data_collection_column = data_collection_column.clone();
                 // eprintln!("get_config :: data_collection_field: {:?}", &data_collection_field);
-                let data_collection_field_str = &data_collection_field.as_str();
-                let index = &data_collection_field_str.find("__");
+                let data_collection_column_str = &data_collection_column.as_str();
+                let index = &data_collection_column_str.find("__");
                 if index.is_some() {
                     // {column_name}__{attr}
-                    let pieces = &data_collection_field.split("__");
+                    let pieces = &data_collection_column.split("__");
                     let pieces: Vec<&str> = pieces.clone().collect();
                     let column_name = pieces[0];
                     let attr_name = pieces[1];
                     // eprintln!("get_config :: column_name: {:?} attr_name: {:?}", &column_name, &attr_name);
                     // select_options, and other structures
-                    let field_list = 
-                        data_collections.get(&data_collection_field).unwrap().clone();
+                    let column_list = data.get(&data_collection_column).unwrap().clone();
                     // eprintln!("get_config :: field_list: {:?}", &field_list);
                     // I need to get the Status column config, get by name
                     // eprintln!("get_config :: data_collection_field: {}", &data_collection_field);
@@ -584,13 +583,13 @@ impl ConfigStorageColumn for ColumnConfig {
                         let mut propertty_config_ = map_columns_by_name.get(column_name).unwrap().clone();
                         // let column_id = &propertty_config_.id.clone().unwrap();
                         // let column_id = column_id.clone();
-                        let mut field_options: Vec<String> = Vec::new();
-                        for field_item in field_list {
-                            let field_value = field_item.get(VALUE).unwrap().clone();
-                            field_options.push(field_value);
+                        let mut column_options: Vec<String> = Vec::new();
+                        for column_item in column_list {
+                            let column_value = column_item.get(VALUE).unwrap().clone();
+                            column_options.push(column_value);
                         }
                         // eprintln!("get_config :: options: {:#?}", &field_options);
-                        propertty_config_.options = Some(field_options);
+                        propertty_config_.options = Some(column_options);
                         // map_columns_by_id.insert(column_id, propertty_config_);
                         columns.push(propertty_config_);
                     }
@@ -814,8 +813,7 @@ pub struct InsertIntoFolderConfig {
     pub name: Option<String>,
     pub sub_folders: Option<Vec<SubFolderDataConfig>>,
     #[validate(required)]
-    pub data: Option<BTreeMap<String, String>>,
-    pub data_collections: Option<BTreeMap<String, Vec<String>>>,
+    pub data: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
 }
 
 impl InsertIntoFolderConfig {
@@ -825,7 +823,6 @@ impl InsertIntoFolderConfig {
             command: None,
             name: name,
             data: Some(BTreeMap::new()),
-            data_collections: None,
             sub_folders: None,
         };
         return config

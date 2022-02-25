@@ -13,7 +13,7 @@ use rust_stemmers::{Algorithm, Stemmer};
 
 use crate::planet::constants::ID;
 use crate::planet::{PlanetError};
-use crate::storage::folder::{DbData};
+use crate::storage::folder::{DbData, get_value_list};
 use crate::commands::folder::config::ColumnConfig;
 use crate::storage::constants::*;
 use crate::planet::constants::*;
@@ -210,9 +210,9 @@ impl SelectColumn {
             let mut options_name_map: BTreeMap<String, String> = BTreeMap::new();
             let column_config = &column_obj.config;
             let column_name = column_config.name.clone().unwrap();
-            for data_collection in folder.data_collections.clone() {
+            for data in folder.data.clone() {
                 // key for ordering: field_ids
-                for key in data_collection.keys() {
+                for key in data.keys() {
                     let has_select_sep = key.find("__");
                     if has_select_sep.is_some() {
                         // key: Status__select_options
@@ -228,7 +228,7 @@ impl SelectColumn {
                             //     },
                             //     ...
                             // ],
-                            let options: &Vec<BTreeMap<String, String>> = data_collection.get(key).unwrap();
+                            let options: &Vec<BTreeMap<String, String>> = data.get(key).unwrap();
                             for option in options {
                                 options_id_map.insert(
                                     option.get(KEY).unwrap().clone(), 
@@ -519,40 +519,50 @@ impl LanguageColumn {
         if detected_language.is_some() {
             let detected_language = detected_language.unwrap();
             language_code = detected_language.iso_code_639_1().to_string();
+            eprintln!("LanguageColumn.validate :: resolved language_code: {}", &language_code);
         } else {
             // We get the default language for the folder from folder config
             let folder = folder.clone();
             let data = folder.data.unwrap();
-            let language_default = data.get(&LANGUAGE_DEFAULT.to_string()).unwrap().as_str();
-            match language_default {
-                LANGUAGE_DANISH => {
-                    return Ok(String::from(LANGUAGE_CODE_DANISH))
-                },
-                LANGUAGE_ENGLISH => {
-                    return Ok(String::from(LANGUAGE_CODE_ENGLISH))
-                },
-                LANGUAGE_SPANISH => {
-                    return Ok(String::from(LANGUAGE_CODE_SPANISH))
-                },
-                LANGUAGE_FRENCH => {
-                    return Ok(String::from(LANGUAGE_CODE_FRENCH))
-                },
-                LANGUAGE_ITALIAN => {
-                    return Ok(String::from(LANGUAGE_CODE_ITALIAN))
-                },
-                LANGUAGE_GERMAN => {
-                    return Ok(String::from(LANGUAGE_CODE_GERMAN))
-                },
-                LANGUAGE_PORTUGUESE => {
-                    return Ok(String::from(LANGUAGE_CODE_PORTUGUESE))
-                },
-                LANGUAGE_NORWEGIAN => {
-                    return Ok(String::from(LANGUAGE_CODE_NORWEGIAN))
-                },
-                LANGUAGE_SWEDISH => {
-                    return Ok(String::from(LANGUAGE_CODE_SWEDISH))
-                },
-                _ => {},
+            let language_default = data.get(&LANGUAGE_DEFAULT.to_string());
+            if language_default.is_some() {
+                let language_default = language_default.unwrap();
+                let language_default = get_value_list(language_default);
+                if language_default.is_some() {
+                    let language_default = language_default.unwrap();
+                    let language_default = language_default.as_str();
+                    eprintln!("LanguageColumn.validate :: language_default: {}", language_default);
+                    match language_default {
+                        LANGUAGE_DANISH => {
+                            return Ok(String::from(LANGUAGE_CODE_DANISH))
+                        },
+                        LANGUAGE_ENGLISH => {
+                            return Ok(String::from(LANGUAGE_CODE_ENGLISH))
+                        },
+                        LANGUAGE_SPANISH => {
+                            return Ok(String::from(LANGUAGE_CODE_SPANISH))
+                        },
+                        LANGUAGE_FRENCH => {
+                            return Ok(String::from(LANGUAGE_CODE_FRENCH))
+                        },
+                        LANGUAGE_ITALIAN => {
+                            return Ok(String::from(LANGUAGE_CODE_ITALIAN))
+                        },
+                        LANGUAGE_GERMAN => {
+                            return Ok(String::from(LANGUAGE_CODE_GERMAN))
+                        },
+                        LANGUAGE_PORTUGUESE => {
+                            return Ok(String::from(LANGUAGE_CODE_PORTUGUESE))
+                        },
+                        LANGUAGE_NORWEGIAN => {
+                            return Ok(String::from(LANGUAGE_CODE_NORWEGIAN))
+                        },
+                        LANGUAGE_SWEDISH => {
+                            return Ok(String::from(LANGUAGE_CODE_SWEDISH))
+                        },
+                        _ => {},
+                    }        
+                }
             }
         }
         return Ok(language_code)
@@ -590,6 +600,27 @@ impl TextColumn {
         };
         return field_obj
     }
+    fn do_text_basic(
+        &mut self, 
+        data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>, 
+        column_id: &String
+    ) -> Option<Vec<String>> {
+        let wrap = data_map.get(column_id);
+        let mut values_wrap: Option<Vec<String>> = None;
+        if wrap.is_some() {
+            let items = wrap.unwrap();
+            let mut my_list: Vec<String> = Vec::new();
+            for item in items {
+                let value = item.get(VALUE);
+                if value.is_some() {
+                    let value = value.unwrap();
+                    my_list.push(value.clone());
+                }
+            }
+            values_wrap = Some(my_list);
+        }
+        return values_wrap
+    }
 }
 impl TextColumn {
     pub fn create_config(
@@ -607,8 +638,8 @@ impl TextColumn {
         return Ok(config)
     }
     pub fn validate(
-        &self, 
-        data_map: &BTreeMap<String, String>, 
+        &mut self, 
+        data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>, 
         folder: &DbData,
         text_column_id: &String,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
@@ -621,144 +652,121 @@ impl TextColumn {
             let column_type = column_config.column_type.unwrap();
             let column_type = column_type.as_str();
             let column_id = column_config.id.unwrap();
-            let mut value_wrap: Option<String> = None;
+            let mut values_wrap: Option<Vec<String>> = None;
             match column_type {
                 COLUMN_TYPE_SMALL_TEXT => {
-                    let wrap = data_map.get(&column_id);
-                    if wrap.is_some() {
-                        value_wrap = Some(wrap.unwrap().clone());
-                    }
+                    values_wrap = self.do_text_basic(data_map, &column_id);
                 },
                 COLUMN_TYPE_LONG_TEXT => {
-                    let wrap = data_map.get(&column_id);
-                    if wrap.is_some() {
-                        value_wrap = Some(wrap.unwrap().clone());
-                    }
+                    values_wrap = self.do_text_basic(data_map, &column_id);
                 },
                 COLUMN_TYPE_NUMBER => {
-                    let wrap = data_map.get(&column_id);
-                    if wrap.is_some() {
-                        value_wrap = Some(wrap.unwrap().clone());
-                    }
+                    values_wrap = self.do_text_basic(data_map, &column_id);
                 },
                 COLUMN_TYPE_SELECT => {
                     // Need to check from data_map the values sent, which can be a list separated by commas
                     let wrap = data_map.get(&column_id);
                     if wrap.is_some() {
-                        value_wrap = Some(wrap.unwrap().clone());
-                        if value_wrap.is_some() {
-                            let mut value_ids: Vec<&str> = Vec::new();
-                            let values = value_wrap.unwrap();
-                            if values.find(",").is_some() {
-                                value_ids = values.split(",").collect();
-                            } else {
-                                value_ids.push(values.as_str());
-                            }
-                            let mut value: String = String::from("");
-                            for data_collection in folder.data_collections.clone() {
-                                for (key, collection_value) in data_collection {
-                                    let has_select_sep = &key.find("__").clone();
-                                    if has_select_sep.is_some() {
-                                        let key_items: Vec<&str> = key.split("__").collect();
-                                        let key_column_name = key_items[0];
-                                        let key_column_type = key_items[1];
-                                        if key_column_type == SELECT_OPTIONS && 
-                                           key_column_name.to_lowercase() == column_name.to_lowercase() {
-                                            for option_ in collection_value {
-                                                let option_key = option_.get(KEY).unwrap().clone();
-                                                let option_value = option_.get(VALUE).unwrap().clone();
-                                                for value_id in value_ids.clone() {
-                                                    if option_key.as_str() == value_id {
-                                                        // data = format!("{} {}", &data, option_value);
-                                                        // value_wrap = Some(&option_value);
-                                                        value = format!("{} {}", &value, option_value);
-                                                    }    
+                        let value_list = wrap.unwrap();
+                        let mut my_value_list: Vec<String> = Vec::new();
+                        for values in value_list {
+                            let values = values.get(VALUE);
+                            if values.is_some() {
+                                let values = values.unwrap();
+                                let mut value_ids: Vec<&str> = Vec::new();
+                                if values.find(",").is_some() {
+                                    value_ids = values.split(",").collect();
+                                } else {
+                                    value_ids.push(values.as_str());
+                                }
+                                let mut value: String = String::from("");
+                                for data in folder.data.clone() {
+                                    for (key, collection_value) in data {
+                                        let has_select_sep = &key.find("__").clone();
+                                        if has_select_sep.is_some() {
+                                            let key_items: Vec<&str> = key.split("__").collect();
+                                            let key_column_name = key_items[0];
+                                            let key_column_type = key_items[1];
+                                            if key_column_type == SELECT_OPTIONS && 
+                                               key_column_name.to_lowercase() == column_name.to_lowercase() {
+                                                for option_ in collection_value {
+                                                    let option_key = option_.get(KEY).unwrap().clone();
+                                                    let option_value = option_.get(VALUE).unwrap().clone();
+                                                    for value_id in value_ids.clone() {
+                                                        if option_key.as_str() == value_id {
+                                                            // data = format!("{} {}", &data, option_value);
+                                                            // value_wrap = Some(&option_value);
+                                                            value = format!("{} {}", &value, option_value);
+                                                        }    
+                                                    }
                                                 }
                                             }
                                         }
                                     }
                                 }
+                                my_value_list.push(value);
                             }
-                            value_wrap = Some(value);
                         }
-    
+                        values_wrap = Some(my_value_list);
                     }
                 },
                 COLUMN_TYPE_DATE => {
-                    let wrap = data_map.get(&column_id);
-                    if wrap.is_some() {
-                        value_wrap = Some(wrap.unwrap().clone());
-                    }
+                    values_wrap = self.do_text_basic(data_map, &column_id);
                 },
                 COLUMN_TYPE_DURATION => {
-                    let wrap = data_map.get(&column_id);
-                    if wrap.is_some() {
-                        value_wrap = Some(wrap.unwrap().clone());
-                    }
+                    values_wrap = self.do_text_basic(data_map, &column_id);
                 },
                 COLUMN_TYPE_CURRENCY => {
-                    let wrap = data_map.get(&column_id);
-                    if wrap.is_some() {
-                        value_wrap = Some(wrap.unwrap().clone());
-                    }
+                    values_wrap = self.do_text_basic(data_map, &column_id);
                 },
                 COLUMN_TYPE_PERCENTAGE => {
-                    let wrap = data_map.get(&column_id);
-                    if wrap.is_some() {
-                        value_wrap = Some(wrap.unwrap().clone());
-                    }
+                    values_wrap = self.do_text_basic(data_map, &column_id);
                 },
                 COLUMN_TYPE_PHONE => {
-                    let wrap = data_map.get(&column_id);
-                    if wrap.is_some() {
-                        value_wrap = Some(wrap.unwrap().clone());
-                    }
+                    values_wrap = self.do_text_basic(data_map, &column_id);
                 },
                 COLUMN_TYPE_EMAIL => {
-                    let wrap = data_map.get(&column_id);
-                    if wrap.is_some() {
-                        value_wrap = Some(wrap.unwrap().clone());
-                    }
+                    values_wrap = self.do_text_basic(data_map, &column_id);
                 },
                 COLUMN_TYPE_FILE => {
-                    let wrap = data_map.get(&column_id);
-                    if wrap.is_some() {
-                        value_wrap = Some(wrap.unwrap().clone());
-                    }
+                    values_wrap = self.do_text_basic(data_map, &column_id);
                 },
                 _ => {},
             }
-            if value_wrap.is_some() {
-                let value = Some(value_wrap.unwrap().clone());
-                if value.is_some() {
-                    // let mut data = String::from("");
-                    let mut value = value.unwrap();
-                    if value == String::from("") {
-                        continue
+            if values_wrap.is_some() {
+                let values = Some(values_wrap.unwrap().clone());
+                if values.is_some() {
+                    let values = values.unwrap();
+                    let mut column_text: String = String::from("");
+                    for mut value in values {
+                        if value == String::from("") {
+                            continue
+                        }
+                        // Do ascii folding
+                        value = fold_to_ascii(value.as_str());
+                        // Through regex, parse only words and numbers, remove duplicate whitespace
+                        let expr = &RE_TEXT;
+                        let mut value_new = String::from("");
+                        let words = expr.captures_iter(value.as_str());
+                        for word in words {
+                            let word = word.get(0).unwrap().as_str();
+                            value_new = format!("{} {}", value_new, word);
+                        }
+                        let value_new = value_new.trim().to_string();
+                        value = value_new;
+                        // Convert to lower
+                        value = value.to_lowercase();
+                        column_text = format!("{} {}", &column_text, &value).trim().to_string();
+                        text = format!("{} {}", &text, &value).trim().to_string();
                     }
-                    // Do ascii folding
-                    value = fold_to_ascii(value.as_str());
-                    // Through regex, parse only words and numbers, remove duplicate whitespace
-                    let expr = &RE_TEXT;
-                    let mut value_new = String::from("");
-                    let words = expr.captures_iter(value.as_str());
-                    for word in words {
-                        let word = word.get(0).unwrap().as_str();
-                        value_new = format!("{} {}", value_new, word);
-                    }
-                    let value_new = value_new.trim().to_string();
-                    value = value_new;
-                    // Convert to lower
-                    value = value.to_lowercase();
-                    map.insert(column_id, value.clone());
-                    text = format!("{} {}", &text, &value);
+                    map.insert(column_id, column_text.clone());
                 }
             } else {
                 continue
             }
         }
         // add text to map
-        let text = text.trim().to_string();
+        // let text = text.trim().to_string();
         map.insert(text_column_id, text);
         return Ok(map.clone())
     }

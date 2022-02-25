@@ -11,7 +11,6 @@ use regex::Regex;
 use slug::slugify;
 use std::str::FromStr;
 
-
 use crate::commands::folder::config::*;
 use crate::storage::constants::*;
 use crate::commands::folder::{Command};
@@ -47,11 +46,10 @@ impl<'gb> InsertIntoFolder<'gb> {
 
     fn get_insert_id_data_map(
         &self,
-        insert_data_map: &BTreeMap<String, String>,
+        insert_data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
         folder_data: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
-    ) -> (BTreeMap<String, String>, BTreeMap<String, String>) {
-        let mut insert_id_data_map: BTreeMap<String, String> = BTreeMap::new();
-        let mut insert_id_data_objects_map: BTreeMap<String, String> = BTreeMap::new();
+    ) -> BTreeMap<String, Vec<BTreeMap<String, String>>> {
+        let mut insert_id_data_map: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
         let mut folder_map_by_name: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
         let columns = folder_data.get(COLUMNS);
         if columns.is_some() {
@@ -61,55 +59,19 @@ impl<'gb> InsertIntoFolder<'gb> {
                 folder_map_by_name.insert(column_name.clone(), column.clone());
             }
         }
+        // eprintln!("InsertIntoFolder.get_insert_id_data_map :: folder_map_by_name: {:#?}", &folder_map_by_name);
         for (name, value) in insert_data_map.clone() {
             let map = folder_map_by_name.get(&name);
             if map.is_some() {
                 let map = map.unwrap();
                 let id = map.get(ID).unwrap().clone();
-                let column_type = map.get(COLUMN_TYPE);
-                let column_type = column_type.unwrap().clone();
-                if column_type == COLUMN_TYPE_LINK.to_string() {
-                    // column_id => remote folder item id
-                    insert_id_data_objects_map.insert(id, value);
-                } else {
-                    insert_id_data_map.insert(id, value);
-                }
+                // let column_type = map.get(COLUMN_TYPE);
+                // let column_type = column_type.unwrap().clone();
+                insert_id_data_map.insert(id, value);
             }
         }
-        return (insert_id_data_map, insert_id_data_objects_map)
-    }
-
-    fn get_insert_id_data_collections_map(
-        &self,
-        insert_data_collections_map: Option<BTreeMap<String, Vec<String>>>,
-        folder_data: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
-    ) -> BTreeMap<String, Vec<String>> {
-        let mut insert_id_data_collections_map: BTreeMap<String, Vec<String>> = BTreeMap::new();
-        if insert_data_collections_map.is_some() {
-            // I receive a map of list of ids
-            let mut folder_map_by_name: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
-            let columns = folder_data.get(COLUMNS);
-            if columns.is_some() {
-                let columns = columns.unwrap();
-                for column in columns {
-                    let column_name = column.get(NAME).unwrap();
-                    folder_map_by_name.insert(column_name.clone(), column.clone());
-                }
-            }
-            let insert_data_collections_map = insert_data_collections_map.unwrap();
-            for (name, id_list) in insert_data_collections_map {
-                let id_map = folder_map_by_name.get(&name);
-                if id_map.is_some() {
-                    let id_map = id_map.unwrap();
-                    let id = id_map.get(ID);
-                    if id.is_some() {
-                        let id = id.unwrap().clone();
-                        insert_id_data_collections_map.insert(id, id_list);
-                    }
-                }
-            }
-        }
-        return insert_id_data_collections_map
+        // eprintln!("InsertIntoFolder.get_insert_id_data_map :: insert_id_data_map: {:#?}", &insert_id_data_map);
+        return insert_id_data_map
     }
 
     pub fn run(&self) -> Result<DbData, Vec<PlanetError>> {
@@ -190,10 +152,9 @@ impl<'gb> InsertIntoFolder<'gb> {
                 let config_columns = config_columns.unwrap();
                 // eprintln!("InsertIntoFolder.run :: config_columns: {:#?}", &config_columns);
 
-                let insert_data_map: BTreeMap<String, String> = self.config.data.clone().unwrap();
-                let insert_data_collections_map = self.config.data_collections.clone();
+                let insert_data_map= self.config.data.clone().unwrap();
                 // I need to have {id} -> Value
-                let folder_data = folder.clone().data_collections.unwrap();
+                let folder_data = folder.clone().data.unwrap();
 
                 // Validate sub_folder id exists in config for the folder and attach to DbData
                 let sub_folders_config = self.config.clone().sub_folders;
@@ -232,14 +193,8 @@ impl<'gb> InsertIntoFolder<'gb> {
                 }
 
                 // get id => value for data, data_objects and data_collections
-                let (
-                    insert_id_data_map, 
-                    insert_id_data_objects_map
-                ) = self.get_insert_id_data_map(
+                let insert_id_data_map = self.get_insert_id_data_map(
                     &insert_data_map, &folder_data
-                );
-                let insert_id_data_collections_map = self.get_insert_id_data_collections_map(
-                    insert_data_collections_map, &folder_data
                 );
                 
                 // process insert config data_collections
@@ -296,8 +251,6 @@ impl<'gb> InsertIntoFolder<'gb> {
                     &name,
                     None,
                     None,
-                    None,
-                    None,
                     routing_wrap.clone(),
                     None,
                     sub_folders_wrap,
@@ -308,9 +261,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                     return Err(errors)
                 }
                 let mut db_data = db_data.unwrap();
-                let mut data: BTreeMap<String, String> = BTreeMap::new();
-                let mut data_objects: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
-                let mut data_collections: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
+                let mut data: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
                 let mut column_config_map: BTreeMap<String, ColumnConfig> = BTreeMap::new();
                 for column in config_columns.clone() {
                     let column_name = column.name.clone().unwrap();
@@ -337,24 +288,16 @@ impl<'gb> InsertIntoFolder<'gb> {
                     let data_item = insert_id_data_map.get(&column_id);
                     if data_item.is_some() {
                         let data_item = data_item.unwrap().clone();
-                        let mut items = Vec::new();
-                        items.push(data_item);
-                        column_data = Some(items);
-                    }
-                    let data_objects_item = insert_id_data_objects_map.get(
-                        &column_id
-                    );
-                    if data_objects_item.is_some() && column_data.is_none() {
-                        let mut items = Vec::new();
-                        items.push(data_objects_item.unwrap().clone());
-                        column_data = Some(items);
-                    }
-                    let data_collections_item = insert_id_data_collections_map.get(
-                        &column_id
-                    );
-                    if data_collections_item.is_some() && column_data.is_none() {
-                        let data_collections_item = data_collections_item.unwrap().clone();
-                        column_data = Some(data_collections_item);
+                        let data_item = &data_item;
+                        let mut my_list: Vec<String> = Vec::new();
+                        for item in data_item {
+                            let value = item.get(VALUE);
+                            if value.is_some() {
+                                let value = value.unwrap();
+                                my_list.push(value.clone());
+                            }
+                        }
+                        column_data = Some(my_list);
                     }
                     // eprintln!("InsertIntoFolder.run :: column_data: {:?}", &column_data);
                     // In case we don't have any value and is system generated we skip
@@ -461,12 +404,14 @@ impl<'gb> InsertIntoFolder<'gb> {
                                     map.insert(ID.to_string(), item_id);
                                     items.push(map);
                                 }
-                                data_collections.insert(column_id.clone(), items);
+                                data.insert(column_id.clone(), items);
                             } else {
                                 let mut map: BTreeMap<String, String> = BTreeMap::new();
                                 let value = id_list[0].clone();
                                 map.insert(ID.to_string(), value);
-                                data_objects.insert(column_id.clone(), map);
+                                let mut my_list: Vec<BTreeMap<String, String>> = Vec::new();
+                                my_list.push(map);
+                                data.insert(column_id.clone(), my_list);
                             }
                             skip_data_assign = true;
                             // links_map
@@ -550,16 +495,14 @@ impl<'gb> InsertIntoFolder<'gb> {
                             );
                             let fields = obj.validate(
                                 &column_data,
-                                &data_objects,
-                                &data_collections,
+                                &data,
                                 routing_wrap.clone(),
                                 &home_dir.to_string()
                             );
                             if fields.is_ok() {
                                 let fields = fields.unwrap();
                                 column_data_wrap = Ok(fields.0);
-                                data_objects = fields.2;
-                                data_collections = fields.3;
+                                data = fields.2;
                             }
                             // skip_data_assign = true;
                         },
@@ -581,11 +524,10 @@ impl<'gb> InsertIntoFolder<'gb> {
                     // );
                     if skip_data_assign == false {
                         let tuple = handle_field_response(
-                            &column_data_wrap, &errors, &column_id, &data, &data_collections, &is_set
+                            &column_data_wrap, &errors, &column_id, &data, &is_set
                         );
                         data = tuple.0;
-                        data_collections = tuple.1;
-                        errors = tuple.2;
+                        errors = tuple.1;
                     }
                 }
                 // text and language
@@ -597,7 +539,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                     let column_type = column_type.as_str();
                     let column_id = &column_config.id.unwrap();
                     if column_type == COLUMN_TYPE_TEXT {
-                        let obj = TextColumn::defaults(
+                        let mut obj = TextColumn::defaults(
                             &column_config_,
                             Some(column_config_map.clone()),
                         );
@@ -617,7 +559,9 @@ impl<'gb> InsertIntoFolder<'gb> {
                             );
                         }
                         text_map = result_text.unwrap();
-                        data_objects.insert(TEXT.to_string(), text_map.clone());
+                        let mut my_list: Vec<BTreeMap<String, String>> = Vec::new();
+                        my_list.push(text_map.clone());
+                        data.insert(TEXT.to_string(), my_list);
                     } else if column_type == COLUMN_TYPE_LANGUAGE {
                         let obj = LanguageColumn::defaults(
                             &column_config_,
@@ -635,22 +579,14 @@ impl<'gb> InsertIntoFolder<'gb> {
                             );
                         }
                         let language_code = result_lang.unwrap();
-                        data.insert(column_id.clone(), language_code);
+                        data.insert(column_id.clone(), build_value_list(&language_code));
                     }
                 }
                 if errors.len() > 0 {
                     return Err(errors)
                 }
                 db_data.data = Some(data);
-                db_data.data_objects = None;
-                db_data.data_collections = None;
-                if data_objects.keys().len() != 0 {
-                    db_data.data_objects = Some(data_objects);
-                }
-                if data_collections.keys().len() != 0 {
-                    db_data.data_collections = Some(data_collections);
-                }
-                eprintln!("InsertIntoFolder.run :: I will write: {:#?}", &db_data);
+                // eprintln!("InsertIntoFolder.run :: I will write: {:#?}", &db_data);
                 let response= db_row.insert(&folder_name, &db_data);
                 if response.is_err() {
                     let error = response.unwrap_err();
@@ -700,14 +636,14 @@ impl<'gb> InsertIntoFolder<'gb> {
                                         let mut linked_item = linked_item.unwrap();
                                         // I may need to update to data_objects or data_collections
                                         if many {
-                                            let data_collections_wrap = linked_item.data_collections;
-                                            let mut data_collections: BTreeMap<String, Vec<BTreeMap<String, String>>>;
-                                            if data_collections_wrap.is_some() {
-                                                data_collections = data_collections_wrap.unwrap();
+                                            let data_wrap = linked_item.data;
+                                            let mut data: BTreeMap<String, Vec<BTreeMap<String, String>>>;
+                                            if data_wrap.is_some() {
+                                                data = data_wrap.unwrap();
                                             } else {
-                                                data_collections = BTreeMap::new();
+                                                data = BTreeMap::new();
                                             }
-                                            let list_wrap = data_collections.get(&column_id);
+                                            let list_wrap = data.get(&column_id);
                                             let mut list: Vec<BTreeMap<String, String>>;
                                             if list_wrap.is_some() {
                                                 list = list_wrap.unwrap().clone();
@@ -720,21 +656,23 @@ impl<'gb> InsertIntoFolder<'gb> {
                                                 item_object.insert(ID.to_string(), id_record.clone());
                                                 list.push(item_object);
                                             }
-                                            data_collections.insert(column_id.clone(), list);
-                                            linked_item.data_collections = Some(data_collections);
+                                            data.insert(column_id.clone(), list);
+                                            linked_item.data = Some(data);
                                             let _linked_item = db_row.update(&linked_item);
                                         } else {
-                                            let data_objects_wrap = linked_item.data_objects;
-                                            let mut data_objects: BTreeMap<String, BTreeMap<String, String>>;
-                                            if data_objects_wrap.is_some() {
-                                                data_objects = data_objects_wrap.unwrap();
+                                            let data_wrap = linked_item.data;
+                                            let mut data: BTreeMap<String, Vec<BTreeMap<String, String>>>;
+                                            if data_wrap.is_some() {
+                                                data = data_wrap.unwrap();
                                             } else {
-                                                data_objects = BTreeMap::new();
+                                                data = BTreeMap::new();
                                             }
                                             let mut item_object: BTreeMap<String, String> = BTreeMap::new();
                                             item_object.insert(ID.to_string(), id_record.clone());
-                                            data_objects.insert(column_id.clone(), item_object);
-                                            linked_item.data_objects = Some(data_objects);
+                                            let mut my_list: Vec<BTreeMap<String, String>> = Vec::new();
+                                            my_list.push(item_object);
+                                            data.insert(column_id.clone(), my_list);
+                                            linked_item.data = Some(data);
                                             let _linked_item = db_row.update(&linked_item);
                                         }
                                     } else {
@@ -916,8 +854,8 @@ impl<'gb> Command<String> for GetFromFolder<'gb> {
                     );
                 }
                 let folder = folder.unwrap();
-                let data_collections = folder.clone().data_collections;
-                let field_ids = data_collections.unwrap().get(COLUMN_IDS).unwrap().clone();
+                let data = folder.clone().data;
+                let field_ids = data.unwrap().get(COLUMN_IDS).unwrap().clone();
                 let config_columns = ColumnConfig::get_config(
                     self.planet_context,
                     self.context,
@@ -974,6 +912,11 @@ impl<'gb> Command<String> for GetFromFolder<'gb> {
                             continue
                         }
                         let value = value.unwrap();
+                        let value = get_value_list(value);
+                        if value.is_none() {
+                            continue
+                        }
+                        let value = &value.unwrap();
                         // Get will return YAML document for the data
                         match column_type {
                             COLUMN_TYPE_SMALL_TEXT => {
@@ -1335,11 +1278,9 @@ fn handle_field_response(
     column_data: &Result<Vec<String>, PlanetError>, 
     errors: &Vec<PlanetError>, 
     column_id: &String,
-    data: &BTreeMap<String, String>,
-    data_collections: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
+    data: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
     is_set: &String
 ) -> (
-    BTreeMap<String, String>, 
     BTreeMap<String, Vec<BTreeMap<String, String>>>,
     Vec<PlanetError>
 ) {
@@ -1347,7 +1288,6 @@ fn handle_field_response(
     // eprintln!("handle_field_response :: column_data: {:?}", column_data);
     let mut errors = errors.clone();
     let mut data = data.clone();
-    let mut data_collections = data_collections.clone();
     let column_id = column_id.clone();
     let is_set = is_set.clone();
     if column_data.is_err() {
@@ -1365,7 +1305,7 @@ fn handle_field_response(
                 errors.push(error);
             } else {
                 let column_value = column_data[0].clone();
-                data.insert(column_id.clone(), column_value);    
+                data.insert(column_id.clone(), build_value_list(&column_value));
             }
         } else {
             // into data_collections, I have a set
@@ -1375,8 +1315,8 @@ fn handle_field_response(
                 map.insert(VALUE.to_string(), item);
                 list.push(map);
             }
-            data_collections.insert(column_id.clone(), list);
+            data.insert(column_id.clone(), list);
         }
     }
-    return (data, data_collections, errors)
+    return (data, errors)
 }

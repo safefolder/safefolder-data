@@ -40,19 +40,16 @@ impl FileColumn {
     pub fn validate(
         &self, 
         paths: &Vec<String>,
-        data_objects: &BTreeMap<String, BTreeMap<String, String>>,
-        data_collections: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
+        data: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
         routing: Option<RoutingData>,
         home_dir: &String,
     ) -> Result<(
             Vec<String>,
             Vec<String>,
-            BTreeMap<String, BTreeMap<String, String>>, 
             BTreeMap<String, Vec<BTreeMap<String, String>>>
         ), PlanetError> {
         let mut db_folder_item = self.db_folder_item.clone().unwrap();
-        let mut data_collections = data_collections.clone();
-        let mut data_objects = data_objects.clone();
+        let mut data = data.clone();
         let paths = paths.clone();
         let config = self.config.clone();
         let column_id = &config.id.unwrap();
@@ -225,7 +222,7 @@ impl FileColumn {
                                     list.push(my_map);
                                 }
                                 let key = format!("{}__tags", column_id);
-                                data_collections.insert(key, list);
+                                data.insert(key, list);
                             } else {
                                 let keyword = keywords;
                                 let mut list: Vec<BTreeMap<String, String>> = Vec::new();
@@ -233,7 +230,7 @@ impl FileColumn {
                                 my_map.insert(VALUE.to_string(), keyword.to_string());
                                 list.push(my_map);
                                 let key = format!("{}__tags", column_id);
-                                data_collections.insert(key, list);
+                                data.insert(key, list);
                             }
                             my_map.insert(
                                 FILE_PROP_SUBJECT.to_string(), 
@@ -276,7 +273,9 @@ impl FileColumn {
                         FILE_PROP_METADATA.to_string(), 
                         response
                     );
-                    data_objects.insert(column_id.clone(), my_map);
+                    let mut my_list: Vec<BTreeMap<String, String>> = Vec::new();
+                    my_list.push(my_map);
+                    data.insert(column_id.clone(), my_list);
                 } else {
                     return Err(
                         PlanetError::new(
@@ -368,8 +367,7 @@ impl FileColumn {
             (
                 file_ids.clone(),
                 document_texts.clone(),
-                data_objects.clone(),
-                data_collections.clone()
+                data.clone()
             )
         )
     }

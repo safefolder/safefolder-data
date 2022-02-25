@@ -26,14 +26,14 @@ pub trait CollectionStatsFunction {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Stats {
     function: Option<FunctionParse>,
-    data_map: Option<BTreeMap<String, String>>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
     field_config_map: BTreeMap<String, ColumnConfig>
 }
 impl Stats {
     pub fn defaults(
         function: Option<FunctionParse>, 
-        data_map: Option<BTreeMap<String, String>>,
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>
     ) -> Self {
         let field_config_map = field_config_map.clone();
