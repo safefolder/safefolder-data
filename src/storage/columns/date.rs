@@ -7,7 +7,7 @@ use lazy_static::lazy_static;
 use regex::{Regex};
 
 use crate::planet::{PlanetError};
-use crate::commands::folder::config::*;
+use crate::statements::folder::schema::*;
 use crate::storage::columns::*;
 use crate::storage::constants::*;
 

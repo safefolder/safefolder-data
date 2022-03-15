@@ -3,7 +3,7 @@ use colored::Colorize;
 use tr::tr;
 
 use crate::planet::{PlanetError, PlanetContext, Context};
-use crate::commands::folder::config::ColumnConfig;
+use crate::statements::folder::schema::*;
 use crate::storage::constants::*;
 use crate::planet::constants::*;
 use crate::storage::columns::*;

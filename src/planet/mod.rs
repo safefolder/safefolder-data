@@ -16,16 +16,32 @@ use std::fs;
 use std::io;
 // use colored::*;
 
+// use crate::statements::Statement;
+
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
 pub struct PlanetContextSource {
     pub mission: String,
     pub home_path: Option<String>,
 }
 
+// pub trait StatementRegistry {
+// }
+
+// #[derive(Debug)]
+// pub struct StatementRegistryItem<'gb> {
+//     pub title: Option<String>,
+//     pub description: Option<String>,
+//     pub key: String,
+//     pub keywords: Option<Vec<String>>,
+//     pub category: Option<String>,
+//     pub statement: dyn Statement<'gb>,
+// }
+
 #[derive(Debug, Clone)]
 pub struct PlanetContext<'gb> {
     pub mission: &'gb str,
     pub home_path: Option<&'gb str>,
+    // pub statement_registry: HashMap<String, dyn StatementRegistry>
 }
 
 impl<'gb> PlanetContext<'gb> {
@@ -53,6 +69,61 @@ impl<'gb> PlanetContext<'gb> {
         }
     }
 
+    // pub fn register_statement(
+    //     &self,
+    //     statement: &dyn Statement,
+    //     title: Option<String>,
+    //     description: Option<String>,
+    //     key: &String,
+    //     keywords: Option<String>,
+    //     category: Option<String>,
+    // ) {
+    //     let item: dyn StatementRegistry = StatementRegistryItem {
+    //         title: title,
+    //         description: description,
+    //         key: key.clone(),
+    //         statement: statement,
+    //         keywords: keywords,
+    //         category: category,
+    //     };
+    //     self.statement_registry.insert(key.clone(), item);
+    // }
+
+    // fn resolve_statement_key(&self, statement_text: &String) -> Result<String, PlanetError> {
+    //     // I get all obhects from registry and check their keys and try to find in statement_text
+    //     // Check I only have one match, return error in case we have multiple items
+    //     return Ok(String::from(""))
+    // }
+
+    // pub fn get_statement(
+    //     &self,
+    //     statement_text: &String,
+    // ) -> Result<dyn Statement, PlanetError> {
+    //     let statement_key = self.resolve_statement_key(statement_text);
+    //     if statement_key.is_err() {
+    //         let error = statement_key.unwrap_err();
+    //         return Err(error);
+    //     }
+    //     let statement_key = statement_key.unwrap();
+    //     let statement_registry = self.statement_registry;
+    //     let statement = statement_registry.get(&statement_key);
+    //     if statement.is_some() {
+    //         let statement_item: StatementRegistryItem = statement.unwrap();
+    //         let statement = statement_item.statement;
+    //         return Ok(statement)
+    //     } else {
+    //         let snippet = &statement_text[..100];
+    //         return Err(
+    //             PlanetError::new(
+    //                 500, 
+    //                 Some(
+    //                     tr!("Statement not found in registry: \"{}\"...", snippet)
+    //                 ),
+    //             )
+    //         );
+    //     }
+    // }
+
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -73,6 +144,12 @@ pub struct Context<'gb> {
     pub space_id: Option<&'gb str>,
     pub box_id: Option<&'gb str>,
     pub site_id: Option<&'gb str>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Environment<'gb> {
+    pub context: &'gb Context<'gb>,
+    pub planet_context: &'gb PlanetContext<'gb>,
 }
 
 #[derive(Debug, Clone)]

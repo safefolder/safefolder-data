@@ -8,7 +8,7 @@ use regex::{Regex};
 use rust_decimal::prelude::*;
 
 use crate::planet::{PlanetError};
-use crate::commands::folder::config::ColumnConfig;
+use crate::statements::folder::schema::*;
 use crate::storage::constants::*;
 use crate::storage::columns::*;
 use crate::storage::folder::FolderSchema;

@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use crate::planet::{PlanetError};
 use crate::storage::folder::{DbData, TreeFolder};
 use crate::planet::constants::*;
-use crate::commands::folder::config::*;
+use crate::statements::folder::schema::*;
 
 /*
 These are the core fields implemented so we can tackle the security and permissions system

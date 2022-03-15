@@ -5,7 +5,7 @@ use tr::tr;
 use serde_yaml;
 
 use crate::planet::{PlanetError};
-use crate::commands::folder::config::ColumnConfig;
+use crate::statements::folder::schema::*;
 use crate::storage::constants::*;
 use crate::functions::{execute_formula, Formula};
 use crate::storage::columns::*;

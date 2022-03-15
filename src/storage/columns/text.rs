@@ -14,7 +14,7 @@ use rust_stemmers::{Algorithm, Stemmer};
 use crate::planet::constants::ID;
 use crate::planet::{PlanetError};
 use crate::storage::folder::{DbData, get_value_list};
-use crate::commands::folder::config::ColumnConfig;
+use crate::statements::folder::schema::*;
 use crate::storage::constants::*;
 use crate::planet::constants::*;
 use crate::storage::generate_id;

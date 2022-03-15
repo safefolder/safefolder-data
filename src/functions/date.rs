@@ -7,7 +7,7 @@ use chrono::{DateTime, Datelike, FixedOffset, NaiveDate, Utc, Duration, Timelike
 use tr::tr;
 use ordinal::Ordinal;
 use crate::functions::*;
-use crate::commands::folder::config::DateFormat;
+use crate::statements::folder::schema::*;
 
 lazy_static! {
     pub static ref RE_DATE: Regex = Regex::new(r#"^DATE\([\s\n\t]{0,}(?P<year>(([\s\d+-/*]*)|(\{[\w\s]+\})|([A-Z]+\(.[^)]*\))))[\s\n\t]{0,},[\s\n\t]{0,}(?P<month>(([\s\d+-/*]+)|(\{[\w\s]+\})|([A-Z]+\(.[^)]*\))))[\s\n\t]{0,},[\s\n\t]{0,}(?P<day>(([\s\d+-/*]+)|(\{[\w\s]+\})|([A-Z]+\(.[^)]*\))))[\s\n\t]{0,}\)"#).unwrap();

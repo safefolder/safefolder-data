@@ -27,7 +27,7 @@ use anyhow::{anyhow};
 use crate::planet::constants::*;
 use crate::storage::{generate_id};
 use crate::planet::{PlanetError};
-use crate::commands::folder::config::{DbFolderConfig};
+use crate::statements::folder::config::{DbFolderConfig};
 use crate::storage::constants::*;
 use crate::storage::columns::*;
 use crate::storage::columns::text::{get_stop_words_by_language, get_stemmer_by_language};
@@ -665,6 +665,7 @@ impl FolderSchema for TreeFolder {
         // box/base_folder_c7c815is1s406kaf3j30/partition_0001.index
         // folders.db
         // If private space, I open workspace db, otherwise I open site db
+
         let database: sled::Db;
         if site_id.is_none() {
             // I have private space, get workspace.db connection
@@ -708,7 +709,7 @@ impl FolderSchema for TreeFolder {
                     box_id: None,
                     tree: db_tree,
                 };
-                Ok(db_folder)    
+                Ok(db_folder)
             },
             Err(err) => {
                 eprintln!("{:?}", &err);

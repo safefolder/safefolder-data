@@ -6,15 +6,16 @@ use std::collections::{BTreeMap, HashMap};
 use std::time::Instant;
 
 use tr::tr;
-use colored::*;
+// use colored::*;
 use regex::Regex;
-use slug::slugify;
-use std::str::FromStr;
+// use slug::slugify;
+// use std::str::FromStr;
 
-use crate::commands::folder::config::*;
+use crate::statements::folder::config::*;
 use crate::storage::constants::*;
-use crate::commands::folder::{Command};
-use crate::commands::{CommandRunner};
+// use crate::statements::Statement;
+// use crate::statements::{CommandRunner};
+use crate::statements::folder::schema::*;
 use crate::planet::constants::{ID, NAME, VALUE, FALSE, COLUMNS};
 use crate::storage::folder::{TreeFolder, TreeFolderItem, FolderItem, FolderSchema, DbData, GetItemOption};
 use crate::storage::folder::*;
@@ -24,7 +25,6 @@ use crate::planet::{
     PlanetContext, 
     PlanetError,
     Context,
-    validation::PlanetValidationError,
 };
 use crate::storage::columns::{text::*, StorageColumn, ObjectStorageColumn};
 use crate::storage::columns::number::*;
@@ -694,96 +694,96 @@ impl<'gb> InsertIntoFolder<'gb> {
         }
     }
 
-    pub fn runner(runner: &CommandRunner, path_yaml: &String) -> () {
-        let t_1 = Instant::now();
-        let config_ = InsertIntoFolderConfig::defaults(None);
-        let config: Result<InsertIntoFolderConfig, Vec<PlanetValidationError>> = config_.import(
-            runner.planet_context,
-            &path_yaml
-        );
-        match config {
-            Ok(_) => {
-                let home_dir = runner.planet_context.home_path.unwrap_or_default();
-                let account_id = runner.context.account_id.unwrap_or_default();
-                let space_id = runner.context.space_id.unwrap_or_default();
-                let site_id = runner.context.site_id;
-                let result = SpaceDatabase::defaults(
-                    site_id, 
-                    space_id, 
-                    Some(home_dir),
-                    Some(false)
-                );
-                if result.clone().is_err() {
-                    let error = result.clone().unwrap_err();
-                    println!();
-                    println!("{}", tr!("I found these errors").red().bold());
-                    println!("{}", "--------------------".red());
-                    println!();
-                    println!(
-                        "{} {}", 
-                        String::from('.').blue(),
-                        error.message
-                    );
-                }
-                let space_database = result.unwrap();
+    // pub fn runner(runner: &CommandRunner, path_yaml: &String) -> () {
+    //     let t_1 = Instant::now();
+    //     let config_ = InsertIntoFolderConfig::defaults(None);
+    //     let config: Result<InsertIntoFolderConfig, Vec<PlanetValidationError>> = config_.import(
+    //         runner.planet_context,
+    //         &path_yaml
+    //     );
+    //     match config {
+    //         Ok(_) => {
+    //             let home_dir = runner.planet_context.home_path.unwrap_or_default();
+    //             let account_id = runner.context.account_id.unwrap_or_default();
+    //             let space_id = runner.context.space_id.unwrap_or_default();
+    //             let site_id = runner.context.site_id;
+    //             let result = SpaceDatabase::defaults(
+    //                 site_id, 
+    //                 space_id, 
+    //                 Some(home_dir),
+    //                 Some(false)
+    //             );
+    //             if result.clone().is_err() {
+    //                 let error = result.clone().unwrap_err();
+    //                 println!();
+    //                 println!("{}", tr!("I found these errors").red().bold());
+    //                 println!("{}", "--------------------".red());
+    //                 println!();
+    //                 println!(
+    //                     "{} {}", 
+    //                     String::from('.').blue(),
+    //                     error.message
+    //                 );
+    //             }
+    //             let space_database = result.unwrap();
         
-                let db_folder= TreeFolder::defaults(
-                    space_database.connection_pool.clone(),
-                    Some(home_dir),
-                    Some(account_id),
-                    Some(space_id),
-                    site_id,
-                ).unwrap();
+    //             let db_folder= TreeFolder::defaults(
+    //                 space_database.connection_pool.clone(),
+    //                 Some(home_dir),
+    //                 Some(account_id),
+    //                 Some(space_id),
+    //                 site_id,
+    //             ).unwrap();
         
-                let insert_into_table: InsertIntoFolder = InsertIntoFolder{
-                    planet_context: runner.planet_context,
-                    context: runner.context,
-                    config: config.unwrap(),
-                    db_folder: db_folder.clone(),
-                    space_database: space_database.clone()
-                };
-                let result: Result<_, Vec<PlanetError>> = insert_into_table.run();
-                match result {
-                    Ok(_) => {
-                        println!();
-                        println!("{}", String::from("[OK]").green());
-                        eprint!("Time: {} ms", &t_1.elapsed().as_millis());
-                    },
-                    Err(errors) => {
-                        let count = 1;
-                        println!();
-                        println!("{}", tr!("I found these errors").red().bold());
-                        println!("{}", "--------------------".red());
-                        println!();
-                        for error in errors {
-                            println!(
-                                "{}{} {}", 
-                                count.to_string().blue(),
-                                String::from('.').blue(),
-                                error.message
-                            );
-                        }
-                    }
-                }
-            },
-            Err(errors) => {
-                println!();
-                println!("{}", tr!("I found these errors").red().bold());
-                println!("{}", "--------------------".red());
-                println!();
-                let mut count = 1;
-                for error in errors {
-                    println!(
-                        "{}{} {}", 
-                        count.to_string().blue(), 
-                        String::from('.').blue(), 
-                        error.message
-                    );
-                    count += 1;
-                }
-            }
-        }
-    }
+    //             let insert_into_table: InsertIntoFolder = InsertIntoFolder{
+    //                 planet_context: runner.planet_context,
+    //                 context: runner.context,
+    //                 config: config.unwrap(),
+    //                 db_folder: db_folder.clone(),
+    //                 space_database: space_database.clone()
+    //             };
+    //             let result: Result<_, Vec<PlanetError>> = insert_into_table.run();
+    //             match result {
+    //                 Ok(_) => {
+    //                     println!();
+    //                     println!("{}", String::from("[OK]").green());
+    //                     eprint!("Time: {} ms", &t_1.elapsed().as_millis());
+    //                 },
+    //                 Err(errors) => {
+    //                     let count = 1;
+    //                     println!();
+    //                     println!("{}", tr!("I found these errors").red().bold());
+    //                     println!("{}", "--------------------".red());
+    //                     println!();
+    //                     for error in errors {
+    //                         println!(
+    //                             "{}{} {}", 
+    //                             count.to_string().blue(),
+    //                             String::from('.').blue(),
+    //                             error.message
+    //                         );
+    //                     }
+    //                 }
+    //             }
+    //         },
+    //         Err(errors) => {
+    //             println!();
+    //             println!("{}", tr!("I found these errors").red().bold());
+    //             println!("{}", "--------------------".red());
+    //             println!();
+    //             let mut count = 1;
+    //             for error in errors {
+    //                 println!(
+    //                     "{}{} {}", 
+    //                     count.to_string().blue(), 
+    //                     String::from('.').blue(), 
+    //                     error.message
+    //                 );
+    //                 count += 1;
+    //             }
+    //         }
+    //     }
+    // }
 }
 
 impl<'gb> InsertIntoFolder<'gb> {
@@ -812,304 +812,304 @@ pub struct GetFromFolder<'gb> {
     pub config: GetFromFolderConfig,
 }
 
-impl<'gb> Command<String> for GetFromFolder<'gb> {
+// impl<'gb> Statement<'gb> for GetFromFolder<'gb> {
 
-    fn run(&self) -> Result<String, PlanetError> {
-        let command = self.config.command.clone().unwrap_or_default();
-        let expr = Regex::new(r#"(GET FROM TABLE) "(?P<folder_name>[a-zA-Z0-9_ ]+)""#).unwrap();
-        let table_name_match = expr.captures(&command).unwrap();
-        let folder_name = &table_name_match["folder_name"].to_string();
-        let folder_file = slugify(&folder_name);
-        let folder_file = folder_file.as_str().replace("-", "_");
+//     fn run(&self) -> Result<String, PlanetError> {
+//         let command = self.config.command.clone().unwrap_or_default();
+//         let expr = Regex::new(r#"(GET FROM TABLE) "(?P<folder_name>[a-zA-Z0-9_ ]+)""#).unwrap();
+//         let table_name_match = expr.captures(&command).unwrap();
+//         let folder_name = &table_name_match["folder_name"].to_string();
+//         let folder_file = slugify(&folder_name);
+//         let folder_file = folder_file.as_str().replace("-", "_");
 
-        let home_dir = self.planet_context.home_path.unwrap_or_default();
-        let account_id = self.context.account_id.unwrap_or_default();
-        let space_id = self.context.space_id.unwrap_or_default();
-        let site_id = self.context.site_id.unwrap_or_default();
-        let box_id = self.context.box_id.unwrap_or_default();
-        let space_database = self.space_database.clone();
-        let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
-            space_database.connection_pool,
-            home_dir,
-            account_id,
-            space_id,
-            site_id,
-            box_id,
-            folder_file.as_str(),
-            &self.db_folder,
-        );
-        match result {
-            Ok(_) => {
-                // let data_config = self.config.data.clone();
-                let mut db_row: TreeFolderItem = result.unwrap();
-                // I need to get SchemaData and schema for the folder
-                // I go through columns in order to build RowData                
-                let folder = self.db_folder.get_by_name(folder_name)?;
-                if *&folder.is_none() {
-                    return Err(
-                        PlanetError::new(
-                            500, 
-                            Some(tr!("Could not find folder {}", &folder_name)),
-                        )
-                    );
-                }
-                let folder = folder.unwrap();
-                let data = folder.clone().data;
-                let field_ids = data.unwrap().get(COLUMN_IDS).unwrap().clone();
-                let config_columns = ColumnConfig::get_config(
-                    self.planet_context,
-                    self.context,
-                    &folder
-                )?;
-                let field_id_map: BTreeMap<String, ColumnConfig> = ColumnConfig::get_column_id_map(&config_columns)?;
-                let columns = self.config.data.clone().unwrap().columns;
-                eprintln!("GetFromFolder.run :: columns: {:?}", &columns);
-                let item_id = self.config.data.clone().unwrap().id.unwrap();
-                // Get item from database
-                let db_data = db_row.get(&folder_name, GetItemOption::ById(item_id), columns)?;
-                // data and basic columns
-                let data = db_data.data;
-                let mut yaml_out_str = String::from("---\n");
-                // id
-                let id_yaml_value = self.config.data.clone().unwrap().id.unwrap().truecolor(
-                    YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
-                );
-                let id_yaml = format!("{}", 
-                    id_yaml_value.truecolor(YAML_COLOR_ORANGE[0], YAML_COLOR_ORANGE[1], YAML_COLOR_ORANGE[2]), 
-                );
-                yaml_out_str.push_str(format!("{column}: {value}\n", 
-                    column=String::from(ID).truecolor(
-                        YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
-                    ), 
-                    value=&id_yaml
-                ).as_str());
-                // name
-                let name_yaml_value = &db_data.name.unwrap().clone();
-                let name_yaml = format!("{}", 
-                    name_yaml_value.truecolor(YAML_COLOR_ORANGE[0], YAML_COLOR_ORANGE[1], YAML_COLOR_ORANGE[2]), 
-                );
-                yaml_out_str.push_str(format!("{column}: {value}\n", 
-                    column=String::from(NAME).truecolor(
-                        YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
-                    ), 
-                    value=&name_yaml
-                ).as_str());
-                yaml_out_str.push_str(format!("{}\n", 
-                    String::from("data:").truecolor(YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]),
-                ).as_str());
-                if data.is_some() {
-                    // column_id -> string value
-                    let data = data.unwrap();
-                    // I need to go through in same order as columns were registered in ColumnConfig when creating schema
-                    for field_id_data in field_ids {
-                        let column_id = field_id_data.get(ID).unwrap();
-                        let column_config = field_id_map.get(column_id).unwrap().clone();
-                        let field_config_ = column_config.clone();
-                        let column_type = column_config.column_type.unwrap();
-                        let column_type = column_type.as_str();
-                        let value = data.get(column_id);
-                        if value.is_none() {
-                            continue
-                        }
-                        let value = value.unwrap();
-                        let value = get_value_list(value);
-                        if value.is_none() {
-                            continue
-                        }
-                        let value = &value.unwrap();
-                        // Get will return YAML document for the data
-                        match column_type {
-                            COLUMN_TYPE_SMALL_TEXT => {
-                                let obj = SmallTextColumn::defaults(&field_config_);
-                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
-                            },
-                            COLUMN_TYPE_LONG_TEXT => {
-                                let obj = LongTextColumn::defaults(&field_config_);
-                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
-                            },
-                            COLUMN_TYPE_CHECKBOX => {
-                                let obj = CheckBoxColumn::defaults(&field_config_);
-                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
-                            },
-                            COLUMN_TYPE_NUMBER => {
-                                let obj = NumberColumn::defaults(&field_config_);
-                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
-                            },
-                            COLUMN_TYPE_SELECT => {
-                                let obj = SelectColumn::defaults(&field_config_, Some(&folder));
-                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
-                            },
-                            COLUMN_TYPE_FORMULA => {
-                                let obj = FormulaColumn::defaults(&field_config_);
-                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
-                            },
-                            COLUMN_TYPE_DATE => {
-                                let obj = DateColumn::defaults(&field_config_);
-                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
-                            },
-                            COLUMN_TYPE_DURATION => {
-                                let obj = DurationColumn::defaults(&field_config_);
-                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
-                            },                            
-                            COLUMN_TYPE_CREATED_TIME => {
-                                let obj = AuditDateColumn::defaults(&field_config_);
-                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
-                            },
-                            COLUMN_TYPE_LAST_MODIFIED_TIME => {
-                                let obj = AuditDateColumn::defaults(&field_config_);
-                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
-                            },
-                            COLUMN_TYPE_CREATED_BY => {
-                                let obj = AuditByColumn::defaults(&field_config_);
-                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
-                            },
-                            COLUMN_TYPE_LAST_MODIFIED_BY => {
-                                let obj = AuditByColumn::defaults(&field_config_);
-                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
-                            },
-                            COLUMN_TYPE_CURRENCY => {
-                                let obj = CurrencyColumn::defaults(&field_config_);
-                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
-                            },
-                            COLUMN_TYPE_PERCENTAGE => {
-                                let obj = PercentageColumn::defaults(&field_config_);
-                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
-                            },
-                            COLUMN_TYPE_GENERATE_ID => {
-                                let obj = GenerateIdColumn::defaults(&field_config_);
-                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
-                            },
-                            COLUMN_TYPE_GENERATE_NUMBER => {
-                                let obj = GenerateNumberColumn::defaults(
-                                    &field_config_,
-                                    Some(folder.clone()),
-                                    Some(self.db_folder.clone()),
-                                );
-                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
-                            },
-                            COLUMN_TYPE_PHONE => {
-                                let obj = PhoneColumn::defaults(&field_config_);
-                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
-                            },
-                            COLUMN_TYPE_EMAIL => {
-                                let obj = EmailColumn::defaults(&field_config_);
-                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
-                            },
-                            COLUMN_TYPE_URL => {
-                                let obj = UrlColumn::defaults(&field_config_);
-                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
-                            },
-                            COLUMN_TYPE_RATING => {
-                                let obj = RatingColumn::defaults(&field_config_);
-                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
-                            },
-                            COLUMN_TYPE_OBJECT => {
-                                let obj = ObjectColumn::defaults(&field_config_);
-                                yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
-                            },
-                            _ => {
-                                yaml_out_str = yaml_out_str;
-                            }
-                        }
-                    }
-                }
-                eprintln!("{}", yaml_out_str);
-                return Ok(yaml_out_str);
-            },
-            Err(error) => {
-                return Err(error);
-            }
-        }
-    }
+//         let home_dir = self.planet_context.home_path.unwrap_or_default();
+//         let account_id = self.context.account_id.unwrap_or_default();
+//         let space_id = self.context.space_id.unwrap_or_default();
+//         let site_id = self.context.site_id.unwrap_or_default();
+//         let box_id = self.context.box_id.unwrap_or_default();
+//         let space_database = self.space_database.clone();
+//         let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
+//             space_database.connection_pool,
+//             home_dir,
+//             account_id,
+//             space_id,
+//             site_id,
+//             box_id,
+//             folder_file.as_str(),
+//             &self.db_folder,
+//         );
+//         match result {
+//             Ok(_) => {
+//                 // let data_config = self.config.data.clone();
+//                 let mut db_row: TreeFolderItem = result.unwrap();
+//                 // I need to get SchemaData and schema for the folder
+//                 // I go through columns in order to build RowData                
+//                 let folder = self.db_folder.get_by_name(folder_name)?;
+//                 if *&folder.is_none() {
+//                     return Err(
+//                         PlanetError::new(
+//                             500, 
+//                             Some(tr!("Could not find folder {}", &folder_name)),
+//                         )
+//                     );
+//                 }
+//                 let folder = folder.unwrap();
+//                 let data = folder.clone().data;
+//                 let field_ids = data.unwrap().get(COLUMN_IDS).unwrap().clone();
+//                 let config_columns = ColumnConfig::get_config(
+//                     self.planet_context,
+//                     self.context,
+//                     &folder
+//                 )?;
+//                 let field_id_map: BTreeMap<String, ColumnConfig> = ColumnConfig::get_column_id_map(&config_columns)?;
+//                 let columns = self.config.data.clone().unwrap().columns;
+//                 eprintln!("GetFromFolder.run :: columns: {:?}", &columns);
+//                 let item_id = self.config.data.clone().unwrap().id.unwrap();
+//                 // Get item from database
+//                 let db_data = db_row.get(&folder_name, GetItemOption::ById(item_id), columns)?;
+//                 // data and basic columns
+//                 let data = db_data.data;
+//                 let mut yaml_out_str = String::from("---\n");
+//                 // id
+//                 let id_yaml_value = self.config.data.clone().unwrap().id.unwrap().truecolor(
+//                     YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
+//                 );
+//                 let id_yaml = format!("{}", 
+//                     id_yaml_value.truecolor(YAML_COLOR_ORANGE[0], YAML_COLOR_ORANGE[1], YAML_COLOR_ORANGE[2]), 
+//                 );
+//                 yaml_out_str.push_str(format!("{column}: {value}\n", 
+//                     column=String::from(ID).truecolor(
+//                         YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
+//                     ), 
+//                     value=&id_yaml
+//                 ).as_str());
+//                 // name
+//                 let name_yaml_value = &db_data.name.unwrap().clone();
+//                 let name_yaml = format!("{}", 
+//                     name_yaml_value.truecolor(YAML_COLOR_ORANGE[0], YAML_COLOR_ORANGE[1], YAML_COLOR_ORANGE[2]), 
+//                 );
+//                 yaml_out_str.push_str(format!("{column}: {value}\n", 
+//                     column=String::from(NAME).truecolor(
+//                         YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]
+//                     ), 
+//                     value=&name_yaml
+//                 ).as_str());
+//                 yaml_out_str.push_str(format!("{}\n", 
+//                     String::from("data:").truecolor(YAML_COLOR_BLUE[0], YAML_COLOR_BLUE[1], YAML_COLOR_BLUE[2]),
+//                 ).as_str());
+//                 if data.is_some() {
+//                     // column_id -> string value
+//                     let data = data.unwrap();
+//                     // I need to go through in same order as columns were registered in ColumnConfig when creating schema
+//                     for field_id_data in field_ids {
+//                         let column_id = field_id_data.get(ID).unwrap();
+//                         let column_config = field_id_map.get(column_id).unwrap().clone();
+//                         let field_config_ = column_config.clone();
+//                         let column_type = column_config.column_type.unwrap();
+//                         let column_type = column_type.as_str();
+//                         let value = data.get(column_id);
+//                         if value.is_none() {
+//                             continue
+//                         }
+//                         let value = value.unwrap();
+//                         let value = get_value_list(value);
+//                         if value.is_none() {
+//                             continue
+//                         }
+//                         let value = &value.unwrap();
+//                         // Get will return YAML document for the data
+//                         match column_type {
+//                             COLUMN_TYPE_SMALL_TEXT => {
+//                                 let obj = SmallTextColumn::defaults(&field_config_);
+//                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+//                             },
+//                             COLUMN_TYPE_LONG_TEXT => {
+//                                 let obj = LongTextColumn::defaults(&field_config_);
+//                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+//                             },
+//                             COLUMN_TYPE_CHECKBOX => {
+//                                 let obj = CheckBoxColumn::defaults(&field_config_);
+//                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+//                             },
+//                             COLUMN_TYPE_NUMBER => {
+//                                 let obj = NumberColumn::defaults(&field_config_);
+//                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+//                             },
+//                             COLUMN_TYPE_SELECT => {
+//                                 let obj = SelectColumn::defaults(&field_config_, Some(&folder));
+//                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+//                             },
+//                             COLUMN_TYPE_FORMULA => {
+//                                 let obj = FormulaColumn::defaults(&field_config_);
+//                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+//                             },
+//                             COLUMN_TYPE_DATE => {
+//                                 let obj = DateColumn::defaults(&field_config_);
+//                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+//                             },
+//                             COLUMN_TYPE_DURATION => {
+//                                 let obj = DurationColumn::defaults(&field_config_);
+//                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+//                             },                            
+//                             COLUMN_TYPE_CREATED_TIME => {
+//                                 let obj = AuditDateColumn::defaults(&field_config_);
+//                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+//                             },
+//                             COLUMN_TYPE_LAST_MODIFIED_TIME => {
+//                                 let obj = AuditDateColumn::defaults(&field_config_);
+//                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+//                             },
+//                             COLUMN_TYPE_CREATED_BY => {
+//                                 let obj = AuditByColumn::defaults(&field_config_);
+//                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+//                             },
+//                             COLUMN_TYPE_LAST_MODIFIED_BY => {
+//                                 let obj = AuditByColumn::defaults(&field_config_);
+//                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+//                             },
+//                             COLUMN_TYPE_CURRENCY => {
+//                                 let obj = CurrencyColumn::defaults(&field_config_);
+//                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+//                             },
+//                             COLUMN_TYPE_PERCENTAGE => {
+//                                 let obj = PercentageColumn::defaults(&field_config_);
+//                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+//                             },
+//                             COLUMN_TYPE_GENERATE_ID => {
+//                                 let obj = GenerateIdColumn::defaults(&field_config_);
+//                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+//                             },
+//                             COLUMN_TYPE_GENERATE_NUMBER => {
+//                                 let obj = GenerateNumberColumn::defaults(
+//                                     &field_config_,
+//                                     Some(folder.clone()),
+//                                     Some(self.db_folder.clone()),
+//                                 );
+//                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+//                             },
+//                             COLUMN_TYPE_PHONE => {
+//                                 let obj = PhoneColumn::defaults(&field_config_);
+//                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+//                             },
+//                             COLUMN_TYPE_EMAIL => {
+//                                 let obj = EmailColumn::defaults(&field_config_);
+//                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+//                             },
+//                             COLUMN_TYPE_URL => {
+//                                 let obj = UrlColumn::defaults(&field_config_);
+//                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+//                             },
+//                             COLUMN_TYPE_RATING => {
+//                                 let obj = RatingColumn::defaults(&field_config_);
+//                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+//                             },
+//                             COLUMN_TYPE_OBJECT => {
+//                                 let obj = ObjectColumn::defaults(&field_config_);
+//                                 yaml_out_str = obj.get_yaml_out(&yaml_out_str, value);
+//                             },
+//                             _ => {
+//                                 yaml_out_str = yaml_out_str;
+//                             }
+//                         }
+//                     }
+//                 }
+//                 eprintln!("{}", yaml_out_str);
+//                 return Ok(yaml_out_str);
+//             },
+//             Err(error) => {
+//                 return Err(error);
+//             }
+//         }
+//     }
 
-    fn runner(runner: &CommandRunner, path_yaml: &String) -> () {
-        let config_ = GetFromFolderConfig::defaults(
-            String::from("")
-        );
-        let config: Result<GetFromFolderConfig, Vec<PlanetValidationError>> = config_.import(
-            runner.planet_context,
-            &path_yaml
-        );
-        match config {
-            Ok(_) => {
-                let home_dir = runner.planet_context.home_path.unwrap_or_default();
-                let account_id = runner.context.account_id.unwrap_or_default();
-                let space_id = runner.context.space_id.unwrap_or_default();
-                let site_id = runner.context.site_id.unwrap_or_default();
-                let result = SpaceDatabase::defaults(
-                    Some(site_id), 
-                    space_id, 
-                    Some(home_dir),
-                    Some(false)
-                );
-                if result.is_err() {
-                    let error = result.clone().unwrap_err();
-                    println!();
-                    println!("{}", tr!("I found these errors").red().bold());
-                    println!("{}", "--------------------".red());
-                    println!();
-                    println!(
-                        "{} {}", 
-                        String::from('.').blue(),
-                        error.message
-                    );
-                }
-                let space_database = result.unwrap();
-                let db_folder= TreeFolder::defaults(
-                    space_database.connection_pool.clone(),
-                    Some(home_dir),
-                    Some(account_id),
-                    Some(space_id),
-                    Some(site_id),
-                ).unwrap();
+    // fn runner(runner: &CommandRunner, path_yaml: &String) -> () {
+    //     let config_ = GetFromFolderConfig::defaults(
+    //         String::from("")
+    //     );
+    //     let config: Result<GetFromFolderConfig, Vec<PlanetValidationError>> = config_.import(
+    //         runner.planet_context,
+    //         &path_yaml
+    //     );
+    //     match config {
+    //         Ok(_) => {
+    //             let home_dir = runner.planet_context.home_path.unwrap_or_default();
+    //             let account_id = runner.context.account_id.unwrap_or_default();
+    //             let space_id = runner.context.space_id.unwrap_or_default();
+    //             let site_id = runner.context.site_id.unwrap_or_default();
+    //             let result = SpaceDatabase::defaults(
+    //                 Some(site_id), 
+    //                 space_id, 
+    //                 Some(home_dir),
+    //                 Some(false)
+    //             );
+    //             if result.is_err() {
+    //                 let error = result.clone().unwrap_err();
+    //                 println!();
+    //                 println!("{}", tr!("I found these errors").red().bold());
+    //                 println!("{}", "--------------------".red());
+    //                 println!();
+    //                 println!(
+    //                     "{} {}", 
+    //                     String::from('.').blue(),
+    //                     error.message
+    //                 );
+    //             }
+    //             let space_database = result.unwrap();
+    //             let db_folder= TreeFolder::defaults(
+    //                 space_database.connection_pool.clone(),
+    //                 Some(home_dir),
+    //                 Some(account_id),
+    //                 Some(space_id),
+    //                 Some(site_id),
+    //             ).unwrap();
 
-                let insert_into_table: GetFromFolder = GetFromFolder{
-                    planet_context: runner.planet_context,
-                    context: runner.context,
-                    config: config.unwrap(),
-                    space_database: space_database.clone(),
-                    db_folder: db_folder.clone(),
-                };
-                let result: Result<_, PlanetError> = insert_into_table.run();
-                match result {
-                    Ok(_) => {
-                        println!();
-                        println!("{}", String::from("[OK]").green());
-                    },
-                    Err(error) => {
-                        let count = 1;
-                        println!();
-                        println!("{}", tr!("I found these errors").red().bold());
-                        println!("{}", "--------------------".red());
-                        println!();
-                        println!(
-                            "{}{} {}", 
-                            count.to_string().blue(),
-                            String::from('.').blue(),
-                            error.message
-                        );
-                    }
-                }
-            },
-            Err(errors) => {
-                println!();
-                println!("{}", tr!("I found these errors").red().bold());
-                println!("{}", "--------------------".red());
-                println!();
-                let mut count = 1;
-                for error in errors {
-                    println!(
-                        "{}{} {}", 
-                        count.to_string().blue(), 
-                        String::from('.').blue(), 
-                        error.message
-                    );
-                    count += 1;
-                }
-            }
-        }
-    }
-}
+    //             let insert_into_table: GetFromFolder = GetFromFolder{
+    //                 planet_context: runner.planet_context,
+    //                 context: runner.context,
+    //                 config: config.unwrap(),
+    //                 space_database: space_database.clone(),
+    //                 db_folder: db_folder.clone(),
+    //             };
+    //             let result: Result<_, PlanetError> = insert_into_table.run();
+    //             match result {
+    //                 Ok(_) => {
+    //                     println!();
+    //                     println!("{}", String::from("[OK]").green());
+    //                 },
+    //                 Err(error) => {
+    //                     let count = 1;
+    //                     println!();
+    //                     println!("{}", tr!("I found these errors").red().bold());
+    //                     println!("{}", "--------------------".red());
+    //                     println!();
+    //                     println!(
+    //                         "{}{} {}", 
+    //                         count.to_string().blue(),
+    //                         String::from('.').blue(),
+    //                         error.message
+    //                     );
+    //                 }
+    //             }
+    //         },
+    //         Err(errors) => {
+    //             println!();
+    //             println!("{}", tr!("I found these errors").red().bold());
+    //             println!("{}", "--------------------".red());
+    //             println!();
+    //             let mut count = 1;
+    //             for error in errors {
+    //                 println!(
+    //                     "{}{} {}", 
+    //                     count.to_string().blue(), 
+    //                     String::from('.').blue(), 
+    //                     error.message
+    //                 );
+    //                 count += 1;
+    //             }
+    //         }
+    //     }
+    // }
+// }
 
 pub struct SelectFromFolder<'gb> {
     pub planet_context: &'gb PlanetContext<'gb>,
@@ -1119,160 +1119,160 @@ pub struct SelectFromFolder<'gb> {
     pub config: SelectFromFolderConfig,
 }
 
-impl<'gb> Command<String> for SelectFromFolder<'gb> {
+// impl<'gb> Statement<'gb> for SelectFromFolder<'gb> {
 
-    fn run(&self) -> Result<String, PlanetError> {
-        let command = self.config.command.clone().unwrap_or_default();
-        let expr = Regex::new(r#"(SELECT FROM TABLE) "(?P<folder_name>[a-zA-Z0-9_ ]+)""#).unwrap();
-        let table_name_match = expr.captures(&command).unwrap();
-        let folder_name = &table_name_match["folder_name"].to_string();
-        let folder_file = slugify(&folder_name);
-        let folder_file = folder_file.as_str().replace("-", "_");
-        eprintln!("SelectFromFolder.run :: folder_file: {}", &folder_file);
+//     fn run(&self) -> Result<String, PlanetError> {
+//         let command = self.config.command.clone().unwrap_or_default();
+//         let expr = Regex::new(r#"(SELECT FROM TABLE) "(?P<folder_name>[a-zA-Z0-9_ ]+)""#).unwrap();
+//         let table_name_match = expr.captures(&command).unwrap();
+//         let folder_name = &table_name_match["folder_name"].to_string();
+//         let folder_file = slugify(&folder_name);
+//         let folder_file = folder_file.as_str().replace("-", "_");
+//         eprintln!("SelectFromFolder.run :: folder_file: {}", &folder_file);
 
-        let home_dir = self.planet_context.home_path.unwrap_or_default();
-        let account_id = self.context.account_id.unwrap_or_default();
-        let space_id = self.context.space_id.unwrap_or_default();
-        let site_id = self.context.site_id.unwrap_or_default();
-        let box_id = self.context.box_id.unwrap_or_default();
-        let space_database = self.space_database.clone();
-        let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
-            space_database.connection_pool,
-            home_dir,
-            account_id,
-            space_id,
-            site_id,
-            box_id,
-            folder_file.as_str(),
-            &self.db_folder,
-        );
-        match result {
-            Ok(_) => {
-                let mut db_row: TreeFolderItem = result.unwrap();
-                let config = self.config.clone();
-                let r#where = config.r#where;
-                let page = config.page;
-                let number_items = config.number_items;
-                let columns = config.columns;
-                let mut page_wrap: Option<usize> = None;
-                let mut number_items_wrap: Option<usize> = None;
-                if page.is_some() {
-                    let page_string = page.unwrap();
-                    let page_number: usize = FromStr::from_str(page_string.as_str()).unwrap();
-                    page_wrap = Some(page_number)
-                }
-                if number_items.is_some() {
-                    let number_items_string = number_items.unwrap();
-                    let number_items: usize = FromStr::from_str(number_items_string.as_str()).unwrap();
-                    number_items_wrap = Some(number_items)
-                }
-                let result = db_row.select(
-                    folder_name, 
-                    r#where, 
-                    page_wrap, 
-                    number_items_wrap, 
-                    columns,
-                )?;
-                eprintln!("SelectFromFolder :: result: {:#?}", &result);
-                // Later on, I do pretty print
-            },
-            Err(error) => {
-                return Err(error);
-            }
-        }
+//         let home_dir = self.planet_context.home_path.unwrap_or_default();
+//         let account_id = self.context.account_id.unwrap_or_default();
+//         let space_id = self.context.space_id.unwrap_or_default();
+//         let site_id = self.context.site_id.unwrap_or_default();
+//         let box_id = self.context.box_id.unwrap_or_default();
+//         let space_database = self.space_database.clone();
+//         let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
+//             space_database.connection_pool,
+//             home_dir,
+//             account_id,
+//             space_id,
+//             site_id,
+//             box_id,
+//             folder_file.as_str(),
+//             &self.db_folder,
+//         );
+//         match result {
+//             Ok(_) => {
+//                 let mut db_row: TreeFolderItem = result.unwrap();
+//                 let config = self.config.clone();
+//                 let r#where = config.r#where;
+//                 let page = config.page;
+//                 let number_items = config.number_items;
+//                 let columns = config.columns;
+//                 let mut page_wrap: Option<usize> = None;
+//                 let mut number_items_wrap: Option<usize> = None;
+//                 if page.is_some() {
+//                     let page_string = page.unwrap();
+//                     let page_number: usize = FromStr::from_str(page_string.as_str()).unwrap();
+//                     page_wrap = Some(page_number)
+//                 }
+//                 if number_items.is_some() {
+//                     let number_items_string = number_items.unwrap();
+//                     let number_items: usize = FromStr::from_str(number_items_string.as_str()).unwrap();
+//                     number_items_wrap = Some(number_items)
+//                 }
+//                 let result = db_row.select(
+//                     folder_name, 
+//                     r#where, 
+//                     page_wrap, 
+//                     number_items_wrap, 
+//                     columns,
+//                 )?;
+//                 eprintln!("SelectFromFolder :: result: {:#?}", &result);
+//                 // Later on, I do pretty print
+//             },
+//             Err(error) => {
+//                 return Err(error);
+//             }
+//         }
 
-        return Ok(String::from(""));
-    }
-    fn runner(runner: &CommandRunner, path_yaml: &String) -> () {
-        let config_ = SelectFromFolderConfig::defaults(
-            None,
-            None,
-            None
-        );
-        let config: Result<SelectFromFolderConfig, Vec<PlanetValidationError>> = config_.import(
-            runner.planet_context,
-            &path_yaml
-        );
-        match config {
-            Ok(_) => {
-                let home_dir = runner.planet_context.home_path.unwrap_or_default();
-                let account_id = runner.context.account_id.unwrap_or_default();
-                let space_id = runner.context.space_id.unwrap_or_default();
-                let site_id = runner.context.site_id.unwrap_or_default();
-                let result = SpaceDatabase::defaults(
-                    Some(site_id), 
-                    space_id, 
-                    Some(home_dir),
-                    Some(false)
-                );
-                if result.is_err() {
-                    let error = result.clone().unwrap_err();
-                    println!();
-                    println!("{}", tr!("I found these errors").red().bold());
-                    println!("{}", "--------------------".red());
-                    println!();
-                    println!(
-                        "{} {}", 
-                        String::from('.').blue(),
-                        error.message
-                    );
-                }
-                let space_database = result.unwrap();
-                let db_folder= TreeFolder::defaults(
-                    space_database.connection_pool.clone(),
-                    Some(home_dir),
-                    Some(account_id),
-                    Some(space_id),
-                    Some(site_id),
-                ).unwrap();
+//         return Ok(String::from(""));
+//     }
+//     // fn runner(runner: &CommandRunner, path_yaml: &String) -> () {
+//     //     let config_ = SelectFromFolderConfig::defaults(
+//     //         None,
+//     //         None,
+//     //         None
+//     //     );
+//     //     let config: Result<SelectFromFolderConfig, Vec<PlanetValidationError>> = config_.import(
+//     //         runner.planet_context,
+//     //         &path_yaml
+//     //     );
+//     //     match config {
+//     //         Ok(_) => {
+//     //             let home_dir = runner.planet_context.home_path.unwrap_or_default();
+//     //             let account_id = runner.context.account_id.unwrap_or_default();
+//     //             let space_id = runner.context.space_id.unwrap_or_default();
+//     //             let site_id = runner.context.site_id.unwrap_or_default();
+//     //             let result = SpaceDatabase::defaults(
+//     //                 Some(site_id), 
+//     //                 space_id, 
+//     //                 Some(home_dir),
+//     //                 Some(false)
+//     //             );
+//     //             if result.is_err() {
+//     //                 let error = result.clone().unwrap_err();
+//     //                 println!();
+//     //                 println!("{}", tr!("I found these errors").red().bold());
+//     //                 println!("{}", "--------------------".red());
+//     //                 println!();
+//     //                 println!(
+//     //                     "{} {}", 
+//     //                     String::from('.').blue(),
+//     //                     error.message
+//     //                 );
+//     //             }
+//     //             let space_database = result.unwrap();
+//     //             let db_folder= TreeFolder::defaults(
+//     //                 space_database.connection_pool.clone(),
+//     //                 Some(home_dir),
+//     //                 Some(account_id),
+//     //                 Some(space_id),
+//     //                 Some(site_id),
+//     //             ).unwrap();
 
-                let select_from_table: SelectFromFolder = SelectFromFolder{
-                    planet_context: runner.planet_context,
-                    context: runner.context,
-                    config: config.unwrap(),
-                    db_folder: db_folder.clone(),
-                    space_database: space_database.clone()
-                };
-                let result: Result<_, PlanetError> = select_from_table.run();
-                match result {
-                    Ok(_) => {
-                        println!();
-                        println!("{}", String::from("[OK]").green());
-                    },
-                    Err(error) => {
-                        let count = 1;
-                        println!();
-                        println!("{}", tr!("I found these errors").red().bold());
-                        println!("{}", "--------------------".red());
-                        println!();
-                        println!(
-                            "{}{} {}", 
-                            count.to_string().blue(),
-                            String::from('.').blue(),
-                            error.message
-                        );
-                    }
-                }
-            },
-            Err(errors) => {
-                println!();
-                println!("{}", tr!("I found these errors").red().bold());
-                println!("{}", "--------------------".red());
-                println!();
-                let mut count = 1;
-                for error in errors {
-                    println!(
-                        "{}{} {}", 
-                        count.to_string().blue(), 
-                        String::from('.').blue(), 
-                        error.message
-                    );
-                    count += 1;
-                }
-            }
-        }
-    }
-}
+//     //             let select_from_table: SelectFromFolder = SelectFromFolder{
+//     //                 planet_context: runner.planet_context,
+//     //                 context: runner.context,
+//     //                 config: config.unwrap(),
+//     //                 db_folder: db_folder.clone(),
+//     //                 space_database: space_database.clone()
+//     //             };
+//     //             let result: Result<_, PlanetError> = select_from_table.run();
+//     //             match result {
+//     //                 Ok(_) => {
+//     //                     println!();
+//     //                     println!("{}", String::from("[OK]").green());
+//     //                 },
+//     //                 Err(error) => {
+//     //                     let count = 1;
+//     //                     println!();
+//     //                     println!("{}", tr!("I found these errors").red().bold());
+//     //                     println!("{}", "--------------------".red());
+//     //                     println!();
+//     //                     println!(
+//     //                         "{}{} {}", 
+//     //                         count.to_string().blue(),
+//     //                         String::from('.').blue(),
+//     //                         error.message
+//     //                     );
+//     //                 }
+//     //             }
+//     //         },
+//     //         Err(errors) => {
+//     //             println!();
+//     //             println!("{}", tr!("I found these errors").red().bold());
+//     //             println!("{}", "--------------------".red());
+//     //             println!();
+//     //             let mut count = 1;
+//     //             for error in errors {
+//     //                 println!(
+//     //                     "{}{} {}", 
+//     //                     count.to_string().blue(), 
+//     //                     String::from('.').blue(), 
+//     //                     error.message
+//     //                 );
+//     //                 count += 1;
+//     //             }
+//     //         }
+//     //     }
+//     // }
+// }
 
 fn handle_field_response(
     column_data: &Result<Vec<String>, PlanetError>, 

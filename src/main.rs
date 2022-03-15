@@ -4,9 +4,10 @@ extern crate serde_yaml;
 extern crate colored;
 extern crate lazy_static;
 extern crate tokio;
+use colored::Colorize;
 use lingua::{LanguageDetector, LanguageDetectorBuilder};
 
-pub mod commands;
+pub mod statements;
 pub mod storage;
 pub mod planet;
 pub mod functions;
@@ -41,11 +42,11 @@ pub mod functions;
 
 use argparse::{ArgumentParser, StoreTrue, Store};
 use std::collections::HashMap;
+use tr::tr;
 
-use crate::commands::CommandRunner;
-use crate::commands::folder::Command;
-use crate::planet::{PlanetContext, Context, ContextSource};
+use crate::planet::{PlanetContext, Context, ContextSource, Environment};
 use planet::constants::*;
+use crate::statements::*;
 
 // async fn swarm() {
 //     const BOOTNODES: [&'static str; 4] = [
@@ -89,8 +90,7 @@ fn main() {
     let mut verbose = false;
     let mut account_id: String = String::from("");
     let mut space_id: String = String::from("");
-    let mut path_yaml = String::from("");
-    let mut command = String::from("");
+    let mut statement = String::from("");
     let mut op = String::from("run");
     let mut scope = String::from("");
     // println!("account_id: {}", hex::encode_upper(account_id));
@@ -109,12 +109,19 @@ fn main() {
         ap.refer(&mut space_id).add_option(
             &["-s", "--spaceid"], Store,
             "Space Id");
-        ap.refer(&mut path_yaml).add_option(
-            &["-c", "--path_yaml"], Store,
-            "Path for YAML config file");
-        ap.refer(&mut op).add_argument("op", Store, "Operation: run, etc...");
-        ap.refer(&mut scope).add_argument("scope", Store, "Scope: command, action, journey");
-        ap.refer(&mut command).add_argument("name", Store, "Command name, action name or journey name");
+        ap.refer(&mut statement).add_option(
+            &["-b", "--statement"], Store,
+            "Statement");
+        ap.refer(&mut op).add_argument(
+            "op", 
+            Store, 
+            "Operation: run, etc..."
+        );
+        ap.refer(&mut scope).add_argument(
+            "scope", 
+            Store, 
+            "Scope: statement, action, journey"
+        );
         ap.parse_args_or_exit();
     }
 
@@ -194,36 +201,42 @@ fn main() {
     // match client.add(data).await {
     //     Ok(res) => println!("{}", res.hash),
     //     Err(e) => eprintln!("error adding file: {}", e)
-    // }    
+    // }
 
-    if op.to_lowercase() == "run" && &scope.to_lowercase() == "command" {
-        let command_runner =  CommandRunner{
-            planet_context: &planet_context,
+    if op.to_lowercase() == "run" && &scope.to_lowercase() == "statement" {
+        eprint!("main.rs :: run statement...");
+        eprint!("main.rs :: run statement :: statement: {}", &statement);
+        let env = Environment{
             context: &context,
-            command: &command,
-            path_yaml: Some(&path_yaml)
+            planet_context: &planet_context
         };
-        run_command(command_runner).unwrap();
-    }
-}
-
-fn run_command(runner: CommandRunner) -> Result<String, String> {
-    // CommandRunner: command, account_id, space_id, path_yaml, possible command_file (when get from dir), planet context
-    // I also need to create a context if not informed.
-    let runner = runner.clone();
-    let runner_path_yaml = &runner.path_yaml;
-    if runner_path_yaml.is_some() {
-        let path_yaml = format!("{}", runner_path_yaml.clone().unwrap());
-        let match_option = *&runner.command.as_str();
-        match match_option {
-            "CREATE FOLDER" => commands::folder::schema::CreateFolder::runner(&runner, &path_yaml),
-            "INSERT INTO FOLDER" => commands::folder::data::InsertIntoFolder::runner(&runner, &path_yaml),
-            "GET FROM FOLDER" => commands::folder::data::GetFromFolder::runner(&runner, &path_yaml),
-            "SELECT FROM FOLDER" => commands::folder::data::SelectFromFolder::runner(&runner, &path_yaml),
-            _ => println!("default")
+        let statement_runner = StatementRunner{
+            response_format: StatementResponseFormat::YAML
+        };
+        let result = statement_runner.run(
+            &env, 
+            None, 
+            &statement
+        );
+        if result.is_ok() {
+            let result = result.unwrap();
+            eprintln!("{}", String::from("[OK]").green());
+            eprintln!("{}", &result);
+        } else {
+            let errors = result.unwrap_err();
+            eprintln!("{}", tr!("I found these errors").red().bold());
+            eprintln!("{}", "--------------------".red());
+            eprintln!();
+            let mut count = 1;
+            for error in errors {
+                println!(
+                    "{}{} {}", 
+                    count.to_string().blue(),
+                    String::from('.').blue(),
+                    error.message
+                );
+                count += 1;
+            }
         }
-        Ok("Command executed".to_string())
-    } else {
-        return Err("Path to YAML command not informed".to_string());
     }
 }

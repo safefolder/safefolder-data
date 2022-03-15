@@ -15,7 +15,7 @@ use xlformula_engine::{calculate, parse_formula, NoReference, NoCustomFunction};
 
 use crate::storage::ConfigStorageColumn;
 use crate::storage::folder::{DbData, TreeFolder, get_value_list};
-use crate::commands::folder::config::ColumnConfig;
+use crate::statements::folder::schema::*;
 use crate::functions::constants::*;
 use crate::functions::text::*;
 use crate::functions::date::*;

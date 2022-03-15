@@ -5,7 +5,7 @@ use colored::Colorize;
 use serde::{Deserialize, Serialize};
 
 use crate::planet::{PlanetError};
-use crate::commands::folder::config::ColumnConfig;
+use crate::statements::folder::schema::*;
 use crate::storage::constants::*;
 use crate::storage::columns::*;
 

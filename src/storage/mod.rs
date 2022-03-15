@@ -8,7 +8,7 @@ pub mod space;
 use std::collections::{BTreeMap,HashMap};
 
 use validator::{ValidationErrors};
-use crate::commands::folder::config::ColumnConfig;
+use crate::statements::folder::schema::*;
 use crate::storage::folder::{DbData, TreeFolder};
 use crate::planet::{PlanetError, Context, PlanetContext};
 use crate::planet::constants::*;
