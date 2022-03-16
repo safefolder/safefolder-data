@@ -130,9 +130,11 @@ fn main() {
 
     let planet_context_source = PlanetContext::import_context().unwrap();
     let home_path = &planet_context_source.home_path.unwrap();
+    let statements = planet_context_source.statements.clone();
     let planet_context = PlanetContext{
         mission: &planet_context_source.mission,
         home_path: Some(&home_path.as_str()),
+        statements: statements,
     };
 
     // Context: This is TEMP, simply context struct, but in future will come from shell, or we create a new one

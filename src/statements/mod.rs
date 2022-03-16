@@ -1,6 +1,7 @@
 pub mod folder;
 pub mod constants;
 
+use yaml_rust;
 use std::collections::{BTreeMap};
 use std::str::FromStr;
 use serde::{Deserialize, Serialize};
@@ -10,8 +11,9 @@ use tr::tr;
 
 use crate::planet::{PlanetError, Environment};
 use crate::storage::space::*;
-use crate::statements::folder::schema::CreateFolderStatement;
 use crate::functions::date::*;
+
+use crate::statements::folder::schema::resolve_schema_statement;
 
 lazy_static! {
     pub static ref RE_WITH_OPTIONS: Regex = Regex::new(r#"(?P<Name>\w+)=(?P<Value>(\d)|(true|false|True|False)|([a-zA-Z0-9{}|]+)|("[\w\s]+)")"#).unwrap();
@@ -25,17 +27,20 @@ pub struct StatementResponse {
 }
 
 // Run needs entry statement_text, and response YAML generic object, or JsonValue
-pub trait Statement<'gb, T> {
-    fn compile(
-        &self, 
-        statement_text: &String
-    ) -> Result<T, Vec<PlanetError>>;
+pub trait Statement<'gb> {
     fn run(
         &self,
         env: &'gb Environment<'gb>,
         space_database: &SpaceDatabase,
         statement_text: &String,
     ) -> Result<yaml_rust::Yaml, Vec<PlanetError>>;
+}
+
+pub trait StatementCompiler<'gb, T> {
+    fn compile(
+        &self, 
+        statement_text: &String
+    ) -> Result<T, Vec<PlanetError>>;
 }
 
 pub trait StatementErrors<T> {
@@ -90,9 +95,6 @@ impl StatementRunner {
         let context = env.context;
         let planet_context = env.planet_context;
 
-        let create_folder = CreateFolderStatement{};
-        let mut response_str = String::from("");
-
         if space_database.is_none() {
             let site_id = context.site_id;
             let space_id = context.space_id;
@@ -105,19 +107,31 @@ impl StatementRunner {
                 Some(true)
             );
             if result.is_err() {
-    
+                let error = result.unwrap_err();
+                let mut errors: Vec<PlanetError> = Vec::new();
+                errors.push(error);
+                return Err(errors)
             }
             space_data = result.unwrap();
         } else {
             space_data = space_database.unwrap();
         }
-        let response = create_folder.run(
-            env, 
-            &space_data,
-            statement_text
-        );
+        let mut response_str = String::from("");
+        let mut response_wrap: Option<Result<yaml_rust::Yaml, Vec<PlanetError>>> = None;
+        // Process all statements from all modules
+        response_wrap = resolve_schema_statement(env, &space_data, statement_text, response_wrap);
+        if response_wrap.is_none() {
+            let error = PlanetError::new(
+                500, 
+                Some(tr!("Statement not supported."))
+            );
+            let mut errors: Vec<PlanetError> = Vec::new();
+            errors.push(error);
+            return Err(errors)
+        }
+        let response = response_wrap.unwrap();
         if response.is_ok() {
-            // TODO: Implement for JSON and XML?????
+            // TODO: Implement for JSON and XML
             let response = response.unwrap();
             let mut emitter = yaml_rust::YamlEmitter::new(&mut response_str);
             emitter.dump(&response).unwrap();
@@ -127,49 +141,6 @@ impl StatementRunner {
             let errors = response.unwrap_err();
             return Err(errors);
         }
-        // let errors: Vec<PlanetError>;
-        
-        // I need to map transaction and link transaction objects to space database....
-        // Since this is temp, until I have the statement registry, just map the private space
-
-        // I need the workspace db, space db and optionally
-
-        // I might have transactions already in the space database. This is the case when the connection
-        // is owned by the journeys. In this case we don't wrap the transaction
-        
-        // let mine = planet_context.get_statement(statement_text);
-        // I execute mine.run(environment, statement_text)
-        // if statement_text.find(STATEMENT_CREATE_FOLDER).is_some() {
-        //     // This response needs to be generic one, YAML based as object
-        //     let mine = CreateFolderStatement{
-        //     }.run();
-        //     let my_object = CreateFolderStatement{
-        //     };
-        //     let mut my_map: HashMap<String, dyn Statement> = HashMap::new();
-        //     my_map.insert(String::from("key"), my_object);
-        //     // Since it is working I can have the statement registry mapped into the planet context
-        //     // 1. I can register statements when system starts and place into planet context. I might
-        //     //      also serialize the planet context, but better be just in time on real time JIT.
-        //     // 2. I need to attach data to statements when registering, like:
-        //     //      * title
-        //     //      * key: This is like id, for example, CREATE FOLDER, INSERT INTO FOLDER, etc...
-        //     //      * description
-        //     //      * keywords
-        //     //      * category
-        //     // 3. Have a rust function that returns statement key based on statement text.
-        //     // 4. Fetch statement object from registry at planet context.
-        // } else if statement_text.find(STATEMENT_INSERT_INTO_FOLDER).is_some() {
-        //     // statements::folder::data::InsertIntoFolder::runner(&runner)
-        // }else {
-        //     let errors: Vec<PlanetError> = Vec::new();
-        //     return Err(
-        //         errors
-        //     )
-        // }
-        // I handle data from generic structure in case I need to return errors
-        // Of Ok, simply return some string saying was executed, or some data from generic structure implemented in
-        // statement.
-        // deal with errrors and return error as object encoded
         Ok(response_str)
     }
 }

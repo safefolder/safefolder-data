@@ -1,2 +1,12 @@
 ---
   mission: Achieve More Through Better systems
+  statements:
+    - title: Create Folder
+      description: Create new folder where to store data
+      key: CREATE FOLDER
+      keywords:
+        - Data
+        - Folder
+        - Table
+        - Create
+      category: Schema

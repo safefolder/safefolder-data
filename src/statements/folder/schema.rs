@@ -48,13 +48,6 @@ lazy_static! {
     pub static ref RE_CREATE_FOLDER_CONFIG: Regex = Regex::new(r#"([\s]*LANGUAGE (?P<Language>spanish|english|french|german|italian|portuguese|norwegian|swedish|danish),*)|([\s]*NAME COLUMN (?P<NameConfig>(SmallText|LongText|Number|Currency|Percentage|GenerateNumber|Phone|Email|Url|Rating)),*)|([\s]*("(?P<Column>[\w\s]+)")[\s]+(?P<ColumnType>SmallText|LongText|Checkbox|Number|Select|Currency|Percentage|GenerateNumber|Phone|Email|Url|Rating|Object|File|Date|Formula|Duration|CreatedTime|LastModifiedTime|CreatedBy|LastModifiedBy|Link|Reference|Language|GenerateId|Stats))([\s]*[WITH]*[\s]*(?P<Options>[\w\s"\$=\{\}\|]*)),|([\s]*SUB FOLDER (?P<SubFolderName>[\w\s]+)),|([\s]*SUB FOLDER (?P<SubFolderNameAlt>[\w\s]+) WITH (?P<SubFolderOptions>[\w\s"\$=\{\}\|]*)),|([\s]*SEARCH RELEVANCE WITH (?P<SearchRelevanceOptions>[\w\s"\$=\{\}\|]*)),"#).unwrap();
 }
 
-// pub indexed: Option<bool>, ?????
-// pub max_length: Option<String>,
-// pub is_set: Option<String>,
-// pub stats_function: Option<String>,
-// pub content_types: Option<Vec<String>>,
-// pub mode: Option<String>,
-
 pub const WITH_PARENT: &str = "Parent";
 pub const WITH_REQUIRED: &str = "Required";
 pub const WITH_OPTIONS: &str = "Options";
@@ -764,7 +757,7 @@ impl CreateFolderCompiledStatement {
 pub struct CreateFolderStatement {
 }
 
-impl<'gb> Statement<'gb, CreateFolderCompiledStatement> for CreateFolderStatement {
+impl<'gb> StatementCompiler<'gb, CreateFolderCompiledStatement> for CreateFolderStatement {
 
     fn compile(
         &self, 
@@ -1133,6 +1126,10 @@ impl<'gb> Statement<'gb, CreateFolderCompiledStatement> for CreateFolderStatemen
         eprintln!("CreateFolderStatement.compile :: compiled_statement: {:#?}", &compiled_statement);
         return Ok(compiled_statement.clone())
     }
+
+}
+
+impl<'gb> Statement<'gb> for CreateFolderStatement {
 
     fn run(
         &self,
@@ -1540,4 +1537,26 @@ fn validate_column_relevance(column_relevance: &BTreeMap<String, u8>) -> Result<
         }
     }
     return Ok(())    
+}
+
+pub fn resolve_schema_statement(
+    env: &Environment,
+    space_data: &SpaceDatabase,
+    statement_text: &String, 
+    response_wrap: Option<Result<yaml_rust::Yaml, Vec<PlanetError>>>
+) -> Option<Result<yaml_rust::Yaml, Vec<PlanetError>>> {
+    let response_wrap = response_wrap.clone();
+    if response_wrap.is_some() {
+        let response = response_wrap.unwrap();
+        return Some(response)
+    }
+    // CREATE FOLDER
+    let expr = &RE_CREATE_FOLDER_MAIN;
+    let check = expr.is_match(&statement_text);
+    if check {
+        let stmt = CreateFolderStatement{};
+        let response = stmt.run(env, &space_data, statement_text);
+        return Some(response);
+    }
+    return None
 }
