@@ -45,67 +45,6 @@ pub struct SubFolderDataConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
-pub struct InsertIntoFolderConfig {
-    #[validate(required, regex="RE_COMMAND_INSERT_INTO_FOLDER")]
-    pub command: Option<String>,
-    #[validate(required)]
-    pub name: Option<String>,
-    pub sub_folders: Option<Vec<SubFolderDataConfig>>,
-    #[validate(required)]
-    pub data: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
-}
-
-impl InsertIntoFolderConfig {
-
-    pub fn defaults(name: Option<String>) -> InsertIntoFolderConfig {
-        let config: InsertIntoFolderConfig = InsertIntoFolderConfig{
-            command: None,
-            name: name,
-            data: Some(BTreeMap::new()),
-            sub_folders: None,
-        };
-        return config
-    }
-
-    pub fn import(
-        &self, 
-        planet_context: &PlanetContext, 
-        yaml_path: &String
-    ) -> Result<InsertIntoFolderConfig, Vec<PlanetValidationError>> {
-        let yaml_str: String = fetch_yaml_config(&yaml_path);
-        // Deseralize the config entity
-        let response: Result<InsertIntoFolderConfig, serde_yaml::Error> = serde_yaml::from_str(&yaml_str);
-        let import_config: CommandImportConfig = CommandImportConfig{
-            command: String::from(""),
-            planet_context: planet_context,
-        };
-        match response {
-            Ok(_) => {
-                let config_model: InsertIntoFolderConfig = response.unwrap();
-                let validate: Result<(), ValidationErrors> = config_model.validate();
-                match validate {
-                    Ok(_) => {
-                        return Ok(config_model)
-                    },
-                    Err(errors) => {
-                        let command = &config_model.command.unwrap();
-                        let planet_errors: Vec<PlanetValidationError> = import_config.parse_validator(
-                            command, errors);
-                        return Err(planet_errors);
-                    }
-                }
-            },
-            Err(error) => {
-                let mut planet_errors: Vec<PlanetValidationError> = Vec::new();
-                planet_errors.push(import_config.parse_serde(&error));
-                return Err(planet_errors);
-            }
-        }
-    }
-
-}
-
-#[derive(Debug, Serialize, Deserialize, Validate, Clone)]
 pub struct DataId {
     pub id: Option<String>,
     pub columns: Option<Vec<String>>,

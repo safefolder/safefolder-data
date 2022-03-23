@@ -141,7 +141,7 @@ impl<'gb> ObjectStorageColumn<'gb> for LinkColumn<'gb> {
         let home_dir = self.planet_context.home_path.unwrap_or_default();
         let account_id = self.context.account_id.unwrap_or_default();
         let space_id = self.context.space_id.unwrap_or_default();
-        let site_id = self.context.site_id.unwrap_or_default();
+        let site_id = self.context.site_id;
         let box_id = self.context.box_id.unwrap_or_default();
         let space_database = self.space_database.clone();
         let space_database = space_database.unwrap();
@@ -150,7 +150,7 @@ impl<'gb> ObjectStorageColumn<'gb> for LinkColumn<'gb> {
             home_dir,
             account_id,
             space_id,
-            site_id,
+            Some(site_id.unwrap().to_string()),
             box_id,
             &linked_folder_id,
             &db_folder,

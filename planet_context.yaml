@@ -10,3 +10,12 @@
         - Table
         - Create
       category: Schema
+    - title: Insert Into Folder
+      description: Insert data into folder.
+      key: INSERT INTO FOLDER
+      keywords:
+        - Data
+        - Folder
+        - Table
+        - Insert
+      category: Data

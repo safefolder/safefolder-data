@@ -2,22 +2,25 @@ pub mod folder;
 pub mod constants;
 
 use yaml_rust;
-use std::collections::{BTreeMap};
+use std::collections::{BTreeMap, HashMap};
 use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use lazy_static::lazy_static;
 use regex::Regex;
 use tr::tr;
 
+use crate::planet::constants::*;
 use crate::planet::{PlanetError, Environment};
 use crate::storage::space::*;
 use crate::functions::date::*;
 
 use crate::statements::folder::schema::resolve_schema_statement;
+use crate::statements::folder::data::resolve_data_statement;
 
 lazy_static! {
-    pub static ref RE_WITH_OPTIONS: Regex = Regex::new(r#"(?P<Name>\w+)=(?P<Value>(\d)|(true|false|True|False)|([a-zA-Z0-9{}|]+)|("[\w\s]+)")"#).unwrap();
-    pub static ref RE_OPTION_LIST_ITEMS: Regex = Regex::new(r#"(?P<Item>((\d+)|([a-zA-Z0-9]+)|(true|false|True|False)))"#).unwrap();
+    pub static ref RE_WITH_OPTIONS: Regex = Regex::new(r#"(?P<Name>\w+)=(?P<Value>(\d)|(true|false|True|False)|([a-zA-Z0-9{}|]+)|([\s\S]+)|("[\w\s]+)")"#).unwrap();
+    pub static ref RE_OPTION_LIST_ITEMS: Regex = Regex::new(r#"(?P<Item>((\d+)|([a-zA-Z0-9]+)|(true|false|True|False)|(---\\n[\S\s]+)|(null)))"#).unwrap();
+    pub static ref RE_DATA_LONG_TEXT: Regex = Regex::new(r#"(?P<Text>"""[\s\S\n\t][^"""]+""")"#).unwrap();
 }
 
 pub struct StatementResponse {
@@ -104,7 +107,6 @@ impl StatementRunner {
                 site_id, 
                 space_id, 
                 Some(home_dir),
-                Some(true)
             );
             if result.is_err() {
                 let error = result.unwrap_err();
@@ -120,6 +122,7 @@ impl StatementRunner {
         let mut response_wrap: Option<Result<yaml_rust::Yaml, Vec<PlanetError>>> = None;
         // Process all statements from all modules
         response_wrap = resolve_schema_statement(env, &space_data, statement_text, response_wrap);
+        response_wrap = resolve_data_statement(env, &space_data, statement_text, response_wrap);
         if response_wrap.is_none() {
             let error = PlanetError::new(
                 500, 
@@ -202,13 +205,109 @@ impl WithOptionValueItem {
                 if value.find("\"").is_some() {
                     value = value.replace("\"", "");
                 }
+                // eprintln!("WithOptionValueItem.defaults :: value: {}", &value);
                 obj = Self{
                     value: value.clone(),
                     item_type: WithOptionValueItemType::String
                 };
             }    
         }
+        // eprintln!("WithOptionValueItem.defaults :: obj: {:#?}", &obj);
         return Ok(obj)
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct DataValue {
+    pub value: Vec<BTreeMap<String, String>>,
+}
+impl DataValue {
+    pub fn defaults(value_str: &String) -> Result<Self, PlanetError> {
+        let value = value_str.as_str();
+        let expr_items = &RE_OPTION_LIST_ITEMS;
+        let value_string = value.replace("\"", "");
+        let value = value_string.as_str();
+        let mut map_list: Vec<BTreeMap<String, String>> = Vec::new();
+        if value.find("{").is_some() {
+            let items = expr_items.captures_iter(&value);
+            for item in items {
+                let value = item.name("Item").unwrap().as_str();
+                let option_value = WithOptionValueItem::defaults(&value.to_string());
+                if option_value.is_ok() {
+                    let option_value = option_value.unwrap();
+                    let mut my_map: BTreeMap<String, String> = BTreeMap::new();
+                    
+                    my_map.insert(VALUE.to_string(), option_value.value);
+                    map_list.push(my_map);
+                } else {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!("Error parsing data value \"{}\".", value_str)),
+                        )
+                    )
+                }
+            }
+        } else {
+            let check_yaml = value.find("---\\n");
+            if check_yaml.is_some() {
+                let fields: Vec<&str> = value.split("---\\n").collect();
+                let my_fields = &fields[1..];
+                for field in my_fields {
+                    let mut my_map: BTreeMap<String, String> = BTreeMap::new();
+                    let field_ = format!("---\\n{}", field);
+                    my_map.insert(VALUE.to_string(), field_.clone());
+                    map_list.push(my_map);
+                }
+            } else {
+                let mut my_map: BTreeMap<String, String> = BTreeMap::new();
+                my_map.insert(VALUE.to_string(), value.to_string());
+                map_list.push(my_map);
+            }
+        }
+        let obj = Self{
+            value: map_list
+        };
+        return Ok(obj)
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct DataValueLongText {
+    pub parsed_text: String,
+    pub map: HashMap<String, String>,
+}
+impl DataValueLongText {
+    pub fn defaults(text: &String) -> Result<Self, PlanetError> {
+        // Parse and replace """....""" as placeholder and register into map
+        let expr = &RE_DATA_LONG_TEXT;
+        let text_items = expr.captures_iter(text);
+        let mut count = 1;
+        let mut parsed_text: String = text.clone();
+        let mut map: HashMap<String, String> = HashMap::new();
+        for text_item in text_items {
+            let text = text_item.name("Text");
+            if text.is_some() {
+                let text_source = text.unwrap().as_str();
+                let text = text_source.replace("\"\"\"", "");
+                let placeholder = format!("$AL__text_{}", &count);
+                parsed_text = parsed_text.replace(text_source, placeholder.as_str());
+                map.insert(placeholder.clone(), text);
+            }
+            count += 1;
+        }
+        let obj = Self{
+            parsed_text: parsed_text,
+            map: map,
+        };
+        return Ok(obj)
+    }
+    pub fn has_placeholder(text: &String) -> bool {
+        // text might be a list of placeholders, like {$AL__text_1|$AL__text_2}
+        let text = text.clone();
+        let check = text.find("$AL__text_");
+        eprintln!("DataValueLongText.has_placeholder :: text: {} check: {}", &text, &check.is_some());
+        return check.is_some() 
     }
 }
 

@@ -6,16 +6,13 @@ use std::collections::{BTreeMap, HashMap};
 use std::time::Instant;
 
 use tr::tr;
-// use colored::*;
 use regex::Regex;
-// use slug::slugify;
-// use std::str::FromStr;
+use lazy_static::lazy_static;
 
 use crate::statements::folder::config::*;
 use crate::storage::constants::*;
-// use crate::statements::Statement;
-// use crate::statements::{CommandRunner};
 use crate::statements::folder::schema::*;
+use crate::statements::*;
 use crate::planet::constants::{ID, NAME, VALUE, FALSE, COLUMNS};
 use crate::storage::folder::{TreeFolder, TreeFolderItem, FolderItem, FolderSchema, DbData, GetItemOption};
 use crate::storage::folder::*;
@@ -25,6 +22,7 @@ use crate::planet::{
     PlanetContext, 
     PlanetError,
     Context,
+    Environment,
 };
 use crate::storage::columns::{text::*, StorageColumn, ObjectStorageColumn};
 use crate::storage::columns::number::*;
@@ -34,15 +32,178 @@ use crate::storage::columns::reference::*;
 use crate::storage::columns::structure::*;
 use crate::storage::columns::media::*;
 
-pub struct InsertIntoFolder<'gb> {
-    pub planet_context: &'gb PlanetContext<'gb>,
-    pub context: &'gb Context<'gb>,
-    pub db_folder: TreeFolder,
-    pub space_database: SpaceDatabase,
-    pub config: InsertIntoFolderConfig,
+lazy_static! {
+    pub static ref RE_INSERT_INTO_FOLDER_MAIN: Regex = Regex::new(r#"INSERT INTO FOLDER (?P<FolderName>[\w\s]+)[\s\t\n]*(?P<Items>\([\s\S]+\));"#).unwrap();
+    pub static ref RE_INSERT_INTO_FOLDER_ITEMS: Regex = Regex::new(r#"(?P<Item>\([\s\S][^)]+\)),*"#).unwrap();
+    pub static ref RE_INSERT_INTO_FOLDER_ITEM_KEYS: Regex = Regex::new(r#"([\s\t]*(?P<Key>[\w\s]+)=[\s\t]*(?P<Value>[\s\S][^,)]*),*)"#).unwrap();
+    pub static ref RE_INSERT_INTO_FOLDER_SUBFOLDERS: Regex = Regex::new(r#"(SUB FOLDER (?P<SubFolderId>[\w]+)([\s]*WITH[\s]*(?P<SubFolderIsReference>IsReference[\s]*=[\s]*(true|false)))*,*)"#).unwrap();
 }
 
-impl<'gb> InsertIntoFolder<'gb> {
+pub const WITH_IS_REFERENCE: &str = "IsReference";
+
+pub const ALLOWED_WITH_OPTIONS_WRITE: [&str; 1] = [
+    WITH_IS_REFERENCE
+];
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct InsertIntoFolderCompiledStmt {
+    pub folder_name: String,
+    pub name: Option<String>,
+    pub sub_folders: Option<Vec<SubFolderDataConfig>>,
+    pub data: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
+}
+
+impl InsertIntoFolderCompiledStmt {
+
+    pub fn defaults(name: Option<String>) -> InsertIntoFolderCompiledStmt {
+        let config: InsertIntoFolderCompiledStmt = InsertIntoFolderCompiledStmt{
+            folder_name: String::from(""),
+            name: name,
+            data: Some(BTreeMap::new()),
+            sub_folders: None,
+        };
+        return config
+    }
+
+}
+
+
+#[derive(Debug, Clone)]
+pub struct InsertIntoFolderStatement {
+}
+
+impl<'gb> StatementCompiler<'gb, InsertIntoFolderCompiledStmt> for InsertIntoFolderStatement {
+
+    fn compile(
+        &self, 
+        statement_text: &String
+    ) -> Result<InsertIntoFolderCompiledStmt, Vec<PlanetError>> {
+        let mut compiled_statement = InsertIntoFolderCompiledStmt::defaults(None);
+        let expr = &RE_INSERT_INTO_FOLDER_MAIN;
+        let check = expr.is_match(&statement_text);
+        let mut errors: Vec<PlanetError> = Vec::new();
+        if !check {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Insert into folder syntax not valid.")
+                ),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+        let captures = expr.captures(&statement_text);
+        if captures.is_some() {
+            let captures = captures.unwrap();
+            let folder_name = captures.name("FolderName").unwrap().as_str();
+            let folder_name = folder_name.replace("\n", "");
+            let folder_name = folder_name.trim();
+            compiled_statement.folder_name = folder_name.to_string();
+            let items = captures.name("Items");
+            if items.is_some() {
+                let items = items.unwrap().as_str();
+                // I parse for long texts and possible text characters like commas, quotes, etc...
+                let long_text = DataValueLongText::defaults(
+                    &items.to_string()
+                );
+                if long_text.is_ok() {
+                    let long_text = long_text.unwrap();
+                    let items = long_text.parsed_text.as_str();
+                    let expr = &RE_INSERT_INTO_FOLDER_ITEMS;
+                    let item_list = expr.captures_iter(items);
+                    for item_ in item_list {
+                        let expr_item = item_.name("Item");
+                        if expr_item.is_some() {
+                            let expr_item = expr_item.unwrap().as_str();
+                            let expr = &RE_INSERT_INTO_FOLDER_ITEM_KEYS;
+                            let list = expr.captures_iter(expr_item);
+                            let mut map: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
+                            for list_item in list {
+                                let key = list_item.name("Key");
+                                let value = list_item.name("Value");
+                                // eprintln!("InsertIntoFolderStatement.compile :: value: {:?}", &value);
+                                if key.is_some() && value.is_some() {
+                                    let key = key.unwrap().as_str().trim();
+                                    let mut value = value.unwrap().as_str().to_string();
+                                    // eprintln!("InsertIntoFolderStatement.compile :: [str] value: {}", &value);
+                                    if key == NAME_CAMEL {
+                                        // eprintln!("InsertIntoFolderStatement.compile :: name: {}", &value);
+                                        compiled_statement.name = Some(value);
+                                        continue;
+                                    }
+                                    if DataValueLongText::has_placeholder(&value) {
+                                        let value_ = value.clone();
+                                        let value_ = value_.replace("\n", "");
+                                        // eprintln!("InsertIntoFolderStatement.compile :: value_: {}", &value_);
+                                        let long_text_src = long_text.map.get(&value_);
+                                        if long_text_src.is_some() {
+                                            let long_text_src = long_text_src.unwrap();
+                                            // eprintln!("InsertIntoFolderStatement.compile :: long text: {}", 
+                                            //     long_text_src
+                                            // );
+                                            value = long_text_src.clone();
+                                        }
+                                    }
+                                    // Here value is text with no placeholders in case of long text """..."""
+                                    // eprintln!("InsertIntoFolderStatement.compile :: pre DataValue: {}", &value);
+                                    let data_value = DataValue::defaults(
+                                        &value
+                                    );
+                                    if data_value.is_ok() {
+                                        let data_value = data_value.unwrap();
+                                        // eprintln!("InsertIntoFolderStatement.compile :: DataValue: {:?}", &data_value.value);
+                                        map.insert(key.to_string(), data_value.value);
+                                    }
+                                }
+                            }
+                            compiled_statement.data = Some(map);
+                        }
+                    }
+                }
+                let expr = &RE_INSERT_INTO_FOLDER_SUBFOLDERS;
+                let sub_folders = expr.captures_iter(items);
+                let mut sub_folder_list: Vec<SubFolderDataConfig> = Vec::new();
+                for sub_folder in sub_folders {
+                    let sub_folder_id = sub_folder.name("SubFolderId");
+                    let is_reference = sub_folder.name("SubFolderIsReference");
+                    let mut obj = SubFolderDataConfig{
+                        id: None,
+                        is_reference: None
+                    };
+                    if sub_folder_id.is_some() {
+                        let sub_folder_id = sub_folder_id.unwrap().as_str();
+                        obj.id = Some(sub_folder_id.to_string());
+                    } else {
+                        continue
+                    }
+                    if is_reference.is_some() {
+                        let is_reference = is_reference.unwrap().as_str();
+                        let is_reference = is_reference.to_lowercase();
+                        let is_reference = is_reference.as_str();
+                        match is_reference {
+                            TRUE => {
+                                obj.is_reference = Some(true);
+                            },
+                            FALSE => {
+                                obj.is_reference = Some(false);
+                            },
+                            _ => {}
+                        }
+                    }
+                    sub_folder_list.push(obj);
+                }
+                if sub_folder_list.len() > 0 {
+                    compiled_statement.sub_folders = Some(sub_folder_list);
+                }
+            }
+        }
+        eprintln!("InsertIntoFolderStatement.compile :: compiled_statement: {:#?}", &compiled_statement);
+        return Ok(compiled_statement)
+    }
+
+}
+
+impl<'gb> InsertIntoFolderStatement {
 
     fn get_insert_id_data_map(
         &self,
@@ -68,23 +229,69 @@ impl<'gb> InsertIntoFolder<'gb> {
                 // let column_type = map.get(COLUMN_TYPE);
                 // let column_type = column_type.unwrap().clone();
                 insert_id_data_map.insert(id, value);
+            } else {
+                // Append error column name is not configured in the configuration.
             }
         }
         // eprintln!("InsertIntoFolder.get_insert_id_data_map :: insert_id_data_map: {:#?}", &insert_id_data_map);
         return insert_id_data_map
     }
 
-    pub fn run(&self) -> Result<DbData, Vec<PlanetError>> {
-        let t_1 = Instant::now();
-        let command = self.config.command.clone().unwrap_or_default();
-        let expr = Regex::new(r#"(INSERT INTO FOLDER) "(?P<folder_name>[a-zA-Z0-9_ ]+)"#).unwrap();
-        let folder_name_match = expr.captures(&command).unwrap();
-        let folder_name = &folder_name_match["folder_name"].to_string();
-        // eprintln!("InsertIntoFolder.run :: folder_name: {}", folder_name);
+    pub fn check_name_exists(&self, folder_name: &String, name: &String, db_row: &mut TreeFolderItem) -> bool {
+        let check: bool;
+        let name = name.clone();
+        let result = db_row.get(&folder_name, GetItemOption::ByName(name), None);
+        eprintln!("InsertIntoFolder.check_name_exists :: get response: {:#?}", &result);
+        match result {
+            Ok(_) => {
+                check = true
+            },
+            Err(_) => {
+                check = false
+            }
+        }
+        return check
+    }
 
-        // folder
+}
+
+impl<'gb> Statement<'gb> for InsertIntoFolderStatement {
+
+    fn run(
+        &self,
+        env: &'gb Environment<'gb>,
+        space_database: &SpaceDatabase,
+        statement_text: &String,
+    ) -> Result<yaml_rust::Yaml, Vec<PlanetError>> {
+        let space_database = space_database.clone();
+        let context = env.context;
+        let planet_context = env.planet_context;
+        let t_1 = Instant::now();
+        let statement = self.compile(statement_text);
+        if statement.is_err() {
+            let errors = statement.unwrap_err();
+            return Err(errors)
+        }
+        let statement = statement.unwrap();
+        let folder_name = &statement.folder_name;
+        eprintln!("InsertIntoFolderStatement.run :: folder_name: {}", folder_name);
+
         let mut errors: Vec<PlanetError> = Vec::new();
-        let folder = self.db_folder.get_by_name(folder_name);
+        // folder
+        let home_dir = planet_context.home_path.unwrap_or_default();
+        let account_id = context.account_id.unwrap_or_default();
+        let space_id = context.space_id.unwrap_or_default();
+        let site_id = context.site_id;
+        let box_id = context.box_id.unwrap_or_default();
+        let space_database = space_database.clone();
+        let db_folder= TreeFolder::defaults(
+            space_database.connection_pool.clone(),
+            Some(home_dir),
+            Some(account_id),
+            Some(space_id),
+            site_id,
+        ).unwrap();
+        let folder = db_folder.get_by_name(folder_name);
         if folder.is_err() {
             let error = folder.unwrap_err();
             errors.push(error);
@@ -99,29 +306,28 @@ impl<'gb> InsertIntoFolder<'gb> {
                 )
             );
             return Err(errors);
-        }    
+        }
 
         let folder = folder.unwrap();
         let folder_name = &folder.clone().name.unwrap();
+        eprintln!("InsertIntoFolder.run :: folder: {:#?}", &folder);
         // eprintln!("InsertIntoFolder.run :: Got folder! folder_name: {}", folder_name);
         let folder_id = folder.clone().id.unwrap();
-
-        let home_dir = self.planet_context.home_path.unwrap_or_default();
-        let account_id = self.context.account_id.unwrap_or_default();
-        let space_id = self.context.space_id.unwrap_or_default();
-        let site_id = self.context.site_id.unwrap_or_default();
-        let box_id = self.context.box_id.unwrap_or_default();
-        let space_database = self.space_database.clone();
+        let mut site_id_alt: Option<String> = None;
+        if site_id.is_some() {
+            let site_id = site_id.unwrap();
+            site_id_alt = Some(site_id.to_string());
+        }
 
         let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
             space_database.connection_pool.clone(),
             home_dir,
             account_id,
             space_id,
-            site_id,
+            site_id_alt,
             box_id,
             folder_id.as_str(),
-            &self.db_folder,
+            &db_folder,
         );
         match result {
             Ok(_) => {
@@ -130,7 +336,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                 // routing
                 let routing_wrap = RoutingData::defaults(
                     Some(account_id.to_string()),
-                    Some(site_id), 
+                    site_id, 
                     Some(space_id), 
                     Some(box_id),
                     None
@@ -140,8 +346,8 @@ impl<'gb> InsertIntoFolder<'gb> {
 
                 // I need a way to get list of instance ColumnConfig (columns)
                 let config_columns = ColumnConfig::get_config(
-                    self.planet_context,
-                    self.context,
+                    planet_context,
+                    context,
                     &folder
                 );
                 if config_columns.is_err() {
@@ -152,12 +358,12 @@ impl<'gb> InsertIntoFolder<'gb> {
                 let config_columns = config_columns.unwrap();
                 // eprintln!("InsertIntoFolder.run :: config_columns: {:#?}", &config_columns);
 
-                let insert_data_map= self.config.data.clone().unwrap();
+                let insert_data_map= statement.data.clone().unwrap();
                 // I need to have {id} -> Value
                 let folder_data = folder.clone().data.unwrap();
 
                 // Validate sub_folder id exists in config for the folder and attach to DbData
-                let sub_folders_config = self.config.clone().sub_folders;
+                let sub_folders_config = statement.clone().sub_folders;
                 let mut sub_folders_wrap: Option<Vec<SubFolderItem>> = None;
                 if sub_folders_config.is_some() {
                     let sub_folders_config = sub_folders_config.unwrap();
@@ -219,7 +425,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                 // So far only take Small Text
                 let name_column: ColumnConfig = ColumnConfig::get_name_column(&folder).unwrap();
                 let name_column_type = name_column.column_type.unwrap().clone();
-                let insert_name = self.config.name.clone();
+                let insert_name = statement.name.clone();
                 // Only support so far Small Text and needs to be informed in YAML with name
                 if name_column_type != COLUMN_TYPE_SMALL_TEXT.to_string() || insert_name.is_none() {
                     errors.push(
@@ -384,11 +590,11 @@ impl<'gb> InsertIntoFolder<'gb> {
                         },
                         COLUMN_TYPE_LINK => {
                             let obj = LinkColumn::defaults(
-                                self.planet_context,
-                                self.context,
+                                planet_context,
+                                context,
                                 &column_config,
-                                Some(self.db_folder.clone()),
-                                Some(self.space_database.clone())
+                                Some(db_folder.clone()),
+                                Some(space_database.clone())
                             );
                             let result = obj.validate(&column_data);
                             if result.is_err() {
@@ -463,7 +669,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                             let obj = GenerateNumberColumn::defaults(
                                 &column_config,
                                 Some(folder.clone()),
-                                Some(self.db_folder.clone()),
+                                Some(db_folder.clone()),
                             );
                             column_data_wrap = obj.validate(&column_data);
                         },
@@ -491,7 +697,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                             let obj = FileColumn::defaults(
                                 &column_config,
                                 Some(db_row.clone()),
-                                Some(self.space_database.clone())
+                                Some(space_database.clone())
                             );
                             let fields = obj.validate(
                                 &column_data,
@@ -606,7 +812,7 @@ impl<'gb> InsertIntoFolder<'gb> {
                             continue
                         }
                         let remote_folder_id = remote_folder_id.unwrap();
-                        let folder = self.db_folder.get(&remote_folder_id).unwrap();
+                        let folder = db_folder.get(&remote_folder_id).unwrap();
                         let folder_name = folder.name.unwrap();
                         let main_data_map = links_data_map.get(&column_id);
                         if main_data_map.is_some() {
@@ -618,10 +824,10 @@ impl<'gb> InsertIntoFolder<'gb> {
                                         home_dir,
                                         account_id,
                                         space_id,
-                                        site_id,
+                                        Some(site_id.unwrap().to_string()),
                                         box_id,
                                         remote_folder_id.as_str(),
-                                        &self.db_folder,
+                                        &db_folder,
                                     );
                                     if result.is_err() {
                                         // Return error about database problem
@@ -685,122 +891,27 @@ impl<'gb> InsertIntoFolder<'gb> {
                     }
                 }
                 eprintln!("InsertIntoFolder.run :: time: {} ms", &t_1.elapsed().as_millis());
-                return Ok(response);
+                let response_coded = serde_yaml::to_string(&response);
+                if response_coded.is_err() {
+                    let error = PlanetError::new(
+                        500, 
+                        Some(tr!("Error encoding statement response.")),
+                    );
+                    errors.push(error);
+                    return Err(errors)
+                }
+                let response = response_coded.unwrap();
+                let yaml_response = yaml_rust::YamlLoader::load_from_str(
+                    response.as_str()
+                ).unwrap();
+                let yaml_response = yaml_response[0].clone();
+                return Ok(yaml_response)
             },
             Err(error) => {
                 errors.push(error);
                 return Err(errors);
             }
         }
-    }
-
-    // pub fn runner(runner: &CommandRunner, path_yaml: &String) -> () {
-    //     let t_1 = Instant::now();
-    //     let config_ = InsertIntoFolderConfig::defaults(None);
-    //     let config: Result<InsertIntoFolderConfig, Vec<PlanetValidationError>> = config_.import(
-    //         runner.planet_context,
-    //         &path_yaml
-    //     );
-    //     match config {
-    //         Ok(_) => {
-    //             let home_dir = runner.planet_context.home_path.unwrap_or_default();
-    //             let account_id = runner.context.account_id.unwrap_or_default();
-    //             let space_id = runner.context.space_id.unwrap_or_default();
-    //             let site_id = runner.context.site_id;
-    //             let result = SpaceDatabase::defaults(
-    //                 site_id, 
-    //                 space_id, 
-    //                 Some(home_dir),
-    //                 Some(false)
-    //             );
-    //             if result.clone().is_err() {
-    //                 let error = result.clone().unwrap_err();
-    //                 println!();
-    //                 println!("{}", tr!("I found these errors").red().bold());
-    //                 println!("{}", "--------------------".red());
-    //                 println!();
-    //                 println!(
-    //                     "{} {}", 
-    //                     String::from('.').blue(),
-    //                     error.message
-    //                 );
-    //             }
-    //             let space_database = result.unwrap();
-        
-    //             let db_folder= TreeFolder::defaults(
-    //                 space_database.connection_pool.clone(),
-    //                 Some(home_dir),
-    //                 Some(account_id),
-    //                 Some(space_id),
-    //                 site_id,
-    //             ).unwrap();
-        
-    //             let insert_into_table: InsertIntoFolder = InsertIntoFolder{
-    //                 planet_context: runner.planet_context,
-    //                 context: runner.context,
-    //                 config: config.unwrap(),
-    //                 db_folder: db_folder.clone(),
-    //                 space_database: space_database.clone()
-    //             };
-    //             let result: Result<_, Vec<PlanetError>> = insert_into_table.run();
-    //             match result {
-    //                 Ok(_) => {
-    //                     println!();
-    //                     println!("{}", String::from("[OK]").green());
-    //                     eprint!("Time: {} ms", &t_1.elapsed().as_millis());
-    //                 },
-    //                 Err(errors) => {
-    //                     let count = 1;
-    //                     println!();
-    //                     println!("{}", tr!("I found these errors").red().bold());
-    //                     println!("{}", "--------------------".red());
-    //                     println!();
-    //                     for error in errors {
-    //                         println!(
-    //                             "{}{} {}", 
-    //                             count.to_string().blue(),
-    //                             String::from('.').blue(),
-    //                             error.message
-    //                         );
-    //                     }
-    //                 }
-    //             }
-    //         },
-    //         Err(errors) => {
-    //             println!();
-    //             println!("{}", tr!("I found these errors").red().bold());
-    //             println!("{}", "--------------------".red());
-    //             println!();
-    //             let mut count = 1;
-    //             for error in errors {
-    //                 println!(
-    //                     "{}{} {}", 
-    //                     count.to_string().blue(), 
-    //                     String::from('.').blue(), 
-    //                     error.message
-    //                 );
-    //                 count += 1;
-    //             }
-    //         }
-    //     }
-    // }
-}
-
-impl<'gb> InsertIntoFolder<'gb> {
-    pub fn check_name_exists(&self, folder_name: &String, name: &String, db_row: &mut TreeFolderItem) -> bool {
-        let check: bool;
-        let name = name.clone();
-        let result = db_row.get(&folder_name, GetItemOption::ByName(name), None);
-        eprintln!("InsertIntoFolder.check_name_exists :: get response: {:#?}", &result);
-        match result {
-            Ok(_) => {
-                check = true
-            },
-            Err(_) => {
-                check = false
-            }
-        }
-        return check
     }
 }
 
@@ -1285,7 +1396,7 @@ fn handle_field_response(
     Vec<PlanetError>
 ) {
     let column_data = column_data.clone();
-    // eprintln!("handle_field_response :: column_data: {:?}", column_data);
+    eprintln!("handle_field_response :: column_id: {} column_data: {:?}", column_id, column_data);
     let mut errors = errors.clone();
     let mut data = data.clone();
     let column_id = column_id.clone();
@@ -1300,7 +1411,7 @@ fn handle_field_response(
             if column_data.clone().len() == 0 {
                 let error = PlanetError::new(
                     500, 
-                    Some(tr!("Content is empty, no data."))
+                    Some(tr!("Content is empty for column id \"{}\", no data.", column_id))
                 );
                 errors.push(error);
             } else {
@@ -1319,4 +1430,26 @@ fn handle_field_response(
         }
     }
     return (data, errors)
+}
+
+pub fn resolve_data_statement(
+    env: &Environment,
+    space_data: &SpaceDatabase,
+    statement_text: &String, 
+    response_wrap: Option<Result<yaml_rust::Yaml, Vec<PlanetError>>>
+) -> Option<Result<yaml_rust::Yaml, Vec<PlanetError>>> {
+    let response_wrap = response_wrap.clone();
+    if response_wrap.is_some() {
+        let response = response_wrap.unwrap();
+        return Some(response)
+    }
+    // INSERT INTO FOLDER
+    let expr = &RE_INSERT_INTO_FOLDER_MAIN;
+    let check = expr.is_match(&statement_text);
+    if check {
+        let stmt = InsertIntoFolderStatement{};
+        let response = stmt.run(env, &space_data, statement_text);
+        return Some(response);
+    }
+    return None
 }

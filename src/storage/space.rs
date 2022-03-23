@@ -16,13 +16,7 @@ impl SpaceDatabase {
         site_id: Option<&str>, 
         space_id: &str, 
         home_dir: Option<&str>,
-        skip_data: Option<bool>,
     ) -> Result<Self, PlanetError> {
-        let skip_data_wrap = skip_data.clone();
-        let mut skip_data = false;
-        if skip_data_wrap.is_some() {
-            skip_data = skip_data_wrap.unwrap();
-        }
         let home_dir = home_dir.unwrap_or_default();
         let space_id = space_id;
         let mut connection_pool: HashMap<String, sled::Db> = HashMap::new();
@@ -35,12 +29,11 @@ impl SpaceDatabase {
             // space database
             let db_names: Vec<&str> = "database.db,workspace.db".split(",").collect();
             for db_name in db_names {
-                let mut key: &str = PRIVATE;
+                let key: &str;
                 if db_name == "workspace.db" {
-                    key = WORKSPACE
-                }
-                if skip_data == true && key == PRIVATE {
-                    continue
+                    key = WORKSPACE;
+                } else {
+                    key = PRIVATE;
                 }
                 // Open db, then sync into connection_pool
                 let path = format!("{home}/private/{file}", file=db_name, home=&home_dir);
@@ -68,9 +61,6 @@ impl SpaceDatabase {
                 let mut key: String = space_id.to_string();
                 if db_name == String::from("site.db") {
                     key = site_id.to_string();
-                }
-                if skip_data == true && key == space_id {
-                    continue
                 }
                 // Open db, then sync into connection_pool
                 let path : String;

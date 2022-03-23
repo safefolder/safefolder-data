@@ -79,27 +79,29 @@ pub const STATS_FUNCTION: &str = "stats_function";
 pub const MODE: &str = "mode";
 pub const CONTENT_TYPES: &str = "content_types";
 
+pub const CURRENCY_SYMBOL_DOLLAR: &str = "$";
+
 // Column Types
-pub const COLUMN_TYPE_SMALL_TEXT: &str = "Small Text";
-pub const COLUMN_TYPE_LONG_TEXT: &str = "Long Text";
+pub const COLUMN_TYPE_SMALL_TEXT: &str = "SmallText";
+pub const COLUMN_TYPE_LONG_TEXT: &str = "LongText";
 pub const COLUMN_TYPE_CHECKBOX: &str = "Checkbox";
 pub const COLUMN_TYPE_SELECT: &str = "Select";
 pub const COLUMN_TYPE_NUMBER: &str = "Number";
 pub const COLUMN_TYPE_DATE: &str = "Date";
 pub const COLUMN_TYPE_FORMULA: &str = "Formula";
 pub const COLUMN_TYPE_DURATION: &str = "Duration";
-pub const COLUMN_TYPE_CREATED_TIME: &str = "Created Time";
-pub const COLUMN_TYPE_LAST_MODIFIED_TIME: &str = "Last Modified Time";
-pub const COLUMN_TYPE_CREATED_BY: &str = "Created By";
-pub const COLUMN_TYPE_LAST_MODIFIED_BY: &str = "Last Modified By";
+pub const COLUMN_TYPE_CREATED_TIME: &str = "CreatedTime";
+pub const COLUMN_TYPE_LAST_MODIFIED_TIME: &str = "LastModifiedTime";
+pub const COLUMN_TYPE_CREATED_BY: &str = "CreatedBy";
+pub const COLUMN_TYPE_LAST_MODIFIED_BY: &str = "LastModifiedBy";
 pub const COLUMN_TYPE_CURRENCY: &str = "Currency";
 pub const COLUMN_TYPE_PERCENTAGE: &str = "Percentage";
 pub const COLUMN_TYPE_LINK: &str = "Link";
 pub const COLUMN_TYPE_REFERENCE: &str = "Reference";
 pub const COLUMN_TYPE_LANGUAGE: &str = "Language";
 pub const COLUMN_TYPE_TEXT: &str = "Text";
-pub const COLUMN_TYPE_GENERATE_ID: &str = "Generate Id";
-pub const COLUMN_TYPE_GENERATE_NUMBER: &str = "Generate Number";
+pub const COLUMN_TYPE_GENERATE_ID: &str = "GenerateId";
+pub const COLUMN_TYPE_GENERATE_NUMBER: &str = "GenerateNumber";
 pub const COLUMN_TYPE_PHONE: &str = "Phone";
 pub const COLUMN_TYPE_EMAIL: &str = "Email";
 pub const COLUMN_TYPE_URL: &str = "Url";

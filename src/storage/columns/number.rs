@@ -260,6 +260,8 @@ impl StorageColumn for CurrencyColumn {
         if currency_symbol.is_some() {
             let currency_symbol = currency_symbol.unwrap();
             field_config_map.insert(CURRENCY_SYMBOL.to_string(), currency_symbol);
+        } else {
+            field_config_map.insert(CURRENCY_SYMBOL.to_string(), CURRENCY_SYMBOL_DOLLAR.to_string());
         }
         return Ok(field_config_map)
     }

@@ -722,7 +722,7 @@ impl ConfigStorageColumn for ColumnConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct CreateFolderCompiledStatement {
+pub struct CreateFolderCompiledStmt {
     pub folder_name: String,
     pub language: Option<LanguageConfig>,
     pub text_search: Option<TextSearchConfig>,
@@ -731,7 +731,7 @@ pub struct CreateFolderCompiledStatement {
     pub sub_folders: Option<Vec<SubFolderConfig>>,
 }
 
-impl CreateFolderCompiledStatement {
+impl CreateFolderCompiledStmt {
 
     pub fn defaults(name: Option<ColumnConfig>) -> Self {
         let mut name_conf: ColumnConfig = ColumnConfig::defaults(None);
@@ -757,20 +757,17 @@ impl CreateFolderCompiledStatement {
 pub struct CreateFolderStatement {
 }
 
-impl<'gb> StatementCompiler<'gb, CreateFolderCompiledStatement> for CreateFolderStatement {
+impl<'gb> StatementCompiler<'gb, CreateFolderCompiledStmt> for CreateFolderStatement {
 
     fn compile(
         &self, 
         statement_text: &String
-    ) -> Result<CreateFolderCompiledStatement, Vec<PlanetError>> {
-        // I need to have some syntax for achiever language and common compile software to deal with it
-        eprintln!("CreateFolder.compile :: statement_text: {}", statement_text);
-        let mut compiled_statement = CreateFolderCompiledStatement::defaults(
+    ) -> Result<CreateFolderCompiledStmt, Vec<PlanetError>> {
+        let mut compiled_statement = CreateFolderCompiledStmt::defaults(
             None
         );
         let expr = &RE_CREATE_FOLDER_MAIN;
         let check = expr.is_match(&statement_text);
-        eprintln!("CreateFolder.compile :: check: {}", check.clone());
         let mut errors: Vec<PlanetError> = Vec::new();
         if !check {
             let error = PlanetError::new(
@@ -892,6 +889,7 @@ impl<'gb> StatementCompiler<'gb, CreateFolderCompiledStatement> for CreateFolder
                 // Here I need compilation of options the same as in subfolders, being common software
                 let column_str = column.unwrap().as_str();
                 let column_type = column_type.unwrap().as_str();
+                // eprintln!("CreateFolder.compile :: column_type: {}", column_type);
                 let mut column = ColumnConfig::defaults(None);
                 let name = column_str.trim().to_string();
                 column.column_type = Some(column_type.to_string());
@@ -900,7 +898,7 @@ impl<'gb> StatementCompiler<'gb, CreateFolderCompiledStatement> for CreateFolder
                 let options = item.name("Options");
                 if options.is_some() {
                     let options = options.unwrap().as_str();
-                    eprintln!("CreateFolder.compile :: options: {}", options);
+                    // eprintln!("CreateFolder.compile :: options: {}", options);
                     let result = WithOptions::defaults(
                         &options.to_string()
                     );
@@ -910,6 +908,7 @@ impl<'gb> StatementCompiler<'gb, CreateFolderCompiledStatement> for CreateFolder
                     } else {
                         let with_options_obj = result.unwrap();
                         let with_options = &with_options_obj.options;
+                        // eprintln!("CreateFolder.compile :: with_options: {:#?}", with_options);
                         // Validate I have allowed options
                         let mut is_valid = true;
                         for (k, _v) in with_options {
@@ -927,7 +926,6 @@ impl<'gb> StatementCompiler<'gb, CreateFolderCompiledStatement> for CreateFolder
                             }
                         }
                         if is_valid {
-                            eprintln!("CreateFolderStatement.compile :: with_options: {:#?}", &with_options);
                             // We process with options only in case all options sent are OK
                             if *&with_options.contains_key(WITH_REQUIRED) {
                                 let required = &with_options_obj.get_single_value(
@@ -992,7 +990,7 @@ impl<'gb> StatementCompiler<'gb, CreateFolderCompiledStatement> for CreateFolder
                                 let is_set = &with_options_obj.get_single_value(
                                     WITH_IS_SET
                                 );
-                                column.is_set = Some(is_set.clone());
+                                column.is_set = Some(is_set.clone().to_lowercase());
                             }
                             if *&with_options.contains_key(WITH_MANY) {
                                 let many = &with_options_obj.get_single_value(
@@ -1123,7 +1121,7 @@ impl<'gb> StatementCompiler<'gb, CreateFolderCompiledStatement> for CreateFolder
         if errors.len() > 0 {
             return Err(errors)
         }
-        eprintln!("CreateFolderStatement.compile :: compiled_statement: {:#?}", &compiled_statement);
+        eprintln!("CreateFolder.compile :: compiled_statement: {:#?}", &compiled_statement);
         return Ok(compiled_statement.clone())
     }
 

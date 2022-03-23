@@ -149,7 +149,7 @@ impl FileColumn {
                         my_map.insert(
                             ID.to_string(), 
                             id
-                        );    
+                        );
                     }
                     if !title.is_null() {
                         my_map.insert(
