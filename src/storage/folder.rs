@@ -58,7 +58,7 @@ pub trait FolderItem {
         folder_id: &str,
         tree_folder: &TreeFolder,
     ) -> Result<TreeFolderItem, PlanetError>;
-    fn insert(&mut self, folder_name: &String, db_data: &DbData) -> Result<DbData, PlanetError>;
+    fn insert(&mut self, folder_name: &String, db_data_list: &Vec<DbData>) -> Result<Vec<DbData>, Vec<PlanetError>>;
     fn update(&mut self, db_data: &DbData) -> Result<DbData, PlanetError>;
     fn get(
         &mut self, 
@@ -1632,55 +1632,71 @@ impl FolderItem for TreeFolderItem {
         Ok(db_row)
     }
 
-    fn insert(&mut self, folder_name: &String, db_data: &DbData) -> Result<DbData, PlanetError> {
+    fn insert(&mut self, folder_name: &String, db_data_list: &Vec<DbData>) -> Result<Vec<DbData>, Vec<PlanetError>> {
+        let mut errors: Vec<PlanetError> = Vec::new();
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
-        let mut db_data = db_data.clone();
-        let data = db_data.data.clone();
-        let mut text_data: BTreeMap<String, String> = BTreeMap::new();
-        if data.is_some() {
-            let mut data = data.unwrap();
-            let my_text_data = data.get(TEXT);
-            if my_text_data.is_some() {
-                text_data = my_text_data.unwrap()[0].clone();
-            }
-            data.remove(TEXT);
-            db_data.data = Some(data.clone());
-        }
-        eprintln!("TreeFolderItem.insert :: db_data: {:#?}", &db_data);
-        let encrypted_data = db_data.encrypt(&shared_key).unwrap();
-        let encoded: Vec<u8> = encrypted_data.serialize();
-        let id = db_data.id.clone().unwrap();
-        let id_db = xid::Id::from_str(id.as_str()).unwrap();
-        let id_db = id_db.as_bytes();
-        let (db, _) = self.open_partition_by_item(&id)?;
-        let response = &db.insert(id_db, encoded);
-        match response {
-            Ok(_) => {
-                // Get item
-                let item_ = self.get(
-                    &folder_name, 
-                    GetItemOption::ById(id), 
-                    None
-                );
-                match item_ {
-                    Ok(_) => {
-                        let item = item_.unwrap();
-                        let index_response = self.index(&item, &text_data);
-                        if index_response.is_err() {
-                            let error = index_response.unwrap_err();
-                            return Err(error)
-                        } else {
-                            Ok(item)
-                        }
-                    },
-                    Err(error) => {
-                        Err(error)
-                    }
+        let mut response_list: Vec<DbData> = Vec::new();
+        for db_data in db_data_list {
+            let mut db_data = db_data.clone();
+            let data = db_data.data.clone();
+            let mut text_data: BTreeMap<String, String> = BTreeMap::new();
+            if data.is_some() {
+                let mut data = data.unwrap();
+                let my_text_data = data.get(TEXT);
+                if my_text_data.is_some() {
+                    text_data = my_text_data.unwrap()[0].clone();
                 }
-            },
-            Err(_) => {
-                Err(PlanetError::new(500, Some(tr!("Could not insert data"))))
+                data.remove(TEXT);
+                db_data.data = Some(data.clone());
             }
+            eprintln!("TreeFolderItem.insert :: db_data: {:#?}", &db_data);
+            let encrypted_data = db_data.encrypt(&shared_key).unwrap();
+            let encoded: Vec<u8> = encrypted_data.serialize();
+            let id = db_data.id.clone().unwrap();
+            let id_db = xid::Id::from_str(id.as_str()).unwrap();
+            let id_db = id_db.as_bytes();
+            let items = self.open_partition_by_item(&id);
+            if items.is_err() {
+                let error = items.unwrap_err();
+                errors.push(error);
+                continue
+            }
+            let items = items.unwrap();
+            let tree = items.0;
+            let response = &tree.insert(id_db, encoded);
+            match response {
+                Ok(_) => {
+                    // Get item
+                    let item_ = self.get(
+                        &folder_name, 
+                        GetItemOption::ById(id), 
+                        None
+                    );
+                    match item_ {
+                        Ok(_) => {
+                            let item = item_.unwrap();
+                            let index_response = self.index(&item, &text_data);
+                            if index_response.is_err() {
+                                let error = index_response.unwrap_err();
+                                errors.push(error);
+                            } else {
+                                response_list.push(item);
+                            }
+                        },
+                        Err(error) => {
+                            errors.push(error);
+                        }
+                    }
+                },
+                Err(_) => {
+                    errors.push(PlanetError::new(500, Some(tr!("Could not insert data"))));
+                }
+            }
+        }
+        if errors.len() > 0 {
+            return Err(errors)
+        } else {
+            return Ok(response_list)
         }
     }
 

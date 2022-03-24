@@ -1134,7 +1134,7 @@ impl<'gb> Statement<'gb> for CreateFolderStatement {
         env: &'gb Environment<'gb>,
         space_database: &SpaceDatabase,
         statement_text: &String,
-    ) -> Result<yaml_rust::Yaml, Vec<PlanetError>> {
+    ) -> Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>> {
         // run would return a generic Yaml object which has the statement response
         // yaml_rust::Yaml
         let space_database = space_database.clone();
@@ -1503,7 +1503,7 @@ impl<'gb> Statement<'gb> for CreateFolderStatement {
                 let yaml_response = yaml_rust::YamlLoader::load_from_str(
                     response.as_str()
                 ).unwrap();
-                let yaml_response = yaml_response[0].clone();
+                let yaml_response = yaml_response.clone();
                 return Ok(yaml_response)
                 },
             Err(error) => {
@@ -1541,8 +1541,8 @@ pub fn resolve_schema_statement(
     env: &Environment,
     space_data: &SpaceDatabase,
     statement_text: &String, 
-    response_wrap: Option<Result<yaml_rust::Yaml, Vec<PlanetError>>>
-) -> Option<Result<yaml_rust::Yaml, Vec<PlanetError>>> {
+    response_wrap: Option<Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>>>
+) -> Option<Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>>> {
     let response_wrap = response_wrap.clone();
     if response_wrap.is_some() {
         let response = response_wrap.unwrap();

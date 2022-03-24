@@ -36,7 +36,7 @@ pub trait Statement<'gb> {
         env: &'gb Environment<'gb>,
         space_database: &SpaceDatabase,
         statement_text: &String,
-    ) -> Result<yaml_rust::Yaml, Vec<PlanetError>>;
+    ) -> Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>>;
 }
 
 pub trait StatementCompiler<'gb, T> {
@@ -44,6 +44,13 @@ pub trait StatementCompiler<'gb, T> {
         &self, 
         statement_text: &String
     ) -> Result<T, Vec<PlanetError>>;
+}
+
+pub trait StatementCompilerBulk<'gb, T> {
+    fn compile(
+        &self, 
+        statement_text: &String
+    ) -> Result<Vec<T>, Vec<PlanetError>>;
 }
 
 pub trait StatementErrors<T> {
@@ -119,7 +126,7 @@ impl StatementRunner {
             space_data = space_database.unwrap();
         }
         let mut response_str = String::from("");
-        let mut response_wrap: Option<Result<yaml_rust::Yaml, Vec<PlanetError>>> = None;
+        let mut response_wrap: Option<Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>>> = None;
         // Process all statements from all modules
         response_wrap = resolve_schema_statement(env, &space_data, statement_text, response_wrap);
         response_wrap = resolve_data_statement(env, &space_data, statement_text, response_wrap);
@@ -135,9 +142,12 @@ impl StatementRunner {
         let response = response_wrap.unwrap();
         if response.is_ok() {
             // TODO: Implement for JSON and XML
-            let response = response.unwrap();
-            let mut emitter = yaml_rust::YamlEmitter::new(&mut response_str);
-            emitter.dump(&response).unwrap();
+            let response_list = response.unwrap();            
+            for response in response_list {
+                let mut emitter = yaml_rust::YamlEmitter::new(&mut response_str);
+                emitter.dump(&response).unwrap();
+                response_str = format!("{}\n", response_str);
+            }
             // eprintln!("StatementRunner.run :: response encoded: {}", &response_str);
         } else {
             // I don't abort db transactions, since I do not own the db connection, only return errors
