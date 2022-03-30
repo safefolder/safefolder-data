@@ -60,7 +60,7 @@ impl StorageColumn for SetColumn {
         config.is_set = Some(String::from("true"));
         return Ok(config)
     }
-    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, PlanetError> {
+    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, Vec<PlanetError>> {
         let data = data.clone();
         // How to validate max and min???
         // Do later
@@ -132,16 +132,17 @@ impl StorageColumn for ObjectColumn {
         }
         return Ok(config)
     }
-    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, PlanetError> {
+    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, Vec<PlanetError>> {
         let config = self.config.clone();
         let mode = config.mode;
         if mode.is_none() {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!("Mode is required for object columns. Default mode is YAML."))
-                )
-            )
+            let error = PlanetError::new(
+                500, 
+                Some(tr!("Mode is required for object columns. Default mode is YAML."))
+            );
+            let mut errors: Vec<PlanetError> = Vec::new();
+            errors.push(error);
+            return Err(errors)
         }
         let mode = mode.unwrap();
         let data = data.clone();
@@ -150,22 +151,24 @@ impl StorageColumn for ObjectColumn {
             if mode == MODE_YAML.to_string() {
                 let result = yaml_rust::YamlLoader::load_from_str(&data_item);
                 if result.is_err() {
-                    return Err(
-                        PlanetError::new(
-                            500, 
-                            Some(tr!("Validation error for object format. Expected format is YAML."))
-                        )
-                    )
+                    let error = PlanetError::new(
+                        500, 
+                        Some(tr!("Validation error for object format. Expected format is YAML."))
+                    );
+                    let mut errors: Vec<PlanetError> = Vec::new();
+                    errors.push(error);
+                    return Err(errors)
                 }
             } else if mode == MODE_JSON.to_string() {
                 let result = json::parse(&data_item);
                 if result.is_err() {
-                    return Err(
-                        PlanetError::new(
-                            500, 
-                            Some(tr!("Validation error for object format. Expected format is JSON."))
-                        )
-                    )
+                    let error = PlanetError::new(
+                        500, 
+                        Some(tr!("Validation error for object format. Expected format is JSON."))
+                    );
+                    let mut errors: Vec<PlanetError> = Vec::new();
+                    errors.push(error);
+                    return Err(errors)
                 }
             }
         }

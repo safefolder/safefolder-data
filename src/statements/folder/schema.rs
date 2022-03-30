@@ -16,7 +16,7 @@ use crate::statements::folder::config::{
     create_minimum_column_map,
 };
 use crate::statements::*;
-use crate::statements::Statement;
+use crate::statements::{Statement, StatementCallMode};
 use crate::storage::folder::{TreeFolder, FolderSchema, DbData, RoutingData, build_value_list};
 use crate::storage::space::{SpaceDatabase};
 use crate::planet::{
@@ -38,9 +38,11 @@ use crate::storage::columns::{
     reference::*,
     media::*,
     structure::*,
+    processing::*,
     StorageColumn,
     StorageColumnBasic,
     ObjectStorageColumn,
+    EnvDbStorageColumn
 };
 
 lazy_static! {
@@ -158,6 +160,7 @@ pub struct ColumnConfig {
     pub stats_function: Option<String>,
     pub content_types: Option<Vec<String>>,
     pub mode: Option<String>,
+    pub statements: Option<String>,
 }
 
 impl ConfigStorageColumn for ColumnConfig {
@@ -194,6 +197,7 @@ impl ConfigStorageColumn for ColumnConfig {
             stats_function: None,
             content_types: None,
             mode: None,
+            statements: None,
         };
         if options.is_some() {
             object.options = Some(options.unwrap());
@@ -255,6 +259,7 @@ impl ConfigStorageColumn for ColumnConfig {
                     stats_function: None,
                     content_types: None,
                     mode: None,
+                    statements: None,
                 };
                 return Some(column_config);
             }
@@ -496,6 +501,12 @@ impl ConfigStorageColumn for ColumnConfig {
                             );
                             column_config = obj.get_config(column_config_map)?;
                         },
+                        COLUMN_TYPE_STATEMENT => {
+                            let mut obj = StatementColumn::defaults(
+                                &column_config,
+                            );
+                            column_config = obj.get_config(column_config_map)?;
+                        },
                         _ => {}
                     }
                     let _ = &map_columns_by_id.insert(column_id, column_config.clone());
@@ -549,6 +560,7 @@ impl ConfigStorageColumn for ColumnConfig {
         properties_map: &HashMap<String, ColumnConfig>,
         db_folder: &TreeFolder,
         folder_name: &String,
+        space_database: &SpaceDatabase
     ) -> Result<BTreeMap<String, String>, PlanetError> {
         // I use this operation when creating folders
         let column_config = self.clone();
@@ -561,6 +573,11 @@ impl ConfigStorageColumn for ColumnConfig {
         let column_type = column_config.column_type.unwrap_or_default();
         let column_id = column_config.id.unwrap_or_default();
         let column_type_str = column_type.as_str();
+        let env = Environment{
+            context: context,
+            planet_context: planet_context
+        };
+        let space_database = space_database.clone();
         // eprintln!("map_object_db :: column_name: {}", &column_name);
         map.insert(String::from(ID), column_id.clone());
         map.insert(String::from(NAME), column_name.clone());
@@ -672,6 +689,13 @@ impl ConfigStorageColumn for ColumnConfig {
                     None,
                     None
                 ).create_config(&map)?;
+            },
+            COLUMN_TYPE_STATEMENT => {
+                map = StatementColumn::defaults(&propertty_config_).create_config(
+                    &map,
+                    &env,
+                    &space_database
+                )?;
             },
             _ => {}
         }
@@ -1154,7 +1178,7 @@ impl<'gb> Statement<'gb> for CreateFolderStatement {
         let site_id = context.site_id;
 
         let result: Result<TreeFolder, PlanetError> = TreeFolder::defaults(
-            space_database.connection_pool,
+            space_database.connection_pool.clone(),
             Some(home_dir),
             Some(account_id),
             Some(space_id),
@@ -1285,6 +1309,7 @@ impl<'gb> Statement<'gb> for CreateFolderStatement {
                         &columns_map,
                         &db_folder,
                         &folder_name,
+                        &space_database
                     );
                     if map.is_err() {
                         let error = map.clone().unwrap_err();
@@ -1541,8 +1566,10 @@ pub fn resolve_schema_statement(
     env: &Environment,
     space_data: &SpaceDatabase,
     statement_text: &String, 
-    response_wrap: Option<Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>>>
+    response_wrap: Option<Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>>>,
+    mode: &StatementCallMode
 ) -> Option<Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>>> {
+    let mode = mode.clone();
     let response_wrap = response_wrap.clone();
     if response_wrap.is_some() {
         let response = response_wrap.unwrap();
@@ -1553,8 +1580,23 @@ pub fn resolve_schema_statement(
     let check = expr.is_match(&statement_text);
     if check {
         let stmt = CreateFolderStatement{};
-        let response = stmt.run(env, &space_data, statement_text);
-        return Some(response);
+        match mode {
+            StatementCallMode::Run => {
+                let response = stmt.run(env, &space_data, 
+                    statement_text);
+                return Some(response);
+            },
+            StatementCallMode::Compile => {
+                let response = stmt.compile(statement_text);
+                if response.is_err() {
+                    let errors = response.unwrap_err();
+                    return Some(Err(errors))
+                }
+                let yaml = "---\nstatus: ok";
+                let result = yaml_rust::YamlLoader::load_from_str(yaml);
+                return Some(Ok(result.unwrap()))
+            }
+        }
     }
     return None
 }

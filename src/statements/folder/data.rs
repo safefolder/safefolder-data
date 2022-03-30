@@ -535,7 +535,7 @@ impl<'gb> Statement<'gb> for InsertIntoFolderStatement {
                             column_data_ = items;
                         }
                         let column_data = column_data_;
-                        let mut column_data_wrap: Result<Vec<String>, PlanetError> = Ok(Vec::new());
+                        let mut column_data_wrap: Result<Vec<String>, Vec<PlanetError>> = Ok(Vec::new());
                         let mut skip_data_assign = false;
                         match column_type {
                             COLUMN_TYPE_SMALL_TEXT => {
@@ -607,8 +607,10 @@ impl<'gb> Statement<'gb> for InsertIntoFolderStatement {
                                 );
                                 let result = obj.validate(&column_data);
                                 if result.is_err() {
-                                    let error = result.clone().err().unwrap();
-                                    errors.push(error);
+                                    let errors_ = result.clone().err().unwrap();
+                                    for error in errors_ {
+                                        errors.push(error);
+                                    }
                                 }
                                 let id_list = result.unwrap();
                                 let many = column_config.many.unwrap();
@@ -1429,7 +1431,7 @@ pub struct SelectFromFolder<'gb> {
 // }
 
 fn handle_field_response(
-    column_data: &Result<Vec<String>, PlanetError>, 
+    column_data: &Result<Vec<String>, Vec<PlanetError>>, 
     errors: &Vec<PlanetError>, 
     column_id: &String,
     data: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
@@ -1446,7 +1448,9 @@ fn handle_field_response(
     let is_set = is_set.clone();
     if column_data.is_err() {
         let err = column_data.unwrap_err();
-        errors.push(err);
+        for error in err {
+            errors.push(error);
+        }
     } else {
         let column_data = column_data.unwrap().clone();
         if is_set == FALSE.to_string() {
@@ -1479,7 +1483,8 @@ pub fn resolve_data_statement(
     env: &Environment,
     space_data: &SpaceDatabase,
     statement_text: &String, 
-    response_wrap: Option<Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>>>
+    response_wrap: Option<Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>>>,
+    mode: &StatementCallMode
 ) -> Option<Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>>> {
     let response_wrap = response_wrap.clone();
     if response_wrap.is_some() {
@@ -1491,8 +1496,19 @@ pub fn resolve_data_statement(
     let check = expr.is_match(&statement_text);
     if check {
         let stmt = InsertIntoFolderStatement{};
-        let response = stmt.run(env, &space_data, statement_text);
-        return Some(response);
+        match mode {
+            StatementCallMode::Run => {
+                let response = stmt.run(env, &space_data, statement_text);
+                return Some(response);        
+            }
+            StatementCallMode::Compile => {
+                let response = stmt.compile(statement_text);
+                if response.is_err() {
+                    let errors = response.unwrap_err();
+                    return Some(Err(errors))
+                }
+            }
+        }
     }
     return None
 }

@@ -5,6 +5,7 @@ pub mod date;
 pub mod reference;
 pub mod structure;
 pub mod media;
+pub mod processing;
 
 use std::collections::{BTreeMap, HashMap};
 use std::str::FromStr;
@@ -12,9 +13,10 @@ use tr::tr;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
 
-use crate::planet::{PlanetError};
+use crate::planet::{PlanetError, Environment};
 use crate::storage::folder::{DbData, TreeFolder};
 use crate::planet::constants::*;
+use crate::storage::space::SpaceDatabase;
 use crate::statements::folder::schema::*;
 
 /*
@@ -55,11 +57,8 @@ Table fields
 * StatsColumn                     [done]: Statistics on linked fields with formula support: AVERAGE, 
 COUNT, COUNTA, COUNTALL, SUM, MAX, AND, OR, XOR, CONCATENATE. I execute these formulas once I post 
 processed the links and references. I would need to parse in a way to use those number functions.
-* FileColumn                      [doing] - Custom file and image management with IPFS. I add many.
-
--
-
-* CommandColumn                   [todo]: This does processing for complex cases, like image manipulation
+* FileColumn                      [done] - Custom file and image management with IPFS. I add many.
+* StatementColumn                 [doing]: This does processing for complex cases, like image manipulation
 
 Above fields gives us what we need as EXCEL functions into the formula field. Formula can provide a 
 combination of these function fields, which are not needed.
@@ -87,7 +86,27 @@ pub trait StorageColumn {
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError>;
-    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, PlanetError>;
+    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, Vec<PlanetError>>;
+    fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String;
+}
+
+pub trait EnvDbStorageColumn {
+    fn create_config(
+        &mut self, 
+        field_config_map: &BTreeMap<String, String>,
+        env: &Environment,
+        space_database: &SpaceDatabase
+    ) -> Result<BTreeMap<String, String>, PlanetError>;
+    fn get_config(
+        &mut self, 
+        field_config_map: &BTreeMap<String, String>,
+    ) -> Result<ColumnConfig, PlanetError>;
+    fn validate(
+        &self, 
+        data: &Vec<String>,
+        env: &Environment,
+        space_database: &SpaceDatabase
+    ) -> Result<Vec<String>, Vec<PlanetError>>;
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String;
 }
 
@@ -100,6 +119,24 @@ pub trait StorageColumnBasic {
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError>;
+    fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String;
+}
+
+pub trait ObjectStorageColumn<'gb> {
+    fn create_config(
+        &mut self, 
+        field_config_map: &BTreeMap<String, String>,
+        properties_map: &HashMap<String, ColumnConfig>,
+        table_name: &String,
+    ) -> Result<BTreeMap<String, String>, PlanetError>;
+    fn get_config(
+        &mut self, 
+        field_config_map: &BTreeMap<String, String>,
+    ) -> Result<ColumnConfig, PlanetError>;
+    fn validate(
+        &self, 
+        data: &Vec<String>, 
+    ) -> Result<Vec<String>, Vec<PlanetError>>;
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String;
 }
 
@@ -159,24 +196,6 @@ pub fn validate_set(config: &ColumnConfig, data: &Vec<String>) -> Result<(), Pla
     return Ok(())
 }
 
-pub trait ObjectStorageColumn<'gb> {
-    fn create_config(
-        &mut self, 
-        field_config_map: &BTreeMap<String, String>,
-        properties_map: &HashMap<String, ColumnConfig>,
-        table_name: &String,
-    ) -> Result<BTreeMap<String, String>, PlanetError>;
-    fn get_config(
-        &mut self, 
-        field_config_map: &BTreeMap<String, String>,
-    ) -> Result<ColumnConfig, PlanetError>;
-    fn validate(
-        &self, 
-        data: &Vec<String>, 
-    ) -> Result<Vec<String>, PlanetError>;
-    fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String;
-}
-
 pub trait FormulaStorageColumn {
     fn create_config(
         &mut self, 
@@ -190,7 +209,7 @@ pub trait FormulaStorageColumn {
         &mut self, 
         field_config_map: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError>;
-    fn validate(&self, data: &String) -> Result<String, PlanetError>;
+    fn validate(&self, data: &String) -> Result<String, Vec<PlanetError>>;
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String;
 }
 

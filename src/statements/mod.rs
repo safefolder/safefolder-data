@@ -23,6 +23,11 @@ lazy_static! {
     pub static ref RE_DATA_LONG_TEXT: Regex = Regex::new(r#"(?P<Text>"""[\s\S\n\t][^"""]+""")"#).unwrap();
 }
 
+pub enum StatementCallMode {
+    Run,
+    Compile
+}
+
 pub struct StatementResponse {
     pub status: String,
     pub status_code: usize,
@@ -95,11 +100,12 @@ pub struct StatementRunner {
 
 impl StatementRunner {
 
-    pub fn run(
+    pub fn call(
         &self,
         env: &Environment,
         space_database: Option<SpaceDatabase>,
         statement_text: &String, 
+        mode: &StatementCallMode
     ) -> Result<String, Vec<PlanetError>> {
         let space_data: SpaceDatabase;
         let context = env.context;
@@ -128,8 +134,8 @@ impl StatementRunner {
         let mut response_str = String::from("");
         let mut response_wrap: Option<Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>>> = None;
         // Process all statements from all modules
-        response_wrap = resolve_schema_statement(env, &space_data, statement_text, response_wrap);
-        response_wrap = resolve_data_statement(env, &space_data, statement_text, response_wrap);
+        response_wrap = resolve_schema_statement(env, &space_data, statement_text, response_wrap, mode);
+        response_wrap = resolve_data_statement(env, &space_data, statement_text, response_wrap, mode);
         if response_wrap.is_none() {
             let error = PlanetError::new(
                 500, 
@@ -142,7 +148,7 @@ impl StatementRunner {
         let response = response_wrap.unwrap();
         if response.is_ok() {
             // TODO: Implement for JSON and XML
-            let response_list = response.unwrap();            
+            let response_list = response.unwrap();
             for response in response_list {
                 let mut emitter = yaml_rust::YamlEmitter::new(&mut response_str);
                 emitter.dump(&response).unwrap();

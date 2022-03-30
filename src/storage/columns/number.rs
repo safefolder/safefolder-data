@@ -48,13 +48,15 @@ impl StorageColumn for CheckBoxColumn {
         // No special attributes so far for small text field
         return Ok(config)
     }
-    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, PlanetError> {
+    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, Vec<PlanetError>> {
         let data = data.clone();
         let field_config = self.config.clone();
         let set_validate = validate_set(&field_config, &data);
         if set_validate.is_err() {
             let error = set_validate.unwrap_err();
-            return Err(error)
+            let mut errors: Vec<PlanetError> = Vec::new();
+            errors.push(error);
+            return Err(errors)
         }
         let required = field_config.required.unwrap();
         let name = field_config.name.unwrap();
@@ -62,15 +64,16 @@ impl StorageColumn for CheckBoxColumn {
         for data_item in data {
             // eprintln!("CheckBoxColumn.is_valid :: value: {:?}", &value);
             if data_item == String::from("") && required == true {
-                return Err(
-                    PlanetError::new(
-                        500, 
-                        Some(tr!(
-                            "Field {}{}{} is required", 
-                            String::from("\"").blue(), name.blue(), String::from("\"").blue()
-                        )),
-                    )
+                let error = PlanetError::new(
+                    500, 
+                    Some(tr!(
+                        "Field {}{}{} is required", 
+                        String::from("\"").blue(), name.blue(), String::from("\"").blue()
+                    )),
                 );
+                let mut errors: Vec<PlanetError> = Vec::new();
+                errors.push(error);
+                return Err(errors);
             } else {
                 let value_str = data_item.as_str();
                 // eprintln!("CheckBoxColumn.is_valid :: value_str: {:?}", &value_str);
@@ -78,12 +81,13 @@ impl StorageColumn for CheckBoxColumn {
                     // return Ok(data);
                     data_new.push(data_item);
                 } else {
-                    return Err(
-                        PlanetError::new(
-                            500, 
-                            Some(tr!("Checkbox value needs to be \"true\" or \"false\"")),
-                        )
+                    let error = PlanetError::new(
+                        500, 
+                        Some(tr!("Checkbox value needs to be \"true\" or \"false\"")),
                     );
+                    let mut errors: Vec<PlanetError> = Vec::new();
+                    errors.push(error);
+                    return Err(errors);
                 }
             }
         }
@@ -137,13 +141,15 @@ impl StorageColumn for NumberColumn {
         // No special attributes so far for small text field
         return Ok(config)
     }
-    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, PlanetError> {
+    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, Vec<PlanetError>> {
         let data = data.clone();
         let field_config = self.config.clone();
         let set_validate = validate_set(&field_config, &data);
         if set_validate.is_err() {
             let error = set_validate.unwrap_err();
-            return Err(error)
+            let mut errors: Vec<PlanetError> = Vec::new();
+            errors.push(error);
+            return Err(errors)
         }
         let required = *&field_config.required.unwrap();
         let name = &field_config.clone().name.unwrap().clone();
@@ -152,15 +158,16 @@ impl StorageColumn for NumberColumn {
         let maximum = field_config.maximum.as_ref();
         for data_item in data {
             if data_item == String::from("") && required == true {
-                return Err(
-                    PlanetError::new(
-                        500, 
-                        Some(tr!(
-                            "Field {}{}{} is required", 
-                            String::from("\"").blue(), name.blue(), String::from("\"").blue()
-                        )),
-                    )
+                let error = PlanetError::new(
+                    500, 
+                    Some(tr!(
+                        "Field {}{}{} is required", 
+                        String::from("\"").blue(), name.blue(), String::from("\"").blue()
+                    )),
                 );
+                let mut errors: Vec<PlanetError> = Vec::new();
+                errors.push(error);
+                return Err(errors);
             } else {
                 let value_str = data_item.as_str();
                 let result = i32::from_str(value_str);
@@ -171,41 +178,44 @@ impl StorageColumn for NumberColumn {
                             let minimum = minimum.unwrap();
                             let minimum: usize = FromStr::from_str(&minimum).unwrap();
                             if value_int < minimum {
-                                return Err(
-                                    PlanetError::new(
-                                        500, 
-                                        Some(tr!(
-                                            "Number value \"{}\" is smaller than minimum, \"{}\"", 
-                                            &value_int, &minimum
-                                        )),
-                                    )
+                                let error = PlanetError::new(
+                                    500, 
+                                    Some(tr!(
+                                        "Number value \"{}\" is smaller than minimum, \"{}\"", 
+                                        &value_int, &minimum
+                                    )),
                                 );
+                                let mut errors: Vec<PlanetError> = Vec::new();
+                                errors.push(error);
+                                return Err(errors);
                             }
                         }
                         if maximum.is_some() {
                             let maximum = maximum.unwrap();
                             let maximum: usize = FromStr::from_str(&maximum).unwrap();
                             if value_int > maximum {
-                                return Err(
-                                    PlanetError::new(
-                                        500, 
-                                        Some(tr!(
-                                            "Number value \"{}\" is bigger than maximum, \"{}\"", 
-                                            &value_int, &maximum
-                                        )),
-                                    )
+                                let error = PlanetError::new(
+                                    500, 
+                                    Some(tr!(
+                                        "Number value \"{}\" is bigger than maximum, \"{}\"", 
+                                        &value_int, &maximum
+                                    )),
                                 );
+                                let mut errors: Vec<PlanetError> = Vec::new();
+                                errors.push(error);
+                                return Err(errors);
                             }
                         }
                         data_new.push(data_item);
                     },
                     Err(_) => {
-                        return Err(
-                            PlanetError::new(
-                                500, 
-                                Some(tr!("I could not process as number: \"{}\"", &data_item)),
-                            )
+                        let error = PlanetError::new(
+                            500, 
+                            Some(tr!("I could not process as number: \"{}\"", &data_item)),
                         );
+                        let mut errors: Vec<PlanetError> = Vec::new();
+                        errors.push(error);
+                        return Err(errors);
                     }
                 }
             }
@@ -283,29 +293,32 @@ impl StorageColumn for CurrencyColumn {
         }
         return Ok(config)
     }
-    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, PlanetError> {
+    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, Vec<PlanetError>> {
         let data = data.clone();
         let config = self.config.clone();
         let set_validate = validate_set(&config, &data);
         if set_validate.is_err() {
             let error = set_validate.unwrap_err();
-            return Err(error)
+            let mut errors: Vec<PlanetError> = Vec::new();
+            errors.push(error);
+            return Err(errors)
         }
         let column_name = config.name.unwrap_or_default();
         let number_decimals = config.number_decimals;
         let currency_symbol = config.currency_symbol;
         if number_decimals.is_none() {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(
-                        tr!(
-                            "Column \"{}\" not configured for currency, number decimals not configured.", 
-                            &column_name
-                        )
-                    ),
-                )
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!(
+                        "Column \"{}\" not configured for currency, number decimals not configured.", 
+                        &column_name
+                    )
+                ),
             );
+            let mut errors: Vec<PlanetError> = Vec::new();
+            errors.push(error);
+            return Err(errors);
         }
         let number_decimals = number_decimals.unwrap();
         let number_decimals: u32 = number_decimals.to_u32().unwrap();
@@ -317,12 +330,13 @@ impl StorageColumn for CurrencyColumn {
             let match_data = data_item.clone();
             let is_valid = expr.is_match(&match_data);
             if !is_valid {
-                return Err(
-                    PlanetError::new(
-                        500, 
-                        Some(tr!("Validation error on currency \"{}\"", data_item.clone())),
-                    )
+                let error = PlanetError::new(
+                    500, 
+                    Some(tr!("Validation error on currency \"{}\"", data_item.clone())),
                 );
+                let mut errors: Vec<PlanetError> = Vec::new();
+                errors.push(error);
+                return Err(errors);
             }
             let captures = expr.captures(&match_data).unwrap();
             let amount_wrap = captures.name("amount");
@@ -353,12 +367,13 @@ impl StorageColumn for CurrencyColumn {
                 // format amount to have number decimals from config
                 let amount = Decimal::from_str(amount_str);
                 if amount.is_err() {
-                    return Err(
-                        PlanetError::new(
-                            500, 
-                            Some(tr!("Validation error on currency \"{}\"", data_item.clone())),
-                        )
+                    let error = PlanetError::new(
+                        500, 
+                        Some(tr!("Validation error on currency \"{}\"", data_item.clone())),
                     );
+                    let mut errors: Vec<PlanetError> = Vec::new();
+                    errors.push(error);
+                    return Err(errors);
                 }
                 let amount = amount.unwrap().round_dp(number_decimals);
                 // amount_string = amount.to_string();
@@ -430,23 +445,26 @@ impl StorageColumn for PercentageColumn {
         }
         return Ok(config)
     }
-    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, PlanetError> {
+    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, Vec<PlanetError>> {
         let data = data.clone();
         let config = self.config.clone();
         let set_validate = validate_set(&config, &data);
         if set_validate.is_err() {
             let error = set_validate.unwrap_err();
-            return Err(error)
+            let mut errors: Vec<PlanetError> = Vec::new();
+            errors.push(error);
+            return Err(errors)
         }
         let column_name = config.name.unwrap_or_default();
         let number_decimals = config.number_decimals;
         if number_decimals.is_none() {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!("Column not configured for percentage \"{}\"", &column_name)),
-                )
-            );            
+            let error = PlanetError::new(
+                500, 
+                Some(tr!("Column not configured for percentage \"{}\"", &column_name)),
+            );
+            let mut errors: Vec<PlanetError> = Vec::new();
+            errors.push(error);
+            return Err(errors);
         }
         let number_decimals = number_decimals.unwrap();
         let number_decimals: u32 = number_decimals.to_u32().unwrap();
@@ -456,12 +474,13 @@ impl StorageColumn for PercentageColumn {
             // format amount to have number decimals from config
             let amount = Decimal::from_str(amount_str);
             if amount.is_err() {
-                return Err(
-                    PlanetError::new(
-                        500, 
-                        Some(tr!("Validation error on percentage \"{}\"", data_item.clone())),
-                    )
+                let error = PlanetError::new(
+                    500, 
+                    Some(tr!("Validation error on percentage \"{}\"", data_item.clone())),
                 );
+                let mut errors: Vec<PlanetError> = Vec::new();
+                errors.push(error);
+                return Err(errors);
             }
             let amount = amount.unwrap().round_dp(number_decimals);
             let number_decimals = number_decimals.to_usize().unwrap();
@@ -527,7 +546,7 @@ impl StorageColumn for GenerateNumberColumn {
         }
         return Ok(config)
     }
-    fn validate(&self, _data: &Vec<String>) -> Result<Vec<String>, PlanetError> {
+    fn validate(&self, _data: &Vec<String>) -> Result<Vec<String>, Vec<PlanetError>> {
         let config = self.config.clone();
         let mut folder = self.folder.clone().unwrap();
         let db_folder = self.db_folder.clone().unwrap();
@@ -565,12 +584,13 @@ impl StorageColumn for GenerateNumberColumn {
                 return Ok(sequence_list)
             }
         }
-        return Err(
-            PlanetError::new(
-                500, 
-                Some(tr!("Error generating new number for column \"{}\".", &column_name)),
-            )
-        )
+        let error = PlanetError::new(
+            500, 
+            Some(tr!("Error generating new number for column \"{}\".", &column_name)),
+        );
+        let mut errors: Vec<PlanetError> = Vec::new();
+        errors.push(error);
+        return Err(errors)
     }
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
         let field_config = self.config.clone();
@@ -642,13 +662,15 @@ impl StorageColumn for RatingColumn {
         }
         return Ok(config)
     }
-    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, PlanetError> {
+    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, Vec<PlanetError>> {
         let config = self.config.clone();
         let data = data.clone();
         let set_validate = validate_set(&config, &data);
         if set_validate.is_err() {
             let error = set_validate.unwrap_err();
-            return Err(error)
+            let mut errors: Vec<PlanetError> = Vec::new();
+            errors.push(error);
+            return Err(errors)
         }
         let column_name = config.name.unwrap_or_default();
         let minimum = config.minimum.as_ref();
@@ -657,41 +679,44 @@ impl StorageColumn for RatingColumn {
         for data_item in data {
             let test = &data_item.parse::<f64>();
             if test.is_err() {
-                return Err(
-                    PlanetError::new(
-                        500, 
-                        Some(tr!("Column value {} for column \"{}\" is not a number.", 
-                        &data_item, &column_name)),
-                    )
-                )
+                let error = PlanetError::new(
+                    500, 
+                    Some(tr!("Column value {} for column \"{}\" is not a number.", 
+                    &data_item, &column_name)),
+                );
+                let mut errors: Vec<PlanetError> = Vec::new();
+                errors.push(error);
+                return Err(errors)
             }
             let data_int: usize = FromStr::from_str(&data_item).unwrap();
             if minimum.is_some() {
                 let minimum = minimum.unwrap();
                 let minimum: usize = FromStr::from_str(&minimum).unwrap();
                 if data_int < minimum {
-                    return Err(
-                        PlanetError::new(
-                            500, 
-                            Some(tr!(
-                                "Rating for column \"{}\" is lower than minimum, {}.", 
-                                &column_name, &minimum)),
-                        )
-                    )
+                    let error = PlanetError::new(
+                        500, 
+                        Some(tr!(
+                            "Rating for column \"{}\" is lower than minimum, {}.", 
+                            &column_name, &minimum)),
+                    );
+                    let mut errors: Vec<PlanetError> = Vec::new();
+                    errors.push(error);
+                    return Err(errors)
                 }
             }
             if maximum.is_some() {
                 let maximum = maximum.unwrap();
                 let maximum: usize = FromStr::from_str(&maximum).unwrap();
                 if data_int > maximum {
-                    return Err(
-                        PlanetError::new(
-                            500, 
-                            Some(tr!(
-                                "Rating for column \"{}\" is higher than maximum, {}.", 
-                                &column_name, &maximum)),
-                        )
-                    )
+                    let error = PlanetError::new(
+                        500, 
+                        Some(tr!(
+                            "Rating for column \"{}\" is higher than maximum, {}.", 
+                            &column_name, &maximum)),
+                    );
+                    let mut errors: Vec<PlanetError> = Vec::new();
+                    errors.push(error);
+                    return Err(errors)
                 }
             }
             data_new.push(data_item);
@@ -834,33 +859,35 @@ impl StorageColumn for StatsColumn {
         }
         return Ok(config)
     }
-    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, PlanetError> {
+    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, Vec<PlanetError>> {
         let config = self.config.clone();
         let stats_function = config.stats_function;
         let related_column = self.config.related_column.clone().unwrap();
         let data_map = self.data_map.clone().unwrap();
         let field_config_map = self.field_config_map.clone();
         if field_config_map.is_none() {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!(
-                        "Init error for \"field_config_map\"."
-                    )),
-                )
-            )
+            let error = PlanetError::new(
+                500, 
+                Some(tr!(
+                    "Init error for \"field_config_map\"."
+                )),
+            );
+            let mut errors: Vec<PlanetError> = Vec::new();
+            errors.push(error);
+            return Err(errors)
         }
         let field_config_map = field_config_map.unwrap();
         let has_column = data_map.get(&related_column).is_some();
         if !has_column {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!(
-                        "Column object data has no column values for \"{}\".", &related_column
-                    )),
-                )
-            )
+            let error = PlanetError::new(
+                500, 
+                Some(tr!(
+                    "Column object data has no column values for \"{}\".", &related_column
+                )),
+            );
+            let mut errors: Vec<PlanetError> = Vec::new();
+            errors.push(error);
+            return Err(errors)
         }
         let folder_name = self.folder_name.clone().unwrap();
         let db_folder = self.db_folder.clone().unwrap();
@@ -908,14 +935,15 @@ impl StorageColumn for StatsColumn {
                         formula = format!("XOR({{{}}})", &related_column);
                     },
                     _ => {
-                        return Err(
-                            PlanetError::new(
-                                500, 
-                                Some(tr!(
-                                    "Stats function \"{}\" not allowed", &stats_function
-                                )),
-                            )
-                        )
+                        let error = PlanetError::new(
+                            500, 
+                            Some(tr!(
+                                "Stats function \"{}\" not allowed", &stats_function
+                            )),
+                        );
+                        let mut errors: Vec<PlanetError> = Vec::new();
+                        errors.push(error);
+                        return Err(errors)
                     }
                 }
                 let formula_compiled = Formula::defaults(
@@ -927,8 +955,22 @@ impl StorageColumn for StatsColumn {
                     Some(folder_name.clone()),
                     false,
                     None
-                )?;
-                let formula_result = execute_formula(&formula_compiled, &data_map, &field_config_map)?;
+                );
+                if formula_compiled.is_err() {
+                    let error = formula_compiled.unwrap_err();
+                    let mut errors: Vec<PlanetError> = Vec::new();
+                    errors.push(error);
+                    return Err(errors)
+                }
+                let formula_compiled = formula_compiled.unwrap();
+                let formula_result = execute_formula(&formula_compiled, &data_map, &field_config_map);
+                if formula_result.is_err() {
+                    let error = formula_result.unwrap_err();
+                    let mut errors: Vec<PlanetError> = Vec::new();
+                    errors.push(error);
+                    return Err(errors)
+                }
+                let formula_result = formula_result.unwrap();
                 data_new.push(formula_result);
             }
         }

@@ -86,7 +86,7 @@ impl FormulaColumn {
     pub fn validate(&self, 
         data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
         field_config_map: &BTreeMap<String, ColumnConfig>,
-    ) -> Result<Vec<String>, PlanetError> {
+    ) -> Result<Vec<String>, Vec<PlanetError>> {
         let config = self.config.clone();
         let field_config_map = field_config_map.clone();
         let data_map = data_map.clone();
@@ -97,17 +97,29 @@ impl FormulaColumn {
             let formula_compiled: Formula = serde_yaml::from_str(
                 formula_compiled_str.as_str()
             ).unwrap();
-            let formula_result = execute_formula(&formula_compiled, &data_map, &field_config_map)?;
+            let formula_result = execute_formula(
+                &formula_compiled, 
+                &data_map, 
+                &field_config_map
+            );
+            if formula_result.is_err() {
+                let error = formula_result.unwrap_err();
+                let mut errors: Vec<PlanetError> = Vec::new();
+                errors.push(error);
+                return Err(errors);
+            }
+            let formula_result = formula_result.unwrap();
             let mut list: Vec<String> = Vec::new();
             list.push(formula_result);
             return Ok(list);
         } else {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!("Formula not found on formula column")),
-                )
+            let error = PlanetError::new(
+                500, 
+                Some(tr!("Formula not found on formula column")),
             );
+            let mut errors: Vec<PlanetError> = Vec::new();
+            errors.push(error);
+            return Err(errors);
         }
     }
     pub fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {

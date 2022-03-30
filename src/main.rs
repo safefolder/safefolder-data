@@ -215,10 +215,11 @@ fn main() {
         let statement_runner = StatementRunner{
             response_format: StatementResponseFormat::YAML
         };
-        let result = statement_runner.run(
+        let result = statement_runner.call(
             &env, 
             None, 
-            &statement
+            &statement,
+            &StatementCallMode::Run
         );
         if result.is_ok() {
             let result = result.unwrap();

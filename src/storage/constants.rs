@@ -78,6 +78,7 @@ pub const OBJECT_SCHEMA: &str = "object_schema";
 pub const STATS_FUNCTION: &str = "stats_function";
 pub const MODE: &str = "mode";
 pub const CONTENT_TYPES: &str = "content_types";
+pub const STATEMENTS: &str = "statements";
 
 pub const CURRENCY_SYMBOL_DOLLAR: &str = "$";
 
@@ -110,6 +111,7 @@ pub const COLUMN_TYPE_SET: &str = "Set";
 pub const COLUMN_TYPE_OBJECT: &str = "Object";
 pub const COLUMN_TYPE_STATS: &str = "Stats";
 pub const COLUMN_TYPE_FILE: &str = "File";
+pub const COLUMN_TYPE_STATEMENT: &str = "Statement";
 
 // Date Format
 pub const DATE_FORMAT_FRIENDLY: &str = "Friendly";

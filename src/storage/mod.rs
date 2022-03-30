@@ -12,6 +12,7 @@ use crate::statements::folder::schema::*;
 use crate::storage::folder::{DbData, TreeFolder};
 use crate::planet::{PlanetError, Context, PlanetContext};
 use crate::planet::constants::*;
+use crate::storage::space::SpaceDatabase;
 
 pub trait ConfigStorageColumn {
     fn defaults(
@@ -28,7 +29,8 @@ pub trait ConfigStorageColumn {
         context: &Context,
         properties_map: &HashMap<String, ColumnConfig>,
         db_folder: &TreeFolder,
-        folder_name: &String
+        folder_name: &String,
+        space_database: &SpaceDatabase
     ) -> Result<BTreeMap<String, String>, PlanetError>;
     fn get_column_config_map(
         planet_context: &PlanetContext,

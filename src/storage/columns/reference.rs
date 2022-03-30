@@ -118,25 +118,33 @@ impl<'gb> ObjectStorageColumn<'gb> for LinkColumn<'gb> {
     fn validate(
         &self, 
         data: &Vec<String>, 
-    ) -> Result<Vec<String>, PlanetError> {
+    ) -> Result<Vec<String>, Vec<PlanetError>> {
         //eprintln!("LinkColumn.validate :: data: {:?}", data);
         let data = data.clone();
         let config = self.config.clone();
         let linked_folder_id = config.linked_folder_id.unwrap();
         let db_folder = self.db_folder.clone().unwrap();
         //eprintln!("LinkColumn.validate  :: linked_folder_id: {}", &linked_folder_id);
-        let folder = db_folder.get(&linked_folder_id)?;
+        let folder = db_folder.get(&linked_folder_id);
+        if folder.is_err() {
+            let error = folder.unwrap_err();
+            let mut errors: Vec<PlanetError> = Vec::new();
+            errors.push(error);
+            return Err(errors)
+        }
+        let folder = folder.unwrap();
         let folder_name = folder.name.unwrap();
         //eprintln!("LinkColumn.validate  :: folder_name: {}", &folder_name);
         let many = config.many.unwrap();
         //eprintln!("LinkColumn.validate  :: many: {}", &many);
         if many == false && data.len() > 1 {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!("Link is not configured for many items. Length items sent: {}", &data.len())),
-                )
+            let error = PlanetError::new(
+                500, 
+                Some(tr!("Link is not configured for many items. Length items sent: {}", &data.len())),
             );
+            let mut errors: Vec<PlanetError> = Vec::new();
+            errors.push(error);
+            return Err(errors);
         }
         let home_dir = self.planet_context.home_path.unwrap_or_default();
         let account_id = self.context.account_id.unwrap_or_default();
@@ -156,22 +164,29 @@ impl<'gb> ObjectStorageColumn<'gb> for LinkColumn<'gb> {
             &db_folder,
         );
         if result.is_err() {
-            return Err(
-                PlanetError::new(
-                    500, 
-                    Some(tr!("Folder by id: \"{}\" not found", &linked_folder_id)),
-                )
+            let error = PlanetError::new(
+                500, 
+                Some(tr!("Folder by id: \"{}\" not found", &linked_folder_id)),
             );
+            let mut errors: Vec<PlanetError> = Vec::new();
+            errors.push(error);
+            return Err(errors);
         }
         let mut db_folder_item = result.unwrap();
         // I will check I am able to fetch the link remote by id and fetch name
         for item_id in data.clone() {
             //eprintln!("LinkColumn.validate  :: item_id: {}", &item_id);
-            let _ = db_folder_item.get(
+            let item = db_folder_item.get(
                 &folder_name, 
                 GetItemOption::ById(item_id), 
                 None
-            )?;
+            );
+            if item.is_err() {
+                let error = item.unwrap_err();
+                let mut errors: Vec<PlanetError> = Vec::new();
+                errors.push(error);
+                return Err(errors)
+            }
         }
         return Ok(data);
     }
@@ -297,7 +312,7 @@ impl<'gb> ObjectStorageColumn<'gb> for ReferenceColumn<'gb> {
     fn validate(
         &self, 
         data: &Vec<String>, 
-    ) -> Result<Vec<String>, PlanetError> {
+    ) -> Result<Vec<String>, Vec<PlanetError>> {
         let data = data.clone();
         return Ok(data);
     }

@@ -121,14 +121,16 @@ impl StorageColumn for DateColumn {
         }
         return Ok(config)
     }
-    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, PlanetError> {
+    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, Vec<PlanetError>> {
         let config = self.config.clone();
         let date_string = data.clone();
         let data = data.clone();
         let set_validate = validate_set(&config, &date_string);
         if set_validate.is_err() {
             let error = set_validate.unwrap_err();
-            return Err(error)
+            let mut errors: Vec<PlanetError> = Vec::new();
+            errors.push(error);
+            return Err(errors)
         }
         // date and/or time with different formats
         let date_format = config.date_format;
@@ -199,12 +201,13 @@ impl StorageColumn for DateColumn {
             );
             if date_obj.is_err() {
                 // Raise validation error
-                return Err(
-                    PlanetError::new(
-                        500, 
-                        Some(tr!("Validation error on date \"{}\"", date_string.clone())),
-                    )
+                let error = PlanetError::new(
+                    500, 
+                    Some(tr!("Validation error on date \"{}\"", date_string.clone())),
                 );
+                let mut errors: Vec<PlanetError> = Vec::new();
+                errors.push(error);
+                return Err(errors);
             }
             data_new.push(date_string);
         }
@@ -253,13 +256,15 @@ impl StorageColumn for DurationColumn {
         let config = self.config.clone();
         return Ok(config)
     }
-    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, PlanetError> {
+    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, Vec<PlanetError>> {
         let data = data.clone();
         let config = self.config.clone();
         let set_validate = validate_set(&config, &data);
         if set_validate.is_err() {
             let error = set_validate.unwrap_err();
-            return Err(error)
+            let mut errors: Vec<PlanetError> = Vec::new();
+            errors.push(error);
+            return Err(errors)
         }
         // validate HH:MM[:SS.SSS]
         let expr = &RE_DURATION;
@@ -267,12 +272,13 @@ impl StorageColumn for DurationColumn {
         for data_item in data {
             let is_valid = expr.is_match(&data_item);
             if !is_valid {
-                return Err(
-                    PlanetError::new(
-                        500, 
-                        Some(tr!("Duration format is not valid: \"{}\"", &data_item)),
-                    )
+                let error = PlanetError::new(
+                    500, 
+                    Some(tr!("Duration format is not valid: \"{}\"", &data_item)),
                 );
+                let mut errors: Vec<PlanetError> = Vec::new();
+                errors.push(error);
+                return Err(errors);
             }
             let matches = expr.captures(&data_item).unwrap();
             let hour = matches.name("hour");
@@ -285,23 +291,25 @@ impl StorageColumn for DurationColumn {
             let micro_str: &str;
             let minute: i8 = FromStr::from_str(minute_str).unwrap();
             if minute > 60 {
-                return Err(
-                    PlanetError::new(
-                        500, 
-                        Some(tr!("Minutes needs to be less than 60: \"{}\"", &data_item)),
-                    )
+                let error = PlanetError::new(
+                    500, 
+                    Some(tr!("Minutes needs to be less than 60: \"{}\"", &data_item)),
                 );
+                let mut errors: Vec<PlanetError> = Vec::new();
+                errors.push(error);
+                return Err(errors);
             }
             if second.is_some() {
                 second_str = second.unwrap().as_str();
                 let second: i8 = FromStr::from_str(second_str).unwrap();
                 if second > 60 {
-                    return Err(
-                        PlanetError::new(
-                            500, 
-                            Some(tr!("Seconds needs to be less than 60: \"{}\"", &data_item)),
-                        )
+                    let error = PlanetError::new(
+                        500, 
+                        Some(tr!("Seconds needs to be less than 60: \"{}\"", &data_item)),
                     );
+                    let mut errors: Vec<PlanetError> = Vec::new();
+                    errors.push(error);
+                    return Err(errors);
                 }
             }
             let mut data_final = format!("{}:{}", hour_str, minute_str);
@@ -360,7 +368,7 @@ impl StorageColumn for AuditDateColumn {
         let config = self.config.clone();
         return Ok(config)
     }
-    fn validate(&self, _: &Vec<String>) -> Result<Vec<String>, PlanetError> {
+    fn validate(&self, _: &Vec<String>) -> Result<Vec<String>, Vec<PlanetError>> {
         let now = Utc::now();
         // 2021-12-18T12:14:15.528276533+00:00
         let now_str = now.to_rfc3339();
