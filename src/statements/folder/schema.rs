@@ -1567,6 +1567,7 @@ pub fn resolve_schema_statement(
     space_data: &SpaceDatabase,
     statement_text: &String, 
     response_wrap: Option<Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>>>,
+    column_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     mode: &StatementCallMode
 ) -> Option<Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>>> {
     let mode = mode.clone();
@@ -1575,6 +1576,9 @@ pub fn resolve_schema_statement(
         let response = response_wrap.unwrap();
         return Some(response)
     }
+    let column_map = column_map.clone();
+    let env = env.clone();
+    let statement_text = substitute_variables(statement_text, &env, column_map.clone());
     // CREATE FOLDER
     let expr = &RE_CREATE_FOLDER_MAIN;
     let check = expr.is_match(&statement_text);
@@ -1582,12 +1586,15 @@ pub fn resolve_schema_statement(
         let stmt = CreateFolderStatement{};
         match mode {
             StatementCallMode::Run => {
-                let response = stmt.run(env, &space_data, 
-                    statement_text);
+                let response = stmt.run(
+                    &env, 
+                    &space_data, 
+                    &statement_text,
+                );
                 return Some(response);
             },
             StatementCallMode::Compile => {
-                let response = stmt.compile(statement_text);
+                let response = stmt.compile(&statement_text);
                 if response.is_err() {
                     let errors = response.unwrap_err();
                     return Some(Err(errors))

@@ -103,9 +103,9 @@ pub trait EnvDbStorageColumn {
     ) -> Result<ColumnConfig, PlanetError>;
     fn validate(
         &self, 
-        data: &Vec<String>,
         env: &Environment,
-        space_database: &SpaceDatabase
+        space_database: &SpaceDatabase,
+        data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>, 
     ) -> Result<Vec<String>, Vec<PlanetError>>;
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String;
 }

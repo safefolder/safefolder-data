@@ -54,6 +54,7 @@ impl EnvDbStorageColumn for StatementColumn {
                         &env, 
                         Some(space_database.clone()), 
                         &statement_text.to_string(),
+                        None,
                         &StatementCallMode::Compile
                     );
                     if result.is_err() {
@@ -85,11 +86,10 @@ impl EnvDbStorageColumn for StatementColumn {
     }
     fn validate(
         &self, 
-        _data: &Vec<String>,
         env: &Environment,
-        space_database: &SpaceDatabase
+        space_database: &SpaceDatabase,
+        data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>, 
     ) -> Result<Vec<String>, Vec<PlanetError>> {
-        // let data = data.clone();
         let env = env.clone();
         let space_database = space_database.clone();
         let config = self.config.clone();
@@ -112,6 +112,7 @@ impl EnvDbStorageColumn for StatementColumn {
                         &env, 
                         Some(space_database.clone()), 
                         &statement_text.to_string(),
+                        Some(data_map.clone()),
                         &StatementCallMode::Run
                     );
                     if result.is_err() {
@@ -121,7 +122,7 @@ impl EnvDbStorageColumn for StatementColumn {
                         }
                     } else {
                         let response = result.unwrap();
-                        responses.push(response);    
+                        responses.push(response);
                     }
                 }
             }

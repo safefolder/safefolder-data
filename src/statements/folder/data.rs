@@ -24,12 +24,13 @@ use crate::planet::{
     Context,
     Environment,
 };
-use crate::storage::columns::{text::*, StorageColumn, ObjectStorageColumn};
+use crate::storage::columns::{text::*, StorageColumn, ObjectStorageColumn, EnvDbStorageColumn};
 use crate::storage::columns::number::*;
 use crate::storage::columns::date::*;
 use crate::storage::columns::formula::*;
 use crate::storage::columns::reference::*;
 use crate::storage::columns::structure::*;
+use crate::storage::columns::processing::*;
 use crate::storage::columns::media::*;
 
 lazy_static! {
@@ -269,6 +270,10 @@ impl<'gb> Statement<'gb> for InsertIntoFolderStatement {
         let space_database = space_database.clone();
         let context = env.context;
         let planet_context = env.planet_context;
+        let env = Environment{
+            context: context,
+            planet_context: planet_context
+        };
         let t_1 = Instant::now();
         let statements = self.compile(statement_text);
         if statements.is_err() {
@@ -799,6 +804,25 @@ impl<'gb> Statement<'gb> for InsertIntoFolderStatement {
                             }
                             let language_code = result_lang.unwrap();
                             data.insert(column_id.clone(), build_value_list(&language_code));
+                        } else if column_type == COLUMN_TYPE_STATEMENT {
+                            let obj = StatementColumn::defaults(&column_config_);
+                            let result_stmt = obj.validate(
+                                &env, 
+                                &space_database, 
+                                &data
+                            );
+                            if result_stmt.is_err() {
+                                let errors_ = result_stmt.clone().unwrap_err();
+                                errors.extend(errors_);
+                            }
+                            let result_stmt = result_stmt.unwrap();
+                            let mut list_value: Vec<BTreeMap<String, String>> = Vec::new();
+                            for item in result_stmt {
+                                let mut map: BTreeMap<String, String> = BTreeMap::new();
+                                map.insert(VALUE.to_string(), item);
+                                list_value.push(map);
+                            }
+                            data.insert(column_id.clone(), list_value);
                         }
                     }
                     if errors.len() > 0 {
@@ -1484,6 +1508,7 @@ pub fn resolve_data_statement(
     space_data: &SpaceDatabase,
     statement_text: &String, 
     response_wrap: Option<Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>>>,
+    column_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     mode: &StatementCallMode
 ) -> Option<Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>>> {
     let response_wrap = response_wrap.clone();
@@ -1491,6 +1516,7 @@ pub fn resolve_data_statement(
         let response = response_wrap.unwrap();
         return Some(response)
     }
+    let statement_text = substitute_variables(statement_text, &env, column_map.clone());
     // INSERT INTO FOLDER
     let expr = &RE_INSERT_INTO_FOLDER_MAIN;
     let check = expr.is_match(&statement_text);
@@ -1498,11 +1524,15 @@ pub fn resolve_data_statement(
         let stmt = InsertIntoFolderStatement{};
         match mode {
             StatementCallMode::Run => {
-                let response = stmt.run(env, &space_data, statement_text);
-                return Some(response);        
+                let response = stmt.run(
+                    env, 
+                    &space_data, 
+                    &statement_text,
+                );
+                return Some(response);
             }
             StatementCallMode::Compile => {
-                let response = stmt.compile(statement_text);
+                let response = stmt.compile(&statement_text);
                 if response.is_err() {
                     let errors = response.unwrap_err();
                     return Some(Err(errors))

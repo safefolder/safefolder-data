@@ -21,6 +21,7 @@ lazy_static! {
     pub static ref RE_WITH_OPTIONS: Regex = Regex::new(r#"(?P<Name>\w+)=(?P<Value>(\d)|(true|false|True|False)|([a-zA-Z0-9{}|]+)|([\s\S]+)|("[\w\s]+)")"#).unwrap();
     pub static ref RE_OPTION_LIST_ITEMS: Regex = Regex::new(r#"(?P<Item>((\d+)|([a-zA-Z0-9]+)|(true|false|True|False)|(---\\n[\S\s]+)|(null)))"#).unwrap();
     pub static ref RE_DATA_LONG_TEXT: Regex = Regex::new(r#"(?P<Text>"""[\s\S\n\t][^"""]+""")"#).unwrap();
+    pub static ref RE_STMT_VARIABLES: Regex = Regex::new(r#"(?P<Var>{[\w\s.]+})"#).unwrap();
 }
 
 pub enum StatementCallMode {
@@ -105,11 +106,13 @@ impl StatementRunner {
         env: &Environment,
         space_database: Option<SpaceDatabase>,
         statement_text: &String, 
-        mode: &StatementCallMode
+        column_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
+        mode: &StatementCallMode,
     ) -> Result<String, Vec<PlanetError>> {
         let space_data: SpaceDatabase;
         let context = env.context;
         let planet_context = env.planet_context;
+        let column_map = column_map.clone();
 
         if space_database.is_none() {
             let site_id = context.site_id;
@@ -134,8 +137,12 @@ impl StatementRunner {
         let mut response_str = String::from("");
         let mut response_wrap: Option<Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>>> = None;
         // Process all statements from all modules
-        response_wrap = resolve_schema_statement(env, &space_data, statement_text, response_wrap, mode);
-        response_wrap = resolve_data_statement(env, &space_data, statement_text, response_wrap, mode);
+        response_wrap = resolve_schema_statement(
+            env, &space_data, statement_text, response_wrap, column_map.clone(), mode
+        );
+        response_wrap = resolve_data_statement(
+            env, &space_data, statement_text, response_wrap, column_map.clone(), mode
+        );
         if response_wrap.is_none() {
             let error = PlanetError::new(
                 500, 
@@ -400,4 +407,59 @@ impl WithOptions {
         }
         return String::from("");
     }
+}
+
+pub fn substitute_variables(
+    statement_text: &String, 
+    env: &Environment, 
+    column_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>
+) -> String {
+    let env = env.clone();
+    let context = env.context;
+    let column_map_wrap = column_map.clone();
+    let column_map: BTreeMap<String, Vec<BTreeMap<String, String>>>;
+    if column_map_wrap.is_some() {
+        column_map = column_map_wrap.unwrap();
+    } else {
+        column_map = BTreeMap::new();
+    }
+    let mut statement_text = statement_text.clone();
+    let statement_str = statement_text.clone();
+    let statement_str = statement_str.as_str();
+    let expr = &RE_STMT_VARIABLES;
+    let variables = expr.captures_iter(statement_str);
+    for variable in variables {
+        // Check variable is included in column map or contexts and replace by value
+        let var = variable.name("Var");
+        if var.is_some() {
+            let var = var.unwrap().as_str();
+            let to_replace = format!("{{{}}}", var);
+            let to_replace = to_replace.as_str();
+            // Column map in case of statements used in statement column
+            if column_map.len() != 0 {
+                let map_var = column_map.get(var);
+                if map_var.is_some() {
+                    let map_var = map_var.unwrap();
+                    for map in map_var {
+                        let value = map.get(VALUE);
+                        if value.is_some() {
+                            let value = value.unwrap();
+                            statement_text = statement_text.replace(to_replace, value.as_str());
+                        }
+                    }
+                }
+            }
+            // Context
+            let ctx_data = context.data.clone();
+            if ctx_data.is_some() {
+                let ctx_data = ctx_data.unwrap().clone();
+                let ctx_item = ctx_data.get(var);
+                if ctx_item.is_some() {
+                    let ctx_item = ctx_item.unwrap().clone();
+                    statement_text = statement_text.replace(to_replace, ctx_item.as_str());
+                }
+            }
+        }
+    }
+    return statement_text
 }

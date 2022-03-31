@@ -219,6 +219,7 @@ fn main() {
             &env, 
             None, 
             &statement,
+            None,
             &StatementCallMode::Run
         );
         if result.is_ok() {
