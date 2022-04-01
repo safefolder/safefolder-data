@@ -8,6 +8,7 @@ use std::time::Instant;
 use tr::tr;
 use regex::Regex;
 use lazy_static::lazy_static;
+use colored::Colorize;
 
 use crate::statements::folder::config::*;
 use crate::storage::constants::*;
@@ -500,8 +501,8 @@ impl<'gb> Statement<'gb> for InsertIntoFolderStatement {
                         if is_set_wrap.is_some() {
                             is_set = is_set_wrap.unwrap();
                         }                    
-                        eprintln!("InsertIntoFolder.run :: column_type: {} is_set: {}", column_type, &is_set);
                         let column_name = column.name.unwrap();
+                        eprintln!("InsertIntoFolder.run :: [{}] column_type: {} is_set: {}", &column_name, column_type, &is_set);
                         // I always have a column id
                         let column_id = column.id.unwrap_or_default();
                         
@@ -521,6 +522,25 @@ impl<'gb> Statement<'gb> for InsertIntoFolderStatement {
                         }
                         // eprintln!("InsertIntoFolder.run :: column_data: {:?}", &column_data);
                         // In case we don't have any value and is system generated we skip
+                        let required_wrap = &column_config.required;
+                        let required: bool;
+                        if required_wrap.is_some() {
+                            required = required_wrap.unwrap();
+                        } else {
+                            required = false;
+                        }
+                        // eprintln!("InsertIntoFolder.run :: column_data: {:?} required: {}", &column_data, &required);
+                        if required && column_data.is_none() {
+                            let error = PlanetError::new(
+                                500, 
+                                Some(tr!(
+                                    "Field {}{}{} is required", 
+                                    String::from("\"").blue(), &column_name.blue(), String::from("\"").blue()
+                                )),
+                            );
+                            errors.push(error);
+                            continue
+                        }
                         if column_data.is_none() &&
                             (
                                 column_type != COLUMN_TYPE_FORMULA && 
