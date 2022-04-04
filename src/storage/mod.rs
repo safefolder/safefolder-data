@@ -7,7 +7,6 @@ pub mod space;
 
 use std::collections::{BTreeMap,HashMap};
 
-use validator::{ValidationErrors};
 use crate::statements::folder::schema::*;
 use crate::storage::folder::{DbData, TreeFolder};
 use crate::planet::{PlanetError, Context, PlanetContext};
@@ -19,7 +18,6 @@ pub trait ConfigStorageColumn {
         options: Option<Vec<String>>
     ) -> ColumnConfig;
     fn version() -> Option<String>;
-    fn is_valid(&self) -> Result<(), ValidationErrors>;
     fn generate_id() -> Option<String> {
         return generate_id();
     }

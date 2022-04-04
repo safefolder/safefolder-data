@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::time::Instant;
 use yaml_rust;
 use serde_yaml;
-use validator::{Validate, ValidationErrors, ValidationError};
+use validator::{Validate, ValidationError};
 use lazy_static::lazy_static;
 
 use tr::tr;
@@ -17,7 +17,7 @@ use crate::statements::folder::config::{
 };
 use crate::statements::*;
 use crate::statements::{Statement, StatementCallMode};
-use crate::storage::folder::{TreeFolder, FolderSchema, DbData, RoutingData, build_value_list};
+use crate::storage::folder::{TreeFolder, FolderSchema, DbData, RoutingData, build_value_list, DbDataMini};
 use crate::storage::space::{SpaceDatabase};
 use crate::planet::{
     PlanetContext, 
@@ -48,6 +48,7 @@ use crate::storage::columns::{
 lazy_static! {
     pub static ref RE_CREATE_FOLDER_MAIN: Regex = Regex::new(r#"CREATE[\s]+FOLDER[\s]+"*(?P<FolderName>[\w\s]+)"*\s+\([\n\t\s]*(?P<Config>.[^)]+),*\);"#).unwrap();
     pub static ref RE_CREATE_FOLDER_CONFIG: Regex = Regex::new(r#"([\s]*LANGUAGE (?P<Language>spanish|english|french|german|italian|portuguese|norwegian|swedish|danish),*)|([\s]*NAME COLUMN (?P<NameConfig>(SmallText|LongText|Number|Currency|Percentage|GenerateNumber|Phone|Email|Url|Rating)),*)|([\s]*("(?P<Column>[\w\s]+)")[\s]+(?P<ColumnType>SmallText|LongText|Checkbox|Number|Select|Currency|Percentage|GenerateNumber|Phone|Email|Url|Rating|Object|File|Date|Formula|Duration|CreatedTime|LastModifiedTime|CreatedBy|LastModifiedBy|Link|Reference|Language|GenerateId|Stats))([\s]*[WITH]*[\s]*(?P<Options>[\w\s"\$=\{\}\|]*)),|([\s]*SUB FOLDER (?P<SubFolderName>[\w\s]+)),|([\s]*SUB FOLDER (?P<SubFolderNameAlt>[\w\s]+) WITH (?P<SubFolderOptions>[\w\s"\$=\{\}\|]*)),|([\s]*SEARCH RELEVANCE WITH (?P<SearchRelevanceOptions>[\w\s"\$=\{\}\|]*)),"#).unwrap();
+    pub static ref RE_LIST_FOLDERS: Regex = Regex::new(r#"LIST FOLDERS;"#).unwrap();
 }
 
 pub const WITH_PARENT: &str = "Parent";
@@ -206,15 +207,6 @@ impl ConfigStorageColumn for ColumnConfig {
     }
     fn version() -> Option<String> {
         return Some(String::from(FIELD_VERSION));
-    }
-    /// Checks that ColumnConfig passes validations
-    fn is_valid(&self) -> Result<(), ValidationErrors> {
-        match self.validate() {
-            Ok(_) => return Ok(()),
-            Err(errors) => {
-                return Err(errors);
-            },
-        };
     }
     fn get_name_column(db_data: &DbData) -> Option<ColumnConfig> {
         let db_data = db_data.clone();
@@ -1541,6 +1533,108 @@ impl<'gb> Statement<'gb> for CreateFolderStatement {
 
 }
 
+#[derive(Debug, Clone)]
+pub struct ListFoldersStatement {
+}
+
+impl<'gb> StatementCompiler<'gb, ()> for ListFoldersStatement {
+
+    fn compile(
+        &self, 
+        statement_text: &String
+    ) -> Result<(), Vec<PlanetError>> {
+        let expr = &RE_LIST_FOLDERS;
+        let check = expr.is_match(&statement_text);
+        let mut errors: Vec<PlanetError> = Vec::new();
+        // This match is already executed on resolution operation. Here we include for consistency, would really
+        // apply if statement is more complex than LIST FOLDERS; with more parameters.
+        if !check {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("List folder syntax not valid.")
+                ),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+        return Ok(())
+    }
+}
+
+impl<'gb> Statement<'gb> for ListFoldersStatement {
+
+    fn run(
+        &self,
+        env: &'gb Environment<'gb>,
+        space_database: &SpaceDatabase,
+        statement_text: &String,
+    ) -> Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>> {
+        let space_database = space_database.clone();
+        let context = env.context;
+        let planet_context = env.planet_context;
+        let mut errors: Vec<PlanetError> = Vec::new();
+        let statement = self.compile(statement_text);
+        if statement.is_err() {
+            let errors = statement.unwrap_err();
+            return Err(errors)
+        }
+        let _statement = statement.unwrap();
+        let home_dir = planet_context.home_path.unwrap_or_default();
+        let account_id = context.account_id.unwrap_or_default();
+        let space_id = context.space_id.unwrap_or_default();
+        let site_id = context.site_id;
+        let result: Result<TreeFolder, PlanetError> = TreeFolder::defaults(
+            space_database.connection_pool.clone(),
+            Some(home_dir),
+            Some(account_id),
+            Some(space_id),
+            site_id,
+        );
+        match result {
+            Ok(_) => {
+                let result = result.unwrap();
+                let items = result.list();
+                if items.is_err() {
+                    let error = items.unwrap_err();
+                    errors.push(error);
+                    return Err(errors)
+                }
+                let items = items.unwrap();
+                let mut items_mini: Vec<DbDataMini> = Vec::new();
+                for item in items {
+                    let item_mini = DbDataMini{
+                        id: item.id,
+                        slug: item.slug,
+                        name: item.name,
+                        routing: item.routing
+                    };
+                    items_mini.push(item_mini);
+                }
+                let response_coded = serde_yaml::to_string(&items_mini);
+                if response_coded.is_err() {
+                    let error = PlanetError::new(
+                        500, 
+                        Some(tr!("Error encoding statement response.")),
+                    );
+                    errors.push(error);
+                    return Err(errors)
+                }
+                let response = response_coded.unwrap();
+                let yaml_response = yaml_rust::YamlLoader::load_from_str(
+                    response.as_str()
+                ).unwrap();
+                let yaml_response = yaml_response.clone();
+                return Ok(yaml_response)
+            }
+            Err(error) => {
+                errors.push(error);
+                Err(errors)
+            }
+        }
+    }
+}
+
 fn validate_default_language(language: &String) -> Result<(), ValidationError> {
     let language = &**language;
     let db_languages = get_db_languages();
@@ -1549,7 +1643,6 @@ fn validate_default_language(language: &String) -> Result<(), ValidationError> {
     } else {
         return Err(ValidationError::new("Invalid Default Language"));
     }
-    
 }
 
 fn validate_column_relevance(column_relevance: &BTreeMap<String, u8>) -> Result<(), ValidationError> {
@@ -1584,6 +1677,32 @@ pub fn resolve_schema_statement(
     let check = expr.is_match(&statement_text);
     if check {
         let stmt = CreateFolderStatement{};
+        match mode {
+            StatementCallMode::Run => {
+                let response = stmt.run(
+                    &env, 
+                    &space_data, 
+                    &statement_text,
+                );
+                return Some(response);
+            },
+            StatementCallMode::Compile => {
+                let response = stmt.compile(&statement_text);
+                if response.is_err() {
+                    let errors = response.unwrap_err();
+                    return Some(Err(errors))
+                }
+                let yaml = "---\nstatus: ok";
+                let result = yaml_rust::YamlLoader::load_from_str(yaml);
+                return Some(Ok(result.unwrap()))
+            }
+        }
+    }
+    // LIST FOLDERS
+    let expr = &RE_LIST_FOLDERS;
+    let check = expr.is_match(&statement_text);
+    if check {
+        let stmt = ListFoldersStatement{};
         match mode {
             StatementCallMode::Run => {
                 let response = stmt.run(

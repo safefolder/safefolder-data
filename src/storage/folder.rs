@@ -45,6 +45,7 @@ pub trait FolderSchema {
     fn update(&self, db_data: &DbData) -> Result<DbData, PlanetError>;
     fn get(&self, id: &String) -> Result<DbData, PlanetError>;
     fn get_by_name(&self, folder_name: &str) -> Result<Option<DbData>, PlanetError>;
+    fn list(&self) -> Result<Vec<DbData>, PlanetError>;
 }
 
 pub trait FolderItem {
@@ -477,6 +478,17 @@ impl DbFile {
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
+pub struct DbDataMini {
+    #[validate(required)]
+    pub id: Option<String>,
+    #[validate(required)]
+    pub slug: Option<String>,
+    #[validate(required)]
+    pub name: Option<String>,
+    pub routing: Option<BTreeMap<String, String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Validate, Clone)]
 pub struct DbData {
     #[validate(required)]
     pub id: Option<String>,
@@ -895,6 +907,29 @@ impl FolderSchema for TreeFolder {
                 Err(PlanetError::new(500, Some(tr!("Could not write folder schema"))))
             }
         }
+    }
+    fn list(&self) -> Result<Vec<DbData>, PlanetError> {
+        let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
+        let mut items: Vec<DbData> = Vec::new();
+        let response = self.tree.iter();
+        for result in response {
+            let item = result.unwrap();
+            let item_db = item.1.to_vec();
+            let item_ = EncryptedMessage::deserialize(item_db).unwrap();
+            let item_ = DbData::decrypt_owned(
+                &item_, 
+                &shared_key);
+            match item_ {
+                Ok(_) => {
+                    let item = item_.unwrap();
+                    items.push(item);
+                },
+                Err(_) => {
+                    return Err(PlanetError::new(500, Some(tr!("Could not fetch item from database"))))
+                }
+            }
+        }
+        return Ok(items)
     }
 }
 
