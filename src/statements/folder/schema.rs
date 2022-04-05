@@ -49,6 +49,7 @@ lazy_static! {
     pub static ref RE_CREATE_FOLDER_MAIN: Regex = Regex::new(r#"CREATE[\s]+FOLDER[\s]+"*(?P<FolderName>[\w\s]+)"*\s+\([\n\t\s]*(?P<Config>.[^)]+),*\);"#).unwrap();
     pub static ref RE_CREATE_FOLDER_CONFIG: Regex = Regex::new(r#"([\s]*LANGUAGE (?P<Language>spanish|english|french|german|italian|portuguese|norwegian|swedish|danish),*)|([\s]*NAME COLUMN (?P<NameConfig>(SmallText|LongText|Number|Currency|Percentage|GenerateNumber|Phone|Email|Url|Rating)),*)|([\s]*("(?P<Column>[\w\s]+)")[\s]+(?P<ColumnType>SmallText|LongText|Checkbox|Number|Select|Currency|Percentage|GenerateNumber|Phone|Email|Url|Rating|Object|File|Date|Formula|Duration|CreatedTime|LastModifiedTime|CreatedBy|LastModifiedBy|Link|Reference|Language|GenerateId|Stats))([\s]*[WITH]*[\s]*(?P<Options>[\w\s"\$=\{\}\|]*)),|([\s]*SUB FOLDER (?P<SubFolderName>[\w\s]+)),|([\s]*SUB FOLDER (?P<SubFolderNameAlt>[\w\s]+) WITH (?P<SubFolderOptions>[\w\s"\$=\{\}\|]*)),|([\s]*SEARCH RELEVANCE WITH (?P<SearchRelevanceOptions>[\w\s"\$=\{\}\|]*)),"#).unwrap();
     pub static ref RE_LIST_FOLDERS: Regex = Regex::new(r#"LIST FOLDERS;"#).unwrap();
+    pub static ref RE_DESCRIBE_FOLDER: Regex = Regex::new(r#"DESCRIBE FOLDER (?P<FolderName>[\w\s]+);"#).unwrap();
 }
 
 pub const WITH_PARENT: &str = "Parent";
@@ -1635,6 +1636,127 @@ impl<'gb> Statement<'gb> for ListFoldersStatement {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct DescribeFolderStatement {
+}
+
+impl<'gb> StatementCompiler<'gb, String> for DescribeFolderStatement {
+
+    fn compile(
+        &self, 
+        statement_text: &String
+    ) -> Result<String, Vec<PlanetError>> {
+        let expr = &RE_DESCRIBE_FOLDER;
+        let check = expr.is_match(&statement_text);
+        let mut errors: Vec<PlanetError> = Vec::new();
+        if !check {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Describe folder syntax not valid.")
+                ),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+        let captures = expr.captures(&statement_text);
+        let folder_name: &str;
+        if captures.is_some() {
+            let captures = captures.unwrap();
+            folder_name = captures.name("FolderName").unwrap().as_str();
+            return Ok(folder_name.to_string().clone())
+        } else {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Could not parse folder name from describe folder statement.")
+                ),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+    }
+}
+
+impl<'gb> Statement<'gb> for DescribeFolderStatement {
+
+    fn run(
+        &self,
+        env: &'gb Environment<'gb>,
+        space_database: &SpaceDatabase,
+        statement_text: &String,
+    ) -> Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>> {
+        let space_database = space_database.clone();
+        let context = env.context;
+        let planet_context = env.planet_context;
+        let mut errors: Vec<PlanetError> = Vec::new();
+        let statement = self.compile(statement_text);
+        if statement.is_err() {
+            let errors = statement.unwrap_err();
+            return Err(errors)
+        }
+        let folder_name = statement.unwrap();
+        // get folder from data layer
+        let home_dir = planet_context.home_path.unwrap_or_default();
+        let account_id = context.account_id.unwrap_or_default();
+        let space_id = context.space_id.unwrap_or_default();
+        let site_id = context.site_id;
+        let result: Result<TreeFolder, PlanetError> = TreeFolder::defaults(
+            space_database.connection_pool.clone(),
+            Some(home_dir),
+            Some(account_id),
+            Some(space_id),
+            site_id,
+        );
+        match result {
+            Ok(_) => {
+                let result = result.unwrap();
+                let folder = result.get_by_name(folder_name.as_str());
+                if folder.is_ok() {
+                    let folder = folder.unwrap();
+                    if folder.is_some() {
+                        let folder = folder.unwrap();
+                        let response_coded = serde_yaml::to_string(&folder);
+                        if response_coded.is_err() {
+                            let error = PlanetError::new(
+                                500, 
+                                Some(tr!("Error encoding statement response.")),
+                            );
+                            errors.push(error);
+                            return Err(errors)
+                        }
+                        let response = response_coded.unwrap();
+                        let yaml_response = yaml_rust::YamlLoader::load_from_str(
+                            response.as_str()
+                        ).unwrap();
+                        let yaml_response = yaml_response.clone();
+                        return Ok(yaml_response)
+                    } else {
+                        // Folder could not be found
+                        let error = PlanetError::new(
+                            500, 
+                            Some(
+                                tr!("Folder \"{}\" not found.", &folder_name)
+                            ),
+                        );
+                        errors.push(error);
+                        return Err(errors)
+                    }
+                } else {
+                    let error = folder.unwrap_err();
+                    let mut errors: Vec<PlanetError> = Vec::new();
+                    errors.push(error);
+                    return Err(errors)
+                }
+            },
+            Err(error) => {
+                errors.push(error);
+                Err(errors)
+            }
+        }
+    }
+}
+
 fn validate_default_language(language: &String) -> Result<(), ValidationError> {
     let language = &**language;
     let db_languages = get_db_languages();
@@ -1724,5 +1846,35 @@ pub fn resolve_schema_statement(
             }
         }
     }
+    // DESCRIBE FOLDER
+    let expr = &RE_DESCRIBE_FOLDER;
+    let check = expr.is_match(&statement_text);
+    if check {
+        let stmt = DescribeFolderStatement{};
+        match mode {
+            StatementCallMode::Run => {
+                let response = stmt.run(
+                    &env, 
+                    &space_data, 
+                    &statement_text,
+                );
+                return Some(response);
+            },
+            StatementCallMode::Compile => {
+                let response = stmt.compile(&statement_text);
+                if response.is_err() {
+                    let errors = response.unwrap_err();
+                    return Some(Err(errors))
+                }
+                let yaml = "---\nstatus: ok";
+                let result = yaml_rust::YamlLoader::load_from_str(yaml);
+                return Some(Ok(result.unwrap()))
+            }
+        }
+    }
+    // DROP FOLDER
+    // ADD COLUMN
+    // MODIFY COLUMN
+    // DELETE COLUMN
     return None
 }
