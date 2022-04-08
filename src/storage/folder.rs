@@ -2,6 +2,7 @@ extern crate sled;
 extern crate slug;
 extern crate rust_stemmers;
 
+use std::fs;
 use std::io::{Read, Write};
 use std::str::FromStr;
 use std::{thread};
@@ -46,6 +47,7 @@ pub trait FolderSchema {
     fn get(&self, id: &String) -> Result<DbData, PlanetError>;
     fn get_by_name(&self, folder_name: &str) -> Result<Option<DbData>, PlanetError>;
     fn list(&self) -> Result<Vec<DbData>, PlanetError>;
+    fn delete(&self, id: &String) -> Result<DbData, PlanetError>;
 }
 
 pub trait FolderItem {
@@ -194,7 +196,7 @@ impl DbFile {
             }
             if box_id.is_some() {
                 routing_map.insert(String::from(BOX_ID), box_id.unwrap());
-            }            
+            }
             routing_map.insert(String::from(IPFS_CID), ipfs_cid);
         }
         if size > MAX_FILE_DB {
@@ -819,6 +821,26 @@ impl FolderSchema for TreeFolder {
         }
     }
 
+    fn delete(&self, id: &String) -> Result<DbData, PlanetError> {
+        let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
+        let id_db = xid::Id::from_str(id).unwrap();
+        let id_db = id_db.as_bytes();
+        let item_db = self.tree.remove(&id_db).unwrap().unwrap().to_vec();
+        let item_ = EncryptedMessage::deserialize(item_db).unwrap();
+        let item_ = DbData::decrypt_owned(
+            &item_, 
+            &shared_key);
+        match item_ {
+            Ok(_) => {
+                let item = item_.unwrap();
+                Ok(item)
+            },
+            Err(_) => {
+                Err(PlanetError::new(500, Some(tr!("Could not fetch item from database"))))
+            }
+        }
+    }
+
     fn create(&self, db_data: &DbData) -> Result<DbData, PlanetError> {
         let folder_name = db_data.name.clone().unwrap();
         let result_table_exists: Result<Option<DbData>, PlanetError> = self.get_by_name(
@@ -1084,7 +1106,7 @@ pub struct TreeFolderItem {
     pub space_id: Option<String>,
     pub site_id: Option<String>,
     pub box_id: Option<String>,
-    pub db: Option<sled::Tree>,
+    pub tree: Option<sled::Tree>,
     pub index: Option<sled::Tree>,
     pub files_db: Option<sled::Tree>,
     pub tree_partitions: Option<sled::Tree>,
@@ -1222,12 +1244,9 @@ impl TreeFolderItem {
         return Ok(tree_tuple)
     }
 
-    fn open_partition(
-        &mut self,
-        partition: &u16,
-    ) -> Result<(sled::Tree, sled::Tree), PlanetError> {
-        let mut path_db: String = String::from("");
-        let mut path_index: String = String::from("");
+    pub fn drop_trees(
+        &mut self
+    ) -> Result<(), PlanetError> {
         let folder_id = self.folder_id.clone().unwrap_or_default();
         let folder_id = folder_id.as_str();
         let account_id = self.account_id.clone().unwrap_or_default();
@@ -1236,20 +1255,129 @@ impl TreeFolderItem {
         let space_id = space_id.as_str();
         let box_id = self.box_id.clone().unwrap_or_default();
         let box_id = box_id.as_str();
-        // let home_dir = self.home_dir.clone().unwrap_or_default();
-        // let home_dir = home_dir.as_str();
-        let partition_str = partition.to_string();
-        let partition_str = format!("{:0>4}", partition_str);
-        // box/base/folder/c7c815is1s406kaf3j30/partitions
-        // box/base/folder/c7c815is1s406kaf3j30/partition/0001.db
-        // box_base_folder/c7c815is1s406kaf3j30/partition/0001.index
-        if self.db.is_some() {
-            let db = self.db.clone().unwrap();
-            let index = self.index.clone().unwrap();
-            return Ok(
-                (db, index)
+        // TODO: Export data prior to drop trees, etc... so I can restore in case of errors to the state when request
+        // to drop folder was received. Restore through IPFS. TODO when we have IPFS integrated.
+
+        // Drop all trees in database for tree items, related to db and index for all partitions
+        let partitions = self.get_partitions();
+        if partitions.is_err() {
+            // Throw error returning, no need to restore data since no data was removed
+            return Err(
+                PlanetError::new(500, Some(tr!("Error getting database partitions.")))
             )
         }
+        let partitions = partitions.unwrap();
+        for partition in partitions {
+            let partition_str = partition.to_string();
+            let partition_str = format!("{:0>4}", partition_str);
+            let paths = self.get_db_paths(account_id, space_id, &partition_str, folder_id, box_id);
+            let path_db = paths.0;
+            let path_index = paths.1;
+            let db_result = self.database.drop_tree(path_db.clone());
+            if db_result.is_err() {
+                // Throw error returning, trigger restore????
+                return Err(
+                    PlanetError::new(500, Some(tr!("Error deleting database partition \"{}\".", &path_db)))
+                )
+            }
+            let index_result = self.database.drop_tree(path_index.clone());
+            if index_result.is_err() {
+                // Throw error returning, trigger restore????
+                return Err(
+                    PlanetError::new(500, Some(tr!("Error deleting index partition \"{}\".", &path_index)))
+                )
+            }
+        }
+        return Ok(())
+    }
+
+    pub fn drop_files(
+        &mut self
+    ) -> Result<(), PlanetError> {
+        // delete all files from OS
+        let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
+        let mut path_db: String = String::from("");
+        let account_id = self.account_id.clone().unwrap_or_default();
+        let account_id = account_id.as_str();
+        let space_id = self.space_id.clone().unwrap_or_default();
+        let space_id = space_id.as_str();
+        let box_id = self.box_id.clone().unwrap_or_default();
+        let box_id = box_id.as_str();
+        let folder_id = self.folder_id.clone().unwrap_or_default();
+        let folder_id = folder_id.as_str();
+        if account_id != "" && space_id != "" {
+            println!("DbFolderItem.write_file :: account_id and space_id have been informed");
+        } else if space_id == "private" {
+            path_db = format!(
+                "box/{box_id}/folder/{folder_id}/files.db",
+                box_id=box_id,
+                folder_id=folder_id,
+            );
+        }
+        let tree: Tree;
+        if self.files_db.is_some() {
+            tree = self.files_db.clone().unwrap();
+        } else {
+            let tree_ = self.database.open_tree(path_db.clone());
+            if tree_.is_err() {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Could not find language column.")),
+                    )
+                )
+            }
+            tree = tree_.unwrap();
+        }
+        let mut path_list: Vec<String> = Vec::new();
+        for result in tree.iter() {
+            let tuple = result.unwrap();
+            let item_db = tuple.1.to_vec();
+            let item_ = EncryptedMessage::deserialize(item_db).unwrap();
+            let item_ = DbFile::decrypt_owned(
+                &item_, 
+                &shared_key);
+            let item = item_.unwrap();
+            let path = item.path;
+            if path.is_some() {
+                let path = path.unwrap();
+                path_list.push(path);
+            }
+        }
+        // Delete tree
+        let result = self.database.drop_tree(path_db.clone());
+        if result.is_err() {
+            let _error = result.unwrap_err();
+            return Err(
+                PlanetError::new(500, Some(tr!(
+                    "Error deleting folder files database"
+                )))
+            )
+        }
+        // Delete big files from files folder
+        for path in path_list {
+            let result = fs::remove_file(path.clone());
+            if result.is_err() {
+                return Err(
+                    PlanetError::new(500, Some(tr!(
+                        "Error deleting file \"{}\"", &path
+                    )))
+                )   
+            }
+        }
+        return Ok(())
+    }
+
+    fn get_db_paths(
+        &mut self,
+        account_id: &str,
+        space_id: &str,
+        partition_str: &String,
+        folder_id: &str,
+        box_id: &str,
+    ) -> (String, String) {
+        let mut path_db: String = String::from("");
+        let mut path_index: String = String::from("");
         if account_id != "" && space_id != "" {
             println!("DbFolderItem.open_partition :: account_id and space_id have been informed");
         } else if space_id == "private" {
@@ -1269,13 +1397,45 @@ impl TreeFolderItem {
                 partition_str=partition_str
             );
         }
+        return (path_db, path_index)
+    }
+
+    fn open_partition(
+        &mut self,
+        partition: &u16,
+    ) -> Result<(sled::Tree, sled::Tree), PlanetError> {
+        let folder_id = self.folder_id.clone().unwrap_or_default();
+        let folder_id = folder_id.as_str();
+        let account_id = self.account_id.clone().unwrap_or_default();
+        let account_id = account_id.as_str();
+        let space_id = self.space_id.clone().unwrap_or_default();
+        let space_id = space_id.as_str();
+        let box_id = self.box_id.clone().unwrap_or_default();
+        let box_id = box_id.as_str();
+        // let home_dir = self.home_dir.clone().unwrap_or_default();
+        // let home_dir = home_dir.as_str();
+        let partition_str = partition.to_string();
+        let partition_str = format!("{:0>4}", partition_str);
+        // box/base/folder/c7c815is1s406kaf3j30/partitions
+        // box/base/folder/c7c815is1s406kaf3j30/partition/0001.db
+        // box_base_folder/c7c815is1s406kaf3j30/partition/0001.index
+        if self.tree.is_some() {
+            let tree = self.tree.clone().unwrap();
+            let index = self.index.clone().unwrap();
+            return Ok(
+                (tree, index)
+            )
+        }
+        let paths = self.get_db_paths(account_id, space_id, &partition_str, folder_id, box_id);
+        let path_db = paths.0;
+        let path_index = paths.1;
         eprintln!("DbFolderItem.open_partition :: path_db: {:?} path_index: {:?}", &path_db, &path_index);
         let db = self.database.open_tree(path_db);
         let index = self.database.open_tree(path_index);
         if db.is_ok() && index.is_ok() {
             let db_ = db.unwrap().clone();
             let index_ = index.unwrap().clone();
-            self.db = Some(db_.clone());
+            self.tree = Some(db_.clone());
             self.index = Some(index_.clone());
             return Ok(
                 (db_.clone(), index_.clone())
@@ -1659,7 +1819,7 @@ impl FolderItem for TreeFolderItem {
             site_id: site_id,
             tree_folder: tree_folder.clone(),
             folder_id: Some(folder_id.to_string()),
-            db: None,
+            tree: None,
             index: None,
             tree_partitions: None,
             files_db: None,
