@@ -53,6 +53,8 @@ lazy_static! {
     pub static ref RE_DROP_FOLDER: Regex = Regex::new(r#"DROP[\s]+FOLDER[\s]+(?P<FolderName>[\w\s]+);"#).unwrap();
     pub static ref RE_ADD_COLUMN: Regex = Regex::new(r#"ADD[\s]+COLUMN[\s]+INTO[\s]+"*(?P<FolderName>[\w\s]+)"*\([\n\t\s]*(?P<Config>.[^)]+),*\);"#).unwrap();
     pub static ref RE_ADD_COLUMN_CONFIG: Regex = Regex::new(r#"([\s]*("(?P<Column>[\w\s]+)")[\s]+(?P<ColumnType>SmallText|LongText|Checkbox|Number|Select|Currency|Percentage|GenerateNumber|Phone|Email|Url|Rating|Object|File|Date|Formula|Duration|CreatedTime|LastModifiedTime|CreatedBy|LastModifiedBy|Link|Reference|Language|GenerateId|Stats))([\s]*[WITH]*[\s]*(?P<Options>[\w\s"\$=\{\}\|]*))"#).unwrap();
+    pub static ref RE_MODIFY_COLUMN: Regex = Regex::new(r#"MODIFY[\s]+COLUMN[\s]+FROM[\s]+"*(?P<FolderName>[\w\s]+)"*\([\n\t\s]*(?P<Config>.[^)]+),*\);"#).unwrap();
+    pub static ref RE_MODIFY_COLUMN_CONFIG: Regex = Regex::new(r#"([\s]*NAME[\s]*COLUMN (?P<NameConfig>(SmallText|LongText|Number|Currency|Percentage|GenerateNumber|Phone|Email|Url|Rating)))|([\s]*("(?P<Column>[\w\s]+)")[\s]+(?P<ColumnType>SmallText|LongText|Checkbox|Number|Select|Currency|Percentage|GenerateNumber|Phone|Email|Url|Rating|Object|File|Date|Formula|Duration|CreatedTime|LastModifiedTime|CreatedBy|LastModifiedBy|Link|Reference|Language|GenerateId|Stats))([\s]*[WITH]*[\s]*(?P<Options>[\w\s"\$=\{\}\|]*))"#).unwrap();
 }
 
 pub const WITH_PARENT: &str = "Parent";
@@ -2000,6 +2002,17 @@ impl<'gb> StatementCompiler<'gb, ColumnCompiledStmt> for AddColumnStatement {
         folder_name = captures.name("FolderName").unwrap().as_str();
         config = captures.name("Config").unwrap().as_str();
         let expr = &RE_ADD_COLUMN_CONFIG;
+        let columns = expr.captures_iter(&config);
+        if columns.count() > 1 {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Only one column is supported for ADD COLUMN statement.")
+                ),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
         let item = expr.captures(&config);
         if item.is_some() {
             let item = item.unwrap();
@@ -2111,6 +2124,259 @@ impl<'gb> Statement<'gb> for AddColumnStatement {
                             data.extend(map_list);
                             data.insert(COLUMNS.to_string(), column_list);
                             // Update folder config
+                            folder.data = Some(data);
+                            let result = db_folder.update(&folder);
+                            // Build output
+                            if result.is_ok() {
+                                let folder = result.unwrap();
+                                let response_coded = serde_yaml::to_string(&folder);
+                                if response_coded.is_err() {
+                                    let error = PlanetError::new(
+                                        500, 
+                                        Some(tr!("Error encoding statement response.")),
+                                    );
+                                    errors.push(error);
+                                }
+                                let response = response_coded.unwrap();
+                                let yaml_response = yaml_rust::YamlLoader::load_from_str(
+                                    response.as_str()
+                                ).unwrap();
+                                let yaml_response = yaml_response.clone();
+                                return Ok(yaml_response)
+                            } else {
+                                let error = PlanetError::new(
+                                    500, 
+                                    Some(
+                                        tr!("Could not update folder on database.")
+                                    ),
+                                );
+                                errors.push(error);
+                            }    
+                        }
+                    } else {
+                        let error = PlanetError::new(
+                            500, 
+                            Some(
+                                tr!("Folder has no data.")
+                            ),
+                        );
+                        errors.push(error);
+                    }
+                } else {
+                    let error = PlanetError::new(
+                        500, 
+                        Some(
+                            tr!("Folder not found.")
+                        ),
+                    );
+                    errors.push(error);
+                    return Err(errors)
+                }
+            } else {
+                let error = PlanetError::new(
+                    500, 
+                    Some(
+                        tr!("Error fetching folder by name.")
+                    ),
+                );
+                errors.push(error);
+            }
+        } else {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Could not parse add column statement.")
+                ),
+            );
+            errors.push(error);
+        }
+        return Err(errors)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ModifyColumnStatement {
+}
+
+impl<'gb> StatementCompiler<'gb, ColumnCompiledStmt> for ModifyColumnStatement {
+
+    fn compile(
+        &self, 
+        statement_text: &String
+    ) -> Result<ColumnCompiledStmt, Vec<PlanetError>> {
+        let expr = &RE_MODIFY_COLUMN;
+        let check = expr.is_match(&statement_text);
+        let mut errors: Vec<PlanetError> = Vec::new();
+        if !check {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Modify column syntax not valid.")
+                ),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+        let captures = expr.captures(&statement_text);
+        let config: &str;
+        let folder_name: &str;
+        if captures.is_none() {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Could not parse modify column statement.")
+                ),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+        let captures = captures.unwrap();
+        folder_name = captures.name("FolderName").unwrap().as_str();
+        config = captures.name("Config").unwrap().as_str();
+        let columns = expr.captures_iter(&config);
+        if columns.count() > 1 {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Only one column is supported for MODIFY COLUMN statement.")
+                ),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+        let expr = &RE_MODIFY_COLUMN_CONFIG;
+        let item = expr.captures(&config);
+        if item.is_some() {
+            let item = item.unwrap();
+            let column = item.name("Column");
+            let column_type = item.name("ColumnType");
+            let name_config = item.name("NameConfig");
+            let column_str: &str;
+            let column_type_str: &str;
+            if name_config.is_some() {
+                column_str = NAME_CAMEL;
+                column_type_str = name_config.unwrap().as_str();
+            } else {
+                column_str = column.unwrap().as_str();
+                column_type_str = column_type.unwrap().as_str();
+            }
+            let result = process_column(column_str, column_type_str, &item);
+            if result.is_ok() {
+                let column = result.unwrap();
+                let mut compiled = ColumnCompiledStmt::defaults(
+                    &folder_name.to_string()
+                );
+                if name_config.is_some() {
+                    compiled.name = Some(column);
+                } else {
+                    let mut columns: Vec<ColumnConfig> = Vec::new();
+                    columns.push(column);
+                    compiled.columns = Some(columns);    
+                }
+                return Ok(compiled)
+            } else {
+                let error = PlanetError::new(
+                    500, 
+                    Some(
+                        tr!("Could not parse config attributes for add column statement.")
+                    ),
+                );
+                errors.push(error);
+                return Err(errors)
+            }
+        } else {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Could not parse config detail for add column statement.")
+                ),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+    }
+}
+
+impl<'gb> Statement<'gb> for ModifyColumnStatement {
+
+    fn run(
+        &self,
+        env: &'gb Environment<'gb>,
+        space_database: &SpaceDatabase,
+        statement_text: &String,
+    ) -> Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>> {
+        let space_database = space_database.clone();
+        let context = env.context;
+        let planet_context = env.planet_context;
+        let statement = self.compile(statement_text);
+        if statement.is_err() {
+            let errors = statement.unwrap_err();
+            return Err(errors)
+        }
+        let mut errors: Vec<PlanetError> = Vec::new();
+        let column_compiled = statement.unwrap();
+        let home_dir = planet_context.home_path.unwrap_or_default();
+        let account_id = context.account_id.unwrap_or_default();
+        let space_id = context.space_id.unwrap_or_default();
+        let site_id = context.site_id;
+        let result: Result<TreeFolder, PlanetError> = TreeFolder::defaults(
+            space_database.connection_pool.clone(),
+            Some(home_dir),
+            Some(account_id),
+            Some(space_id),
+            site_id,
+        );
+        if result.is_ok() {
+            let db_folder = result.unwrap();
+            let folder_name = column_compiled.folder_name;
+            let folder = db_folder.get_by_name(folder_name.as_str());
+            if folder.is_ok() {
+                let folder = folder.unwrap();
+                if folder.is_some() {
+                    let mut folder = folder.unwrap();
+                    let data = folder.data;
+                    if data.is_some() {
+                        let mut data = data.unwrap();
+                        let column_list = data.get(COLUMNS);
+                        if column_list.is_some() {
+                            let column_list = column_list.unwrap().clone();
+                            let column = column_compiled.columns.unwrap()[0].clone();
+                            let column_name = column.clone().name.unwrap_or_default();
+                            let column_name_str = column_name.clone();
+                            let column_name_str = column_name_str.as_str();
+                            let mut column_list_new: Vec<BTreeMap<String, String>> = Vec::new();
+                            for column_item in column_list {
+                                let column_item_name = column_item.get(NAME).unwrap().clone();
+                                if column_item_name.to_lowercase().as_str() == column_name_str.to_lowercase() {
+                                    let mut columns_map: HashMap<String, ColumnConfig> = HashMap::new();
+                                    columns_map.insert(column_name.clone(), column.clone());
+                                    let map = &column.create_config(
+                                        planet_context,
+                                        context,
+                                        &columns_map,
+                                        &db_folder,
+                                        &folder_name,
+                                        &space_database
+                                    );
+                                    if map.is_err() {
+                                        let error = map.clone().unwrap_err();
+                                        errors.push(error);
+                                    }
+                                    let map = map.clone().unwrap();
+                                    column_list_new.push(map);
+                                } else {
+                                    column_list_new.push(column_item);
+                                }
+                            }
+                            data.insert(COLUMNS.to_string(), column_list_new);
+                            let map_list = &column.map_collections_db();
+                            if map_list.is_err() {
+                                let error = map_list.clone().unwrap_err();
+                                errors.push(error);
+                            }
+                            let map_list = map_list.clone().unwrap();
+                            let map_list = map_list.clone();
+                            data.extend(map_list);
                             folder.data = Some(data);
                             let result = db_folder.update(&folder);
                             // Build output
@@ -2344,6 +2610,30 @@ pub fn resolve_schema_statement(
         }
     }
     // MODIFY COLUMN
+    let expr = &RE_MODIFY_COLUMN;
+    let check = expr.is_match(&statement_text);
+    if check {
+        let stmt = ModifyColumnStatement{};
+        match mode {
+            StatementCallMode::Run => {
+                let response = stmt.run(
+                    &env, 
+                    &space_data, 
+                    &statement_text,
+                );
+                return Some(response);
+            },
+            StatementCallMode::Compile => {
+                let response = stmt.compile(&statement_text);
+                if response.is_err() {
+                    let errors = response.unwrap_err();
+                    return Some(Err(errors))
+                }
+                let result = yaml_rust::YamlLoader::load_from_str("---\nstatus: ok");
+                return Some(Ok(result.unwrap()))
+            }
+        }
+    }
     // MODIFY LANGUAGE
     // ADD SUBFOLDER
     // REMOVE SUBFOLDER
