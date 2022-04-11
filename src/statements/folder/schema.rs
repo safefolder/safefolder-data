@@ -10,7 +10,7 @@ use lazy_static::lazy_static;
 
 use tr::tr;
 use colored::*;
-use regex::Regex;
+use regex::{Regex, Captures};
 
 use crate::statements::folder::config::{
     create_minimum_column_map,
@@ -48,9 +48,11 @@ use crate::storage::columns::{
 lazy_static! {
     pub static ref RE_CREATE_FOLDER_MAIN: Regex = Regex::new(r#"CREATE[\s]+FOLDER[\s]+"*(?P<FolderName>[\w\s]+)"*\s+\([\n\t\s]*(?P<Config>.[^)]+),*\);"#).unwrap();
     pub static ref RE_CREATE_FOLDER_CONFIG: Regex = Regex::new(r#"([\s]*LANGUAGE (?P<Language>spanish|english|french|german|italian|portuguese|norwegian|swedish|danish),*)|([\s]*NAME COLUMN (?P<NameConfig>(SmallText|LongText|Number|Currency|Percentage|GenerateNumber|Phone|Email|Url|Rating)),*)|([\s]*("(?P<Column>[\w\s]+)")[\s]+(?P<ColumnType>SmallText|LongText|Checkbox|Number|Select|Currency|Percentage|GenerateNumber|Phone|Email|Url|Rating|Object|File|Date|Formula|Duration|CreatedTime|LastModifiedTime|CreatedBy|LastModifiedBy|Link|Reference|Language|GenerateId|Stats))([\s]*[WITH]*[\s]*(?P<Options>[\w\s"\$=\{\}\|]*)),|([\s]*SUB FOLDER (?P<SubFolderName>[\w\s]+)),|([\s]*SUB FOLDER (?P<SubFolderNameAlt>[\w\s]+) WITH (?P<SubFolderOptions>[\w\s"\$=\{\}\|]*)),|([\s]*SEARCH RELEVANCE WITH (?P<SearchRelevanceOptions>[\w\s"\$=\{\}\|]*)),"#).unwrap();
-    pub static ref RE_LIST_FOLDERS: Regex = Regex::new(r#"LIST FOLDERS;"#).unwrap();
-    pub static ref RE_DESCRIBE_FOLDER: Regex = Regex::new(r#"DESCRIBE FOLDER (?P<FolderName>[\w\s]+);"#).unwrap();
-    pub static ref RE_DROP_FOLDER: Regex = Regex::new(r#"DROP FOLDER (?P<FolderName>[\w\s]+);"#).unwrap();
+    pub static ref RE_LIST_FOLDERS: Regex = Regex::new(r#"LIST[\s]+FOLDERS;"#).unwrap();
+    pub static ref RE_DESCRIBE_FOLDER: Regex = Regex::new(r#"DESCRIBE[\s]+FOLDER[\s]+(?P<FolderName>[\w\s]+);"#).unwrap();
+    pub static ref RE_DROP_FOLDER: Regex = Regex::new(r#"DROP[\s]+FOLDER[\s]+(?P<FolderName>[\w\s]+);"#).unwrap();
+    pub static ref RE_ADD_COLUMN: Regex = Regex::new(r#"ADD[\s]+COLUMN[\s]+INTO[\s]+"*(?P<FolderName>[\w\s]+)"*\([\n\t\s]*(?P<Config>.[^)]+),*\);"#).unwrap();
+    pub static ref RE_ADD_COLUMN_CONFIG: Regex = Regex::new(r#"([\s]*("(?P<Column>[\w\s]+)")[\s]+(?P<ColumnType>SmallText|LongText|Checkbox|Number|Select|Currency|Percentage|GenerateNumber|Phone|Email|Url|Rating|Object|File|Date|Formula|Duration|CreatedTime|LastModifiedTime|CreatedBy|LastModifiedBy|Link|Reference|Language|GenerateId|Stats))([\s]*[WITH]*[\s]*(?P<Options>[\w\s"\$=\{\}\|]*))"#).unwrap();
 }
 
 pub const WITH_PARENT: &str = "Parent";
@@ -769,7 +771,236 @@ impl CreateFolderCompiledStmt {
 
 }
 
-// Statement trait only needs the run which takes environment (ctx and planet ctx) and statement text
+pub fn process_column(column_str: &str, column_type: &str, item: &Captures) -> Result<ColumnConfig, Vec<PlanetError>> {
+    let mut column = ColumnConfig::defaults(None);
+    let name = column_str.trim().to_string();
+    column.column_type = Some(column_type.to_string());
+    column.name = Some(name);
+    column.id = generate_id();
+    let options = item.name("Options");
+    let mut errors: Vec<PlanetError> = Vec::new();
+    if options.is_some() {
+        let options = options.unwrap().as_str();
+        // eprintln!("CreateFolder.compile :: options: {}", options);
+        let result = WithOptions::defaults(
+            &options.to_string()
+        );
+        if result.is_err() {
+            let error = result.unwrap_err();
+            errors.push(error);
+        } else {
+            let with_options_obj = result.unwrap();
+            let with_options = &with_options_obj.options;
+            // eprintln!("CreateFolder.compile :: with_options: {:#?}", with_options);
+            // Validate I have allowed options
+            let mut is_valid = true;
+            for (k, _v) in with_options {
+                let found = ALLOWED_WITH_OPTIONS.contains(&k.as_str());
+                if !found {
+                    errors.push(
+                        PlanetError::new(
+                            500, 
+                            Some(
+                                tr!("Statement compile error: Option \"{}\" not allowed.", &k)
+                            ),
+                        )
+                    );
+                    is_valid = false;
+                }
+            }
+            if is_valid {
+                // We process with options only in case all options sent are OK
+                if *&with_options.contains_key(WITH_REQUIRED) {
+                    let required = &with_options_obj.get_single_value(
+                        WITH_REQUIRED
+                    );
+                    if *required == String::from("True") {
+                        column.required = Some(true);
+                    } else {
+                        column.required = Some(false);
+                    }
+                }
+                if *&with_options.contains_key(WITH_OPTIONS) {
+                    let options = with_options.get(WITH_OPTIONS);
+                    if options.is_some() {
+                        let options = options.unwrap().clone();
+                        let mut options_string: Vec<String> = Vec::new();
+                        for option in options {
+                            let option_value = option.value;
+                            options_string.push(option_value);
+                        }
+                        column.options = Some(options_string);
+                    }
+                }
+                if *&with_options.contains_key(WITH_NUMBER_DECIMALS) {
+                    let number_decimals = &with_options_obj.get_single_value(
+                        WITH_NUMBER_DECIMALS
+                    );
+                    let number_decimals: i8 = FromStr::from_str(number_decimals.as_str()).unwrap();
+                    column.number_decimals = Some(number_decimals);
+                }
+                if *&with_options.contains_key(WITH_CURRENCY_SYMBOL) {
+                    let currency_symbol = &with_options_obj.get_single_value(
+                        WITH_CURRENCY_SYMBOL
+                    );
+                    column.currency_symbol = Some(currency_symbol.clone());
+                }
+                if *&with_options.contains_key(WITH_MAXIMUM) {
+                    let maximum = &with_options_obj.get_single_value(
+                        WITH_MAXIMUM
+                    );
+                    column.maximum = Some(maximum.clone());
+                }
+                if *&with_options.contains_key(WITH_MINIMUM) {
+                    let minimum = &with_options_obj.get_single_value(
+                        WITH_MINIMUM
+                    );
+                    column.minimum = Some(minimum.clone());
+                }
+                if *&with_options.contains_key(WITH_SET_MINIMUM) {
+                    let set_minimum = &with_options_obj.get_single_value(
+                        WITH_SET_MINIMUM
+                    );
+                    column.set_minimum = Some(set_minimum.clone());
+                }
+                if *&with_options.contains_key(WITH_SET_MAXIMUM) {
+                    let set_maximum = &with_options_obj.get_single_value(
+                        WITH_SET_MAXIMUM
+                    );
+                    column.set_maximum = Some(set_maximum.clone());
+                }
+                if *&with_options.contains_key(WITH_IS_SET) {
+                    let is_set = &with_options_obj.get_single_value(
+                        WITH_IS_SET
+                    );
+                    column.is_set = Some(is_set.clone().to_lowercase());
+                }
+                if *&with_options.contains_key(WITH_MANY) {
+                    let many = &with_options_obj.get_single_value(
+                        WITH_MANY
+                    );
+                    if *many == String::from("True") {
+                        column.many = Some(true);
+                    } else {
+                        column.many = Some(false);
+                    }
+                }
+                if *&with_options.contains_key(WITH_DEFAULT) {
+                    let default = &with_options_obj.get_single_value(
+                        WITH_DEFAULT
+                    );
+                    column.default = Some(default.clone());
+                }
+                if *&with_options.contains_key(WITH_FORMULA) {
+                    let formula = &with_options_obj.get_single_value(
+                        WITH_FORMULA
+                    );
+                    column.formula = Some(formula.clone());
+                }
+                if *&with_options.contains_key(WITH_FORMULA_FORMAT) {
+                    let formula_format = &with_options_obj.get_single_value(
+                        WITH_FORMULA_FORMAT
+                    );
+                    column.formula_format = Some(formula_format.clone());
+                }
+                if *&with_options.contains_key(WITH_DATE_FORMAT) {
+                    let date_format = &with_options_obj.get_single_value(
+                        WITH_DATE_FORMAT
+                    );
+                    let date_format = date_format.as_str();
+                    let mut date_format_obj: DateFormat = DateFormat::Friendly;
+                    match date_format {
+                        DATE_FORMAT_FRIENDLY => {
+                            date_format_obj = DateFormat::Friendly;
+                        },
+                        DATE_FORMAT_US => {
+                            date_format_obj = DateFormat::US;
+                        },
+                        DATE_FORMAT_EUROPEAN => {
+                            date_format_obj = DateFormat::European;
+                        },
+                        DATE_FORMAT_ISO => {
+                            date_format_obj = DateFormat::ISO;
+                        },
+                        _ => {},
+                    }
+                    column.date_format = Some(date_format_obj);
+                }
+                if *&with_options.contains_key(WITH_TIME_FORMAT) {
+                    let time_format = &with_options_obj.get_single_value(
+                        WITH_TIME_FORMAT
+                    );
+                    let time_format: i8 = FromStr::from_str(time_format.as_str()).unwrap();
+                    column.time_format = Some(time_format);
+                }
+                if *&with_options.contains_key(WITH_LINKED_FOLDER_ID) {
+                    let linked_folder_id = &with_options_obj.get_single_value(
+                        WITH_LINKED_FOLDER_ID
+                    );
+                    column.linked_folder_id = Some(linked_folder_id.clone());
+                }
+                if *&with_options.contains_key(WITH_DELETE_ON_LINK_DROP) {
+                    let delete_on_link_drop = &with_options_obj.get_single_value(
+                        WITH_DELETE_ON_LINK_DROP
+                    );
+                    if *delete_on_link_drop == String::from("True") {
+                        column.delete_on_link_drop = Some(true);
+                    } else {
+                        column.delete_on_link_drop = Some(false);
+                    }
+                }
+                if *&with_options.contains_key(WITH_RELATED_COLUMN) {
+                    let related_column = &with_options_obj.get_single_value(
+                        WITH_RELATED_COLUMN
+                    );
+                    column.related_column = Some(related_column.clone());
+                }
+                if *&with_options.contains_key(WITH_SEQUENCE) {
+                    let sequence = &with_options_obj.get_single_value(
+                        WITH_SEQUENCE
+                    );
+                    column.sequence = Some(sequence.clone());
+                }
+                if *&with_options.contains_key(WITH_MAX_LENGTH) {
+                    let max_length = &with_options_obj.get_single_value(
+                        WITH_MAX_LENGTH
+                    );
+                    column.max_length = Some(max_length.clone());
+                }
+                if *&with_options.contains_key(WITH_STATS_FUNCTION) {
+                    let stats_function = &with_options_obj.get_single_value(
+                        WITH_STATS_FUNCTION
+                    );
+                    column.stats_function = Some(stats_function.clone());
+                }
+                if *&with_options.contains_key(WITH_CONTENT_TYPES) {
+                    let content_types = with_options.get(
+                        WITH_CONTENT_TYPES
+                    );
+                    if content_types.is_some() {
+                        let content_types = content_types.unwrap().clone();
+                        let mut content_types_str: Vec<String> = Vec::new();
+                        for content_type in content_types {
+                            let content_type_str = content_type.value;
+                            content_types_str.push(content_type_str);
+                        }
+                        column.content_types = Some(content_types_str);
+                    }
+                }
+                if *&with_options.contains_key(WITH_MODE) {
+                    let mode = &with_options_obj.get_single_value(
+                        WITH_MODE
+                    );
+                    column.mode = Some(mode.clone());
+                }
+            }
+        }
+    }
+    if errors.len() > 0 {
+        return Err(errors)
+    }
+    return Ok(column)
+}
 
 #[derive(Debug, Clone)]
 pub struct CreateFolderStatement {
@@ -907,231 +1138,11 @@ impl<'gb> StatementCompiler<'gb, CreateFolderCompiledStmt> for CreateFolderState
                 // Here I need compilation of options the same as in subfolders, being common software
                 let column_str = column.unwrap().as_str();
                 let column_type = column_type.unwrap().as_str();
-                // eprintln!("CreateFolder.compile :: column_type: {}", column_type);
-                let mut column = ColumnConfig::defaults(None);
-                let name = column_str.trim().to_string();
-                column.column_type = Some(column_type.to_string());
-                column.name = Some(name);
-                column.id = generate_id();
-                let options = item.name("Options");
-                if options.is_some() {
-                    let options = options.unwrap().as_str();
-                    // eprintln!("CreateFolder.compile :: options: {}", options);
-                    let result = WithOptions::defaults(
-                        &options.to_string()
-                    );
-                    if result.is_err() {
-                        let error = result.unwrap_err();
-                        errors.push(error);
-                    } else {
-                        let with_options_obj = result.unwrap();
-                        let with_options = &with_options_obj.options;
-                        // eprintln!("CreateFolder.compile :: with_options: {:#?}", with_options);
-                        // Validate I have allowed options
-                        let mut is_valid = true;
-                        for (k, _v) in with_options {
-                            let found = ALLOWED_WITH_OPTIONS.contains(&k.as_str());
-                            if !found {
-                                errors.push(
-                                    PlanetError::new(
-                                        500, 
-                                        Some(
-                                            tr!("Statement compile error: Option \"{}\" not allowed.", &k)
-                                        ),
-                                    )
-                                );
-                                is_valid = false;
-                            }
-                        }
-                        if is_valid {
-                            // We process with options only in case all options sent are OK
-                            if *&with_options.contains_key(WITH_REQUIRED) {
-                                let required = &with_options_obj.get_single_value(
-                                    WITH_REQUIRED
-                                );
-                                if *required == String::from("True") {
-                                    column.required = Some(true);
-                                } else {
-                                    column.required = Some(false);
-                                }
-                            }
-                            if *&with_options.contains_key(WITH_OPTIONS) {
-                                let options = with_options.get(WITH_OPTIONS);
-                                if options.is_some() {
-                                    let options = options.unwrap().clone();
-                                    let mut options_string: Vec<String> = Vec::new();
-                                    for option in options {
-                                        let option_value = option.value;
-                                        options_string.push(option_value);
-                                    }
-                                    column.options = Some(options_string);
-                                }
-                            }
-                            if *&with_options.contains_key(WITH_NUMBER_DECIMALS) {
-                                let number_decimals = &with_options_obj.get_single_value(
-                                    WITH_NUMBER_DECIMALS
-                                );
-                                let number_decimals: i8 = FromStr::from_str(number_decimals.as_str()).unwrap();
-                                column.number_decimals = Some(number_decimals);
-                            }
-                            if *&with_options.contains_key(WITH_CURRENCY_SYMBOL) {
-                                let currency_symbol = &with_options_obj.get_single_value(
-                                    WITH_CURRENCY_SYMBOL
-                                );
-                                column.currency_symbol = Some(currency_symbol.clone());
-                            }
-                            if *&with_options.contains_key(WITH_MAXIMUM) {
-                                let maximum = &with_options_obj.get_single_value(
-                                    WITH_MAXIMUM
-                                );
-                                column.maximum = Some(maximum.clone());
-                            }
-                            if *&with_options.contains_key(WITH_MINIMUM) {
-                                let minimum = &with_options_obj.get_single_value(
-                                    WITH_MINIMUM
-                                );
-                                column.minimum = Some(minimum.clone());
-                            }
-                            if *&with_options.contains_key(WITH_SET_MINIMUM) {
-                                let set_minimum = &with_options_obj.get_single_value(
-                                    WITH_SET_MINIMUM
-                                );
-                                column.set_minimum = Some(set_minimum.clone());
-                            }
-                            if *&with_options.contains_key(WITH_SET_MAXIMUM) {
-                                let set_maximum = &with_options_obj.get_single_value(
-                                    WITH_SET_MAXIMUM
-                                );
-                                column.set_maximum = Some(set_maximum.clone());
-                            }
-                            if *&with_options.contains_key(WITH_IS_SET) {
-                                let is_set = &with_options_obj.get_single_value(
-                                    WITH_IS_SET
-                                );
-                                column.is_set = Some(is_set.clone().to_lowercase());
-                            }
-                            if *&with_options.contains_key(WITH_MANY) {
-                                let many = &with_options_obj.get_single_value(
-                                    WITH_MANY
-                                );
-                                if *many == String::from("True") {
-                                    column.many = Some(true);
-                                } else {
-                                    column.many = Some(false);
-                                }
-                            }
-                            if *&with_options.contains_key(WITH_DEFAULT) {
-                                let default = &with_options_obj.get_single_value(
-                                    WITH_DEFAULT
-                                );
-                                column.default = Some(default.clone());
-                            }
-                            if *&with_options.contains_key(WITH_FORMULA) {
-                                let formula = &with_options_obj.get_single_value(
-                                    WITH_FORMULA
-                                );
-                                column.formula = Some(formula.clone());
-                            }
-                            if *&with_options.contains_key(WITH_FORMULA_FORMAT) {
-                                let formula_format = &with_options_obj.get_single_value(
-                                    WITH_FORMULA_FORMAT
-                                );
-                                column.formula_format = Some(formula_format.clone());
-                            }
-                            if *&with_options.contains_key(WITH_DATE_FORMAT) {
-                                let date_format = &with_options_obj.get_single_value(
-                                    WITH_DATE_FORMAT
-                                );
-                                let date_format = date_format.as_str();
-                                let mut date_format_obj: DateFormat = DateFormat::Friendly;
-                                match date_format {
-                                    DATE_FORMAT_FRIENDLY => {
-                                        date_format_obj = DateFormat::Friendly;
-                                    },
-                                    DATE_FORMAT_US => {
-                                        date_format_obj = DateFormat::US;
-                                    },
-                                    DATE_FORMAT_EUROPEAN => {
-                                        date_format_obj = DateFormat::European;
-                                    },
-                                    DATE_FORMAT_ISO => {
-                                        date_format_obj = DateFormat::ISO;
-                                    },
-                                    _ => {},
-                                }
-                                column.date_format = Some(date_format_obj);
-                            }
-                            if *&with_options.contains_key(WITH_TIME_FORMAT) {
-                                let time_format = &with_options_obj.get_single_value(
-                                    WITH_TIME_FORMAT
-                                );
-                                let time_format: i8 = FromStr::from_str(time_format.as_str()).unwrap();
-                                column.time_format = Some(time_format);
-                            }
-                            if *&with_options.contains_key(WITH_LINKED_FOLDER_ID) {
-                                let linked_folder_id = &with_options_obj.get_single_value(
-                                    WITH_LINKED_FOLDER_ID
-                                );
-                                column.linked_folder_id = Some(linked_folder_id.clone());
-                            }
-                            if *&with_options.contains_key(WITH_DELETE_ON_LINK_DROP) {
-                                let delete_on_link_drop = &with_options_obj.get_single_value(
-                                    WITH_DELETE_ON_LINK_DROP
-                                );
-                                if *delete_on_link_drop == String::from("True") {
-                                    column.delete_on_link_drop = Some(true);
-                                } else {
-                                    column.delete_on_link_drop = Some(false);
-                                }
-                            }
-                            if *&with_options.contains_key(WITH_RELATED_COLUMN) {
-                                let related_column = &with_options_obj.get_single_value(
-                                    WITH_RELATED_COLUMN
-                                );
-                                column.related_column = Some(related_column.clone());
-                            }
-                            if *&with_options.contains_key(WITH_SEQUENCE) {
-                                let sequence = &with_options_obj.get_single_value(
-                                    WITH_SEQUENCE
-                                );
-                                column.sequence = Some(sequence.clone());
-                            }
-                            if *&with_options.contains_key(WITH_MAX_LENGTH) {
-                                let max_length = &with_options_obj.get_single_value(
-                                    WITH_MAX_LENGTH
-                                );
-                                column.max_length = Some(max_length.clone());
-                            }
-                            if *&with_options.contains_key(WITH_STATS_FUNCTION) {
-                                let stats_function = &with_options_obj.get_single_value(
-                                    WITH_STATS_FUNCTION
-                                );
-                                column.stats_function = Some(stats_function.clone());
-                            }
-                            if *&with_options.contains_key(WITH_CONTENT_TYPES) {
-                                let content_types = with_options.get(
-                                    WITH_CONTENT_TYPES
-                                );
-                                if content_types.is_some() {
-                                    let content_types = content_types.unwrap().clone();
-                                    let mut content_types_str: Vec<String> = Vec::new();
-                                    for content_type in content_types {
-                                        let content_type_str = content_type.value;
-                                        content_types_str.push(content_type_str);
-                                    }
-                                    column.content_types = Some(content_types_str);
-                                }
-                            }
-                            if *&with_options.contains_key(WITH_MODE) {
-                                let mode = &with_options_obj.get_single_value(
-                                    WITH_MODE
-                                );
-                                column.mode = Some(mode.clone());
-                            }
-                        }
-                    }
+                let result = process_column(column_str, column_type, &item);
+                if result.is_ok() {
+                    let column = result.unwrap();
+                    columns.push(column);
                 }
-                columns.push(column);
             }
         }
         compiled_statement.sub_folders = Some(sub_folders);
@@ -1926,6 +1937,250 @@ impl<'gb> Statement<'gb> for DropFolderStatement {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ColumnCompiledStmt {
+    pub folder_name: String,
+    pub language: Option<LanguageConfig>,
+    pub text_search: Option<TextSearchConfig>,
+    pub name: Option<ColumnConfig>,
+    pub columns: Option<Vec<ColumnConfig>>,
+    pub sub_folders: Option<Vec<SubFolderConfig>>,
+}
+impl ColumnCompiledStmt {
+    pub fn defaults(folder_name: &String) -> Self {
+        let obj = Self{
+            folder_name: folder_name.clone(),
+            language: None,
+            text_search: None,
+            name: None,
+            columns: None,
+            sub_folders: None
+        };
+        return obj
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct AddColumnStatement {
+}
+
+impl<'gb> StatementCompiler<'gb, ColumnCompiledStmt> for AddColumnStatement {
+
+    fn compile(
+        &self, 
+        statement_text: &String
+    ) -> Result<ColumnCompiledStmt, Vec<PlanetError>> {
+        let expr = &RE_ADD_COLUMN;
+        let check = expr.is_match(&statement_text);
+        let mut errors: Vec<PlanetError> = Vec::new();
+        if !check {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Add column syntax not valid.")
+                ),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+        let captures = expr.captures(&statement_text);
+        let config: &str;
+        let folder_name: &str;
+        if captures.is_none() {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Could not parse add column statement.")
+                ),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+        let captures = captures.unwrap();
+        folder_name = captures.name("FolderName").unwrap().as_str();
+        config = captures.name("Config").unwrap().as_str();
+        let expr = &RE_ADD_COLUMN_CONFIG;
+        let item = expr.captures(&config);
+        if item.is_some() {
+            let item = item.unwrap();
+            let column = item.name("Column");
+            let column_type = item.name("ColumnType");
+            let column_str = column.unwrap().as_str();
+            let column_type = column_type.unwrap().as_str();
+            let result = process_column(column_str, column_type, &item);
+            if result.is_ok() {
+                let column = result.unwrap();
+                let mut compiled = ColumnCompiledStmt::defaults(
+                    &folder_name.to_string()
+                );
+                let mut columns: Vec<ColumnConfig> = Vec::new();
+                columns.push(column);
+                compiled.columns = Some(columns);
+                return Ok(compiled)
+            } else {
+                let error = PlanetError::new(
+                    500, 
+                    Some(
+                        tr!("Could not parse config attributes for add column statement.")
+                    ),
+                );
+                errors.push(error);
+                return Err(errors)
+            }
+        } else {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Could not parse config detail for add column statement.")
+                ),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+    }
+}
+
+impl<'gb> Statement<'gb> for AddColumnStatement {
+
+    fn run(
+        &self,
+        env: &'gb Environment<'gb>,
+        space_database: &SpaceDatabase,
+        statement_text: &String,
+    ) -> Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>> {
+        let space_database = space_database.clone();
+        let context = env.context;
+        let planet_context = env.planet_context;
+        let statement = self.compile(statement_text);
+        if statement.is_err() {
+            let errors = statement.unwrap_err();
+            return Err(errors)
+        }
+        let mut errors: Vec<PlanetError> = Vec::new();
+        let column_compiled = statement.unwrap();
+        let home_dir = planet_context.home_path.unwrap_or_default();
+        let account_id = context.account_id.unwrap_or_default();
+        let space_id = context.space_id.unwrap_or_default();
+        let site_id = context.site_id;
+        let result: Result<TreeFolder, PlanetError> = TreeFolder::defaults(
+            space_database.connection_pool.clone(),
+            Some(home_dir),
+            Some(account_id),
+            Some(space_id),
+            site_id,
+        );
+        if result.is_ok() {
+            let db_folder = result.unwrap();
+            let folder_name = column_compiled.folder_name;
+            let folder = db_folder.get_by_name(folder_name.as_str());
+            if folder.is_ok() {
+                let folder = folder.unwrap();
+                if folder.is_some() {
+                    let mut folder = folder.unwrap();
+                    let data = folder.data;
+                    if data.is_some() {
+                        let mut data = data.unwrap();
+                        let column_list = data.get(COLUMNS);
+                        if column_list.is_some() {
+                            let mut column_list = column_list.unwrap().clone();
+                            let column = column_compiled.columns.unwrap()[0].clone();
+                            let mut columns_map: HashMap<String, ColumnConfig> = HashMap::new();
+                            let column_name = column.clone().name.unwrap_or_default();
+                            columns_map.insert(column_name, column.clone());
+                            let map = &column.create_config(
+                                planet_context,
+                                context,
+                                &columns_map,
+                                &db_folder,
+                                &folder_name,
+                                &space_database
+                            );
+                            if map.is_err() {
+                                let error = map.clone().unwrap_err();
+                                errors.push(error);
+                            }
+                            let map = map.clone().unwrap();
+                            column_list.push(map);
+                            let map_list = &column.map_collections_db();
+                            if map_list.is_err() {
+                                let error = map_list.clone().unwrap_err();
+                                errors.push(error);
+                            }
+                            let map_list = map_list.clone().unwrap();
+                            let map_list = map_list.clone();
+                            data.extend(map_list);
+                            data.insert(COLUMNS.to_string(), column_list);
+                            // Update folder config
+                            folder.data = Some(data);
+                            let result = db_folder.update(&folder);
+                            // Build output
+                            if result.is_ok() {
+                                let folder = result.unwrap();
+                                let response_coded = serde_yaml::to_string(&folder);
+                                if response_coded.is_err() {
+                                    let error = PlanetError::new(
+                                        500, 
+                                        Some(tr!("Error encoding statement response.")),
+                                    );
+                                    errors.push(error);
+                                }
+                                let response = response_coded.unwrap();
+                                let yaml_response = yaml_rust::YamlLoader::load_from_str(
+                                    response.as_str()
+                                ).unwrap();
+                                let yaml_response = yaml_response.clone();
+                                return Ok(yaml_response)
+                            } else {
+                                let error = PlanetError::new(
+                                    500, 
+                                    Some(
+                                        tr!("Could not update folder on database.")
+                                    ),
+                                );
+                                errors.push(error);
+                            }    
+                        }
+                    } else {
+                        let error = PlanetError::new(
+                            500, 
+                            Some(
+                                tr!("Folder has no data.")
+                            ),
+                        );
+                        errors.push(error);
+                    }
+                } else {
+                    let error = PlanetError::new(
+                        500, 
+                        Some(
+                            tr!("Folder not found.")
+                        ),
+                    );
+                    errors.push(error);
+                    return Err(errors)
+                }
+            } else {
+                let error = PlanetError::new(
+                    500, 
+                    Some(
+                        tr!("Error fetching folder by name.")
+                    ),
+                );
+                errors.push(error);
+            }
+        } else {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Could not parse add column statement.")
+                ),
+            );
+            errors.push(error);
+        }
+        return Err(errors)
+    }
+}
+
 fn validate_default_language(language: &String) -> Result<(), ValidationError> {
     let language = &**language;
     let db_languages = get_db_languages();
@@ -2064,7 +2319,36 @@ pub fn resolve_schema_statement(
         }
     }
     // ADD COLUMN
+    let expr = &RE_ADD_COLUMN;
+    let check = expr.is_match(&statement_text);
+    if check {
+        let stmt = AddColumnStatement{};
+        match mode {
+            StatementCallMode::Run => {
+                let response = stmt.run(
+                    &env, 
+                    &space_data, 
+                    &statement_text,
+                );
+                return Some(response);
+            },
+            StatementCallMode::Compile => {
+                let response = stmt.compile(&statement_text);
+                if response.is_err() {
+                    let errors = response.unwrap_err();
+                    return Some(Err(errors))
+                }
+                let result = yaml_rust::YamlLoader::load_from_str("---\nstatus: ok");
+                return Some(Ok(result.unwrap()))
+            }
+        }
+    }
     // MODIFY COLUMN
-    // DELETE COLUMN
+    // MODIFY LANGUAGE
+    // ADD SUBFOLDER
+    // REMOVE SUBFOLDER
+    // MODIFY SUBFOLDER
+    // MODIFY SEARCH RELEVANCE
+    // DROP COLUMN
     return None
 }

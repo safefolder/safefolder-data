@@ -739,6 +739,7 @@ impl FolderSchema for TreeFolder {
 
     fn get_by_name(&self, folder_name: &str) -> Result<Option<DbData>, PlanetError> {
         // I travel folder for account_id if any, space id if any and folder name
+        let folder_name = folder_name.trim();
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let iter = self.tree.iter();
         let mut number_items = 0;
@@ -757,7 +758,7 @@ impl FolderSchema for TreeFolder {
             let item = item_.unwrap();
             let item_source = item.clone();
             let item_name = &item.name.unwrap();
-            eprintln!("DbFolder.get_by_name :: name: {}", item_name);
+            // eprintln!("DbFolder.get_by_name :: name: *{}*", item_name);
             let matches_name_none = &item_name.to_lowercase() == &folder_name.to_lowercase();
             let mut check_account: bool = true;
             let routing_response = item.routing;
