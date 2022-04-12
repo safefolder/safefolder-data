@@ -44,6 +44,7 @@ pub trait ConfigStorageColumn {
     fn map_objects_db(&self) -> Result<BTreeMap<String, Vec<BTreeMap<String, String>>>, PlanetError>;
     fn get_column_id_map(properties: &Vec<ColumnConfig>) -> Result<BTreeMap<String, ColumnConfig>, PlanetError>;
     fn get_name_column(db_data: &DbData) -> Option<ColumnConfig>;
+    fn get_options_key(column_name: &str) -> String;
 }
 
 pub fn generate_id() -> Option<String> {
