@@ -56,6 +56,7 @@ lazy_static! {
     pub static ref RE_MODIFY_COLUMN: Regex = Regex::new(r#"MODIFY[\s]+COLUMN[\s]+FROM[\s]+"*(?P<FolderName>[\w\s]+)"*\([\n\t\s]*(?P<Config>.[^)]+),*\);"#).unwrap();
     pub static ref RE_MODIFY_COLUMN_CONFIG: Regex = Regex::new(r#"([\s]*NAME[\s]*COLUMN (?P<NameConfig>(SmallText|LongText|Number|Currency|Percentage|GenerateNumber|Phone|Email|Url|Rating)))|([\s]*("(?P<Column>[\w\s]+)")[\s]+(?P<ColumnType>SmallText|LongText|Checkbox|Number|Select|Currency|Percentage|GenerateNumber|Phone|Email|Url|Rating|Object|File|Date|Formula|Duration|CreatedTime|LastModifiedTime|CreatedBy|LastModifiedBy|Link|Reference|Language|GenerateId|Stats))([\s]*[WITH]*[\s]*(?P<Options>[\w\s"\$=\{\}\|]*))"#).unwrap();
     pub static ref RE_DROP_COLUMN: Regex = Regex::new(r#"DROP[\s]+COLUMN[\s]+"*(?P<ColumnName>[\w\s]+)"*[\s]*FROM[\s]+"*(?P<FolderName>[\w\s]+)"*;"#).unwrap();
+    pub static ref RE_MODIFY_LANGUAGE: Regex = Regex::new(r#"MODIFY[\s]+LANGUAGE[\s]+FROM[\s]+"*(?P<FolderName>[\w\s]+)"*\([\n\t\s]*(?P<Config>.[^)]+),*\);"#).unwrap();
 }
 
 pub const WITH_PARENT: &str = "Parent";
@@ -2645,6 +2646,218 @@ impl<'gb> Statement<'gb> for DropColumnStatement {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct ModifyLanguageStatement {
+}
+
+impl<'gb> StatementCompiler<'gb, (String, String)> for ModifyLanguageStatement {
+
+    fn compile(
+        &self, 
+        statement_text: &String
+    ) -> Result<(String, String), Vec<PlanetError>> {
+        let expr = &RE_MODIFY_LANGUAGE;
+        let check = expr.is_match(&statement_text);
+        let mut errors: Vec<PlanetError> = Vec::new();
+        if !check {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Modify language syntax not valid.")
+                ),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+        let captures = expr.captures(&statement_text);
+        let folder_name: &str;
+        if captures.is_none() {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Could not parse modify language statement.")
+                ),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+        let captures = captures.unwrap();
+        folder_name = captures.name("FolderName").unwrap().as_str();
+        let config = captures.name("Config").unwrap().as_str();
+        let fields: Vec<&str> = config.split("LANGUAGE ").collect();
+        if fields.len() == 0 {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("You need LANGUAGE attribute in the configuration sent.")
+                ),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+        let language = fields[1].to_string().replace("\n", "");
+        let language_str = language.as_str();
+        let check_language = LANGUAGE_ITEMS.contains(&language_str);
+        if !check_language {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Language \"{}\" is not supported.", language_str)
+                ),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+        return Ok(
+            (
+                folder_name.to_string(),
+                language
+            )
+        )
+    }
+}
+
+impl<'gb> Statement<'gb> for ModifyLanguageStatement {
+
+    fn run(
+        &self,
+        env: &'gb Environment<'gb>,
+        space_database: &SpaceDatabase,
+        statement_text: &String,
+    ) -> Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>> {
+        let space_database = space_database.clone();
+        let context = env.context;
+        let planet_context = env.planet_context;
+        let statement = self.compile(statement_text);
+        if statement.is_err() {
+            let errors = statement.unwrap_err();
+            return Err(errors)
+        }
+        let mut errors: Vec<PlanetError> = Vec::new();
+        let statement_items = statement.unwrap();
+        let folder_name = statement_items.0;
+        let language_code = statement_items.1;
+        let language = LanguageConfig{
+            default: language_code
+        };
+        let home_dir = planet_context.home_path.unwrap_or_default();
+        let account_id = context.account_id.unwrap_or_default();
+        let space_id = context.space_id.unwrap_or_default();
+        let box_id = context.box_id.unwrap_or_default();
+        let site_id = context.site_id;
+        let result: Result<TreeFolder, PlanetError> = TreeFolder::defaults(
+            space_database.connection_pool.clone(),
+            Some(home_dir),
+            Some(account_id),
+            Some(space_id),
+            site_id,
+        );
+        if result.is_ok() {
+            let db_folder = result.unwrap();
+            let folder = db_folder.get_by_name(folder_name.as_str());
+            if folder.is_ok() {
+                let folder = folder.unwrap();
+                if folder.is_some() {
+                    let mut folder = folder.unwrap();
+                    let folder_id = folder.clone().id.unwrap();
+                    let data = folder.data;
+                    if data.is_some() {
+                        let mut data = data.unwrap();
+                        let language_default = language.default;
+                        data.insert(LANGUAGE_DEFAULT.to_string(), build_value_list(&language_default));
+                        folder.data = Some(data);
+                        let result = db_folder.update(&folder);
+                        // Build output
+                        if result.is_ok() {
+                            let mut site_id_alt: Option<String> = None;
+                            if site_id.is_some() {
+                                let site_id = site_id.unwrap();
+                                site_id_alt = Some(site_id.to_string());
+                            }
+                            let result_item: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
+                                space_database.connection_pool.clone(),
+                                home_dir,
+                                account_id,
+                                space_id,
+                                site_id_alt,
+                                box_id,
+                                folder_id.as_str(),
+                                &db_folder,
+                            );
+                            if result_item.is_ok() {
+                                let mut items_db = result_item.unwrap();
+                                let result_reindex = items_db.reindex_default_language();
+                                if result_reindex.is_err() {
+                                    let error = result_reindex.unwrap_err();
+                                    errors.push(error);
+                                    return Err(errors)
+                                }
+                                let folder = result.unwrap();
+                                let response_coded = serde_yaml::to_string(&folder);
+                                if response_coded.is_err() {
+                                    let error = PlanetError::new(
+                                        500, 
+                                        Some(tr!("Error encoding statement response.")),
+                                    );
+                                    errors.push(error);
+                                }
+                                let response = response_coded.unwrap();
+                                let yaml_response = yaml_rust::YamlLoader::load_from_str(
+                                    response.as_str()
+                                ).unwrap();
+                                let yaml_response = yaml_response.clone();
+                                return Ok(yaml_response)
+                            }
+                        } else {
+                            let error = PlanetError::new(
+                                500, 
+                                Some(
+                                    tr!("Could not update folder on database.")
+                                ),
+                            );
+                            errors.push(error);
+                        }
+                    } else {
+                        let error = PlanetError::new(
+                            500, 
+                            Some(
+                                tr!("Folder has no data.")
+                            ),
+                        );
+                        errors.push(error);
+                    }
+                } else {
+                    let error = PlanetError::new(
+                        500, 
+                        Some(
+                            tr!("Folder not found.")
+                        ),
+                    );
+                    errors.push(error);
+                    return Err(errors)
+                }
+            } else {
+                let error = PlanetError::new(
+                    500, 
+                    Some(
+                        tr!("Error fetching folder by name.")
+                    ),
+                );
+                errors.push(error);
+            }
+        } else {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Could not parse modify language statement.")
+                ),
+            );
+            errors.push(error);
+        }
+        return Err(errors)
+    }
+}
+
 fn validate_default_language(language: &String) -> Result<(), ValidationError> {
     let language = &**language;
     let db_languages = get_db_languages();
@@ -2858,6 +3071,30 @@ pub fn resolve_schema_statement(
         }
     }
     // MODIFY LANGUAGE
+    let expr = &RE_MODIFY_LANGUAGE;
+    let check = expr.is_match(&statement_text);
+    if check {
+        let stmt = ModifyLanguageStatement{};
+        match mode {
+            StatementCallMode::Run => {
+                let response = stmt.run(
+                    &env, 
+                    &space_data, 
+                    &statement_text,
+                );
+                return Some(response);
+            },
+            StatementCallMode::Compile => {
+                let response = stmt.compile(&statement_text);
+                if response.is_err() {
+                    let errors = response.unwrap_err();
+                    return Some(Err(errors))
+                }
+                let result = yaml_rust::YamlLoader::load_from_str("---\nstatus: ok");
+                return Some(Ok(result.unwrap()))
+            }
+        }
+    }
     // ADD SUBFOLDER
     // REMOVE SUBFOLDER
     // MODIFY SUBFOLDER

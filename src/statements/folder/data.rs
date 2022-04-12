@@ -812,7 +812,7 @@ impl<'gb> Statement<'gb> for InsertIntoFolderStatement {
                             );
                             let text_map = text_map.clone();
                             let text = text_map.get(&text_column_id).unwrap();
-                            let result_lang = obj.validate(text, &folder);
+                            let result_lang = obj.validate(text);
                             if result_lang.is_err() {
                                 let error_message = result_lang.clone().unwrap_err().message;
                                 errors.push(

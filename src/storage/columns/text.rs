@@ -525,7 +525,7 @@ impl LanguageColumn {
         let config = self.config.clone();
         return Ok(config)
     }
-    pub fn validate(&self, text: &String, folder: &DbData) -> Result<String, PlanetError> {
+    pub fn validate(&self, text: &String) -> Result<String, PlanetError> {
         let detector: LanguageDetector = LanguageDetectorBuilder::from_languages(&LANGUAGES).with_preloaded_language_models().build();
         let detected_language: Option<Language> = detector.detect_language_of(text);
         let mut language_code = String::from("");
@@ -533,52 +533,12 @@ impl LanguageColumn {
             let detected_language = detected_language.unwrap();
             language_code = detected_language.iso_code_639_1().to_string();
             eprintln!("LanguageColumn.validate :: resolved language_code: {}", &language_code);
+            return Ok(language_code)
         } else {
-            // We get the default language for the folder from folder config
-            let folder = folder.clone();
-            let data = folder.data.unwrap();
-            let language_default = data.get(&LANGUAGE_DEFAULT.to_string());
-            if language_default.is_some() {
-                let language_default = language_default.unwrap();
-                let language_default = get_value_list(language_default);
-                if language_default.is_some() {
-                    let language_default = language_default.unwrap();
-                    let language_default = language_default.as_str();
-                    eprintln!("LanguageColumn.validate :: language_default: {}", language_default);
-                    match language_default {
-                        LANGUAGE_DANISH => {
-                            return Ok(String::from(LANGUAGE_CODE_DANISH))
-                        },
-                        LANGUAGE_ENGLISH => {
-                            return Ok(String::from(LANGUAGE_CODE_ENGLISH))
-                        },
-                        LANGUAGE_SPANISH => {
-                            return Ok(String::from(LANGUAGE_CODE_SPANISH))
-                        },
-                        LANGUAGE_FRENCH => {
-                            return Ok(String::from(LANGUAGE_CODE_FRENCH))
-                        },
-                        LANGUAGE_ITALIAN => {
-                            return Ok(String::from(LANGUAGE_CODE_ITALIAN))
-                        },
-                        LANGUAGE_GERMAN => {
-                            return Ok(String::from(LANGUAGE_CODE_GERMAN))
-                        },
-                        LANGUAGE_PORTUGUESE => {
-                            return Ok(String::from(LANGUAGE_CODE_PORTUGUESE))
-                        },
-                        LANGUAGE_NORWEGIAN => {
-                            return Ok(String::from(LANGUAGE_CODE_NORWEGIAN))
-                        },
-                        LANGUAGE_SWEDISH => {
-                            return Ok(String::from(LANGUAGE_CODE_SWEDISH))
-                        },
-                        _ => {},
-                    }        
-                }
-            }
-        }
-        return Ok(language_code)
+            // language is empty string. When indexing, we get default from folder to index in that language when
+            // language not detected.
+            return Ok(language_code)
+        }        
     }
     pub fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {
         let column_config = self.config.clone();
@@ -595,6 +555,67 @@ impl LanguageColumn {
     }
 }
 
+pub fn get_default_language_code(folder: &DbData) -> Result<String, PlanetError> {
+    let folder = folder.clone();
+    let data = folder.data.unwrap();
+    let language_default = data.get(&LANGUAGE_DEFAULT.to_string());
+    if language_default.is_some() {
+        let language_default = language_default.unwrap();
+        let language_default = get_value_list(language_default);
+        if language_default.is_some() {
+            let language_default = language_default.unwrap();
+            let language_default = language_default.as_str();
+            match language_default {
+                LANGUAGE_DANISH => {
+                    return Ok(String::from(LANGUAGE_CODE_DANISH))
+                },
+                LANGUAGE_ENGLISH => {
+                    return Ok(String::from(LANGUAGE_CODE_ENGLISH))
+                },
+                LANGUAGE_SPANISH => {
+                    return Ok(String::from(LANGUAGE_CODE_SPANISH))
+                },
+                LANGUAGE_FRENCH => {
+                    return Ok(String::from(LANGUAGE_CODE_FRENCH))
+                },
+                LANGUAGE_ITALIAN => {
+                    return Ok(String::from(LANGUAGE_CODE_ITALIAN))
+                },
+                LANGUAGE_GERMAN => {
+                    return Ok(String::from(LANGUAGE_CODE_GERMAN))
+                },
+                LANGUAGE_PORTUGUESE => {
+                    return Ok(String::from(LANGUAGE_CODE_PORTUGUESE))
+                },
+                LANGUAGE_NORWEGIAN => {
+                    return Ok(String::from(LANGUAGE_CODE_NORWEGIAN))
+                },
+                LANGUAGE_SWEDISH => {
+                    return Ok(String::from(LANGUAGE_CODE_SWEDISH))
+                },
+                _ => {
+                    let error = PlanetError::new(
+                        500, 
+                        Some(tr!("Language default \"{}\" not supported.", language_default)),
+                    );
+                    return Err(error);
+                },
+            }        
+        } else {
+            let error = PlanetError::new(
+                500, 
+                Some(tr!("Error defining default language")),
+            );
+            return Err(error);
+        }
+    } else {
+        let error = PlanetError::new(
+            500, 
+            Some(tr!("Error defining default language, not found on folder configuration.")),
+        );
+        return Err(error);
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct TextColumn {

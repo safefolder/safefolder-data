@@ -31,7 +31,9 @@ use crate::planet::{PlanetError};
 use crate::statements::folder::config::{DbFolderConfig};
 use crate::storage::constants::*;
 use crate::storage::columns::*;
-use crate::storage::columns::text::{get_stop_words_by_language, get_stemmer_by_language};
+use crate::storage::columns::text::{
+    get_stop_words_by_language, get_stemmer_by_language, get_default_language_code
+};
 
 
 pub trait FolderSchema {
@@ -1115,6 +1117,98 @@ pub struct TreeFolderItem {
 
 impl TreeFolderItem {
 
+    pub fn reindex_default_language(
+        &mut self
+    ) -> Result<(), PlanetError> {
+        let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
+        let tree_folder = self.tree_folder.clone();
+        let folder_id = self.folder_id.clone();
+        let mut language_id: String = String::from("");
+        if folder_id.is_some() {
+            let folder_id = folder_id.unwrap();
+            let folder = tree_folder.get(&folder_id);
+            if folder.is_ok() {
+                let folder = folder.unwrap();
+                let data = folder.data;
+                if data.is_some() {
+                    let data = data.unwrap();
+                    let column_list = data.get(COLUMNS);
+                    if column_list.is_some() {
+                        let column_list = column_list.unwrap();
+                        for column_item in column_list {
+                            let column_type = column_item.get(COLUMN_TYPE).unwrap().clone();
+                            if column_type == COLUMN_TYPE_LANGUAGE.to_string() {
+                                language_id = column_item.get(ID).unwrap().clone();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if language_id == String::from("") {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Error getting language id from folder config.")),
+                )
+            )
+        }
+        let partitions = self.get_partitions();
+        if partitions.is_err() {
+            // Throw error returning, no need to restore data since no data was removed
+            return Err(
+                PlanetError::new(500, Some(tr!("Error getting database partitions.")))
+            )
+        }
+        let partitions = partitions.unwrap();
+        for partition in partitions {
+            let result = self.open_partition(&partition);
+            if result.is_ok() {
+                let items = result.unwrap();
+                self.tree = Some(items.0);
+                self.index = Some(items.1);
+                let tree = self.tree.clone().unwrap();
+                for result in tree.iter() {
+                    let tuple = result.unwrap();
+                    let item_db = tuple.1.to_vec();
+                    let item_ = EncryptedMessage::deserialize(item_db).unwrap();
+                    let item_ = DbData::decrypt_owned(
+                        &item_, 
+                        &shared_key);
+                    let item = item_.unwrap();
+                    let data = item.clone().data;
+                    if data.is_some() {
+                        let data = data.unwrap();
+                        let language = data.get(&language_id);
+                        if language.is_some() {
+                            let language = language.unwrap();
+                            let language = get_value_list(language);
+                            if language.is_some() {
+                                let language = language.unwrap();
+                                if language == String::from("") {
+                                    let mut text_data: BTreeMap<String, String> = BTreeMap::new();
+                                    let my_text_data = data.get(TEXT);
+                                    if my_text_data.is_some() {
+                                        text_data = my_text_data.unwrap()[0].clone();
+                                    }
+                                    let result = self.index(
+                                        &item,
+                                        &text_data
+                                    );
+                                    if result.is_err() {
+                                        let error = result.unwrap_err();
+                                        return Err(error)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }    
+            }
+        }
+        return Ok(())
+    }
+
     fn get_partition(
         &mut self,
         item_id: &str,
@@ -1544,7 +1638,7 @@ impl TreeFolderItem {
         }
         let folder = folder.unwrap();
         // eprintln!("DbFolderItem.get_language_code :: folder: {:#?}", &folder);
-        let data_config = folder.data.unwrap();
+        let data_config = folder.clone().data.unwrap();
         let columns = data_config.get(COLUMNS);
         if columns.is_some() {
             let columns = columns.unwrap();
@@ -1563,7 +1657,20 @@ impl TreeFolderItem {
                             let language_code = language_code.unwrap();
                             let language_code = get_value_list(&language_code);
                             if language_code.is_some() {
-                                let language_code = language_code.unwrap();
+                                let mut language_code = language_code.unwrap();
+                                if language_code == String::from("") {
+                                    let result = get_default_language_code(&folder);
+                                    if result.is_ok() {
+                                        language_code = result.unwrap();
+                                    } else {
+                                        return Err(
+                                            PlanetError::new(
+                                                500, 
+                                                Some(tr!("Could not detect default language")),
+                                            )
+                                        )
+                                    }
+                                }
                                 return Ok(language_code)
                             }
                         }
