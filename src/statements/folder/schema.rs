@@ -2103,6 +2103,22 @@ impl<'gb> Statement<'gb> for AddColumnStatement {
                         if column_list.is_some() {
                             let mut column_list = column_list.unwrap().clone();
                             let column = column_compiled.columns.unwrap()[0].clone();
+                            for column_item in column_list.clone() {
+                                let item_column_name = column_item.get(NAME);
+                                if item_column_name.is_some() {
+                                    let item_column_name = item_column_name.unwrap().clone();
+                                    let column_name = &column.name.clone().unwrap();
+                                    let column_name = column_name.clone();
+                                    if item_column_name.to_lowercase() == column_name.to_lowercase() {
+                                        let error = PlanetError::new(
+                                            500, 
+                                            Some(tr!("Column already exists with name \"{}\"", &column_name)),
+                                        );
+                                        errors.push(error);
+                                        return Err(errors)
+                                    }
+                                }
+                            }
                             let mut columns_map: HashMap<String, ColumnConfig> = HashMap::new();
                             let column_name = column.clone().name.unwrap_or_default();
                             columns_map.insert(column_name, column.clone());
