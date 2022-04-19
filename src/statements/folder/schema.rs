@@ -57,6 +57,8 @@ lazy_static! {
     pub static ref RE_MODIFY_COLUMN_CONFIG: Regex = Regex::new(r#"([\s]*NAME[\s]*COLUMN (?P<NameConfig>(SmallText|LongText|Number|Currency|Percentage|GenerateNumber|Phone|Email|Url|Rating)))|([\s]*("(?P<Column>[\w\s]+)")[\s]+(?P<ColumnType>SmallText|LongText|Checkbox|Number|Select|Currency|Percentage|GenerateNumber|Phone|Email|Url|Rating|Object|File|Date|Formula|Duration|CreatedTime|LastModifiedTime|CreatedBy|LastModifiedBy|Link|Reference|Language|GenerateId|Stats))([\s]*[WITH]*[\s]*(?P<Options>[\w\s"\$=\{\}\|]*))"#).unwrap();
     pub static ref RE_DROP_COLUMN: Regex = Regex::new(r#"DROP[\s]+COLUMN[\s]+"*(?P<ColumnName>[\w\s]+)"*[\s]*FROM[\s]+"*(?P<FolderName>[\w\s]+)"*;"#).unwrap();
     pub static ref RE_MODIFY_LANGUAGE: Regex = Regex::new(r#"MODIFY[\s]+LANGUAGE[\s]+FROM[\s]+"*(?P<FolderName>[\w\s]+)"*\([\n\t\s]*(?P<Config>.[^)]+),*\);"#).unwrap();
+    pub static ref RE_ADD_SUBFOLDER: Regex = Regex::new(r#"ADD[\s]+SUBFOLDER[\s]+INTO[\s]+"*(?P<FolderName>[\w\s]+)"*[\s]*\([\n\t\s]*(?P<Config>[\s\S][^)]+)\);"#).unwrap();
+    pub static ref RE_ADD_SUBFOLDER_CONFIG: Regex = Regex::new(r#"([\s]*(?P<SubFolderName>[\w\s]+))|([\s]*(?P<SubFolderNameAlt>[\w\s]+) WITH (?P<SubFolderOptions>[\w\s"\$=\{\}\|]*))"#).unwrap();
 }
 
 pub const WITH_PARENT: &str = "Parent";
@@ -2603,7 +2605,7 @@ impl<'gb> Statement<'gb> for DropColumnStatement {
                                     ),
                                 );
                                 errors.push(error);
-                            }    
+                            }
                         }
                     } else {
                         let error = PlanetError::new(
@@ -2817,6 +2819,284 @@ impl<'gb> Statement<'gb> for ModifyLanguageStatement {
                             );
                             errors.push(error);
                         }
+                    } else {
+                        let error = PlanetError::new(
+                            500, 
+                            Some(
+                                tr!("Folder has no data.")
+                            ),
+                        );
+                        errors.push(error);
+                    }
+                } else {
+                    let error = PlanetError::new(
+                        500, 
+                        Some(
+                            tr!("Folder not found.")
+                        ),
+                    );
+                    errors.push(error);
+                    return Err(errors)
+                }
+            } else {
+                let error = PlanetError::new(
+                    500, 
+                    Some(
+                        tr!("Error fetching folder by name.")
+                    ),
+                );
+                errors.push(error);
+            }
+        } else {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Could not parse modify language statement.")
+                ),
+            );
+            errors.push(error);
+        }
+        return Err(errors)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct AddSubfolderStatement {
+}
+
+impl<'gb> StatementCompiler<'gb, (String, SubFolderConfig)> for AddSubfolderStatement {
+
+    fn compile(
+        &self, 
+        statement_text: &String
+    ) -> Result<(String, SubFolderConfig), Vec<PlanetError>> {
+        let expr = &RE_ADD_SUBFOLDER;
+        let check = expr.is_match(&statement_text);
+        let mut errors: Vec<PlanetError> = Vec::new();
+        if !check {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Add subfolder syntax not valid.")
+                ),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+        let captures = expr.captures(&statement_text);
+        let folder_name: &str;
+        if captures.is_none() {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Could not parse add subfolder statement.")
+                ),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+        let captures = captures.unwrap();
+        folder_name = captures.name("FolderName").unwrap().as_str();
+        let config = captures.name("Config").unwrap().as_str();
+        let expr = &RE_ADD_SUBFOLDER_CONFIG;
+        let items = expr.captures_iter(config);
+        if items.count() > 1 {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Only one column is supported for ADD SUBFOLDER statement.")
+                ),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+        let item = expr.captures(config);
+        if item.is_some() {
+            let item = item.unwrap();
+            let sub_folder_name = item.name("SubFolderName");
+            let sub_folder_name_alt = item.name("SubFolderNameAlt");
+            if sub_folder_name.is_some() || sub_folder_name_alt.is_some() {
+                // Sub folders
+                let mut sub_folder_name_: &str = "";
+                if sub_folder_name.is_some() {
+                    sub_folder_name_ = sub_folder_name.unwrap().as_str();
+                }
+                if sub_folder_name_alt.is_some() {
+                    sub_folder_name_ = sub_folder_name_alt.unwrap().as_str();
+                }
+                let sub_folder_name_str = sub_folder_name_.replace("\n", "");
+                sub_folder_name_ = sub_folder_name_str.as_str();
+                let sub_folder_options = captures.name("SubFolderOptions");
+                let mut sub_folder_obj: SubFolderConfig = SubFolderConfig{
+                    id: generate_id(),
+                    name: Some(sub_folder_name_.to_string()),
+                    parent: None,
+                    parent_id: None,
+                    version: SubFolderConfig::version(),
+                };
+                if sub_folder_options.is_some() {
+                    let sub_folder_options = sub_folder_options.unwrap().as_str();
+                    let result = WithOptions::defaults(
+                        &sub_folder_options.to_string()
+                    );
+                    if result.is_err() {
+                        let error = result.unwrap_err();
+                        errors.push(error);
+                    } else {
+                        let with_options_obj = result.unwrap();
+                        let with_options = &with_options_obj.options;
+                        if *&with_options.contains_key(WITH_PARENT) {
+                            let parent = &with_options_obj.get_single_value(
+                                WITH_PARENT
+                            );
+                            sub_folder_obj.parent = Some(parent.clone());
+                        }
+                    }
+                }
+                return Ok(
+                    (
+                        folder_name.to_string(),
+                        sub_folder_obj.clone()
+                    )
+                )        
+            }
+        }
+        let error = PlanetError::new(
+            500, 
+            Some(
+                tr!("Compilation error for ADD SUBFOLDER statement.")
+            ),
+        );
+        errors.push(error);
+        return Err(errors)
+    }
+}
+
+impl<'gb> Statement<'gb> for AddSubfolderStatement {
+
+    fn run(
+        &self,
+        env: &'gb Environment<'gb>,
+        space_database: &SpaceDatabase,
+        statement_text: &String,
+    ) -> Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>> {
+        let space_database = space_database.clone();
+        let context = env.context;
+        let planet_context = env.planet_context;
+        let statement = self.compile(statement_text);
+        if statement.is_err() {
+            let errors = statement.unwrap_err();
+            return Err(errors)
+        }
+        let mut errors: Vec<PlanetError> = Vec::new();
+        let statement_items = statement.unwrap();
+        let folder_name = statement_items.0;
+        let sub_folder = statement_items.1;
+        let home_dir = planet_context.home_path.unwrap_or_default();
+        let account_id = context.account_id.unwrap_or_default();
+        let space_id = context.space_id.unwrap_or_default();
+        let site_id = context.site_id;
+        let result: Result<TreeFolder, PlanetError> = TreeFolder::defaults(
+            space_database.connection_pool.clone(),
+            Some(home_dir),
+            Some(account_id),
+            Some(space_id),
+            site_id,
+        );
+        if result.is_ok() {
+            let db_folder = result.unwrap();
+            let folder = db_folder.get_by_name(folder_name.as_str());
+            if folder.is_ok() {
+                let folder = folder.unwrap();
+                if folder.is_some() {
+                    let mut folder = folder.unwrap();
+                    let data = folder.data;
+                    if data.is_some() {
+                        let mut data = data.unwrap();
+                        // Sub folders
+                        let sub_folder_name = sub_folder.name.unwrap_or_default();
+                        let sub_folder_id = sub_folder.id.unwrap_or_default();
+                        let mut list: Vec<BTreeMap<String, String>> = Vec::new();
+                        let db_sub_folders = data.get(SUB_FOLDERS);
+                        if db_sub_folders.is_some() {
+                            // I process here the parent values
+                            let db_sub_folders = db_sub_folders.unwrap().clone();
+                            list = db_sub_folders;
+                            let mut my_map: HashMap<String, String> = HashMap::new();
+                            for sub_folder in list.clone() {
+                                let sub_folder_name_item = sub_folder.get(NAME).unwrap().clone();
+                                let sub_folder_id_item = sub_folder.get(ID).unwrap().clone();
+                                if sub_folder_name_item.to_lowercase() == sub_folder_name.to_lowercase() {
+                                    let error = PlanetError::new(
+                                        500, 
+                                        Some(tr!("Subfolder \"{}\" already exists.", &sub_folder_name)),
+                                    );
+                                    errors.push(error);
+                                    return Err(errors)
+                                } else {
+                                    my_map.insert(sub_folder_name_item, sub_folder_id_item);
+                                }
+                            }
+                            let mut sub_folder_db_map: BTreeMap<String, String> = BTreeMap::new();
+                            sub_folder_db_map.insert(NAME.to_string(), sub_folder_name);
+                            sub_folder_db_map.insert(ID.to_string(), sub_folder_id);
+                            sub_folder_db_map.insert(
+                                VERSION.to_string(), 
+                                sub_folder.version.unwrap_or_default()
+                            );
+                            let parent = sub_folder.parent.clone().unwrap_or_default();
+                            let parent_id = my_map.get(&parent);
+                            if parent_id.is_some() {
+                                let parent_id = parent_id.unwrap();
+                                sub_folder_db_map.insert(
+                                    PARENT_ID.to_string(), 
+                                    parent_id.clone()
+                                );
+                            }
+                            list.push(sub_folder_db_map);
+                        } else {
+                            // Since I have no sub folders on db, I have no way to have parent objects, no options
+                            let mut sub_folder_db_map: BTreeMap<String, String> = BTreeMap::new();
+                            sub_folder_db_map.insert(NAME.to_string(), sub_folder_name);
+                            sub_folder_db_map.insert(ID.to_string(), sub_folder_id);
+                            sub_folder_db_map.insert(
+                                VERSION.to_string(), 
+                                sub_folder.version.unwrap_or_default()
+                            );
+                            list.push(sub_folder_db_map);
+                        }
+                        data.insert(
+                            SUB_FOLDERS.to_string(),
+                            list
+                        );
+                        folder.data = Some(data);
+                        let result = db_folder.update(&folder);
+                        // Build output
+                        if result.is_ok() {
+                            let folder = result.unwrap();
+                            let response_coded = serde_yaml::to_string(&folder);
+                            if response_coded.is_err() {
+                                let error = PlanetError::new(
+                                    500, 
+                                    Some(tr!("Error encoding statement response.")),
+                                );
+                                errors.push(error);
+                            }
+                            let response = response_coded.unwrap();
+                            let yaml_response = yaml_rust::YamlLoader::load_from_str(
+                                response.as_str()
+                            ).unwrap();
+                            let yaml_response = yaml_response.clone();
+                            return Ok(yaml_response)
+                        } else {
+                            let error = PlanetError::new(
+                                500, 
+                                Some(
+                                    tr!("Could not update folder on database.")
+                                ),
+                            );
+                            errors.push(error);
+                        }    
                     } else {
                         let error = PlanetError::new(
                             500, 
@@ -3096,6 +3376,30 @@ pub fn resolve_schema_statement(
         }
     }
     // ADD SUBFOLDER
+    let expr = &RE_ADD_SUBFOLDER;
+    let check = expr.is_match(&statement_text);
+    if check {
+        let stmt = AddSubfolderStatement{};
+        match mode {
+            StatementCallMode::Run => {
+                let response = stmt.run(
+                    &env, 
+                    &space_data, 
+                    &statement_text,
+                );
+                return Some(response);
+            },
+            StatementCallMode::Compile => {
+                let response = stmt.compile(&statement_text);
+                if response.is_err() {
+                    let errors = response.unwrap_err();
+                    return Some(Err(errors))
+                }
+                let result = yaml_rust::YamlLoader::load_from_str("---\nstatus: ok");
+                return Some(Ok(result.unwrap()))
+            }
+        }
+    }
     // REMOVE SUBFOLDER
     // MODIFY SUBFOLDER
     // MODIFY SEARCH RELEVANCE
