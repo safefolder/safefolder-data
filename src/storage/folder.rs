@@ -1117,6 +1117,63 @@ pub struct TreeFolderItem {
 
 impl TreeFolderItem {
 
+    pub fn reindex_all(
+        &mut self
+    ) -> Result<(), PlanetError> {
+        let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
+        let partitions = self.get_partitions();
+        if partitions.is_err() {
+            // Throw error returning, no need to restore data since no data was removed
+            return Err(
+                PlanetError::new(500, Some(tr!("Error getting database partitions.")))
+            )
+        }
+        let partitions = partitions.unwrap();
+        for partition in partitions {
+            let result = self.open_partition(&partition);
+            if result.is_ok() {
+                let items = result.unwrap();
+                self.tree = Some(items.0);
+                self.index = Some(items.1);
+                let tree = self.tree.clone().unwrap();
+                for result in tree.iter() {
+                    let tuple = result.unwrap();
+                    let item_db = tuple.1.to_vec();
+                    let item_ = EncryptedMessage::deserialize(item_db).unwrap();
+                    let item_ = DbData::decrypt_owned(
+                        &item_, 
+                        &shared_key);
+                    let item = item_.unwrap();
+                    let data = item.clone().data;
+                    if data.is_some() {
+                        let data = data.unwrap();
+                        let mut text_data: BTreeMap<String, String> = BTreeMap::new();
+                        let my_text_data = data.get(TEXT);
+                        if my_text_data.is_some() {
+                            text_data = my_text_data.unwrap()[0].clone();
+                        }
+                        let result = self.index(
+                            &item,
+                            &text_data
+                        );
+                        if result.is_err() {
+                            let error = result.unwrap_err();
+                            return Err(error)
+                        }
+                    }
+                }
+            } else {
+                return Err(
+                    PlanetError::new(500, Some(tr!(
+                        "Could not open partition \"{}\".", &partition
+                    )))
+                )
+    
+            }
+        }
+        return Ok(())
+    }
+
     pub fn reindex_default_language(
         &mut self
     ) -> Result<(), PlanetError> {

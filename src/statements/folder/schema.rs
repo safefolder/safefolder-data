@@ -61,6 +61,7 @@ lazy_static! {
     pub static ref RE_SUBFOLDER_CONFIG: Regex = Regex::new(r#"([\s]*(?P<SubFolderName>[\w\s]+))|([\s]*(?P<SubFolderNameAlt>[\w\s]+) WITH (?P<SubFolderOptions>[\w\s"\$=\{\}\|]*))"#).unwrap();
     pub static ref RE_MODIFY_SUBFOLDER: Regex = Regex::new(r#"MODIFY[\s]+SUBFOLDER[\s]+"*(?P<SubFolderName>[\w\s]+)"*[\s]+FROM[\s]+"*(?P<FolderName>[\w\s]+)"*[\s]*\([\n\t\s]*(?P<Config>[\s\S][^)]+)\);"#).unwrap();
     pub static ref RE_DROP_SUBFOLDER: Regex = Regex::new(r#"DROP[\s]+SUBFOLDER[\s]+"*(?P<SubFolderName>[\w\s]+)"*[\s]+FROM[\s]+"*(?P<FolderName>[\w\s]+)"*;"#).unwrap();
+    pub static ref RE_MODIFY_SEARCH_RELEVANCE: Regex = Regex::new(r#"MODIFY[\s]+SEARCH[\s]+RELEVANCE[\s]+FROM[\s]+"*(?P<FolderName>[\w\s]+)"*[\s]*\([\n\t\s]*WITH[\s]+(?P<SearchRelevanceOptions>[\w\s"\$=\{\}\|]*)\);"#).unwrap();
 }
 
 pub const WITH_PARENT: &str = "Parent";
@@ -3553,6 +3554,286 @@ impl<'gb> Statement<'gb> for DropSubfolderStatement {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct ModifySearchRelevanceStatement {
+}
+
+impl<'gb> StatementCompiler<'gb, (String, TextSearchConfig)> for ModifySearchRelevanceStatement {
+
+    fn compile(
+        &self, 
+        statement_text: &String
+    ) -> Result<(String, TextSearchConfig), Vec<PlanetError>> {
+        let expr = &RE_MODIFY_SEARCH_RELEVANCE;
+        let check = expr.is_match(&statement_text);
+        let mut errors: Vec<PlanetError> = Vec::new();
+        if !check {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Modify search relevance syntax not valid.")
+                ),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+        let captures = expr.captures(&statement_text);
+        let folder_name: &str;
+        if captures.is_none() {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Could not parse modify search relevance statement.")
+                ),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+        let captures = captures.unwrap();
+        folder_name = captures.name("FolderName").unwrap().as_str();
+        let search_options = captures.name("SearchRelevanceOptions");
+        if search_options.is_some() {
+            let search_options = search_options.unwrap().as_str();
+            let search_options = search_options.replace("\n", "");
+            let search_options = search_options.as_str();
+            let result = WithOptions::defaults(
+                &search_options.to_string()
+            );
+            if result.is_err() {
+                let mut errors: Vec<PlanetError> = Vec::new();
+                let error = result.unwrap_err();
+                errors.push(error);
+                return Err(errors)
+            } else {
+                let with_options_obj = result.unwrap();
+                let with_options = &with_options_obj.options;
+                let mut column_relevance: BTreeMap<String, u8> = BTreeMap::new();
+                for (k, v) in with_options {
+                    let value = v.clone()[0].clone().value;
+                    let value_int: u8 = FromStr::from_str(value.as_str()).unwrap();
+                    let key = k.clone();
+                    column_relevance.insert(key, value_int);
+                }
+                // Validate column relevance
+                let validate = validate_column_relevance(&column_relevance);
+                if validate.is_err() {
+                    errors.push(
+                        PlanetError::new(
+                            500, 
+                            Some(
+                                tr!("Validation error for column relevance: \"{}\".", &search_options)
+                            ),
+                        )
+                    );
+                    return Err(errors)
+                }
+                let text_search_config = TextSearchConfig{
+                    column_relevance: column_relevance
+                };
+                return Ok(
+                    (
+                        folder_name.to_string(),
+                        text_search_config,
+                    )
+                )
+            }
+        } else {
+            errors.push(
+                PlanetError::new(
+                    500, 
+                    Some(
+                        tr!("Error compiling modify search relevance.")
+                    ),
+                )
+            );
+            return Err(errors)
+        }
+    }
+}
+
+impl<'gb> Statement<'gb> for ModifySearchRelevanceStatement {
+
+    fn run(
+        &self,
+        env: &'gb Environment<'gb>,
+        space_database: &SpaceDatabase,
+        statement_text: &String,
+    ) -> Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>> {
+        let space_database = space_database.clone();
+        let context = env.context;
+        let planet_context = env.planet_context;
+        let statement = self.compile(statement_text);
+        if statement.is_err() {
+            let errors = statement.unwrap_err();
+            return Err(errors)
+        }
+        let mut errors: Vec<PlanetError> = Vec::new();
+        let statement_items = statement.unwrap();
+        let folder_name = statement_items.0;
+        let text_search = statement_items.1;
+        let home_dir = planet_context.home_path.unwrap_or_default();
+        let account_id = context.account_id.unwrap_or_default();
+        let space_id = context.space_id.unwrap_or_default();
+        let box_id = context.box_id.unwrap_or_default();
+        let site_id = context.site_id;
+        let result: Result<TreeFolder, PlanetError> = TreeFolder::defaults(
+            space_database.connection_pool.clone(),
+            Some(home_dir),
+            Some(account_id),
+            Some(space_id),
+            site_id,
+        );
+        if result.is_ok() {
+            let db_folder = result.unwrap();
+            let folder = db_folder.get_by_name(folder_name.as_str());
+            if folder.is_ok() {
+                let folder = folder.unwrap();
+                if folder.is_some() {
+                    let mut folder = folder.unwrap();
+                    let folder_id = folder.clone().id.unwrap();
+                    let data = folder.data;
+                    if data.is_some() {
+                        let mut data = data.unwrap();
+                        let mut column_relevance = text_search.column_relevance;
+                        let mut my_map: BTreeMap<String, String> = BTreeMap::new();
+                        // Include Text rule if not found
+                        let mut has_text = false;
+                        for (column_relevance_item, _) in column_relevance.clone() {
+                            if column_relevance_item == String::from(TEXT_COLUMN) {
+                                has_text = true;
+                            }
+                        }
+                        if !has_text {
+                            let relevance: u8 = 1;
+                            column_relevance.insert(TEXT_COLUMN.to_string(), relevance);
+                        }
+                        for (column_relevance_item, relevance) in column_relevance {
+                            let mut has_column = false;
+                            let columns = data.get(COLUMNS);
+                            if columns.is_some() {
+                                let columns = columns.unwrap();
+                                for column in columns {
+                                    let column_name = column.get(NAME).unwrap().clone();
+                                    if column_name.to_lowercase() == column_relevance_item.to_lowercase() {
+                                        has_column = true;
+                                    }
+                                }
+                            }
+                            if !has_column && column_relevance_item != TEXT_COLUMN.to_string() {
+                                errors.push(
+                                    PlanetError::new(
+                                        500, 
+                                        Some(
+                                            tr!("Configuration does not have field \"{}\"", &column_relevance_item)
+                                        ),
+                                    )
+                                );
+                            } else {
+                                let relevance_string= relevance.to_string();
+                                my_map.insert(column_relevance_item.clone(), relevance_string);
+                            }
+                        }
+                        let mut my_list: Vec<BTreeMap<String, String>> = Vec::new();
+                        my_list.push(my_map);
+                        data.insert(TEXT_SEARCH_COLUMN_RELEVANCE.to_string(), my_list);
+                        folder.data = Some(data);
+                        let result = db_folder.update(&folder);
+                        // Reindex all data items in folder
+                        let mut site_id_alt: Option<String> = None;
+                        if site_id.is_some() {
+                            let site_id = site_id.unwrap();
+                            site_id_alt = Some(site_id.to_string());
+                        }
+                        let result_item: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
+                            space_database.connection_pool.clone(),
+                            home_dir,
+                            account_id,
+                            space_id,
+                            site_id_alt,
+                            box_id,
+                            folder_id.as_str(),
+                            &db_folder,
+                        );
+                        if result_item.is_ok() {
+                            let mut result_item = result_item.unwrap();
+                            let reindex_result = result_item.reindex_all();
+                            if reindex_result.is_err() {
+                                let error = reindex_result.unwrap_err();
+                                errors.push(error);
+                                return Err(errors)
+                            }
+                        } else {
+                            let error = result_item.unwrap_err();
+                            errors.push(error);
+                            return Err(errors)
+                        }
+                        // Build output
+                        if result.is_ok() {
+                            let folder = result.unwrap();
+                            let response_coded = serde_yaml::to_string(&folder);
+                            if response_coded.is_err() {
+                                let error = PlanetError::new(
+                                    500, 
+                                    Some(tr!("Error encoding statement response.")),
+                                );
+                                errors.push(error);
+                            }
+                            let response = response_coded.unwrap();
+                            let yaml_response = yaml_rust::YamlLoader::load_from_str(
+                                response.as_str()
+                            ).unwrap();
+                            let yaml_response = yaml_response.clone();
+                            return Ok(yaml_response)
+                        } else {
+                            let error = PlanetError::new(
+                                500, 
+                                Some(
+                                    tr!("Could not update folder on database.")
+                                ),
+                            );
+                            errors.push(error);
+                        }    
+                    } else {
+                        let error = PlanetError::new(
+                            500, 
+                            Some(
+                                tr!("Folder has no data.")
+                            ),
+                        );
+                        errors.push(error);
+                    }
+                } else {
+                    let error = PlanetError::new(
+                        500, 
+                        Some(
+                            tr!("Folder not found.")
+                        ),
+                    );
+                    errors.push(error);
+                    return Err(errors)
+                }
+            } else {
+                let error = PlanetError::new(
+                    500, 
+                    Some(
+                        tr!("Error fetching folder by name.")
+                    ),
+                );
+                errors.push(error);
+            }
+        } else {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Could not parse modify language statement.")
+                ),
+            );
+            errors.push(error);
+        }
+        return Err(errors)
+    }
+}
+
 fn validate_default_language(language: &String) -> Result<(), ValidationError> {
     let language = &**language;
     let db_languages = get_db_languages();
@@ -3866,5 +4147,29 @@ pub fn resolve_schema_statement(
         }
     }
     // MODIFY SEARCH RELEVANCE
+    let expr = &RE_MODIFY_SEARCH_RELEVANCE;
+    let check = expr.is_match(&statement_text);
+    if check {
+        let stmt = ModifySearchRelevanceStatement{};
+        match mode {
+            StatementCallMode::Run => {
+                let response = stmt.run(
+                    &env, 
+                    &space_data, 
+                    &statement_text,
+                );
+                return Some(response);
+            },
+            StatementCallMode::Compile => {
+                let response = stmt.compile(&statement_text);
+                if response.is_err() {
+                    let errors = response.unwrap_err();
+                    return Some(Err(errors))
+                }
+                let result = yaml_rust::YamlLoader::load_from_str("---\nstatus: ok");
+                return Some(Ok(result.unwrap()))
+            }
+        }
+    }
     return None
 }
