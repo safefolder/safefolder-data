@@ -7,7 +7,7 @@ use yaml_rust;
 use serde_yaml;
 use validator::{Validate, ValidationError};
 use lazy_static::lazy_static;
-use std::fs::{create_dir_all};
+use std::fs::{create_dir_all, remove_dir_all};
 
 use tr::tr;
 use colored::*;
@@ -64,6 +64,7 @@ lazy_static! {
     pub static ref RE_DROP_SUBFOLDER: Regex = Regex::new(r#"DROP[\s]+SUBFOLDER[\s]+"*(?P<SubFolderName>[\w\s]+)"*[\s]+FROM[\s]+"*(?P<FolderName>[\w\s]+)"*;"#).unwrap();
     pub static ref RE_MODIFY_SEARCH_RELEVANCE: Regex = Regex::new(r#"MODIFY[\s]+SEARCH[\s]+RELEVANCE[\s]+FROM[\s]+"*(?P<FolderName>[\w\s]+)"*[\s]*\([\n\t\s]*WITH[\s]+(?P<SearchRelevanceOptions>[\w\s"\$=\{\}\|]*)\);"#).unwrap();
     pub static ref RE_CREATE_SPACE_DIR: Regex = Regex::new(r#"CREATE SPACE DIR;"#).unwrap();
+    pub static ref RE_DROP_SITE_DIR: Regex = Regex::new(r#"DROP[\s]+SITE[\s]+DIR[\s]+(?P<SiteId>[\w]+);"#).unwrap();
 }
 
 pub const WITH_PARENT: &str = "Parent";
@@ -3945,6 +3946,90 @@ impl<'gb> Statement<'gb> for CreateSpaceDirStatement {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct DropSiteDirStatement {
+}
+
+impl<'gb> StatementCompiler<'gb, String> for DropSiteDirStatement {
+
+    fn compile(
+        &self, 
+        statement_text: &String
+    ) -> Result<String, Vec<PlanetError>> {
+        let expr = &RE_DROP_SITE_DIR;
+        let check = expr.is_match(&statement_text);
+        let mut errors: Vec<PlanetError> = Vec::new();
+        if !check {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Syntax not valid.")
+                ),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+        let captures = expr.captures(&statement_text);
+        if captures.is_none() {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Could not parse statement.")
+                ),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+        let captures = captures.unwrap();
+        let site_id = captures.name("SiteId").unwrap().as_str();
+        return Ok(site_id.to_string())
+    }
+}
+
+impl<'gb> Statement<'gb> for DropSiteDirStatement {
+
+    fn run(
+        &self,
+        env: &'gb Environment<'gb>,
+        _space_database: &SpaceDatabase,
+        statement_text: &String,
+    ) -> Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>> {
+        let planet_context = env.planet_context;
+        let statement = self.compile(statement_text);
+        if statement.is_err() {
+            let errors = statement.unwrap_err();
+            return Err(errors)
+        }
+        let mut errors: Vec<PlanetError> = Vec::new();
+        let site_id = statement.unwrap();
+        let home_dir = planet_context.home_path.unwrap_or_default();
+        let path_base = format!(
+            "{home}/sites/{site_id}", 
+            home=&home_dir, 
+            site_id=site_id,
+        );
+        let result = remove_dir_all(path_base.clone());
+        if result.is_err() {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Could not delete site directory \"{}\".", &path_base)
+                ),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+        let yaml_output = format!("---\nsite_id: {}", &site_id);
+        let yaml_output = yaml_output.as_str();
+        let yaml_response = yaml_rust::YamlLoader::load_from_str(
+            yaml_output
+        ).unwrap();
+        let yaml_response = yaml_response.clone();
+        return Ok(yaml_response)
+    }
+}
+
+
 fn validate_default_language(language: &String) -> Result<(), ValidationError> {
     let language = &**language;
     let db_languages = get_db_languages();
@@ -4287,6 +4372,31 @@ pub fn resolve_schema_statement(
     let check = expr.is_match(&statement_text);
     if check {
         let stmt = CreateSpaceDirStatement{};
+        match mode {
+            StatementCallMode::Run => {
+                let response = stmt.run(
+                    &env, 
+                    &space_data, 
+                    &statement_text,
+                );
+                return Some(response);
+            },
+            StatementCallMode::Compile => {
+                let response = stmt.compile(&statement_text);
+                if response.is_err() {
+                    let errors = response.unwrap_err();
+                    return Some(Err(errors))
+                }
+                let result = yaml_rust::YamlLoader::load_from_str("---\nstatus: ok");
+                return Some(Ok(result.unwrap()))
+            }
+        }
+    }
+    // DROP SITE DIR
+    let expr = &RE_DROP_SITE_DIR;
+    let check = expr.is_match(&statement_text);
+    if check {
+        let stmt = DropSiteDirStatement{};
         match mode {
             StatementCallMode::Run => {
                 let response = stmt.run(
