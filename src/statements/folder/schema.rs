@@ -7,6 +7,7 @@ use yaml_rust;
 use serde_yaml;
 use validator::{Validate, ValidationError};
 use lazy_static::lazy_static;
+use std::fs::{create_dir_all};
 
 use tr::tr;
 use colored::*;
@@ -62,6 +63,7 @@ lazy_static! {
     pub static ref RE_MODIFY_SUBFOLDER: Regex = Regex::new(r#"MODIFY[\s]+SUBFOLDER[\s]+"*(?P<SubFolderName>[\w\s]+)"*[\s]+FROM[\s]+"*(?P<FolderName>[\w\s]+)"*[\s]*\([\n\t\s]*(?P<Config>[\s\S][^)]+)\);"#).unwrap();
     pub static ref RE_DROP_SUBFOLDER: Regex = Regex::new(r#"DROP[\s]+SUBFOLDER[\s]+"*(?P<SubFolderName>[\w\s]+)"*[\s]+FROM[\s]+"*(?P<FolderName>[\w\s]+)"*;"#).unwrap();
     pub static ref RE_MODIFY_SEARCH_RELEVANCE: Regex = Regex::new(r#"MODIFY[\s]+SEARCH[\s]+RELEVANCE[\s]+FROM[\s]+"*(?P<FolderName>[\w\s]+)"*[\s]*\([\n\t\s]*WITH[\s]+(?P<SearchRelevanceOptions>[\w\s"\$=\{\}\|]*)\);"#).unwrap();
+    pub static ref RE_CREATE_SPACE_DIR: Regex = Regex::new(r#"CREATE SPACE DIR;"#).unwrap();
 }
 
 pub const WITH_PARENT: &str = "Parent";
@@ -3834,6 +3836,115 @@ impl<'gb> Statement<'gb> for ModifySearchRelevanceStatement {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct CreateSpaceDirStatement {
+}
+
+impl<'gb> StatementCompiler<'gb, ()> for CreateSpaceDirStatement {
+
+    fn compile(
+        &self, 
+        statement_text: &String
+    ) -> Result<(), Vec<PlanetError>> {
+        let expr = &RE_CREATE_SPACE_DIR;
+        let check = expr.is_match(&statement_text);
+        let mut errors: Vec<PlanetError> = Vec::new();
+        if !check {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Syntax not valid.")
+                ),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+        return Ok(())
+    }
+}
+
+impl<'gb> Statement<'gb> for CreateSpaceDirStatement {
+
+    fn run(
+        &self,
+        env: &'gb Environment<'gb>,
+        _space_database: &SpaceDatabase,
+        _statement_text: &String,
+    ) -> Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>> {
+        let planet_context = env.planet_context;
+        let mut errors: Vec<PlanetError> = Vec::new();
+        let site_id = generate_id();
+        if site_id.is_some() {
+            let site_id = site_id.unwrap();
+            let home_dir = planet_context.home_path.unwrap_or_default();
+            // Create directory for site_id
+            let path_base = format!(
+                "{home}/sites/{site_id}/spaces/base/boxes/base", 
+                home=&home_dir, 
+                site_id=site_id,
+            );
+            let path = format!("{base}/database.db", base=path_base);
+            let config: sled::Config = sled::Config::default()
+            .use_compression(true)
+            .path(path.clone());
+            let result= config.open();
+            if result.is_err() {
+                let error = PlanetError::new(
+                    500, 
+                    Some(
+                        tr!("Error opening \"{}\"", &path)
+                    ),
+                );
+                errors.push(error);
+                return Err(errors)
+            }
+            let path = format!("{base}/site.db", base=path_base);
+            let config: sled::Config = sled::Config::default()
+            .use_compression(true)
+            .path(path.clone());
+            let result= config.open();
+            if result.is_err() {
+                let error = PlanetError::new(
+                    500, 
+                    Some(
+                        tr!("Error opening \"{}\"", &path)
+                    ),
+                );
+                errors.push(error);
+                return Err(errors)
+            }
+            let path = format!("{base}/files", base=path_base);
+            let result = create_dir_all(path);
+            if result.is_err() {
+                let error = PlanetError::new(
+                    500, 
+                    Some(
+                        tr!("Error creating \"files\" directory for space.")
+                    ),
+                );
+                errors.push(error);
+                return Err(errors)
+            }
+            let yaml_output = format!("---\nsite_id: {}", &site_id);
+            let yaml_output = yaml_output.as_str();
+            let yaml_response = yaml_rust::YamlLoader::load_from_str(
+                yaml_output
+            ).unwrap();
+            let yaml_response = yaml_response.clone();
+            return Ok(yaml_response)
+        } else {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Error generating the site identifier.")
+                ),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+    }
+}
+
 fn validate_default_language(language: &String) -> Result<(), ValidationError> {
     let language = &**language;
     let db_languages = get_db_languages();
@@ -4151,6 +4262,31 @@ pub fn resolve_schema_statement(
     let check = expr.is_match(&statement_text);
     if check {
         let stmt = ModifySearchRelevanceStatement{};
+        match mode {
+            StatementCallMode::Run => {
+                let response = stmt.run(
+                    &env, 
+                    &space_data, 
+                    &statement_text,
+                );
+                return Some(response);
+            },
+            StatementCallMode::Compile => {
+                let response = stmt.compile(&statement_text);
+                if response.is_err() {
+                    let errors = response.unwrap_err();
+                    return Some(Err(errors))
+                }
+                let result = yaml_rust::YamlLoader::load_from_str("---\nstatus: ok");
+                return Some(Ok(result.unwrap()))
+            }
+        }
+    }
+    // CREATE SPACE DIR
+    let expr = &RE_CREATE_SPACE_DIR;
+    let check = expr.is_match(&statement_text);
+    if check {
+        let stmt = CreateSpaceDirStatement{};
         match mode {
             StatementCallMode::Run => {
                 let response = stmt.run(
