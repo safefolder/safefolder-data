@@ -42,7 +42,7 @@ pub trait FolderSchema {
         home_dir: Option<&str>,
         account_id: Option<&str>,
         space_id: Option<&str>,
-        site_id: Option<&str>,
+        site_id: Option<String>,
     ) -> Result<TreeFolder, PlanetError>;
     fn create(&self, db_data: &DbData) -> Result<DbData, PlanetError>;
     fn update(&self, db_data: &DbData) -> Result<DbData, PlanetError>;
@@ -100,9 +100,9 @@ pub struct RoutingData {
 impl RoutingData {
     pub fn defaults(
         account_id: Option<String>, 
-        site_id: Option<&str>,
-        space_id: Option<&str>, 
-        box_id: Option<&str>, 
+        site_id: Option<String>,
+        space_id: &str, 
+        box_id: &str, 
         ipfs_cid: Option<String>,
     ) -> Option<RoutingData> {
         let mut routing = RoutingData{
@@ -116,14 +116,8 @@ impl RoutingData {
             let site_id = site_id.unwrap().to_string();
             routing.site_id = Some(site_id);
         }
-        if space_id.is_some() {
-            let space_id = space_id.unwrap().to_string();
-            routing.space_id = Some(space_id);
-        }
-        if box_id.is_some() {
-            let box_id = box_id.unwrap().to_string();
-            routing.box_id = Some(box_id);
-        }
+        routing.space_id = Some(space_id.to_string());
+        routing.box_id = Some(box_id.to_string());
         let routing_wrap = Some(routing);
         return routing_wrap
     }
@@ -666,7 +660,7 @@ impl FolderSchema for TreeFolder {
         home_dir: Option<&str>,
         account_id: Option<&str>,
         space_id: Option<&str>,
-        site_id: Option<&str>,
+        site_id: Option<String>,
     ) -> Result<TreeFolder, PlanetError> {
         let home_dir = home_dir.unwrap_or_default();
         let account_id = account_id.unwrap_or_default();
@@ -697,8 +691,8 @@ impl FolderSchema for TreeFolder {
             database = database_.unwrap().clone();
         } else {
             // I have site, get site.db connection
-            let site_id = site_id.unwrap();
-            let database_ = connection_pool.get(site_id);
+            let site_id = site_id.clone().unwrap();
+            let database_ = connection_pool.get(&site_id);
             if database_.is_none() {
                 return Err(
                     PlanetError::new(
@@ -710,7 +704,7 @@ impl FolderSchema for TreeFolder {
             database = database_.unwrap().clone();
         }
         let path =  format!("folders.db");
-        let site_id = site_id.unwrap_or_default();
+        let site_id = site_id.clone().unwrap_or_default();
         eprintln!("DbFolder.defaults :: path: {}", &path);
         let result = database.open_tree(path);
         match result {
@@ -1304,9 +1298,9 @@ impl TreeFolderItem {
             data.insert(PARTITION.to_string(), build_value_list(&partition.to_string()));
             let routing_wrap = RoutingData::defaults(
                 Some(account_id.to_string()),
-                Some(site_id), 
-                Some(space_id), 
-                Some(box_id),
+                Some(site_id.to_string()), 
+                space_id, 
+                box_id,
                 None
             );
             let db_data = DbData::defaults(
@@ -2149,26 +2143,18 @@ impl FolderItem for TreeFolderItem {
         }
         // eprintln!("DbFolderItem.index :: index_data: {:#?}", &index_data);
         // Write into disk the index data
-        let mut site_id_wrap: Option<&str> = None;
-        let mut space_id_wrap: Option<&str> = None;
-        let mut box_id_wrap: Option<&str> = None;
+        let mut site_id_wrap: Option<String> = None;
         let site_id = self.site_id.clone().unwrap_or_default();
         let space_id = self.space_id.clone().unwrap_or_default();
         let box_id = self.box_id.clone().unwrap_or_default();
         if site_id != String::from("") {
-            site_id_wrap = Some(site_id.as_str());
-        }
-        if space_id != String::from("") {
-            space_id_wrap = Some(space_id.as_str());
-        }
-        if box_id != String::from("") {
-            box_id_wrap = Some(box_id.as_str());
+            site_id_wrap = Some(site_id);
         }
         let routing_wrap = RoutingData::defaults(
             self.account_id.clone(),
             site_id_wrap, 
-            space_id_wrap, 
-            box_id_wrap,
+            &space_id, 
+            &box_id,
             None
         );
         let name = db_item.name.unwrap_or_default();

@@ -287,18 +287,18 @@ impl<'gb> Statement<'gb> for InsertIntoFolderStatement {
 
         let mut errors: Vec<PlanetError> = Vec::new();
         // folder
-        let home_dir = planet_context.home_path.unwrap_or_default();
-        let account_id = context.account_id.unwrap_or_default();
-        let space_id = context.space_id.unwrap_or_default();
-        let site_id = context.site_id;
-        let box_id = context.box_id.unwrap_or_default();
+        let home_dir = planet_context.home_path.clone();
+        let account_id = context.account_id.clone().unwrap_or_default();
+        let space_id = context.space_id;
+        let site_id = context.site_id.clone();
+        let box_id = context.box_id;
         let space_database = space_database.clone();
         let db_folder= TreeFolder::defaults(
             space_database.connection_pool.clone(),
-            Some(home_dir),
-            Some(account_id),
+            Some(home_dir.clone().unwrap_or_default().as_str()),
+            Some(&account_id),
             Some(space_id),
-            site_id,
+            site_id.clone(),
         ).unwrap();
         let folder = db_folder.get_by_name(folder_name);
         if folder.is_err() {
@@ -324,14 +324,14 @@ impl<'gb> Statement<'gb> for InsertIntoFolderStatement {
         let folder_id = folder.clone().id.unwrap();
         let mut site_id_alt: Option<String> = None;
         if site_id.is_some() {
-            let site_id = site_id.unwrap();
-            site_id_alt = Some(site_id.to_string());
+            let site_id = site_id.clone().unwrap();
+            site_id_alt = Some(site_id.clone().to_string());
         }
 
         let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
             space_database.connection_pool.clone(),
-            home_dir,
-            account_id,
+            home_dir.clone().unwrap_or_default().as_str(),
+            &account_id,
             space_id,
             site_id_alt,
             box_id,
@@ -345,9 +345,9 @@ impl<'gb> Statement<'gb> for InsertIntoFolderStatement {
                 // routing
                 let routing_wrap = RoutingData::defaults(
                     Some(account_id.to_string()),
-                    site_id, 
-                    Some(space_id), 
-                    Some(box_id),
+                    site_id.clone(), 
+                    &space_id, 
+                    &box_id,
                     None
                 );
                 
@@ -741,7 +741,7 @@ impl<'gb> Statement<'gb> for InsertIntoFolderStatement {
                                     &column_data,
                                     &data,
                                     routing_wrap.clone(),
-                                    &home_dir.to_string()
+                                    &home_dir.clone().unwrap_or_default()
                                 );
                                 if fields.is_ok() {
                                     let fields = fields.unwrap();
@@ -906,10 +906,10 @@ impl<'gb> Statement<'gb> for InsertIntoFolderStatement {
                                         for item_id in id_list {
                                             let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
                                                 space_database.connection_pool.clone(),
-                                                home_dir,
-                                                account_id,
+                                                home_dir.clone().unwrap_or_default().as_str(),
+                                                &account_id,
                                                 space_id,
-                                                Some(site_id.unwrap().to_string()),
+                                                Some(site_id.clone().unwrap().to_string()),
                                                 box_id,
                                                 remote_folder_id.as_str(),
                                                 &db_folder,

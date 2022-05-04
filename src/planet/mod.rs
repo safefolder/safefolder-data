@@ -31,15 +31,7 @@ pub struct PlanetContextSource {
     pub home_path: Option<String>,
     pub statements: Vec<StatementRegistryItem>,
 }
-
-#[derive(Debug, Clone)]
-pub struct PlanetContext<'gb> {
-    pub mission: &'gb str,
-    pub home_path: Option<&'gb str>,
-    pub statements: Vec<StatementRegistryItem>,
-}
-
-impl<'gb> PlanetContext<'gb> {
+impl PlanetContextSource {
     pub fn import_context() -> Result<PlanetContextSource, io::Error> {
         let app_path = env::current_dir();
         if app_path.is_err() {
@@ -48,22 +40,33 @@ impl<'gb> PlanetContext<'gb> {
         let app_path_str = app_path.unwrap();
         let app_path_str = app_path_str.to_str().unwrap();
         let path_planet_context: &str = &*format!("{}/planet_context.yaml", app_path_str);
-        if Some(path_planet_context).is_some() {
-            let planet_context_str = fs::read_to_string(&path_planet_context)
+        let planet_context_str = fs::read_to_string(&path_planet_context)
             .expect("Something went wrong reading the YAML file");
-            let mut planet_context_source: PlanetContextSource = serde_yaml::from_str(&planet_context_str).unwrap();
-            let sys_home_dir = dirs::home_dir().unwrap();
-            let sys_home_dir_str = sys_home_dir.as_os_str().to_str().unwrap();
-            planet_context_source.home_path = Some(format!("{home_dir}/.achiever-planet", home_dir=sys_home_dir_str));
-            // eprintln!("PlanetContext.import_context :: planet_context: {:#?}", &planet_context_source);
-            // let mine = planet_context_source.as_ref();
-            return Ok(planet_context_source)
-        } else {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, 
-                &*tr!("Could not import planet context")))
-        }
+        let mut planet_context_source: PlanetContextSource = serde_yaml::from_str(&planet_context_str).unwrap();
+        let sys_home_dir = dirs::home_dir().unwrap();
+        let sys_home_dir_str = sys_home_dir.as_os_str().to_str().unwrap();
+        let home_path = format!("{home_dir}/.achiever-planet", home_dir=sys_home_dir_str).clone();
+        planet_context_source.home_path = Some(home_path);
+        eprintln!("PlanetContextSource.import_context :: planet_context_source: {:#?}", &planet_context_source);
+        return Ok(planet_context_source)
     }
+}
 
+#[derive(Debug, Clone)]
+pub struct PlanetContext<'gb> {
+    pub mission: &'gb str,
+    pub home_path: Option<String>,
+    pub statements: Vec<StatementRegistryItem>,
+}
+impl<'gb> PlanetContext<'gb> {
+    pub fn import(planet_context_source: &'gb PlanetContextSource) -> PlanetContext<'gb> {
+        let planet_context: PlanetContext<'gb> = PlanetContext{
+            mission: &planet_context_source.mission,
+            home_path: planet_context_source.home_path.clone(),
+            statements: planet_context_source.statements.clone()
+        };
+        return planet_context
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -71,19 +74,49 @@ pub struct ContextSource {
     pub id: Option<String>,
     pub data: Option<HashMap<String, String>>,
     pub account_id: Option<String>,
-    pub space_id: Option<String>,
-    pub box_id: Option<String>,
+    pub space_id: String,
+    pub box_id: String,
     pub site_id: Option<String>,
+}
+impl ContextSource {
+    pub fn defaults(space_id: String, site_id: String, box_id: String) -> Self {
+        let mut site_id_wrap: Option<String> = None;
+        if site_id != String::from("") {
+            site_id_wrap = Some(site_id);
+        }
+        let context_source: ContextSource = ContextSource{
+            id: None,
+            data: Some(HashMap::new()),
+            space_id: space_id,
+            account_id: None,
+            box_id: box_id,
+            site_id: site_id_wrap,
+        };
+        return context_source
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct Context<'gb> {
     pub id: Option<&'gb str>,
     pub data: Option<&'gb HashMap<String, String>>,
-    pub account_id: Option<&'gb str>,
-    pub space_id: Option<&'gb str>,
-    pub box_id: Option<&'gb str>,
-    pub site_id: Option<&'gb str>,
+    pub account_id: Option<String>,
+    pub space_id: &'gb str,
+    pub box_id: &'gb str,
+    pub site_id: Option<String>,
+}
+impl<'gb> Context<'gb> {
+    pub fn defaults(context_source: &'gb ContextSource) -> Self {
+        let context = Self{
+            id: None,
+            data: None,
+            account_id: context_source.account_id.clone(),
+            space_id: &context_source.space_id,
+            box_id: &context_source.box_id,
+            site_id: context_source.site_id.clone(),
+        };
+        return context
+    }
 }
 
 #[derive(Debug, Clone)]

@@ -1195,15 +1195,15 @@ impl<'gb> Statement<'gb> for CreateFolderStatement {
             return Err(errors)
         }
         let statement = statement.unwrap();
-        let home_dir = planet_context.home_path.unwrap_or_default();
-        let account_id = context.account_id.unwrap_or_default();
-        let space_id = context.space_id.unwrap_or_default();
-        let site_id = context.site_id;
+        let home_dir = planet_context.home_path.clone();
+        let account_id = context.account_id.clone().unwrap_or_default();
+        let space_id = context.space_id.clone();
+        let site_id = context.site_id.clone();
 
         let result: Result<TreeFolder, PlanetError> = TreeFolder::defaults(
             space_database.connection_pool.clone(),
-            Some(home_dir),
-            Some(account_id),
+            Some(home_dir.unwrap_or_default().as_str()),
+            Some(&account_id),
             Some(space_id),
             site_id,
         );
@@ -1216,8 +1216,8 @@ impl<'gb> Statement<'gb> for CreateFolderStatement {
                 let folder_name = statement.folder_name;
 
                 // routing parameters
-                let account_id = Some(context.account_id.unwrap_or_default().to_string());
-                let site_id = context.site_id;
+                let account_id = Some(context.account_id.clone().unwrap_or_default().to_string());
+                let site_id = context.site_id.clone();
                 let space_id = context.space_id;
                 let box_id = context.box_id;
 
@@ -1611,14 +1611,14 @@ impl<'gb> Statement<'gb> for ListFoldersStatement {
             return Err(errors)
         }
         let _statement = statement.unwrap();
-        let home_dir = planet_context.home_path.unwrap_or_default();
-        let account_id = context.account_id.unwrap_or_default();
-        let space_id = context.space_id.unwrap_or_default();
-        let site_id = context.site_id;
+        let home_dir = planet_context.home_path.clone();
+        let account_id = context.account_id.clone().unwrap_or_default();
+        let space_id = context.space_id;
+        let site_id = context.site_id.clone();
         let result: Result<TreeFolder, PlanetError> = TreeFolder::defaults(
             space_database.connection_pool.clone(),
-            Some(home_dir),
-            Some(account_id),
+            Some(home_dir.unwrap_or_default().as_str()),
+            Some(&account_id),
             Some(space_id),
             site_id,
         );
@@ -1727,14 +1727,14 @@ impl<'gb> Statement<'gb> for DescribeFolderStatement {
         }
         let folder_name = statement.unwrap();
         // get folder from data layer
-        let home_dir = planet_context.home_path.unwrap_or_default();
-        let account_id = context.account_id.unwrap_or_default();
-        let space_id = context.space_id.unwrap_or_default();
-        let site_id = context.site_id;
+        let home_dir = planet_context.home_path.clone();
+        let account_id = context.account_id.clone().unwrap_or_default();
+        let space_id = context.space_id;
+        let site_id = context.site_id.clone();
         let result: Result<TreeFolder, PlanetError> = TreeFolder::defaults(
             space_database.connection_pool.clone(),
-            Some(home_dir),
-            Some(account_id),
+            Some(home_dir.unwrap_or_default().as_str()),
+            Some(&account_id),
             Some(space_id),
             site_id,
         );
@@ -1848,20 +1848,20 @@ impl<'gb> Statement<'gb> for DropFolderStatement {
         }
         let folder_name = statement.unwrap();
         // get folder from data layer
-        let home_dir = planet_context.home_path.unwrap_or_default();
-        let account_id = context.account_id.unwrap_or_default();
-        let space_id = context.space_id.unwrap_or_default();
-        let box_id = context.box_id.unwrap_or_default();
-        let site_id = context.site_id;
+        let home_dir = planet_context.home_path.clone();
+        let account_id = context.account_id.clone().unwrap_or_default();
+        let space_id = context.space_id;
+        let box_id = context.box_id;
+        let site_id = context.site_id.clone();
         let mut site_id_alt: Option<String> = None;
         if site_id.is_some() {
-            let site_id = site_id.unwrap();
+            let site_id = site_id.clone().unwrap();
             site_id_alt = Some(site_id.to_string());
         }
         let result: Result<TreeFolder, PlanetError> = TreeFolder::defaults(
             space_database.connection_pool.clone(),
-            Some(home_dir),
-            Some(account_id),
+            Some(home_dir.clone().unwrap_or_default().as_str()),
+            Some(&account_id),
             Some(space_id),
             site_id,
         );
@@ -1877,8 +1877,8 @@ impl<'gb> Statement<'gb> for DropFolderStatement {
                         let folder_id = folder.id.clone().unwrap();
                         let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
                             space_database.connection_pool.clone(),
-                            home_dir,
-                            account_id,
+                            home_dir.unwrap_or_default().as_str(),
+                            &account_id,
                             space_id,
                             site_id_alt,
                             box_id,
@@ -2087,14 +2087,14 @@ impl<'gb> Statement<'gb> for AddColumnStatement {
         }
         let mut errors: Vec<PlanetError> = Vec::new();
         let column_compiled = statement.unwrap();
-        let home_dir = planet_context.home_path.unwrap_or_default();
-        let account_id = context.account_id.unwrap_or_default();
-        let space_id = context.space_id.unwrap_or_default();
-        let site_id = context.site_id;
+        let home_dir = planet_context.home_path.clone();
+        let account_id = context.account_id.clone().unwrap_or_default();
+        let space_id = context.space_id;
+        let site_id = context.site_id.clone();
         let result: Result<TreeFolder, PlanetError> = TreeFolder::defaults(
             space_database.connection_pool.clone(),
-            Some(home_dir),
-            Some(account_id),
+            Some(home_dir.unwrap_or_default().as_str()),
+            Some(&account_id),
             Some(space_id),
             site_id,
         );
@@ -2347,14 +2347,14 @@ impl<'gb> Statement<'gb> for ModifyColumnStatement {
         }
         let mut errors: Vec<PlanetError> = Vec::new();
         let column_compiled = statement.unwrap();
-        let home_dir = planet_context.home_path.unwrap_or_default();
-        let account_id = context.account_id.unwrap_or_default();
-        let space_id = context.space_id.unwrap_or_default();
-        let site_id = context.site_id;
+        let home_dir = planet_context.home_path.clone();
+        let account_id = context.account_id.clone().unwrap_or_default();
+        let space_id = context.space_id;
+        let site_id = context.site_id.clone();
         let result: Result<TreeFolder, PlanetError> = TreeFolder::defaults(
             space_database.connection_pool.clone(),
-            Some(home_dir),
-            Some(account_id),
+            Some(home_dir.unwrap_or_default().as_str()),
+            Some(&account_id),
             Some(space_id),
             site_id,
         );
@@ -2546,14 +2546,14 @@ impl<'gb> Statement<'gb> for DropColumnStatement {
         let statement_items = statement.unwrap();
         let folder_name = statement_items.0;
         let column_name = statement_items.1;
-        let home_dir = planet_context.home_path.unwrap_or_default();
-        let account_id = context.account_id.unwrap_or_default();
-        let space_id = context.space_id.unwrap_or_default();
-        let site_id = context.site_id;
+        let home_dir = planet_context.home_path.clone();
+        let account_id = context.account_id.clone().unwrap_or_default();
+        let space_id = context.space_id;
+        let site_id = context.site_id.clone();
         let result: Result<TreeFolder, PlanetError> = TreeFolder::defaults(
             space_database.connection_pool.clone(),
-            Some(home_dir),
-            Some(account_id),
+            Some(home_dir.unwrap_or_default().as_str()),
+            Some(&account_id),
             Some(space_id),
             site_id,
         );
@@ -2749,17 +2749,17 @@ impl<'gb> Statement<'gb> for ModifyLanguageStatement {
         let language = LanguageConfig{
             default: language_code
         };
-        let home_dir = planet_context.home_path.unwrap_or_default();
-        let account_id = context.account_id.unwrap_or_default();
-        let space_id = context.space_id.unwrap_or_default();
-        let box_id = context.box_id.unwrap_or_default();
-        let site_id = context.site_id;
+        let home_dir = planet_context.home_path.clone();
+        let account_id = context.account_id.clone().unwrap_or_default();
+        let space_id = context.space_id;
+        let box_id = context.box_id;
+        let site_id = context.site_id.clone();
         let result: Result<TreeFolder, PlanetError> = TreeFolder::defaults(
             space_database.connection_pool.clone(),
-            Some(home_dir),
-            Some(account_id),
+            Some(home_dir.clone().unwrap_or_default().as_str()),
+            Some(&account_id),
             Some(space_id),
-            site_id,
+            site_id.clone(),
         );
         if result.is_ok() {
             let db_folder = result.unwrap();
@@ -2785,8 +2785,8 @@ impl<'gb> Statement<'gb> for ModifyLanguageStatement {
                             }
                             let result_item: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
                                 space_database.connection_pool.clone(),
-                                home_dir,
-                                account_id,
+                                home_dir.unwrap_or_default().as_str(),
+                                &account_id,
                                 space_id,
                                 site_id_alt,
                                 box_id,
@@ -3015,14 +3015,14 @@ impl<'gb> Statement<'gb> for AddSubfolderStatement {
         let statement_items = statement.unwrap();
         let folder_name = statement_items.0;
         let sub_folder = statement_items.1;
-        let home_dir = planet_context.home_path.unwrap_or_default();
-        let account_id = context.account_id.unwrap_or_default();
-        let space_id = context.space_id.unwrap_or_default();
-        let site_id = context.site_id;
+        let home_dir = planet_context.home_path.clone();
+        let account_id = context.account_id.clone().unwrap_or_default();
+        let space_id = context.space_id;
+        let site_id = context.site_id.clone();
         let result: Result<TreeFolder, PlanetError> = TreeFolder::defaults(
             space_database.connection_pool.clone(),
-            Some(home_dir),
-            Some(account_id),
+            Some(home_dir.unwrap_or_default().as_str()),
+            Some(&account_id),
             Some(space_id),
             site_id,
         );
@@ -3240,14 +3240,14 @@ impl<'gb> Statement<'gb> for ModifySubfolderStatement {
         let current_sub_folder_name = statement_items.1;
         let sub_folder = statement_items.2;
         let sub_folder_compiled = sub_folder.clone(); 
-        let home_dir = planet_context.home_path.unwrap_or_default();
-        let account_id = context.account_id.unwrap_or_default();
-        let space_id = context.space_id.unwrap_or_default();
-        let site_id = context.site_id;
+        let home_dir = planet_context.home_path.clone();
+        let account_id = context.account_id.clone().unwrap_or_default();
+        let space_id = context.space_id;
+        let site_id = context.site_id.clone();
         let result: Result<TreeFolder, PlanetError> = TreeFolder::defaults(
             space_database.connection_pool.clone(),
-            Some(home_dir),
-            Some(account_id),
+            Some(home_dir.unwrap_or_default().as_str()),
+            Some(&account_id),
             Some(space_id),
             site_id,
         );
@@ -3438,14 +3438,14 @@ impl<'gb> Statement<'gb> for DropSubfolderStatement {
         let statement_items = statement.unwrap();
         let folder_name = statement_items.0;
         let sub_folder_name = statement_items.1;
-        let home_dir = planet_context.home_path.unwrap_or_default();
-        let account_id = context.account_id.unwrap_or_default();
-        let space_id = context.space_id.unwrap_or_default();
-        let site_id = context.site_id;
+        let home_dir = planet_context.home_path.clone();
+        let account_id = context.account_id.clone().unwrap_or_default();
+        let space_id = context.space_id;
+        let site_id = context.site_id.clone();
         let result: Result<TreeFolder, PlanetError> = TreeFolder::defaults(
             space_database.connection_pool.clone(),
-            Some(home_dir),
-            Some(account_id),
+            Some(home_dir.unwrap_or_default().as_str()),
+            Some(&account_id),
             Some(space_id),
             site_id,
         );
@@ -3675,17 +3675,17 @@ impl<'gb> Statement<'gb> for ModifySearchRelevanceStatement {
         let statement_items = statement.unwrap();
         let folder_name = statement_items.0;
         let text_search = statement_items.1;
-        let home_dir = planet_context.home_path.unwrap_or_default();
-        let account_id = context.account_id.unwrap_or_default();
-        let space_id = context.space_id.unwrap_or_default();
-        let box_id = context.box_id.unwrap_or_default();
-        let site_id = context.site_id;
+        let home_dir = planet_context.home_path.clone();
+        let account_id = context.account_id.clone().unwrap_or_default();
+        let space_id = context.space_id;
+        let box_id = context.box_id;
+        let site_id = context.site_id.clone();
         let result: Result<TreeFolder, PlanetError> = TreeFolder::defaults(
             space_database.connection_pool.clone(),
-            Some(home_dir),
-            Some(account_id),
+            Some(home_dir.clone().unwrap_or_default().as_str()),
+            Some(&account_id),
             Some(space_id),
-            site_id,
+            site_id.clone(),
         );
         if result.is_ok() {
             let db_folder = result.unwrap();
@@ -3750,8 +3750,8 @@ impl<'gb> Statement<'gb> for ModifySearchRelevanceStatement {
                         }
                         let result_item: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
                             space_database.connection_pool.clone(),
-                            home_dir,
-                            account_id,
+                            home_dir.unwrap_or_default().as_str(),
+                            &account_id,
                             space_id,
                             site_id_alt,
                             box_id,
@@ -3878,11 +3878,11 @@ impl<'gb> Statement<'gb> for CreateSpaceDirStatement {
         let site_id = generate_id();
         if site_id.is_some() {
             let site_id = site_id.unwrap();
-            let home_dir = planet_context.home_path.unwrap_or_default();
+            let home_dir = planet_context.home_path.clone();
             // Create directory for site_id
             let path_base = format!(
                 "{home}/sites/{site_id}/spaces/base/boxes/base", 
-                home=&home_dir, 
+                home=&home_dir.unwrap_or_default(), 
                 site_id=site_id,
             );
             let path = format!("{base}/database.db", base=path_base);
@@ -4003,10 +4003,10 @@ impl<'gb> Statement<'gb> for DropSiteDirStatement {
         }
         let mut errors: Vec<PlanetError> = Vec::new();
         let site_id = statement.unwrap();
-        let home_dir = planet_context.home_path.unwrap_or_default();
+        let home_dir = planet_context.home_path.clone();
         let path_base = format!(
             "{home}/sites/{site_id}", 
-            home=&home_dir, 
+            home=&home_dir.unwrap_or_default(), 
             site_id=site_id,
         );
         let result = remove_dir_all(path_base.clone());
@@ -4094,10 +4094,10 @@ impl<'gb> Statement<'gb> for DropSpaceDirStatement {
         let items = statement.unwrap();
         let site_id = items.0;
         let space_id = items.1;
-        let home_dir = planet_context.home_path.unwrap_or_default();
+        let home_dir = planet_context.home_path.clone();
         let path_base = format!(
             "{home}/sites/{site_id}/spaces/{space_id}", 
-            home=&home_dir, 
+            home=&home_dir.unwrap_or_default(), 
             site_id=site_id,
             space_id=space_id
         );

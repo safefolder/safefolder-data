@@ -115,14 +115,15 @@ impl StatementRunner {
         let column_map = column_map.clone();
 
         if space_database.is_none() {
-            let site_id = context.site_id;
+            let site_id = context.site_id.clone();
             let space_id = context.space_id;
-            let space_id = space_id.unwrap();
-            let home_dir = planet_context.home_path.unwrap_or_default();
+            let box_id = context.box_id;
+            let home_dir = planet_context.home_path.clone();
             let result = SpaceDatabase::defaults(
                 site_id, 
                 space_id, 
-                Some(home_dir),
+                box_id,
+                Some(home_dir.unwrap_or_default().as_str()),
             );
             if result.is_err() {
                 let error = result.unwrap_err();

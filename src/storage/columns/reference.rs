@@ -146,17 +146,17 @@ impl<'gb> ObjectStorageColumn<'gb> for LinkColumn<'gb> {
             errors.push(error);
             return Err(errors);
         }
-        let home_dir = self.planet_context.home_path.unwrap_or_default();
-        let account_id = self.context.account_id.unwrap_or_default();
-        let space_id = self.context.space_id.unwrap_or_default();
-        let site_id = self.context.site_id;
-        let box_id = self.context.box_id.unwrap_or_default();
+        let home_dir = self.planet_context.home_path.clone();
+        let account_id = self.context.account_id.clone().unwrap_or_default();
+        let space_id = self.context.space_id;
+        let site_id = self.context.site_id.clone();
+        let box_id = self.context.box_id;
         let space_database = self.space_database.clone();
         let space_database = space_database.unwrap();
         let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
             space_database.connection_pool.clone(),
-            home_dir,
-            account_id,
+            home_dir.unwrap_or_default().as_str(),
+            &account_id,
             space_id,
             Some(site_id.unwrap().to_string()),
             box_id,
