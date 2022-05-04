@@ -75,11 +75,10 @@ pub struct ContextSource {
     pub data: Option<HashMap<String, String>>,
     pub account_id: Option<String>,
     pub space_id: String,
-    pub box_id: String,
     pub site_id: Option<String>,
 }
 impl ContextSource {
-    pub fn defaults(space_id: String, site_id: String, box_id: String) -> Self {
+    pub fn defaults(space_id: String, site_id: String) -> Self {
         let mut site_id_wrap: Option<String> = None;
         if site_id != String::from("") {
             site_id_wrap = Some(site_id);
@@ -89,7 +88,6 @@ impl ContextSource {
             data: Some(HashMap::new()),
             space_id: space_id,
             account_id: None,
-            box_id: box_id,
             site_id: site_id_wrap,
         };
         return context_source
@@ -102,7 +100,6 @@ pub struct Context<'gb> {
     pub data: Option<&'gb HashMap<String, String>>,
     pub account_id: Option<String>,
     pub space_id: &'gb str,
-    pub box_id: &'gb str,
     pub site_id: Option<String>,
 }
 impl<'gb> Context<'gb> {
@@ -112,7 +109,6 @@ impl<'gb> Context<'gb> {
             data: None,
             account_id: context_source.account_id.clone(),
             space_id: &context_source.space_id,
-            box_id: &context_source.box_id,
             site_id: context_source.site_id.clone(),
         };
         return context

@@ -59,7 +59,6 @@ pub trait FolderItem {
         account_id: &str,
         space_id: &str,
         site_id: Option<String>,
-        box_id: &str,
         folder_id: &str,
         tree_folder: &TreeFolder,
     ) -> Result<TreeFolderItem, PlanetError>;
@@ -92,7 +91,6 @@ pub trait FolderItem {
 pub struct RoutingData {
     pub account_id: Option<String>,
     pub space_id: Option<String>,
-    pub box_id: Option<String>,
     pub site_id: Option<String>,
     pub ipfs_cid: Option<String>,
 }
@@ -102,14 +100,12 @@ impl RoutingData {
         account_id: Option<String>, 
         site_id: Option<String>,
         space_id: &str, 
-        box_id: &str, 
         ipfs_cid: Option<String>,
     ) -> Option<RoutingData> {
         let mut routing = RoutingData{
             account_id: account_id,
             site_id: None,
             space_id: None,
-            box_id: None,
             ipfs_cid: ipfs_cid,
         };
         if site_id.is_some() {
@@ -117,7 +113,6 @@ impl RoutingData {
             routing.site_id = Some(site_id);
         }
         routing.space_id = Some(space_id.to_string());
-        routing.box_id = Some(box_id.to_string());
         let routing_wrap = Some(routing);
         return routing_wrap
     }
@@ -178,7 +173,6 @@ impl DbFile {
             let account_id = routing.account_id.clone().clone();
             let site_id = routing.site_id.clone();
             let space_id = routing.space_id.clone();
-            let box_id = routing.box_id.clone();
             let ipfs_cid = routing.ipfs_cid.clone().unwrap_or_default();
             if account_id.is_some() {
                 routing_map.insert(String::from(ACCOUNT_ID), account_id.unwrap().to_string());
@@ -189,9 +183,6 @@ impl DbFile {
 
             if space_id.is_some() {
                 routing_map.insert(String::from(SPACE_ID), space_id.unwrap());
-            }
-            if box_id.is_some() {
-                routing_map.insert(String::from(BOX_ID), box_id.unwrap());
             }
             routing_map.insert(String::from(IPFS_CID), ipfs_cid);
         }
@@ -517,7 +508,6 @@ impl DbData {
             let account_id = routing.account_id.clone().clone();
             let site_id = routing.site_id.clone();
             let space_id = routing.space_id.clone();
-            let box_id = routing.box_id.clone();
             let ipfs_cid = routing.ipfs_cid.clone().unwrap_or_default();
             if account_id.is_some() {
                 routing_map.insert(String::from(ACCOUNT_ID), account_id.unwrap().to_string());
@@ -529,9 +519,6 @@ impl DbData {
             if space_id.is_some() {
                 routing_map.insert(String::from(SPACE_ID), space_id.unwrap());
             }
-            if box_id.is_some() {
-                routing_map.insert(String::from(BOX_ID), box_id.unwrap());
-            }            
             routing_map.insert(String::from(IPFS_CID), ipfs_cid);
             routing_map_ = Some(routing_map);
         }
@@ -578,13 +565,11 @@ impl SchemaData {
         account_id: Option<&str>, 
         site_id: Option<&str>, 
         space_id: Option<&str>, 
-        box_id: Option<&str>, 
     ) -> SchemaData {
         let mut routing = RoutingData{
             account_id: None,
             site_id: None,
             space_id: None,
-            box_id: None,
             ipfs_cid: None,
         };
         if account_id.is_some() {
@@ -598,10 +583,6 @@ impl SchemaData {
         if space_id.is_some() {
             let space_id = space_id.unwrap().to_string();
             routing.space_id = Some(space_id);
-        }
-        if box_id.is_some() {
-            let box_id = box_id.unwrap().to_string();
-            routing.box_id = Some(box_id);
         }
         let schema_data = SchemaData{
             id: generate_id(),
@@ -1055,13 +1036,11 @@ impl FolderItemData {
         account_id: Option<&String>, 
         site_id: Option<&String>,
         space_id: Option<&String>,
-        box_id: Option<&String>,
     ) -> Self {
         let mut routing = RoutingData{
             account_id: None,
             site_id: None,
             space_id: None,
-            box_id: None,
             ipfs_cid: None,
         };
         if account_id.is_some() {
@@ -1075,10 +1054,6 @@ impl FolderItemData {
         if space_id.is_some() {
             let space_id = space_id.unwrap().clone();
             routing.space_id = Some(space_id);
-        }
-        if box_id.is_some() {
-            let box_id = box_id.unwrap().clone();
-            routing.box_id = Some(box_id);
         }
         return Self{
             id: generate_id(),
@@ -1102,7 +1077,6 @@ pub struct TreeFolderItem {
     pub account_id: Option<String>,
     pub space_id: Option<String>,
     pub site_id: Option<String>,
-    pub box_id: Option<String>,
     pub tree: Option<sled::Tree>,
     pub index: Option<sled::Tree>,
     pub files_db: Option<sled::Tree>,
@@ -1269,8 +1243,6 @@ impl TreeFolderItem {
         let account_id = account_id.as_str();
         let space_id = self.space_id.clone().unwrap_or_default();
         let space_id = space_id.as_str();
-        let box_id = self.box_id.clone().unwrap_or_default();
-        let box_id = box_id.as_str();
         let site_id = self.site_id.clone().unwrap_or_default();
         let site_id = site_id.as_str();
         let partition:u16;
@@ -1300,7 +1272,6 @@ impl TreeFolderItem {
                 Some(account_id.to_string()),
                 Some(site_id.to_string()), 
                 space_id, 
-                box_id,
                 None
             );
             let db_data = DbData::defaults(
@@ -1399,8 +1370,6 @@ impl TreeFolderItem {
         let account_id = account_id.as_str();
         let space_id = self.space_id.clone().unwrap_or_default();
         let space_id = space_id.as_str();
-        let box_id = self.box_id.clone().unwrap_or_default();
-        let box_id = box_id.as_str();
         // TODO: Export data prior to drop trees, etc... so I can restore in case of errors to the state when request
         // to drop folder was received. Restore through IPFS. TODO when we have IPFS integrated.
 
@@ -1416,7 +1385,7 @@ impl TreeFolderItem {
         for partition in partitions {
             let partition_str = partition.to_string();
             let partition_str = format!("{:0>4}", partition_str);
-            let paths = self.get_db_paths(account_id, space_id, &partition_str, folder_id, box_id);
+            let paths = self.get_db_paths(account_id, space_id, &partition_str, folder_id);
             let path_db = paths.0;
             let path_index = paths.1;
             let db_result = self.database.drop_tree(path_db.clone());
@@ -1447,16 +1416,13 @@ impl TreeFolderItem {
         let account_id = account_id.as_str();
         let space_id = self.space_id.clone().unwrap_or_default();
         let space_id = space_id.as_str();
-        let box_id = self.box_id.clone().unwrap_or_default();
-        let box_id = box_id.as_str();
         let folder_id = self.folder_id.clone().unwrap_or_default();
         let folder_id = folder_id.as_str();
         if account_id != "" && space_id != "" {
             println!("DbFolderItem.write_file :: account_id and space_id have been informed");
         } else if space_id == "private" {
             path_db = format!(
-                "box/{box_id}/folder/{folder_id}/files.db",
-                box_id=box_id,
+                "folders/{folder_id}/files.db",
                 folder_id=folder_id,
             );
         }
@@ -1520,25 +1486,21 @@ impl TreeFolderItem {
         space_id: &str,
         partition_str: &String,
         folder_id: &str,
-        box_id: &str,
     ) -> (String, String) {
         let mut path_db: String = String::from("");
         let mut path_index: String = String::from("");
         if account_id != "" && space_id != "" {
             println!("DbFolderItem.open_partition :: account_id and space_id have been informed");
         } else if space_id == "private" {
-            // .achiever-planet/{table_file} : platform wide folder (slug with underscore)
-            // box/{box_id}/folder/{folder_id}/0001.db
-            // box/{box_id}/folder/{folder_id}/{sub_folder_id}/0001.db
+            // folders/{folder_id}/0001.db
+            // folders/{folder_id}/{sub_folder_id}/0001.db
             path_db = format!(
-                "box/{box_id}/folder/{folder_id}/{partition_str}.db",
-                box_id=box_id,
+                "folders/{folder_id}/{partition_str}.db",
                 folder_id=folder_id,
                 partition_str=partition_str
             );
             path_index = format!(
-                "box/{box_id}/folder/{folder_id}/{partition_str}.index",
-                box_id=box_id,
+                "folders/{folder_id}/{partition_str}.index",
                 folder_id=folder_id,
                 partition_str=partition_str
             );
@@ -1556,8 +1518,6 @@ impl TreeFolderItem {
         let account_id = account_id.as_str();
         let space_id = self.space_id.clone().unwrap_or_default();
         let space_id = space_id.as_str();
-        let box_id = self.box_id.clone().unwrap_or_default();
-        let box_id = box_id.as_str();
         // let home_dir = self.home_dir.clone().unwrap_or_default();
         // let home_dir = home_dir.as_str();
         let partition_str = partition.to_string();
@@ -1572,7 +1532,7 @@ impl TreeFolderItem {
                 (tree, index)
             )
         }
-        let paths = self.get_db_paths(account_id, space_id, &partition_str, folder_id, box_id);
+        let paths = self.get_db_paths(account_id, space_id, &partition_str, folder_id);
         let path_db = paths.0;
         let path_index = paths.1;
         eprintln!("DbFolderItem.open_partition :: path_db: {:?} path_index: {:?}", &path_db, &path_index);
@@ -1596,40 +1556,21 @@ impl TreeFolderItem {
     fn open_partitions(
         &mut self,
     ) -> Result<sled::Tree, PlanetError> {
-        let mut path: String = String::from("");
         // let home_dir = self.home_dir.clone().unwrap_or_default();
         // let home_dir = home_dir.as_str();
-        let account_id = self.account_id.clone().unwrap_or_default();
-        let account_id = account_id.as_str();
-        let space_id = self.space_id.clone().unwrap_or_default();
-        let space_id = space_id.as_str();
-        let box_id = self.box_id.clone().unwrap_or_default();
-        let box_id = box_id.as_str();
         let folder_id = self.folder_id.clone().unwrap_or_default();
         let folder_id = folder_id.as_str();
         if self.tree_partitions.is_some() {
             let db = self.tree_partitions.clone().unwrap();
             return Ok(db)
         }
-        // box/base/folder/c7c815is1s406kaf3j30/partitions
-        // box/base/folder/c7c815is1s406kaf3j30/partition/0001.db
-        // box_base_folder/c7c815is1s406kaf3j30/partition/0001.index
-        if account_id != "" && space_id != "" {
-            println!("DbFolderItem.open_partitions :: account_id and space_id have been informed");
-        } else if space_id == "private" {
-            // .achiever-planet/{table_file} : platform wide folder (slug with underscore)
-            // path = format!(
-            //     "{home}/private/boxes/{box_id}/folders/{folder_id}/partition.db", 
-            //     home=&home_dir, 
-            //     box_id=box_id,
-            //     folder_id=folder_id
-            // );
-            path = format!(
-                "box/{box_id}/folder/{folder_id}/partitions",
-                box_id=box_id,
-                folder_id=folder_id
-            );
-        }
+        // folders/c7c815is1s406kaf3j30/partitions
+        // folders/c7c815is1s406kaf3j30/partition/0001.db
+        // folders/c7c815is1s406kaf3j30/partition/0001.index
+        let path = format!(
+            "folders/{folder_id}/partitions",
+            folder_id=folder_id
+        );
         eprintln!("DbFolderItem.open_partitions :: path: {:?}", path);
         let result = self.database.open_tree(path);
         if result.is_err() {
@@ -1799,25 +1740,13 @@ impl TreeFolderItem {
         let id = db_file.id.clone().unwrap();
         let id_db = xid::Id::from_str(id.as_str()).unwrap();
         let id_db = id_db.as_bytes();
-        let mut path_db: String = String::from("");
         let folder_id = self.folder_id.clone().unwrap_or_default();
         let folder_id = folder_id.as_str();
-        let account_id = self.account_id.clone().unwrap_or_default();
-        let account_id = account_id.as_str();
-        let space_id = self.space_id.clone().unwrap_or_default();
-        let space_id = space_id.as_str();
-        let box_id = self.box_id.clone().unwrap_or_default();
-        let box_id = box_id.as_str();
         let file_name = db_file.name.unwrap_or_default();
-        if account_id != "" && space_id != "" {
-            println!("DbFolderItem.write_file :: account_id and space_id have been informed");
-        } else if space_id == "private" {
-            path_db = format!(
-                "box/{box_id}/folder/{folder_id}/files.db",
-                box_id=box_id,
-                folder_id=folder_id,
-            );
-        }
+        let path_db = format!(
+            "folders/{folder_id}/files.db",
+            folder_id=folder_id,
+        );
         let db: Tree;
         if self.files_db.is_some() {
             db = self.files_db.clone().unwrap();
@@ -1858,22 +1787,10 @@ impl TreeFolderItem {
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let folder_id = self.folder_id.clone().unwrap_or_default();
         let folder_id = folder_id.as_str();
-        let account_id = self.account_id.clone().unwrap_or_default();
-        let account_id = account_id.as_str();
-        let space_id = self.space_id.clone().unwrap_or_default();
-        let space_id = space_id.as_str();
-        let box_id = self.box_id.clone().unwrap_or_default();
-        let box_id = box_id.as_str();
-        let mut path_db: String = String::from("");
-        if account_id != "" && space_id != "" {
-            println!("DbFolderItem.write_file :: account_id and space_id have been informed");
-        } else if space_id == "private" {
-            path_db = format!(
-                "box/{box_id}/folder/{folder_id}/files.db",
-                box_id=box_id,
-                folder_id=folder_id,
-            );
-        }
+        let path_db = format!(
+            "folders/{folder_id}/files.db",
+            folder_id=folder_id,
+        );
         let db: Tree;
         if self.files_db.is_some() {
             db = self.files_db.clone().unwrap();
@@ -1958,7 +1875,6 @@ impl FolderItem for TreeFolderItem {
         account_id: &str,
         space_id: &str,
         site_id: Option<String>,
-        box_id: &str,
         folder_id: &str,
         tree_folder: &TreeFolder,
     ) -> Result<TreeFolderItem, PlanetError> {
@@ -1974,7 +1890,6 @@ impl FolderItem for TreeFolderItem {
             home_dir: Some(home_dir.to_string()),
             account_id: Some(account_id.to_string()),
             space_id: Some(space_id.to_string()),
-            box_id: Some(box_id.to_string()),
             site_id: site_id,
             tree_folder: tree_folder.clone(),
             folder_id: Some(folder_id.to_string()),
@@ -2146,7 +2061,6 @@ impl FolderItem for TreeFolderItem {
         let mut site_id_wrap: Option<String> = None;
         let site_id = self.site_id.clone().unwrap_or_default();
         let space_id = self.space_id.clone().unwrap_or_default();
-        let box_id = self.box_id.clone().unwrap_or_default();
         if site_id != String::from("") {
             site_id_wrap = Some(site_id);
         }
@@ -2154,7 +2068,6 @@ impl FolderItem for TreeFolderItem {
             self.account_id.clone(),
             site_id_wrap, 
             &space_id, 
-            &box_id,
             None
         );
         let name = db_item.name.unwrap_or_default();

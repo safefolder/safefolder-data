@@ -117,12 +117,10 @@ impl StatementRunner {
         if space_database.is_none() {
             let site_id = context.site_id.clone();
             let space_id = context.space_id;
-            let box_id = context.box_id;
             let home_dir = planet_context.home_path.clone();
             let result = SpaceDatabase::defaults(
                 site_id, 
                 space_id, 
-                box_id,
                 Some(home_dir.unwrap_or_default().as_str()),
             );
             if result.is_err() {

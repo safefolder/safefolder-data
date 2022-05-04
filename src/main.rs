@@ -4,7 +4,7 @@ extern crate serde_yaml;
 extern crate colored;
 extern crate lazy_static;
 extern crate tokio;
-use achiever::storage::constants::{BASE, PRIVATE};
+use achiever::storage::constants::{PRIVATE};
 use colored::Colorize;
 use lingua::{LanguageDetector, LanguageDetectorBuilder};
 
@@ -26,7 +26,6 @@ fn main() {
     let mut account_id: String = String::from("");
     let mut space_id: String = String::from(PRIVATE);
     let mut site_id: String = String::from("");
-    let mut box_id: String = String::from(BASE);
     let mut statement = String::from("");
     let mut op = String::from("run");
     let mut scope = String::from("");
@@ -49,9 +48,6 @@ fn main() {
         ap.refer(&mut space_id).add_option(
             &["-s", "--spaceid"], Store,
             "Space Id");
-        ap.refer(&mut box_id).add_option(
-            &["-s", "--boxid"], Store,
-            "Box Id");
         ap.refer(&mut statement).add_option(
             &["-b", "--statement"], Store,
             "Statement");
@@ -70,7 +66,7 @@ fn main() {
 
     let planet_context_source = PlanetContextSource::import_context().unwrap();
     let planet_context = PlanetContext::import(&planet_context_source);
-    let context_source = ContextSource::defaults(space_id, site_id, box_id);
+    let context_source = ContextSource::defaults(space_id, site_id);
     let context = Context::defaults(&context_source);
     eprintln!("main.rs :: context: {:#?}", &context);
 

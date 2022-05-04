@@ -15,7 +15,6 @@ impl SpaceDatabase {
     pub fn defaults(
         site_id: Option<String>, 
         space_id: &str, 
-        box_id: &str,
         home_dir: Option<&str>,
     ) -> Result<Self, PlanetError> {
         let home_dir = home_dir.unwrap_or_default();
@@ -72,10 +71,9 @@ impl SpaceDatabase {
                 let path : String;
                 if key == space_id {
                     path = format!(
-                        "{home}/sites/{site_id}/spaces/{space_id}/boxes/{box_id}/database.db", 
+                        "{home}/sites/{site_id}/spaces/{space_id}/database.db", 
                         site_id=site_id, 
                         space_id=&space_id,
-                        box_id=box_id,
                         home=&home_dir
                     );
                 } else {

@@ -1219,7 +1219,6 @@ impl<'gb> Statement<'gb> for CreateFolderStatement {
                 let account_id = Some(context.account_id.clone().unwrap_or_default().to_string());
                 let site_id = context.site_id.clone();
                 let space_id = context.space_id;
-                let box_id = context.box_id;
 
                 // db folder options with language data
                 let db_folder: TreeFolder = result.unwrap();
@@ -1412,7 +1411,6 @@ impl<'gb> Statement<'gb> for CreateFolderStatement {
                     account_id, 
                     site_id, 
                     space_id,
-                    box_id,
                     None,
                 );
                 let mut data_wrap: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>> = None;
@@ -1851,7 +1849,6 @@ impl<'gb> Statement<'gb> for DropFolderStatement {
         let home_dir = planet_context.home_path.clone();
         let account_id = context.account_id.clone().unwrap_or_default();
         let space_id = context.space_id;
-        let box_id = context.box_id;
         let site_id = context.site_id.clone();
         let mut site_id_alt: Option<String> = None;
         if site_id.is_some() {
@@ -1881,7 +1878,6 @@ impl<'gb> Statement<'gb> for DropFolderStatement {
                             &account_id,
                             space_id,
                             site_id_alt,
-                            box_id,
                             folder_id.as_str(),
                             &db_folder,
                         );
@@ -2752,7 +2748,6 @@ impl<'gb> Statement<'gb> for ModifyLanguageStatement {
         let home_dir = planet_context.home_path.clone();
         let account_id = context.account_id.clone().unwrap_or_default();
         let space_id = context.space_id;
-        let box_id = context.box_id;
         let site_id = context.site_id.clone();
         let result: Result<TreeFolder, PlanetError> = TreeFolder::defaults(
             space_database.connection_pool.clone(),
@@ -2789,7 +2784,6 @@ impl<'gb> Statement<'gb> for ModifyLanguageStatement {
                                 &account_id,
                                 space_id,
                                 site_id_alt,
-                                box_id,
                                 folder_id.as_str(),
                                 &db_folder,
                             );
@@ -3678,7 +3672,6 @@ impl<'gb> Statement<'gb> for ModifySearchRelevanceStatement {
         let home_dir = planet_context.home_path.clone();
         let account_id = context.account_id.clone().unwrap_or_default();
         let space_id = context.space_id;
-        let box_id = context.box_id;
         let site_id = context.site_id.clone();
         let result: Result<TreeFolder, PlanetError> = TreeFolder::defaults(
             space_database.connection_pool.clone(),
@@ -3754,7 +3747,6 @@ impl<'gb> Statement<'gb> for ModifySearchRelevanceStatement {
                             &account_id,
                             space_id,
                             site_id_alt,
-                            box_id,
                             folder_id.as_str(),
                             &db_folder,
                         );

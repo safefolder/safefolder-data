@@ -291,7 +291,6 @@ impl<'gb> Statement<'gb> for InsertIntoFolderStatement {
         let account_id = context.account_id.clone().unwrap_or_default();
         let space_id = context.space_id;
         let site_id = context.site_id.clone();
-        let box_id = context.box_id;
         let space_database = space_database.clone();
         let db_folder= TreeFolder::defaults(
             space_database.connection_pool.clone(),
@@ -334,7 +333,6 @@ impl<'gb> Statement<'gb> for InsertIntoFolderStatement {
             &account_id,
             space_id,
             site_id_alt,
-            box_id,
             folder_id.as_str(),
             &db_folder,
         );
@@ -347,7 +345,6 @@ impl<'gb> Statement<'gb> for InsertIntoFolderStatement {
                     Some(account_id.to_string()),
                     site_id.clone(), 
                     &space_id, 
-                    &box_id,
                     None
                 );
                 
@@ -910,7 +907,6 @@ impl<'gb> Statement<'gb> for InsertIntoFolderStatement {
                                                 &account_id,
                                                 space_id,
                                                 Some(site_id.clone().unwrap().to_string()),
-                                                box_id,
                                                 remote_folder_id.as_str(),
                                                 &db_folder,
                                             );
