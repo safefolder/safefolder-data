@@ -69,6 +69,11 @@ impl SpaceDatabase {
                 }
                 // Open db, then sync into connection_pool
                 let path : String;
+                if key == PRIVATE.to_string() {
+                    // We have space private, since no space id was informed, but not allowed for sites.
+                    // Space id has not been informed for the site, like when creating folders.
+                    continue
+                }
                 if key == space_id {
                     path = format!(
                         "{home}/sites/{site_id}/spaces/{space_id}/database.db", 

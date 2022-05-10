@@ -1,0 +1,11 @@
+CREATE FOLDER Site (
+	LANGUAGE english,
+	NAME COLUMN SmallText,
+	"Title" SmallText WITH Required=true,
+	"Description" LongText,
+	"Keywords" SmallText WITH IsSet=true,
+    "Content" LongText,
+    "Main Image" File,
+    "Images" File WITH Many=true,
+    "Meta" Object,
+);

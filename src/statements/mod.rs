@@ -18,7 +18,7 @@ use crate::statements::folder::schema::resolve_schema_statement;
 use crate::statements::folder::data::resolve_data_statement;
 
 lazy_static! {
-    pub static ref RE_WITH_OPTIONS: Regex = Regex::new(r#"(?P<Name>\w+)=(?P<Value>(\d*)|(true|false|True|False)|([a-zA-Z0-9{}|]+)|([\s\S]+)|("[\w\s]+)")"#).unwrap();
+    pub static ref RE_WITH_OPTIONS: Regex = Regex::new(r#"(?P<Name>\w+)=(?P<Value>(\d+)|(true|false|True|False)|([a-zA-Z0-9{}|]+)|([\s\S]+)|("[\w\s]+)")"#).unwrap();
     pub static ref RE_OPTION_LIST_ITEMS: Regex = Regex::new(r#"(?P<Item>((\d+)|([a-zA-Z0-9]+)|(true|false|True|False)|(---\\n[\S\s]+)|(null)))"#).unwrap();
     pub static ref RE_DATA_LONG_TEXT: Regex = Regex::new(r#"(?P<Text>"""[\s\S\n\t][^"""]+""")"#).unwrap();
     pub static ref RE_STMT_VARIABLES: Regex = Regex::new(r#"(?P<Var>\{[\w\s.]+\})"#).unwrap();
@@ -188,6 +188,7 @@ impl WithOptionValueItem {
         // Check value and define item_type
         let obj: WithOptionValueItem;
         let mut value = value.clone();
+        eprintln!("WithOptionValueItem.defaults :: value: {}", &value);
         // Number
         let result = i32::from_str(&value);
         if result.is_ok() {
@@ -348,6 +349,7 @@ impl WithOptions {
         for item in items {
             let name = item.name("Name").unwrap().as_str();
             let value = item.name("Value").unwrap().as_str();
+            eprintln!("WithOptions.defaults :: name: {} value: {}", name, value);
             let value_string = value.replace("\"", "");
             let value = value_string.as_str();
             if value.find("{").is_some() {

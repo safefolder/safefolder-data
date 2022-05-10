@@ -18,7 +18,16 @@ use crate::statements::folder::config::{
 };
 use crate::statements::*;
 use crate::statements::{Statement, StatementCallMode};
-use crate::storage::folder::{TreeFolder, FolderSchema, DbData, RoutingData, build_value_list, DbDataMini, TreeFolderItem, FolderItem};
+use crate::storage::folder::{
+    TreeFolder, 
+    FolderSchema, 
+    DbData, 
+    RoutingData, 
+    build_value_list, 
+    DbDataMini, 
+    TreeFolderItem, 
+    FolderItem,
+};
 use crate::storage::space::{SpaceDatabase};
 use crate::planet::{
     PlanetContext, 
@@ -84,7 +93,7 @@ pub const WITH_FORMULA: &str = "Formula";
 pub const WITH_FORMULA_FORMAT: &str = "FormulaFormat";
 pub const WITH_DATE_FORMAT: &str = "DateFormat";
 pub const WITH_TIME_FORMAT: &str = "TimeFormat";
-pub const WITH_LINKED_FOLDER_ID: &str = "LinkedFolderId";
+pub const WITH_LINKED_FOLDER: &str = "LinkedFolder";
 pub const WITH_DELETE_ON_LINK_DROP: &str = "DeleteOnLinkDrop";
 pub const WITH_RELATED_COLUMN: &str = "RelatedColumn";
 pub const WITH_SEQUENCE: &str = "Sequence";
@@ -97,7 +106,7 @@ pub const ALLOWED_WITH_OPTIONS: [&str; 24] = [
     WITH_PARENT, WITH_REQUIRED, WITH_OPTIONS, WITH_NUMBER_DECIMALS, WITH_CURRENCY_SYMBOL, 
     WITH_MAXIMUM, WITH_MINIMUM, WITH_SET_MINIMUM, WITH_SET_MAXIMUM, WITH_IS_SET, WITH_MANY, 
     WITH_DEFAULT, WITH_FORMULA, WITH_FORMULA_FORMAT, WITH_DATE_FORMAT, WITH_TIME_FORMAT, 
-    WITH_LINKED_FOLDER_ID, WITH_DELETE_ON_LINK_DROP, WITH_RELATED_COLUMN, WITH_SEQUENCE, 
+    WITH_LINKED_FOLDER, WITH_DELETE_ON_LINK_DROP, WITH_RELATED_COLUMN, WITH_SEQUENCE, 
     WITH_MAX_LENGTH, WITH_STATS_FUNCTION, WITH_CONTENT_TYPES, WITH_MODE
 ];
 
@@ -165,7 +174,7 @@ pub struct ColumnConfig {
     pub time_format: Option<i8>,
     pub currency_symbol: Option<String>,
     pub number_decimals: Option<i8>,
-    pub linked_folder_id: Option<String>,
+    pub linked_folder: Option<String>,
     pub delete_on_link_drop: Option<bool>,
     pub related_column: Option<String>,
     pub sequence: Option<String>,
@@ -202,7 +211,7 @@ impl ConfigStorageColumn for ColumnConfig {
             time_format: None,
             currency_symbol: None,
             number_decimals: None,
-            linked_folder_id: None,
+            linked_folder: None,
             delete_on_link_drop: None,
             related_column: None,
             sequence: None,
@@ -255,7 +264,7 @@ impl ConfigStorageColumn for ColumnConfig {
                     time_format: None,
                     currency_symbol: None,
                     number_decimals: None,
-                    linked_folder_id: None,
+                    linked_folder: None,
                     delete_on_link_drop: None,
                     related_column: None,
                     sequence: None,
@@ -304,14 +313,15 @@ impl ConfigStorageColumn for ColumnConfig {
     fn get_config(
         planet_context: &PlanetContext,
         context: &Context,
-        db_data: &DbData
+        folder: &DbData
     ) -> Result<Vec<ColumnConfig>, PlanetError> {
         // eprintln!("get_config...");
         // let select_data: Option<Vec<(String, String)>> = None;
-        let db_data = db_data.clone();
+        let db_data = folder.clone();
         let mut columns: Vec<ColumnConfig> = Vec::new();
         // I use data_collections, where we store the columns
         let data = db_data.data.clone();
+        let folder_name = db_data.name.unwrap_or_default();
         // let data = db_data.data;
         // let data_objects = db_data.data_objects;
         // eprintln!("get_config :: data: {:#?}", &data);
@@ -437,6 +447,7 @@ impl ConfigStorageColumn for ColumnConfig {
                                 planet_context,
                                 context,
                                 &column_config,
+                                &folder_name,
                                 None,
                                 None
                             );
@@ -647,6 +658,7 @@ impl ConfigStorageColumn for ColumnConfig {
                     planet_context,
                     context,
                     &propertty_config_,
+                    &folder_name.clone(),
                     Some(db_folder.clone()),
                     None
                 ).create_config(
@@ -794,12 +806,11 @@ pub fn process_column(column_str: &str, column_type: &str, item: &Captures) -> R
     let name = column_str.trim().to_string();
     column.column_type = Some(column_type.to_string());
     column.name = Some(name);
-    column.id = generate_id();
+    column.id = generate_id();    
     let options = item.name("Options");
     let mut errors: Vec<PlanetError> = Vec::new();
     if options.is_some() {
         let options = options.unwrap().as_str();
-        // eprintln!("CreateFolder.compile :: options: {}", options);
         let result = WithOptions::defaults(
             &options.to_string()
         );
@@ -809,7 +820,6 @@ pub fn process_column(column_str: &str, column_type: &str, item: &Captures) -> R
         } else {
             let with_options_obj = result.unwrap();
             let with_options = &with_options_obj.options;
-            // eprintln!("CreateFolder.compile :: with_options: {:#?}", with_options);
             // Validate I have allowed options
             let mut is_valid = true;
             for (k, _v) in with_options {
@@ -951,11 +961,11 @@ pub fn process_column(column_str: &str, column_type: &str, item: &Captures) -> R
                     let time_format: i8 = FromStr::from_str(time_format.as_str()).unwrap();
                     column.time_format = Some(time_format);
                 }
-                if *&with_options.contains_key(WITH_LINKED_FOLDER_ID) {
-                    let linked_folder_id = &with_options_obj.get_single_value(
-                        WITH_LINKED_FOLDER_ID
+                if *&with_options.contains_key(WITH_LINKED_FOLDER) {
+                    let linked_folder = &with_options_obj.get_single_value(
+                        WITH_LINKED_FOLDER
                     );
-                    column.linked_folder_id = Some(linked_folder_id.clone());
+                    column.linked_folder = Some(linked_folder.clone());
                 }
                 if *&with_options.contains_key(WITH_DELETE_ON_LINK_DROP) {
                     let delete_on_link_drop = &with_options_obj.get_single_value(
@@ -1450,75 +1460,76 @@ impl<'gb> Statement<'gb> for CreateFolderStatement {
                 // Related folders, I need to update their config, like Links
                 //
                 let columns = response.data.unwrap();
-                let mut linked_folder_ids: Vec<String> = Vec::new();
-                let mut map_column_names: BTreeMap<String, String> = BTreeMap::new();
+                let columns = columns.get(COLUMNS).unwrap();
+                let mut linked_folders: Vec<String> = Vec::new();
                 let mut map_column_ids: BTreeMap<String, String> = BTreeMap::new();
-                for (_, v) in columns {
-                    if v.len() == 1 {
-                        let v = &v[0];
-                        let column_type = v.get(COLUMN_TYPE);
-                        let column_name = v.get(NAME);
-                        let column_id = v.get(ID);
-                        if column_type.is_some() {
-                            let column_type = column_type.unwrap();
-                            let column_name = column_name.unwrap();
-                            let column_id = column_id.unwrap();
-                            if column_type == COLUMN_TYPE_LINK {
-                                let linked_folder_id = v.get(LINKED_FOLDER_ID);
-                                if linked_folder_id.is_some() {
-                                    let linked_folder_id = linked_folder_id.unwrap();
-                                    let has_id = linked_folder_ids.contains(linked_folder_id);
-                                    if !has_id {
-                                        linked_folder_ids.push(linked_folder_id.clone());
-                                        map_column_names.insert(
-                                            linked_folder_id.clone(), column_name.clone()
-                                        );
-                                        map_column_ids.insert(
-                                            linked_folder_id.clone(), column_id.clone()
-                                        );
-                                    }
+                for v in columns {
+                    let v = v.clone();
+                    let column_type = v.get(COLUMN_TYPE);
+                    let column_id = v.get(ID);
+                    if column_type.is_some() {
+                        let column_type = column_type.unwrap();
+                        let column_id = column_id.unwrap();
+                        if column_type == COLUMN_TYPE_LINK {
+                            let linked_folder = v.get(LINKED_FOLDER);
+                            if linked_folder.is_some() {
+                                let linked_folder = linked_folder.unwrap();
+                                let has_id = linked_folders.contains(linked_folder);
+                                if !has_id {
+                                    linked_folders.push(linked_folder.clone());
+                                    map_column_ids.insert(
+                                        linked_folder.clone(), column_id.clone()
+                                    );
                                 }
                             }
-                        }    
+                        }
                     }
                 }
                 // Get each folder from db_folder instance and update with link to this created table
+                // eprintln!("CreateFolder.run :: LINKS map_column_names: {:?}", &map_column_names);
                 let local_column_map = db_data.data.unwrap();
-                for link_folder_id in linked_folder_ids {
-                    let linked_folder = db_folder.get(&link_folder_id);
+                let local_columns = local_column_map.get(COLUMNS).unwrap();
+                for link_folder in linked_folders {
+                    let linked_folder = db_folder.get_by_name(&link_folder);
                     if linked_folder.is_ok() {
-                        let mut linked_folder = linked_folder.unwrap();
-                        let data = linked_folder.clone().data;
+                        let mut linked_folder = linked_folder.unwrap().unwrap();
                         let mut map = linked_folder.clone().data.unwrap();
-                        let column_name = map_column_names.get(&link_folder_id).unwrap();
-                        let remote_column_map = local_column_map.get(
-                            column_name
-                        ).unwrap().clone();
-                        // Update Column map with columns for local column, Link with link_folder_id being 
-                        // this local Column
-                        if remote_column_map.len() == 1 {
-                            let mut remote_column_map = remote_column_map[0].clone();
-                            remote_column_map.insert(String::from(LINKED_FOLDER_ID), folder_id.clone());
-                            remote_column_map.insert(String::from(NAME), folder_name.clone());
-                            remote_column_map.insert(String::from(MANY), String::from(TRUE));
-                            let mut my_list: Vec<BTreeMap<String, String>> = Vec::new();
-                            my_list.push(remote_column_map.clone());
-                            map.insert(folder_name.clone(), my_list);
-                            let mut column_ids_map = linked_folder.data.unwrap();
-                            let mut column_ids = column_ids_map.get(
-                                COLUMN_IDS
-                            ).unwrap().clone();
-                            let column_id = map_column_ids.get(&link_folder_id.clone()).unwrap();
-                            let mut element: BTreeMap<String, String> = BTreeMap::new();
-                            element.insert(String::from(ID),column_id.clone());
-                            column_ids.push(element);
-                            column_ids_map.insert(String::from(COLUMN_IDS), column_ids);
-                            let mut new_data = data.unwrap();
-                            new_data.extend(column_ids_map);
-                            linked_folder.data = Some(new_data);
-                            eprintln!("CreateFolder.run :: linked_folder: {:#?}", &linked_folder);
-                            let _ = db_folder.update(&linked_folder);
+                        let column_name = &link_folder;
+                        let mut remote_column_map: BTreeMap<String, String> = BTreeMap::new();
+                        for column_data in local_columns {
+                            let column_data_name = column_data.get(NAME);
+                            if column_data_name.is_some() {
+                                let column_data_name = column_data_name.unwrap().clone();
+                                if column_data_name.to_lowercase() == column_name.clone().to_lowercase() {
+                                    remote_column_map = column_data.clone();
+                                }
+                            }
                         }
+                        remote_column_map.insert(String::from(LINKED_FOLDER), folder_name.clone());
+                        remote_column_map.insert(String::from(NAME), folder_name.clone());
+                        remote_column_map.insert(String::from(MANY), String::from(TRUE));
+                        let linked_folder_data = linked_folder.data.unwrap();
+                        let linked_folder_columns = linked_folder_data.get(
+                            COLUMNS
+                        ).unwrap();
+                        let mut column_found = false;
+                        let mut linked_folder_columns_new: Vec<BTreeMap<String, String>> = Vec::new();
+                        for remote_column in linked_folder_columns {
+                            let remote_column_name = remote_column.get(NAME).unwrap().clone();
+                            if remote_column_name.to_lowercase() == column_name.to_ascii_lowercase() {
+                                column_found = true;
+                                linked_folder_columns_new.push(remote_column_map.clone());
+                            } else {
+                                linked_folder_columns_new.push(remote_column.clone());
+                            }
+                        }
+                        if !column_found {
+                            linked_folder_columns_new.push(remote_column_map.clone());
+                        }
+                        map.insert(COLUMNS.to_string(), linked_folder_columns_new);
+                        linked_folder.data = Some(map);
+                        eprintln!("CreateFolder.run :: linked_folder: {:#?}", &linked_folder);
+                        let _ = db_folder.update(&linked_folder);
                     }
                 }
 
@@ -3873,7 +3884,12 @@ impl<'gb> Statement<'gb> for CreateSpaceDirStatement {
             let home_dir = planet_context.home_path.clone();
             // Create directory for site_id
             let path_base = format!(
-                "{home}/sites/{site_id}/spaces/base/boxes/base", 
+                "{home}/sites/{site_id}/spaces/base", 
+                home=&home_dir.clone().unwrap_or_default(), 
+                site_id=site_id,
+            );
+            let path_base_site = format!(
+                "{home}/sites/{site_id}", 
                 home=&home_dir.unwrap_or_default(), 
                 site_id=site_id,
             );
@@ -3892,7 +3908,7 @@ impl<'gb> Statement<'gb> for CreateSpaceDirStatement {
                 errors.push(error);
                 return Err(errors)
             }
-            let path = format!("{base}/site.db", base=path_base);
+            let path = format!("{base}/site.db", base=path_base_site);
             let config: sled::Config = sled::Config::default()
             .use_compression(true)
             .path(path.clone());

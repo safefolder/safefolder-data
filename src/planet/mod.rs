@@ -15,6 +15,8 @@ use std::env;
 use std::fs;
 use std::io;
 
+use crate::storage::constants::PRIVATE;
+
 
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
 pub struct StatementRegistryItem {
@@ -28,6 +30,8 @@ pub struct StatementRegistryItem {
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
 pub struct PlanetContextSource {
     pub mission: String,
+    pub site_id: String,
+    pub space_id: String,
     pub home_path: Option<String>,
     pub statements: Vec<StatementRegistryItem>,
 }
@@ -55,6 +59,8 @@ impl PlanetContextSource {
 #[derive(Debug, Clone)]
 pub struct PlanetContext<'gb> {
     pub mission: &'gb str,
+    pub site_id: &'gb str,
+    pub space_id: &'gb str,
     pub home_path: Option<String>,
     pub statements: Vec<StatementRegistryItem>,
 }
@@ -62,6 +68,8 @@ impl<'gb> PlanetContext<'gb> {
     pub fn import(planet_context_source: &'gb PlanetContextSource) -> PlanetContext<'gb> {
         let planet_context: PlanetContext<'gb> = PlanetContext{
             mission: &planet_context_source.mission,
+            site_id: &planet_context_source.site_id,
+            space_id: &planet_context_source.space_id,
             home_path: planet_context_source.home_path.clone(),
             statements: planet_context_source.statements.clone()
         };
@@ -80,8 +88,12 @@ pub struct ContextSource {
 impl ContextSource {
     pub fn defaults(space_id: String, site_id: String) -> Self {
         let mut site_id_wrap: Option<String> = None;
+        let mut space_id = space_id.clone();
         if site_id != String::from("") {
             site_id_wrap = Some(site_id);
+            if space_id == String::from(PRIVATE) {
+                space_id = String::from("");
+            }
         }
         let context_source: ContextSource = ContextSource{
             id: None,

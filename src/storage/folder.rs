@@ -127,13 +127,11 @@ pub struct NameTree {
     name: String
 }
 
-// This structure would apply for SchemaData and RowData, we would need to convert from one to the other
-// data has field_id -> value, so if we change column name would not be affected
-
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
 pub struct SubFolderItem {
     #[validate(required)]
     pub id: Option<String>,
+    pub name: Option<String>,
     pub is_reference: Option<bool>,
     pub data: Option<BTreeMap<String, String>>,
 }
@@ -678,7 +676,7 @@ impl FolderSchema for TreeFolder {
                 return Err(
                     PlanetError::new(
                         500, 
-                        Some(tr!("Could not open site space \"{}\" workspace database.", site_id)),
+                        Some(tr!("Could not open site \"{}\" database.", site_id)),
                     )
                 )
             }
@@ -1366,10 +1364,6 @@ impl TreeFolderItem {
     ) -> Result<(), PlanetError> {
         let folder_id = self.folder_id.clone().unwrap_or_default();
         let folder_id = folder_id.as_str();
-        let account_id = self.account_id.clone().unwrap_or_default();
-        let account_id = account_id.as_str();
-        let space_id = self.space_id.clone().unwrap_or_default();
-        let space_id = space_id.as_str();
         // TODO: Export data prior to drop trees, etc... so I can restore in case of errors to the state when request
         // to drop folder was received. Restore through IPFS. TODO when we have IPFS integrated.
 
@@ -1385,7 +1379,7 @@ impl TreeFolderItem {
         for partition in partitions {
             let partition_str = partition.to_string();
             let partition_str = format!("{:0>4}", partition_str);
-            let paths = self.get_db_paths(account_id, space_id, &partition_str, folder_id);
+            let paths = self.get_db_paths(&partition_str, folder_id);
             let path_db = paths.0;
             let path_index = paths.1;
             let db_result = self.database.drop_tree(path_db.clone());
@@ -1482,29 +1476,19 @@ impl TreeFolderItem {
 
     fn get_db_paths(
         &mut self,
-        account_id: &str,
-        space_id: &str,
         partition_str: &String,
         folder_id: &str,
     ) -> (String, String) {
-        let mut path_db: String = String::from("");
-        let mut path_index: String = String::from("");
-        if account_id != "" && space_id != "" {
-            println!("DbFolderItem.open_partition :: account_id and space_id have been informed");
-        } else if space_id == "private" {
-            // folders/{folder_id}/0001.db
-            // folders/{folder_id}/{sub_folder_id}/0001.db
-            path_db = format!(
-                "folders/{folder_id}/{partition_str}.db",
-                folder_id=folder_id,
-                partition_str=partition_str
-            );
-            path_index = format!(
-                "folders/{folder_id}/{partition_str}.index",
-                folder_id=folder_id,
-                partition_str=partition_str
-            );
-        }
+        let path_db = format!(
+            "folders/{folder_id}/{partition_str}.db",
+            folder_id=folder_id,
+            partition_str=partition_str
+        );
+        let path_index = format!(
+            "folders/{folder_id}/{partition_str}.index",
+            folder_id=folder_id,
+            partition_str=partition_str
+        );
         return (path_db, path_index)
     }
 
@@ -1514,10 +1498,6 @@ impl TreeFolderItem {
     ) -> Result<(sled::Tree, sled::Tree), PlanetError> {
         let folder_id = self.folder_id.clone().unwrap_or_default();
         let folder_id = folder_id.as_str();
-        let account_id = self.account_id.clone().unwrap_or_default();
-        let account_id = account_id.as_str();
-        let space_id = self.space_id.clone().unwrap_or_default();
-        let space_id = space_id.as_str();
         // let home_dir = self.home_dir.clone().unwrap_or_default();
         // let home_dir = home_dir.as_str();
         let partition_str = partition.to_string();
@@ -1532,19 +1512,19 @@ impl TreeFolderItem {
                 (tree, index)
             )
         }
-        let paths = self.get_db_paths(account_id, space_id, &partition_str, folder_id);
+        let paths = self.get_db_paths(&partition_str, folder_id);
         let path_db = paths.0;
         let path_index = paths.1;
         eprintln!("DbFolderItem.open_partition :: path_db: {:?} path_index: {:?}", &path_db, &path_index);
-        let db = self.database.open_tree(path_db);
+        let tree = self.database.open_tree(path_db);
         let index = self.database.open_tree(path_index);
-        if db.is_ok() && index.is_ok() {
-            let db_ = db.unwrap().clone();
+        if tree.is_ok() && index.is_ok() {
+            let tree_ = tree.unwrap().clone();
             let index_ = index.unwrap().clone();
-            self.tree = Some(db_.clone());
+            self.tree = Some(tree_.clone());
             self.index = Some(index_.clone());
             return Ok(
-                (db_.clone(), index_.clone())
+                (tree_.clone(), index_.clone())
             )
         } else {
             return Err(
@@ -2168,11 +2148,10 @@ impl FolderItem for TreeFolderItem {
         let item_db: Vec<u8>;
         match by {
             GetItemOption::ById(id) => {
-                eprintln!("DbFolderItem.get :: id: {}", &id);
                 let id_db = xid::Id::from_str(&id).unwrap();
                 let id_db = id_db.as_bytes();
-                let (db, _) = self.open_partition_by_item(&id)?;
-                let db_result = db.get(&id_db);
+                let (tree, _) = self.open_partition_by_item(&id)?;
+                let db_result = tree.get(&id_db);
                 if db_result.is_err() {
                     return Err(
                         PlanetError::new(
@@ -2186,7 +2165,7 @@ impl FolderItem for TreeFolderItem {
                     return Err(
                         PlanetError::new(
                             404, 
-                            Some(tr!("Item does not exist"))
+                            Some(tr!("Folder Item with id \"{}\" at folder \"{}\" does not exist.", &id, folder_name))
                         )
                     );
                 }

@@ -16,6 +16,7 @@ pub struct LinkColumn<'gb> {
     pub config: ColumnConfig,
     pub planet_context: &'gb PlanetContext<'gb>,
     pub context: &'gb Context<'gb>,
+    pub folder_name: &'gb String,
     pub db_folder: Option<TreeFolder>,
     pub space_database: Option<SpaceDatabase>,
 }
@@ -24,6 +25,7 @@ impl<'gb> LinkColumn<'gb> {
         planet_context: &'gb PlanetContext, 
         context: &'gb Context, 
         column_config: &ColumnConfig,
+        folder_name: &'gb String,
         db_folder: Option<TreeFolder>,
         space_database: Option<SpaceDatabase>
     ) -> Self {
@@ -33,6 +35,7 @@ impl<'gb> LinkColumn<'gb> {
             planet_context: planet_context,
             context: context,
             db_folder: db_folder,
+            folder_name: folder_name,
             space_database: space_database
         };
         return field_obj
@@ -48,23 +51,37 @@ impl<'gb> ObjectStorageColumn<'gb> for LinkColumn<'gb> {
         let mut field_config_map = field_config_map.clone();
         let config = self.config.clone();
         let many = config.many;
-        let linked_folder_id = config.linked_folder_id;
+        let linked_folder = config.linked_folder;
         let delete_on_link_drop = config.delete_on_link_drop;
+        let folder_name = self.folder_name.clone();
         // linked folder id is required for a link Column
-        if linked_folder_id.is_none() {
+        if linked_folder.is_none() {
             let name = config.name.unwrap_or_default();
             return Err(
                 PlanetError::new(
                     500, 
-                    Some(tr!("Column not configured for links: \"{}\"", name)),
+                    Some(tr!("Column not configured for links: \"{}\". 
+                    Linked folder not defined.", name)),
                 )
             );
         }
-        let linked_folder_id = linked_folder_id.unwrap();
-        // Get folder config by folder id
-        // let db_folder = TreeFolder::defaults(self.planet_context, self.context)?;
-        let _ = self.db_folder.clone().unwrap().get(&linked_folder_id)?;
-        field_config_map.insert(LINKED_FOLDER_ID.to_string(), linked_folder_id);
+        let linked_folder = linked_folder.unwrap();
+        // Get folder config by folder name
+        if folder_name.to_lowercase() != linked_folder.to_lowercase() {
+            // Only get remote folder in case is not Self connection for Link
+            let folder_result = self.db_folder.clone().unwrap().get_by_name(
+                &linked_folder
+            )?;
+            if folder_result.is_none() {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Folder \"{}\" not found.", &linked_folder)),
+                    )
+                );
+            }    
+        }
+        field_config_map.insert(LINKED_FOLDER.to_string(), linked_folder);
         // These are options, not required
         if many.is_some() {
             let many = many.unwrap();
@@ -91,7 +108,7 @@ impl<'gb> ObjectStorageColumn<'gb> for LinkColumn<'gb> {
         let field_config_map = field_config_map.clone();
         let mut config = self.config.clone();
         let many = field_config_map.get(MANY);
-        let linked_folder_id = field_config_map.get(LINKED_FOLDER_ID);
+        let linked_folder = field_config_map.get(LINKED_FOLDER);
         let delete_on_link_drop = field_config_map.get(DELETE_ON_LINK_DROP);
         if many.is_some() {
             let many = many.unwrap().clone().to_lowercase();
@@ -101,9 +118,9 @@ impl<'gb> ObjectStorageColumn<'gb> for LinkColumn<'gb> {
                 config.many = Some(false);
             }
         }
-        if linked_folder_id.is_some() {
-            let linked_folder_id = linked_folder_id.unwrap().clone();
-            config.linked_folder_id = Some(linked_folder_id);
+        if linked_folder.is_some() {
+            let linked_folder = linked_folder.unwrap().clone();
+            config.linked_folder = Some(linked_folder);
         }
         if delete_on_link_drop.is_some() {
             let delete_on_link_drop = delete_on_link_drop.unwrap().clone();
@@ -122,10 +139,11 @@ impl<'gb> ObjectStorageColumn<'gb> for LinkColumn<'gb> {
         //eprintln!("LinkColumn.validate :: data: {:?}", data);
         let data = data.clone();
         let config = self.config.clone();
-        let linked_folder_id = config.linked_folder_id.unwrap();
+        let linked_folder = config.linked_folder.unwrap();
         let db_folder = self.db_folder.clone().unwrap();
-        //eprintln!("LinkColumn.validate  :: linked_folder_id: {}", &linked_folder_id);
-        let folder = db_folder.get(&linked_folder_id);
+        // eprintln!("LinkColumn.validate  :: linked_folder: {}", &linked_folder);
+        let folder = db_folder.get_by_name(&linked_folder);
+        // let folder = db_folder.get(&linked_folder_id);
         if folder.is_err() {
             let error = folder.unwrap_err();
             let mut errors: Vec<PlanetError> = Vec::new();
@@ -133,6 +151,17 @@ impl<'gb> ObjectStorageColumn<'gb> for LinkColumn<'gb> {
             return Err(errors)
         }
         let folder = folder.unwrap();
+        if folder.is_none() {
+            let error = PlanetError::new(
+                500, 
+                Some(tr!("Folder \"{}\" not found.", &linked_folder)),
+            );
+            let mut errors: Vec<PlanetError> = Vec::new();
+            errors.push(error);
+            return Err(errors);
+        }
+        let folder = folder.unwrap();
+        let linked_folder_id = folder.id.unwrap_or_default();
         let folder_name = folder.name.unwrap();
         //eprintln!("LinkColumn.validate  :: folder_name: {}", &folder_name);
         let many = config.many.unwrap();

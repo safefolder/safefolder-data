@@ -1,5 +1,7 @@
 ---
   mission: Achieve More Through Better systems
+  site_id: c9p5rma79h979776ca6g
+  space_id: base
   statements:
     - title: Create Folder
       description: Create new folder where to store data

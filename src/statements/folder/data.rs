@@ -37,7 +37,7 @@ use crate::storage::columns::media::*;
 lazy_static! {
     pub static ref RE_INSERT_INTO_FOLDER_MAIN: Regex = Regex::new(r#"INSERT INTO FOLDER (?P<FolderName>[\w\s]+)[\s\t\n]*(?P<Items>\([\s\S]+\));"#).unwrap();
     pub static ref RE_INSERT_INTO_FOLDER_ITEMS: Regex = Regex::new(r#"(?P<Item>\([\s\S][^)]+\)),*"#).unwrap();
-    pub static ref RE_INSERT_INTO_FOLDER_ITEM_KEYS: Regex = Regex::new(r#"([\s\t]*(?P<Key>[\w\s]+)=[\s\t]*(?P<Value>[\s\S][^,)]*),*)"#).unwrap();
+    pub static ref RE_INSERT_INTO_FOLDER_ITEM_KEYS: Regex = Regex::new(r#"([\s\t]*(?P<Key>[\w\s]+)=[\s\t]*(?P<Value>[\s\S][^,\n)]*),*)"#).unwrap();
     pub static ref RE_INSERT_INTO_FOLDER_SUBFOLDERS: Regex = Regex::new(r#"(SUB FOLDER (?P<SubFolderId>[\w]+)([\s]*WITH[\s]*(?P<SubFolderIsReference>IsReference[\s]*=[\s]*(true|false)))*,*)"#).unwrap();
 }
 
@@ -389,10 +389,11 @@ impl<'gb> Statement<'gb> for InsertIntoFolderStatement {
                             if check {
                                 let sub_folder = SubFolderItem{
                                     id: Some(item_id),
+                                    name: None,
                                     is_reference: item.is_reference,
                                     data: None,
                                 };
-                                sub_folders.push(sub_folder);    
+                                sub_folders.push(sub_folder);
                             } else {
                                 errors.push(
                                     PlanetError::new(
@@ -624,6 +625,7 @@ impl<'gb> Statement<'gb> for InsertIntoFolderStatement {
                                     planet_context,
                                     context,
                                     &column_config,
+                                    folder_name,
                                     Some(db_folder.clone()),
                                     Some(space_database.clone())
                                 );
@@ -633,68 +635,69 @@ impl<'gb> Statement<'gb> for InsertIntoFolderStatement {
                                     for error in errors_ {
                                         errors.push(error);
                                     }
-                                }
-                                let id_list = result.unwrap();
-                                let many = column_config.many.unwrap();
-                                if many {
-                                    let mut items: Vec<BTreeMap<String, String>> = Vec::new();
-                                    for item_id in id_list.clone() {
-                                        let mut map: BTreeMap<String, String> = BTreeMap::new();
-                                        map.insert(ID.to_string(), item_id);
-                                        items.push(map);
-                                    }
-                                    data.insert(column_id.clone(), items);
                                 } else {
-                                    let mut map: BTreeMap<String, String> = BTreeMap::new();
-                                    let value = id_list[0].clone();
-                                    map.insert(ID.to_string(), value);
-                                    let mut my_list: Vec<BTreeMap<String, String>> = Vec::new();
-                                    my_list.push(map);
-                                    data.insert(column_id.clone(), my_list);
-                                }
-                                skip_data_assign = true;
-                                // links_map
-                                let linked_folder_id = column_config.clone().linked_folder_id.unwrap();
-                                let map_item = links_map.get(
-                                    &linked_folder_id
-                                );
-                                if map_item.is_some() {
-                                    let mut array = map_item.unwrap().clone();
-                                    array.push(column_config);
-                                    links_map.insert(column_id.clone(), array.clone());
-                                } else {
-                                    let mut array: Vec<ColumnConfig> = Vec::new();
-                                    array.push(column_config);
-                                    links_map.insert(column_id.clone(), array);
-                                }
-                                links_map_map.insert(item_id.clone(), links_map.clone());
-                                // links_data_map
-                                // address folder id => {"Home Addresses" => [jdskdsj], "Work Addresses": [djdks8dsjk]}
-                                let map_item_data = links_data_map.get(&linked_folder_id);
-                                if map_item_data.is_some() {
-                                    let mut my_map = map_item_data.unwrap().clone();
-                                    let my_list_wrap = my_map.get(&column_name.clone());
-                                    let mut my_list: Vec<String>;
-                                    if my_list_wrap.is_some() {
-                                        my_list = my_list_wrap.unwrap().clone();
+                                    let id_list = result.unwrap();
+                                    let many = column_config.many.unwrap();
+                                    if many {
+                                        let mut items: Vec<BTreeMap<String, String>> = Vec::new();
+                                        for item_id in id_list.clone() {
+                                            let mut map: BTreeMap<String, String> = BTreeMap::new();
+                                            map.insert(ID.to_string(), item_id);
+                                            items.push(map);
+                                        }
+                                        data.insert(column_id.clone(), items);
                                     } else {
-                                        my_list = Vec::new();
+                                        let mut map: BTreeMap<String, String> = BTreeMap::new();
+                                        let value = id_list[0].clone();
+                                        map.insert(ID.to_string(), value);
+                                        let mut my_list: Vec<BTreeMap<String, String>> = Vec::new();
+                                        my_list.push(map);
+                                        data.insert(column_id.clone(), my_list);
                                     }
-                                    for item_id in id_list.clone() {
-                                        my_list.push(item_id);
+                                    skip_data_assign = true;
+                                    // links_map
+                                    let linked_folder = column_config.clone().linked_folder.unwrap();
+                                    let map_item = links_map.get(
+                                        &linked_folder
+                                    );
+                                    if map_item.is_some() {
+                                        let mut array = map_item.unwrap().clone();
+                                        array.push(column_config);
+                                        links_map.insert(column_id.clone(), array.clone());
+                                    } else {
+                                        let mut array: Vec<ColumnConfig> = Vec::new();
+                                        array.push(column_config);
+                                        links_map.insert(column_id.clone(), array);
                                     }
-                                    my_map.insert(column_name.clone(), my_list);
-                                    links_data_map.insert(column_id.clone(), my_map);
-                                } else {
-                                    let mut my_map: HashMap<String, Vec<String>> = HashMap::new();
-                                    let mut my_list: Vec<String> = Vec::new();
-                                    for item_id in id_list.clone() {
-                                        my_list.push(item_id);
+                                    links_map_map.insert(item_id.clone(), links_map.clone());
+                                    // links_data_map
+                                    // address folder id => {"Home Addresses" => [jdskdsj], "Work Addresses": [djdks8dsjk]}
+                                    let map_item_data = links_data_map.get(&linked_folder);
+                                    if map_item_data.is_some() {
+                                        let mut my_map = map_item_data.unwrap().clone();
+                                        let my_list_wrap = my_map.get(&column_name.clone());
+                                        let mut my_list: Vec<String>;
+                                        if my_list_wrap.is_some() {
+                                            my_list = my_list_wrap.unwrap().clone();
+                                        } else {
+                                            my_list = Vec::new();
+                                        }
+                                        for item_id in id_list.clone() {
+                                            my_list.push(item_id);
+                                        }
+                                        my_map.insert(column_name.clone(), my_list);
+                                        links_data_map.insert(column_id.clone(), my_map);
+                                    } else {
+                                        let mut my_map: HashMap<String, Vec<String>> = HashMap::new();
+                                        let mut my_list: Vec<String> = Vec::new();
+                                        for item_id in id_list.clone() {
+                                            my_list.push(item_id);
+                                        }
+                                        my_map.insert(column_name.clone(), my_list);
+                                        links_data_map.insert(column_id.clone(), my_map);
                                     }
-                                    my_map.insert(column_name.clone(), my_list);
-                                    links_data_map.insert(column_id.clone(), my_map);
+                                    links_data_map_map.insert(item_id.clone(), links_data_map.clone());    
                                 }
-                                links_data_map_map.insert(item_id.clone(), links_data_map.clone());
                             },
                             COLUMN_TYPE_GENERATE_ID => {
                                 let obj = GenerateIdColumn::defaults(&column_config);
@@ -889,12 +892,14 @@ impl<'gb> Statement<'gb> for InsertIntoFolderStatement {
                             for config in config_column_list {
                                 let config = config.clone();
                                 let many = config.many.unwrap();
-                                let remote_folder_id = config.linked_folder_id;
-                                if remote_folder_id.is_none() {
+                                let remote_folder_name = config.linked_folder;
+                                if remote_folder_name.is_none() {
                                     continue
                                 }
-                                let remote_folder_id = remote_folder_id.unwrap();
-                                let folder = db_folder.get(&remote_folder_id).unwrap();
+                                let remote_folder_name = remote_folder_name.unwrap();
+                                let folder = db_folder.get_by_name(&remote_folder_name).unwrap().unwrap();
+                                // let folder = db_folder.get(&remote_folder_name).unwrap();
+                                let remote_folder_id = folder.id.unwrap_or_default();
                                 let folder_name = folder.name.unwrap();
                                 let main_data_map = links_data_map.get(&column_id);
                                 if main_data_map.is_some() {
@@ -921,6 +926,7 @@ impl<'gb> Statement<'gb> for InsertIntoFolderStatement {
                                             );
                                             if linked_item.is_ok() {
                                                 let mut linked_item = linked_item.unwrap();
+                                                eprintln!("InsertIntoFolder.run :: linked_item: {:#?}", &linked_item);
                                                 // I may need to update to data_objects or data_collections
                                                 if many {
                                                     let data_wrap = linked_item.data;
