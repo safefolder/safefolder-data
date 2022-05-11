@@ -1405,21 +1405,12 @@ impl TreeFolderItem {
     ) -> Result<(), PlanetError> {
         // delete all files from OS
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
-        let mut path_db: String = String::from("");
-        let account_id = self.account_id.clone().unwrap_or_default();
-        let account_id = account_id.as_str();
-        let space_id = self.space_id.clone().unwrap_or_default();
-        let space_id = space_id.as_str();
         let folder_id = self.folder_id.clone().unwrap_or_default();
         let folder_id = folder_id.as_str();
-        if account_id != "" && space_id != "" {
-            println!("DbFolderItem.write_file :: account_id and space_id have been informed");
-        } else if space_id == "private" {
-            path_db = format!(
-                "folders/{folder_id}/files.db",
-                folder_id=folder_id,
-            );
-        }
+        let path_db = format!(
+            "folders/{folder_id}/files.db",
+            folder_id=folder_id,
+        );
         let tree: Tree;
         if self.files_db.is_some() {
             tree = self.files_db.clone().unwrap();
