@@ -1,0 +1,7 @@
+INSERT INTO FOLDER Space (
+	Name = Achiever Planet Space,
+	Title = Achiever Planet Space,
+	Description = """Achiever planet base space.""",
+	Keywords = {planet},
+	Site = c9t978279h9286uc1fcg,
+);

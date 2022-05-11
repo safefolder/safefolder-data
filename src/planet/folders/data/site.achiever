@@ -1,0 +1,6 @@
+INSERT INTO FOLDER Site (
+	Name = Achiever Planet,
+	Title = Achiever Planet,
+	Description = """Achiever planet site.""",
+	Keywords = {planet},
+);
