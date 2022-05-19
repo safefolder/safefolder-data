@@ -251,7 +251,7 @@ impl Formula {
     pub fn defaults(
         formula: &String,
         formula_format: &String,
-        table: Option<DbData>,
+        folder: Option<DbData>,
         properties_map: Option<HashMap<String, ColumnConfig>>,
         db_folder: Option<TreeFolder>,
         folder_name: Option<String>,
@@ -279,11 +279,11 @@ impl Formula {
         let mut formula_processed = formula_origin.clone();
         let formula_format = formula_format.clone();
         let mut properties_map_: HashMap<String, ColumnConfig> = HashMap::new();
-        if table.is_some() {
-            let table = table.unwrap();
+        if folder.is_some() {
+            let folder = folder.unwrap();
             let db_table = db_folder.unwrap();
             let table_name = folder_name.unwrap();
-            let field_type_map_ = TreeFolder::get_column_type_map(&table)?;
+            let field_type_map_ = TreeFolder::get_column_type_map(&folder)?;
             let field_name_map_ = TreeFolder::get_column_name_map(&db_table, &table_name)?;
             for (column_name, column_type) in field_type_map_.clone() {
                 let mut column_config = ColumnConfig::defaults(None);

@@ -26,7 +26,7 @@ Table fields
 ============
 
 * SmallTextColumn                 [done] - text
-* LongTextColumn                  [partly done] - text : This is the text field, needs to be updated based on full text search.
+* LongTextColumn                  [done] - text : This is the text field, needs to be updated based on full text search.
 * CheckBoxColumn                  [done] - number
 * SelectColumn                    [done] - text
 * DateColumn                      [done] - date
@@ -58,7 +58,7 @@ Table fields
 COUNT, COUNTA, COUNTALL, SUM, MAX, AND, OR, XOR, CONCATENATE. I execute these formulas once I post 
 processed the links and references. I would need to parse in a way to use those number functions.
 * FileColumn                      [done] - Custom file and image management with IPFS. I add many.
-* StatementColumn                 [doing]: This does processing for complex cases, like image manipulation
+* StatementColumn                 [done]: This does processing for complex cases, like image manipulation
 
 Above fields gives us what we need as EXCEL functions into the formula field. Formula can provide a 
 combination of these function fields, which are not needed.

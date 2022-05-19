@@ -10,12 +10,13 @@ use regex::Regex;
 use lazy_static::lazy_static;
 use colored::Colorize;
 
+use crate::functions::Formula;
 use crate::statements::folder::config::*;
 use crate::storage::constants::*;
 use crate::statements::folder::schema::*;
 use crate::statements::*;
 use crate::planet::constants::{ID, NAME, VALUE, FALSE, COLUMNS};
-use crate::storage::folder::{TreeFolder, TreeFolderItem, FolderItem, FolderSchema, DbData, GetItemOption};
+// use crate::storage::folder::{TreeFolder, TreeFolderItem, FolderItem, FolderSchema, DbData, GetItemOption};
 use crate::storage::folder::*;
 use crate::storage::{ConfigStorageColumn, generate_id};
 use crate::storage::space::{SpaceDatabase};
@@ -33,12 +34,25 @@ use crate::storage::columns::reference::*;
 use crate::storage::columns::structure::*;
 use crate::storage::columns::processing::*;
 use crate::storage::columns::media::*;
+use crate::statements::constants::*;
+use crate::functions::{RE_FORMULA_QUERY};
 
 lazy_static! {
     pub static ref RE_INSERT_INTO_FOLDER_MAIN: Regex = Regex::new(r#"INSERT INTO FOLDER (?P<FolderName>[\w\s]+)[\s\t\n]*(?P<Items>\([\s\S]+\));"#).unwrap();
     pub static ref RE_INSERT_INTO_FOLDER_ITEMS: Regex = Regex::new(r#"(?P<Item>\([\s\S][^)]+\)),*"#).unwrap();
     pub static ref RE_INSERT_INTO_FOLDER_ITEM_KEYS: Regex = Regex::new(r#"([\s\t]*(?P<Key>[\w\s]+)=[\s\t]*(?P<Value>[\s\S][^,\n)]*),*)"#).unwrap();
     pub static ref RE_INSERT_INTO_FOLDER_SUBFOLDERS: Regex = Regex::new(r#"(SUB FOLDER (?P<SubFolderId>[\w]+)([\s]*WITH[\s]*(?P<SubFolderIsReference>IsReference[\s]*=[\s]*(true|false)))*,*)"#).unwrap();
+    pub static ref RE_SELECT: Regex = Regex::new(r#"SELECT[\s]*[\s\S]*[\s]*FROM[\s]*[\s\S]*;"#).unwrap();
+    pub static ref RE_SELECT_COUNT: Regex = Regex::new(r#"SELECT[\s]*((?P<CountAll>COUNT\(\*\))|(COUNT\(DISTINCT[\s]+(?P<CountColumnDis>[\w\s]+)\))|(COUNT\((?P<CountColumn>[\w\s]+)\)))[\s]*FROM[\s]*(?P<FolderName>[\w\s]+);"#).unwrap();
+    pub static ref RE_SELECT_PAGING: Regex = Regex::new(r#"([\s]*PAGE[\s]*(?P<Page>[\d]+))*([\s]*NUMBER ITEMS[\s]*(?P<NumberItems>[\d]+))*"#).unwrap();
+    pub static ref RE_SELECT_FROM: Regex = Regex::new(r#"FROM[\s]*"(?P<FolderName>[\w\s]*)"[\s]*(WHERE|SORT BY|GROUP BY|SEARCH)*"#).unwrap();
+    pub static ref RE_SELECT_COLUMNS: Regex = Regex::new(r#"SELECT[\s]*((?P<AllColumns>\*)|(?P<Columns>[\w\s,]+))[\s]*FROM"#).unwrap();
+    pub static ref RE_SELECT_SORTING: Regex = Regex::new(r#"(SORT[\s]*BY[\s]*\{(?P<SortBy>[|\w\s]+)\})"#).unwrap();
+    pub static ref RE_SELECT_SORT_FIELDS: Regex = Regex::new(r#"(?P<Column>[\w\s]+)(?P<Mode>ASC|DESC)*"#).unwrap();
+    pub static ref RE_SELECT_GROUP_BY: Regex = Regex::new(r#"(GROUP[\s]*BY[\s]*"(?P<GroupByColumns>[\w\s,]+)")"#).unwrap();
+    pub static ref RE_SELECT_GROUP_COLUMNS: Regex = Regex::new(r#"(?P<Column>[\w\s]+)"#).unwrap();
+    pub static ref RE_SELECT_SEARCH: Regex = Regex::new(r#"(SEARCH[\s]*"(?P<Search>[\w\s]+)")"#).unwrap();
+    pub static ref RE_SELECT_WHERE: Regex = Regex::new(r#"WHERE[\s]*(?P<Where>[\s\S]+);+"#).unwrap();
 }
 
 pub const WITH_IS_REFERENCE: &str = "IsReference";
@@ -1313,6 +1327,383 @@ pub struct GetFromFolder<'gb> {
     // }
 // }
 
+// Sort By
+
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum SelectSortMode {
+    Ascending,
+    Descending,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SelectSortBy {
+    pub column: String,
+    pub mode: SelectSortMode,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SelectCount {
+    pub column: Option<String>,
+    pub all: bool,
+    pub distinct: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SelectFromFolderCompiledStmt {
+    pub folder_name: String,
+    pub columns: Option<Vec<String>>,
+    pub page: i32,
+    pub number_items: i32,
+    pub search: Option<String>,
+    pub where_source: Option<String>,
+    pub where_compiled: Option<Formula>,
+    pub group_by: Option<Vec<String>>,
+    pub sort_by: Option<Vec<SelectSortBy>>,
+    pub count: Option<SelectCount>,
+}
+
+impl SelectFromFolderCompiledStmt {
+
+    pub fn defaults(
+        folder_name: String,
+        page: Option<i32>, 
+        number_items: Option<i32>,
+    ) -> SelectFromFolderCompiledStmt {
+        let page_int: i32;
+        let number_items_int: i32;
+        if page.is_some() {
+            page_int = page.unwrap();
+        } else {
+            page_int = 1;
+        }
+        if number_items.is_some() {
+            number_items_int = number_items.unwrap();
+        } else {
+            number_items_int = 20;
+        }
+        let statement = SelectFromFolderCompiledStmt{
+            folder_name: folder_name,
+            page: page_int,
+            number_items: number_items_int,
+            columns: None,
+            search: None,
+            where_source: None,
+            where_compiled: None,
+            group_by: None,
+            sort_by: None,
+            count: None,
+        };
+        return statement
+    }
+
+}
+
+#[derive(Debug, Clone)]
+pub struct SelectFromFolderStatement {
+}
+
+impl<'gb> StatementCompiler<'gb, SelectFromFolderCompiledStmt> for SelectFromFolderStatement {
+
+    fn compile(
+        &self, 
+        statement_text: &String
+    ) -> Result<SelectFromFolderCompiledStmt, Vec<PlanetError>> {
+        let expr = &RE_SELECT_COUNT;
+        let is_count = expr.is_match(&statement_text);
+        let mut page: Option<i32> = None;
+        let mut number_items: Option<i32> = None;
+        let mut folder_name = String::from("");
+        let mut errors: Vec<PlanetError> = Vec::new();
+        if is_count {
+            let captures = expr.captures(&statement_text);
+            if captures.is_some() {
+                let captures = captures.unwrap();
+                let folder_name_ = captures.name("FolderName");
+                let count_all = captures.name("CountAll");
+                let count_column = captures.name("CountColumn");
+                let count_column_distinct = captures.name("CountColumnDis");
+                if folder_name_.is_some() {
+                    let folder_name_ = folder_name_.unwrap().as_str();
+                    folder_name = folder_name_.to_string();
+                } else {
+                    // Raise error since folder name is required
+                    errors.push(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!("Folder name not detected and is required.")),
+                        )
+                    )
+                }
+                let mut statement = SelectFromFolderCompiledStmt::defaults(
+                    folder_name, 
+                    page, 
+                    number_items
+                );
+                if count_all.is_some() {
+                    let count = SelectCount{
+                        column: None,
+                        all: true,
+                        distinct: false,
+                    };
+                    statement.count = Some(count);
+                    return Ok(statement)
+                } else {
+                    let count_column_: &str;
+                    let mut distinct = false;
+                    if count_column.is_some() {
+                        count_column_ = count_column.unwrap().as_str();
+                    } else {
+                        count_column_ = count_column_distinct.unwrap().as_str();
+                        distinct = true;
+                    }
+                    let count = SelectCount{
+                        column: Some(count_column_.to_string()),
+                        all: false,
+                        distinct: distinct,
+                    };
+                    statement.count = Some(count);
+                    return Ok(statement)
+                }
+            }
+        } else {
+            let statement_text = statement_text.clone();
+            let statement_text = statement_text.replace("\n", "").clone();
+            let expr = &RE_SELECT;
+            let is_match = expr.is_match(&statement_text);
+            if !is_match {
+                errors.push(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Bad syntax for SELECT statement.")),
+                    )
+                )
+            } else {
+                // 1 - Paging
+                let expr = &RE_SELECT_PAGING;
+                let captures_iter = expr.captures_iter(&statement_text);
+                let mut statement_text_new = statement_text.clone();
+                for captures in captures_iter {
+                    let page_regex = captures.name("Page");
+                    let number_items_regex = captures.name("NumberItems");
+                    if page_regex.is_some() || number_items_regex.is_some() {
+                        if page_regex.is_some() {
+                            let page_regex = page_regex.unwrap().as_str();
+                            let page_int: i32 = FromStr::from_str(page_regex).unwrap();
+                            let check_text = format!("PAGE {}", &page_int);
+                            statement_text_new = statement_text_new.replace(&check_text, "");
+                            page = Some(page_int);
+                        }
+                        if number_items_regex.is_some() {
+                            let number_items_regex = number_items_regex.unwrap().as_str();
+                            let number_items_int: i32 = FromStr::from_str(number_items_regex).unwrap();
+                            let check_text = format!("NUMBER ITEMS {}", &number_items_int);
+                            statement_text_new = statement_text_new.replace(&check_text, "");
+                            number_items = Some(number_items_int);
+                        }
+                    }
+                }
+                let mut statement_text = statement_text_new;
+                // 2 - From
+                let expr = &RE_SELECT_FROM;
+                let captures = expr.captures(&statement_text);
+                if captures.is_some() {
+                    let captures = captures.unwrap();
+                    let folder_name_ = captures.name("FolderName");
+                    if folder_name_.is_some() {
+                        let folder_name_ = folder_name_.unwrap().as_str();
+                        folder_name = folder_name_.to_string();
+                        folder_name = folder_name.trim().to_string();
+                        let check_text = format!("FROM \"{}\"", &folder_name);
+                        statement_text = statement_text.replace(
+                            &check_text, 
+                            "FROM {from}"
+                        );
+                    } else {
+                        errors.push(
+                            PlanetError::new(
+                                500, 
+                                Some(tr!("Folder name is required.")),
+                            )
+                        )
+                    }
+                }
+                let mut statement = SelectFromFolderCompiledStmt::defaults(
+                    folder_name, 
+                    page, 
+                    number_items
+                );
+                // 3 - Columns
+                let expr = &RE_SELECT_COLUMNS;
+                let captures = expr.captures(&statement_text);
+                if captures.is_some() {
+                    let captures = captures.unwrap();
+                    let columns = captures.name("Columns");
+                    if columns.is_some() {
+                        let columns_str = columns.unwrap().as_str();
+                        let columns_: Vec<&str> = columns_str.split(",").collect();
+                        let columns: Vec<String> = columns_.iter().map(|&s|s.trim().into()).collect();
+                        statement.columns = Some(columns);
+                        let check_text = format!("SELECT {}", columns_str);
+                        statement_text = statement_text.replace(
+                            &check_text, 
+                            ""
+                        );
+                    }
+                }
+                // 4 - Sort By
+                let expr_1 = &RE_SELECT_SORTING;
+                let captures = expr_1.captures(&statement_text);
+                if captures.is_some() {
+                    let captures = captures.unwrap();
+                    let sort_by = captures.name("SortBy");
+                    if sort_by.is_some() {
+                        let sort_by = sort_by.unwrap().as_str();
+                        // {COLUMN A ASC|COLUMN B DESC}
+                        let expr = &RE_SELECT_SORT_FIELDS;
+                        let items = expr.captures_iter(sort_by);
+                        let mut sort_items: Vec<SelectSortBy> = Vec::new();
+                        for item in items {
+                            let column = item.name("Column");
+                            let mode = item.name("Mode");
+                            let mut sort_obj = SelectSortBy{
+                                column: String::from(""),
+                                mode: SelectSortMode::Ascending
+                            };
+                            if column.is_some() {
+                                let column = column.unwrap().as_str();
+                                sort_obj.column = column.to_string().trim().to_string();
+                            }
+                            if mode.is_some() {
+                                let mode = mode.unwrap().as_str();
+                                match mode {
+                                    SORT_MODE_ASC => {
+                                        sort_obj.mode = SelectSortMode::Ascending;
+                                    },
+                                    SORT_MODE_DESC => {
+                                        sort_obj.mode = SelectSortMode::Descending;
+                                    },
+                                    _ => {}
+                                }
+                            } else {
+                                sort_obj.mode = SelectSortMode::Ascending;
+                            }
+                            sort_items.push(sort_obj);
+                        }
+                        if sort_items.len() > 0 {
+                            statement.sort_by = Some(sort_items);
+                            statement_text = expr_1.replace(&statement_text, "").to_string();
+                        }
+                    }
+                }
+                // 5 - Group By
+                let expr_1 = &RE_SELECT_GROUP_BY;
+                let captures = expr_1.captures(&statement_text);
+                if captures.is_some() {
+                    let captures = captures.unwrap();
+                    let group_by_columns = captures.name("GroupByColumns");
+                    if group_by_columns.is_some() {
+                        let group_by_columns = group_by_columns.unwrap().as_str();
+                        // Column A, Column B
+                        let expr = &RE_SELECT_GROUP_COLUMNS;
+                        let columns = expr.captures_iter(group_by_columns);
+                        let mut columns_string: Vec<String> = Vec::new();
+                        for column in columns {
+                            let column_str = column.name("Column").unwrap().as_str();
+                            columns_string.push(column_str.to_string().trim().to_string());
+                        }
+                        if columns_string.len() > 0 {
+                            statement.group_by = Some(columns_string);
+                            statement_text = expr_1.replace(&statement_text, "").to_string();
+                        }
+                    }
+                }
+                // 6 - Search
+                let expr = &RE_SELECT_SEARCH;
+                let captures = expr.captures(&statement_text);
+                if captures.is_some() {
+                    let captures = captures.unwrap();
+                    let search = captures.name("Search");
+                    if search.is_some() {
+                        let search = search.unwrap().as_str();
+                        statement.search = Some(search.to_string());
+                        statement_text = expr.replace(&statement_text, "").to_string();
+                    }
+                }
+                // 7 - Where
+                let expr_1 = &RE_SELECT_WHERE;
+                let captures = expr_1.captures(&statement_text);
+                if captures.is_some() {
+                    let captures = captures.unwrap();
+                    let where_formula = captures.name("Where");
+                    if where_formula.is_some() {
+                        let where_formula_str = where_formula.unwrap().as_str();
+                        let expr = &RE_FORMULA_QUERY;
+                        let is_valid = expr.is_match(where_formula_str);
+                        statement.where_source = Some(where_formula_str.to_string());
+                        if !is_valid {
+                            errors.push(
+                                PlanetError::new(
+                                    500, 
+                                    Some(tr!("WHERE formula is not valid.")),
+                                )
+                            )
+                        }
+                    }
+                }
+                return Ok(statement)
+            }
+        }
+        return Err(errors)
+    }
+}
+
+impl<'gb> Statement<'gb> for SelectFromFolderStatement {
+
+    fn run(
+        &self,
+        _env: &'gb Environment<'gb>,
+        _space_database: &SpaceDatabase,
+        statement_text: &String,
+    ) -> Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>> {
+        // let space_database = space_database.clone();
+        // let context = env.context;
+        // let planet_context = env.planet_context;
+        // let env = Environment{
+        //     context: context,
+        //     planet_context: planet_context
+        // };
+        // let t_1 = Instant::now();
+        let statement = self.compile(statement_text);
+        if statement.is_err() {
+            let errors = statement.unwrap_err();
+            return Err(errors)
+        }
+        let statement = statement.unwrap();
+        eprintln!("SelectFromFolderStatement.run :: select: {:#?}", &statement);
+        // validate?????
+        let mut errors: Vec<PlanetError> = Vec::new();
+        // Execute compiler
+        let mut yaml_response: Vec<yaml_rust::Yaml> = Vec::new();
+        let response_coded = serde_yaml::to_string("");
+        if response_coded.is_err() {
+            let error = PlanetError::new(
+                500, 
+                Some(tr!("Error encoding statement response.")),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+        let response = response_coded.unwrap();
+        let yaml_item = yaml_rust::YamlLoader::load_from_str(
+            response.as_str()
+        ).unwrap();
+        yaml_response.push(yaml_item[0].clone());
+        return Ok(yaml_response)
+    }
+}
+
+
 pub struct SelectFromFolder<'gb> {
     pub planet_context: &'gb PlanetContext<'gb>,
     pub context: &'gb Context<'gb>,
@@ -1544,6 +1935,29 @@ pub fn resolve_data_statement(
     let check = expr.is_match(&statement_text);
     if check {
         let stmt = InsertIntoFolderStatement{};
+        match mode {
+            StatementCallMode::Run => {
+                let response = stmt.run(
+                    env, 
+                    &space_data, 
+                    &statement_text,
+                );
+                return Some(response);
+            }
+            StatementCallMode::Compile => {
+                let response = stmt.compile(&statement_text);
+                if response.is_err() {
+                    let errors = response.unwrap_err();
+                    return Some(Err(errors))
+                }
+            }
+        }
+    }
+    // SELECT FROM FOLDER
+    let expr = &RE_SELECT;
+    let check = expr.is_match(&statement_text);
+    if check {
+        let stmt = SelectFromFolderStatement{};
         match mode {
             StatementCallMode::Run => {
                 let response = stmt.run(
