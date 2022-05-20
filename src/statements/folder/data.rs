@@ -35,7 +35,7 @@ use crate::storage::columns::structure::*;
 use crate::storage::columns::processing::*;
 use crate::storage::columns::media::*;
 use crate::statements::constants::*;
-use crate::functions::{RE_FORMULA_QUERY};
+use crate::functions::{RE_FORMULA_QUERY, RE_FORMULA_ASSIGN};
 
 lazy_static! {
     pub static ref RE_INSERT_INTO_FOLDER_MAIN: Regex = Regex::new(r#"INSERT INTO FOLDER (?P<FolderName>[\w\s]+)[\s\t\n]*(?P<Items>\([\s\S]+\));"#).unwrap();
@@ -1658,32 +1658,156 @@ impl<'gb> StatementCompiler<'gb, SelectFromFolderCompiledStmt> for SelectFromFol
     }
 }
 
+impl<'gb> SelectFromFolderStatement {
+
+    pub fn validate(
+        &self,
+        env: &'gb Environment<'gb>,
+        space_database: &SpaceDatabase,
+        mut compiled_statement: SelectFromFolderCompiledStmt,
+    ) -> Result<SelectFromFolderCompiledStmt, Vec<PlanetError>> {
+        let context = env.context;
+        let planet_context = env.planet_context;
+        let mut errors: Vec<PlanetError> = Vec::new();
+        
+        // - Get folder and other data
+        let folder_name = compiled_statement.folder_name.clone();
+        let home_dir = planet_context.home_path.clone();
+        let account_id = context.account_id.clone().unwrap_or_default();
+        let space_id = context.space_id;
+        let site_id = context.site_id.clone();
+        let space_database = space_database.clone();
+        let db_folder= TreeFolder::defaults(
+            space_database.connection_pool.clone(),
+            Some(home_dir.clone().unwrap_or_default().as_str()),
+            Some(&account_id),
+            Some(space_id),
+            site_id.clone(),
+        ).unwrap();
+        let folder = db_folder.get_by_name(&folder_name);
+        if folder.is_err() {
+            let error = folder.unwrap_err();
+            errors.push(error);
+            return Err(errors)
+        }
+        let folder = folder.unwrap();
+        if *&folder.is_none() {
+            errors.push(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Could not find folder {}", &folder_name)),
+                )
+            );
+            return Err(errors)
+        }
+        let folder = folder.unwrap();
+        // - Validate columns: columns, group_by, sort
+        let mut column_list: Vec<String> = Vec::new();
+        if compiled_statement.columns.is_some() {
+            let columns = compiled_statement.columns.clone().unwrap();
+            column_list.extend(columns);
+        }
+        if compiled_statement.sort_by.is_some() {
+            let sort_by = compiled_statement.sort_by.clone().unwrap();
+            for sort_by_item in sort_by {
+                let item_column = sort_by_item.column;
+                if !column_list.contains(&item_column) {
+                    column_list.push(item_column);
+                }
+            }
+        }
+        if compiled_statement.group_by.is_some() {
+            let group_by = compiled_statement.group_by.clone().unwrap();
+            column_list.extend(group_by);
+        }
+        let mut column_raised: HashMap<String, String> = HashMap::new();
+        for column in column_list {
+            let has_column = db_folder.has_column(&folder_name, &column);
+            let error_raised = column_raised.get(&column).is_some();
+            if !has_column && !error_raised {
+                errors.push(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!(
+                            "Column \"{}\" does not exist in folder \"{}\".", 
+                            &column, &folder_name
+                        )),
+                    )
+                );
+                column_raised.insert(column.clone(), String::from(""));
+            }
+        }
+        // - Compile Where formula
+        let where_source = compiled_statement.where_source.clone();
+        if where_source.is_some() {
+            let where_source = where_source.unwrap();
+            let expr = &RE_FORMULA_ASSIGN;
+            let is_assign_function = expr.is_match(&where_source);
+            eprintln!("SelectFromFolderStatement.validate :: is_assign_function: {}", &is_assign_function);
+            let field_config_map = ColumnConfig::get_column_config_map(
+                planet_context,
+                context,
+                &folder
+            ).unwrap();
+            let field_config_map_wrap = Some(field_config_map.clone());
+            let formula_query = Formula::defaults(
+                &where_source, 
+                &String::from("bool"), 
+                Some(folder), 
+                None, 
+                Some(db_folder), 
+                Some(folder_name.clone()), 
+                is_assign_function,
+                field_config_map_wrap.clone()
+            );
+            if formula_query.is_err() {
+                let error = formula_query.unwrap_err();
+                errors.push(error);
+            } else {
+                let formula_query = formula_query.unwrap();
+                compiled_statement.where_compiled = Some(formula_query);
+            }
+        }
+        if errors.len() > 0 {
+            return Err(errors)
+        }
+        return Ok(compiled_statement.clone())
+    }
+
+}
+
 impl<'gb> Statement<'gb> for SelectFromFolderStatement {
 
     fn run(
         &self,
-        _env: &'gb Environment<'gb>,
-        _space_database: &SpaceDatabase,
+        env: &'gb Environment<'gb>,
+        space_database: &SpaceDatabase,
         statement_text: &String,
     ) -> Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>> {
-        // let space_database = space_database.clone();
-        // let context = env.context;
-        // let planet_context = env.planet_context;
-        // let env = Environment{
-        //     context: context,
-        //     planet_context: planet_context
-        // };
+        let space_database = space_database.clone();
         // let t_1 = Instant::now();
+        // 1 - Compile SELECT statement into SelectFromFolderCompiledStmt
         let statement = self.compile(statement_text);
         if statement.is_err() {
             let errors = statement.unwrap_err();
             return Err(errors)
         }
         let statement = statement.unwrap();
-        eprintln!("SelectFromFolderStatement.run :: select: {:#?}", &statement);
-        // validate?????
+        eprintln!("SelectFromFolderStatement.run :: [compiled] select: {:#?}", &statement);
+        // 2 - Compile Where formula and validate query for existing columns.
+        let validation = self.validate(
+            env, 
+            &space_database, 
+            statement
+        );
+        if validation.is_err() {
+            let errors = validation.unwrap_err();
+            return Err(errors)
+        }
+        let statement = validation.unwrap();
+        eprintln!("SelectFromFolderStatement.run :: [validated] select: {:#?}", &statement);
+
         let mut errors: Vec<PlanetError> = Vec::new();
-        // Execute compiler
         let mut yaml_response: Vec<yaml_rust::Yaml> = Vec::new();
         let response_coded = serde_yaml::to_string("");
         if response_coded.is_err() {

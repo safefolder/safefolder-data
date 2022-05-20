@@ -632,6 +632,40 @@ impl TreeFolder {
     }
 }
 
+impl TreeFolder {
+    pub fn has_column(
+        &self,
+        folder_name: &String,
+        column_name: &String
+    ) -> bool {
+        let result = self.get_by_name(folder_name);
+        if result.is_ok() {
+            let folder = result.unwrap();
+            if folder.is_some() {
+                let folder = folder.unwrap();
+                let folder_data = folder.data.clone();
+                if folder_data.is_some() {
+                    let folder_data = folder_data.unwrap();
+                    let folder_columns = folder_data.get(COLUMNS);
+                    if folder_columns.is_some() {
+                        let folder_columns = folder_columns.unwrap();
+                        for item in folder_columns {
+                            let value = item.get(NAME);
+                            if value.is_some() {
+                                let value = value.unwrap();
+                                if value.clone().to_lowercase() == column_name.clone().to_lowercase() {
+                                    return true
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return false
+    }
+}
+
 impl FolderSchema for TreeFolder {
 
     fn defaults(
@@ -964,9 +998,12 @@ impl TreeFolder {
                 let column_config = db_columns.get(db_column).unwrap();
                 if column_config.len() == 1 {
                     let column_config = &column_config[0];
-                    let column_id = column_config.get(ID).unwrap().clone();
-                    let column_name = db_column.clone();
-                    column_id_map.insert(column_name, column_id);    
+                    let column_id = column_config.get(ID);
+                    if column_id.is_some() {
+                        let column_id = column_id.unwrap().clone();
+                        let column_name = db_column.clone();
+                        column_id_map.insert(column_name, column_id);    
+                    }
                 }
             }
             Ok(column_id_map)
