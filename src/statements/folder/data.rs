@@ -1400,16 +1400,19 @@ impl SelectFromFolderCompiledStmt {
 }
 
 #[derive(Debug, Clone)]
-pub struct SelectFromFolderStatement {
+pub struct SearchCompiler<'gb>{
+    pub statement_text: String,
+    env: &'gb Environment<'gb>,
+    space_database: SpaceDatabase,
 }
 
-impl<'gb> StatementCompiler<'gb, SelectFromFolderCompiledStmt> for SelectFromFolderStatement {
+impl<'gb> SearchCompiler<'gb> {
 
-    fn compile(
+    pub fn compile(
         &self, 
-        statement_text: &String
     ) -> Result<SelectFromFolderCompiledStmt, Vec<PlanetError>> {
         let expr = &RE_SELECT_COUNT;
+        let statement_text = self.statement_text.clone();
         let is_count = expr.is_match(&statement_text);
         let mut page: Option<i32> = None;
         let mut number_items: Option<i32> = None;
@@ -1656,16 +1659,13 @@ impl<'gb> StatementCompiler<'gb, SelectFromFolderCompiledStmt> for SelectFromFol
         }
         return Err(errors)
     }
-}
-
-impl<'gb> SelectFromFolderStatement {
 
     pub fn validate(
         &self,
-        env: &'gb Environment<'gb>,
-        space_database: &SpaceDatabase,
         mut compiled_statement: SelectFromFolderCompiledStmt,
     ) -> Result<SelectFromFolderCompiledStmt, Vec<PlanetError>> {
+        let env = self.env.clone();
+        let space_database = self.space_database.clone();
         let context = env.context;
         let planet_context = env.planet_context;
         let mut errors: Vec<PlanetError> = Vec::new();
@@ -1740,7 +1740,7 @@ impl<'gb> SelectFromFolderStatement {
         // - Compile Where formula
         let where_source = compiled_statement.where_source.clone();
         if where_source.is_some() {
-            let where_source = where_source.unwrap();
+            let mut where_source = where_source.unwrap();
             let expr = &RE_FORMULA_ASSIGN;
             let is_assign_function = expr.is_match(&where_source);
             eprintln!("SelectFromFolderStatement.validate :: is_assign_function: {}", &is_assign_function);
@@ -1750,6 +1750,15 @@ impl<'gb> SelectFromFolderStatement {
                 &folder
             ).unwrap();
             let field_config_map_wrap = Some(field_config_map.clone());
+            // Modify formula in case we have general SEARCH in the statement
+            let stmt_search = compiled_statement.search.clone();
+            if stmt_search.is_some() {
+                let stmt_search = stmt_search.unwrap();
+                let search_func = format!("SEARCH(\"Text\", \"{}\")", stmt_search);
+                where_source = format!(
+                    "AND({}, {})", &search_func, where_source
+                );
+            }
             let formula_query = Formula::defaults(
                 &where_source, 
                 &String::from("bool"), 
@@ -1774,6 +1783,34 @@ impl<'gb> SelectFromFolderStatement {
         return Ok(compiled_statement.clone())
     }
 
+    pub fn do_compile(
+        &self,
+    ) -> Result<SelectFromFolderCompiledStmt, Vec<PlanetError>> {
+        // let mut errors: Vec<PlanetError> = Vec::new();
+        // 1 - Compile SELECT statement into SelectFromFolderCompiledStmt
+        let statement = self.compile();
+        if statement.is_err() {
+            let errors = statement.unwrap_err();
+            return Err(errors)
+        }
+        let statement = statement.unwrap();
+        eprintln!("SelectFromFolderStatement.run :: [compiled] select: {:#?}", &statement);
+        // 2 - Compile Where formula and validate query for existing columns.
+        let validation = self.validate(
+            statement
+        );
+        if validation.is_err() {
+            let errors = validation.unwrap_err();
+            return Err(errors)
+        }
+        let statement = validation.unwrap();
+        return Ok(statement)
+    }
+
+}
+
+#[derive(Debug, Clone)]
+pub struct SelectFromFolderStatement {
 }
 
 impl<'gb> Statement<'gb> for SelectFromFolderStatement {
@@ -1787,26 +1824,29 @@ impl<'gb> Statement<'gb> for SelectFromFolderStatement {
         let space_database = space_database.clone();
         // let t_1 = Instant::now();
         // 1 - Compile SELECT statement into SelectFromFolderCompiledStmt
-        let statement = self.compile(statement_text);
-        if statement.is_err() {
-            let errors = statement.unwrap_err();
+        let search_compiler = SearchCompiler{
+            statement_text: statement_text.clone(),
+            env: env,
+            space_database: space_database.clone()
+        };
+        let result = search_compiler.do_compile();
+        if result.is_err() {
+            let errors = result.unwrap_err();
             return Err(errors)
         }
-        let statement = statement.unwrap();
-        eprintln!("SelectFromFolderStatement.run :: [compiled] select: {:#?}", &statement);
-        // 2 - Compile Where formula and validate query for existing columns.
-        let validation = self.validate(
-            env, 
-            &space_database, 
-            statement
-        );
-        if validation.is_err() {
-            let errors = validation.unwrap_err();
-            return Err(errors)
-        }
-        let statement = validation.unwrap();
-        eprintln!("SelectFromFolderStatement.run :: [validated] select: {:#?}", &statement);
+        let statement = result.unwrap();
 
+        // - Consider only one partition for base algorithms. Then later on refactor and add threads
+        // - Create iterator????
+
+        // 3 - Search indices as help to find items in WHERE formula when text columns exist. Priority
+        //         here is speed.
+        // 4 - Open folder partitions, processing each in thread.
+        // 5 - Execute subqueries for the links and aggregations.
+        // 6 - Execute formula for a match.
+        // 7 - Group by items, with support for sorting inside grouping.
+        // 8 - Sorting, going through all items.
+        // 9 - Paging and fetch final data.
         let mut errors: Vec<PlanetError> = Vec::new();
         let mut yaml_response: Vec<yaml_rust::Yaml> = Vec::new();
         let response_coded = serde_yaml::to_string("");
@@ -2092,7 +2132,12 @@ pub fn resolve_data_statement(
                 return Some(response);
             }
             StatementCallMode::Compile => {
-                let response = stmt.compile(&statement_text);
+                let compiler = SearchCompiler{
+                    statement_text: statement_text.clone(),
+                    env: env,
+                    space_database: space_data.clone()
+                };
+                let response = compiler.do_compile();
                 if response.is_err() {
                     let errors = response.unwrap_err();
                     return Some(Err(errors))
