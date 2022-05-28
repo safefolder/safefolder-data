@@ -24,6 +24,11 @@ pub const SELECT_DEFAULT_NUMBER_ITEMS: u32 = 20;
 pub const INDEX_PROFILE_IDX: &str = "idx";
 pub const INDEX_PROFILE_RAW: &str = "raw";
 
+// Sorting
+pub const SORT_TYPE_STR: &str = "str";
+pub const SORT_TYPE_NUMBER: &str = "number";
+pub const SORT_MAX_STRING_LENGTH: usize = 100;
+
 pub const DB: &str = "db";
 pub const INDEX: &str = "index";
 pub const PRIVATE: &str = "private";

@@ -664,6 +664,46 @@ impl TreeFolder {
         }
         return false
     }
+
+    pub fn get_column_by_name(
+        column_name: &String, 
+        folder: &DbData
+    ) -> Result<BTreeMap<String, String>, PlanetError> {
+        let folder = folder.clone();
+        let folder_data = folder.data;
+        if folder_data.is_some() {
+            let folder_data = folder_data.unwrap();
+            let columns = folder_data.get(COLUMNS);
+            if columns.is_some() {
+                let columns = columns.unwrap();
+                for column in columns {
+                    let column_name_db = column.get(NAME);
+                    let column_id = column.get(ID);
+                    if column_name_db.is_none() || column_id.is_none() {
+                        // Raise error
+                        return Err(
+                            PlanetError::new(
+                                500, 
+                                Some(tr!("Could not get column id for \"{}\".", column_name)),
+                            )
+                        );
+                    }
+                    let column_name_db = column_name_db.unwrap().clone();
+                    if column_name_db.to_lowercase() == column_name.to_lowercase() {
+                        return Ok(
+                            column.clone()
+                        )
+                    }
+                }
+            }
+        }
+        return Err(
+            PlanetError::new(
+                500, 
+                Some(tr!("Could not get column id for \"{}\".", column_name)),
+            )
+        );
+    }
 }
 
 impl FolderSchema for TreeFolder {
@@ -1520,7 +1560,13 @@ impl TreeFolderItem {
         return (path_db, path_index)
     }
 
-    fn open_partition(
+    pub fn get_partition_str(partition: &u16) -> String {
+        let partition_str = partition.to_string();
+        let partition_str = format!("{:0>4}", partition_str);
+        return partition_str
+    }
+
+    pub fn open_partition(
         &mut self,
         partition: &u16,
     ) -> Result<(sled::Tree, sled::Tree), PlanetError> {
@@ -1596,7 +1642,7 @@ impl TreeFolderItem {
         return Ok(tree)
     }
 
-    fn get_partitions(&mut self) -> Result<Vec<u16>, PlanetError> {
+    pub fn get_partitions(&mut self) -> Result<Vec<u16>, PlanetError> {
         let mut list_partitions: Vec<u16> = Vec::new();
         let count = self.total_count()?;
         let number_items = count.total.to_u16().unwrap();

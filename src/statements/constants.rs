@@ -3,3 +3,4 @@ pub const STATEMENT_INSERT_INTO_FOLDER: &str = "INSERT INTO FOLDER";
 
 pub const SORT_MODE_ASC: &str = "ASC";
 pub const SORT_MODE_DESC: &str = "DESC";
+pub const COLUMN_ID: &str = "column_id";

@@ -4,17 +4,24 @@ extern crate slug;
 
 use std::collections::{BTreeMap, HashMap};
 use std::time::Instant;
+use std::cmp::Ordering;
 
 use tr::tr;
 use regex::Regex;
 use lazy_static::lazy_static;
 use colored::Colorize;
 
+use serde_encrypt::{
+    shared_key::SharedKey, traits::SerdeEncryptSharedKey,
+    AsSharedKey, EncryptedMessage,
+};
+
 use crate::functions::Formula;
 use crate::statements::folder::config::*;
 use crate::storage::constants::*;
 use crate::statements::folder::schema::*;
 use crate::statements::*;
+use crate::statements::constants::*;
 use crate::planet::constants::{ID, NAME, VALUE, FALSE, COLUMNS};
 // use crate::storage::folder::{TreeFolder, TreeFolderItem, FolderItem, FolderSchema, DbData, GetItemOption};
 use crate::storage::folder::*;
@@ -34,8 +41,8 @@ use crate::storage::columns::reference::*;
 use crate::storage::columns::structure::*;
 use crate::storage::columns::processing::*;
 use crate::storage::columns::media::*;
-use crate::statements::constants::*;
-use crate::functions::{RE_FORMULA_QUERY, RE_FORMULA_ASSIGN};
+// use crate::statements::constants::{COLUMN_ID};
+use crate::functions::{RE_FORMULA_QUERY, RE_FORMULA_ASSIGN, execute_formula};
 
 lazy_static! {
     pub static ref RE_INSERT_INTO_FOLDER_MAIN: Regex = Regex::new(r#"INSERT INTO FOLDER (?P<FolderName>[\w\s]+)[\s\t\n]*(?P<Items>\([\s\S]+\));"#).unwrap();
@@ -1343,6 +1350,12 @@ pub struct SelectSortBy {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SortedtBy {
+    pub sorted_item: String,
+    pub mode: SelectSortMode,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SelectCount {
     pub column: Option<String>,
     pub all: bool,
@@ -1402,8 +1415,8 @@ impl SelectFromFolderCompiledStmt {
 #[derive(Debug, Clone)]
 pub struct SearchCompiler<'gb>{
     pub statement_text: String,
-    env: &'gb Environment<'gb>,
-    space_database: SpaceDatabase,
+    pub env: &'gb Environment<'gb>,
+    pub space_database: SpaceDatabase,
 }
 
 impl<'gb> SearchCompiler<'gb> {
@@ -1810,6 +1823,731 @@ impl<'gb> SearchCompiler<'gb> {
 }
 
 #[derive(Debug, Clone)]
+pub struct SearchWhereBooster{}
+
+#[derive(Debug, Clone)]
+pub struct SortValueMode {
+    str: Option<String>,
+    number: Option<i64>
+}
+
+#[derive(Debug, Eq, Ord, PartialEq, PartialOrd, Clone)]
+pub struct SearchSorter{
+    pub partition: u16,
+    pub id: String,
+    pub column_id: Option<String>,
+    pub column_1_str: Option<String>,
+    pub column_1_number: Option<i64>,
+    pub column_2_str: Option<String>,
+    pub column_2_number: Option<i64>,
+    pub column_3_str: Option<String>,
+    pub column_3_number: Option<i64>,
+    pub column_4_str: Option<String>,
+    pub column_4_number: Option<i64>,
+    pub column_5_str: Option<String>,
+    pub column_5_number: Option<i64>,
+    pub column_6_str: Option<String>,
+    pub column_6_number: Option<i64>,
+    pub column_7_str: Option<String>,
+    pub column_7_number: Option<i64>,
+    pub column_8_str: Option<String>,
+    pub column_8_number: Option<i64>,
+    pub column_9_str: Option<String>,
+    pub column_9_number: Option<i64>,
+    pub column_10_str: Option<String>,
+    pub column_10_number: Option<i64>,
+}
+
+impl SearchSorter {
+    pub fn defaults(partition: &u16, id: &String) -> Self {
+        let obj = Self{
+            partition: partition.clone(),
+            id: id.clone(),
+            column_id: None,
+            column_1_str: None,
+            column_2_str: None,
+            column_3_str: None,
+            column_4_str: None,
+            column_5_str: None,
+            column_6_str: None,
+            column_7_str: None,
+            column_8_str: None,
+            column_9_str: None,
+            column_10_str: None,
+            column_1_number: None,
+            column_2_number: None,
+            column_3_number: None,
+            column_4_number: None,
+            column_5_number: None,
+            column_6_number: None,
+            column_7_number: None,
+            column_8_number: None,
+            column_9_number: None,
+            column_10_number: None,
+        };
+        return obj
+    }
+}
+
+pub struct SearchResultItem {
+    pub id: Option<String>,
+    pub partition: Option<u16>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SearchIterator<'gb>{
+    pub query: SelectFromFolderCompiledStmt,
+    pub env: &'gb Environment<'gb>,
+    pub space_database: SpaceDatabase,
+}
+
+impl<'gb> SearchIterator<'gb>{
+
+    fn get_column_sort_type(
+        &self,
+        column: &BTreeMap<String, String>, 
+    ) -> String {
+        let column = column.clone();
+        let column_type = column.get(COLUMN_TYPE);
+        let mut sort_column_type = String::from(SORT_TYPE_STR);
+        if column_type.is_some() {
+            let column_type = column_type.unwrap().clone();
+            let column_type = column_type.as_str();
+            match column_type {
+                COLUMN_TYPE_DURATION => {
+                    sort_column_type = String::from(SORT_TYPE_NUMBER);
+                },
+                COLUMN_TYPE_CHECKBOX => {
+                    sort_column_type = String::from(SORT_TYPE_NUMBER);
+                },
+                COLUMN_TYPE_NUMBER => {
+                    sort_column_type = String::from(SORT_TYPE_NUMBER);
+                },
+                COLUMN_TYPE_GENERATE_NUMBER => {
+                    sort_column_type = String::from(SORT_TYPE_NUMBER);
+                },
+                COLUMN_TYPE_CURRENCY => {
+                    sort_column_type = String::from(SORT_TYPE_NUMBER);
+                },
+                COLUMN_TYPE_PERCENTAGE => {
+                    sort_column_type = String::from(SORT_TYPE_NUMBER);
+                },
+                __ => {}
+            }
+        }
+        return sort_column_type
+    }
+
+    fn get_sort_value(
+        &self, 
+        item: &DbData,
+        column_id: &String,
+        column_type: &String,
+    ) -> Result<SortValueMode, PlanetError> {
+        let column_id = column_id.clone();
+        let item = item.clone();
+        let item_data = item.data.clone();
+        let column_type = column_type.as_str();
+        if item_data.is_some() {
+            let item_data = item_data.unwrap();
+            let values = item_data.get(&column_id);
+            if values.is_some() {
+                let values = values.unwrap();
+                let value = get_value_list(values);
+                if value.is_some() {
+                    let value = value.unwrap();
+                    match column_type {
+                        COLUMN_TYPE_DURATION => {
+                            let number: i64 = FromStr::from_str(value.as_str()).unwrap();
+                            let number = number*1000;
+                            return Ok(SortValueMode{str: None, number: Some(number)})
+                        },
+                        COLUMN_TYPE_CHECKBOX => {
+                            let number: i64 = FromStr::from_str(value.as_str()).unwrap();
+                            let number = number*1000;
+                            return Ok(SortValueMode{str: None, number: Some(number)})
+                        },
+                        COLUMN_TYPE_NUMBER => {
+                            let number: i64 = FromStr::from_str(value.as_str()).unwrap();
+                            let number = number*1000;
+                            return Ok(SortValueMode{str: None, number: Some(number)})
+                        },
+                        COLUMN_TYPE_GENERATE_NUMBER => {
+                            let number: i64 = FromStr::from_str(value.as_str()).unwrap();
+                            let number = number*1000;
+                            return Ok(SortValueMode{str: None, number: Some(number)})
+                        },
+                        COLUMN_TYPE_CURRENCY => {
+                            let number: i64 = FromStr::from_str(value.as_str()).unwrap();
+                            let number = number*1000;
+                            return Ok(SortValueMode{str: None, number: Some(number)})
+                        },
+                        COLUMN_TYPE_PERCENTAGE => {
+                            let number: i64 = FromStr::from_str(value.as_str()).unwrap();
+                            let number = number*1000;
+                            return Ok(SortValueMode{str: None, number: Some(number)})
+                        },
+                        __ => {
+                            return Ok(SortValueMode{str: Some(value), number: None})
+                        }
+                    }
+                }
+            }
+        }
+        return Err(
+            PlanetError::new(
+                500, 
+                Some(tr!("Error sorting query data.")),
+            )
+        )
+
+    }
+
+    fn add_to_sorter(
+        &self,
+        partition: &u16,
+        item: &DbData,
+        column_type_map: &HashMap<String, String>,
+        sorter_map: &HashMap<String, SortedtBy>,
+        sorter_list: &Vec<SearchSorter>
+    ) -> Result<Vec<SearchSorter>, Vec<PlanetError>> {
+        let partition = partition.clone();
+        let column_type_map = column_type_map.clone();
+        let mut sorter_list = sorter_list.clone();
+        let item_id = item.id.clone().unwrap();
+        for (sorter_column_id, sorter_column_item) in sorter_map {
+            let sorter_column_item = sorter_column_item.sorted_item.clone();
+            let column_type = column_type_map.get(sorter_column_id);
+            if column_type.is_none() {
+                continue
+            }
+            let column_type = column_type.unwrap();
+            let result = self.get_sort_value(
+                item, 
+                sorter_column_id, 
+                column_type
+            );
+            if result.is_err() {
+                let mut errors: Vec<PlanetError> = Vec::new();
+                errors.push(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Error sorting query data.")),
+                    )
+                );
+            }
+            let sort_value = result.unwrap();
+            let sorter_column_item = sorter_column_item.as_str();
+            let mut sorter = SearchSorter::defaults(&partition, &item_id);
+            let mut column_value = String::from("");
+            let mut column_value_number: i64 = 0;
+            if sort_value.str.is_some() {
+                column_value = sort_value.str.unwrap();
+                // Cap sorting strings to 100 bytes to reduce size
+                if column_value.len() > SORT_MAX_STRING_LENGTH {
+                    let slice = &column_value[0..SORT_MAX_STRING_LENGTH];
+                    column_value = format!("{}...", slice);
+                }
+            } else {
+                column_value_number = sort_value.number.unwrap();
+            }
+            // if sorter_column_item.find("number").is_some() {
+            //     column_value_number = FromStr::from_str(column_value.as_str()).unwrap();
+            // }
+            match sorter_column_item {
+                "column_id" => {
+                    sorter.column_id = Some(column_value);
+                },
+                "column_1_str" => {
+                    sorter.column_1_str = Some(column_value);
+                },
+                "column_2_str" => {
+                    sorter.column_2_str = Some(column_value);
+                },
+                "column_3_str" => {
+                    sorter.column_3_str = Some(column_value);
+                },
+                "column_4_str" => {
+                    sorter.column_4_str = Some(column_value);
+                },
+                "column_5_str" => {
+                    sorter.column_5_str = Some(column_value);
+                },
+                "column_6_str" => {
+                    sorter.column_6_str = Some(column_value);
+                },
+                "column_7_str" => {
+                    sorter.column_7_str = Some(column_value);
+                },
+                "column_8_str" => {
+                    sorter.column_8_str = Some(column_value);
+                },
+                "column_9_str" => {
+                    sorter.column_9_str = Some(column_value);
+                },
+                "column_10_str" => {
+                    sorter.column_10_str = Some(column_value);
+                },
+                "column_1_number" => {
+                    sorter.column_1_number = Some(column_value_number);
+                },
+                "column_2_number" => {
+                    sorter.column_2_number = Some(column_value_number);
+                },
+                "column_3_number" => {
+                    sorter.column_3_number = Some(column_value_number);
+                },
+                "column_4_number" => {
+                    sorter.column_4_number = Some(column_value_number);
+                },
+                "column_5_number" => {
+                    sorter.column_5_number = Some(column_value_number);
+                },
+                "column_6_number" => {
+                    sorter.column_6_number = Some(column_value_number);
+                },
+                "column_7_number" => {
+                    sorter.column_7_number = Some(column_value_number);
+                },
+                "column_8_number" => {
+                    sorter.column_8_number = Some(column_value_number);
+                },
+                "column_9_number" => {
+                    sorter.column_9_number = Some(column_value_number);
+                },
+                "column_10_number" => {
+                    sorter.column_10_number = Some(column_value_number);
+                },
+                __ => {}
+            }
+            sorter_list.push(sorter);
+        }
+        return Ok(sorter_list.clone())
+    }
+
+    fn compare_strings(
+        &self,
+        mode: &SelectSortMode,
+        column_a: &String,
+        column_b: &String
+    ) -> Ordering {
+        let mode = mode.clone();
+        let column_order: Ordering;
+        match mode {
+            SelectSortMode::Ascending => {
+                column_order = column_a.cmp(&column_b);
+            },
+            SelectSortMode::Descending => {
+                column_order = column_b.cmp(&column_a);
+            },
+        }
+        return column_order
+    }
+
+    fn compare_numbers(
+        &self,
+        mode: &SelectSortMode,
+        column_a: &i64,
+        column_b: &i64
+    ) -> Ordering {
+        let mode = mode.clone();
+        let column_order: Ordering;
+        match mode {
+            SelectSortMode::Ascending => {
+                column_order = column_a.cmp(&column_b);
+            },
+            SelectSortMode::Descending => {
+                column_order = column_b.cmp(&column_a);
+            },
+        }
+        return column_order
+    }
+
+    fn sort(
+        &self,
+        sorter_list: &Vec<SearchSorter>,
+        sorter_map: &HashMap<String, SortedtBy>,
+    ) -> Vec<SearchSorter> {
+        let mut sorter_list = sorter_list.clone();
+        let only_id = sorter_map.len() == 1;
+        // Case I only sort on ids
+        if only_id {
+            sorter_list.sort();
+        } else {
+            // I sort each column independently
+            sorter_list.sort_by(|a, b| {
+                let mut match_order = Ordering::Greater;
+                for (_column_id, sorted_by) in sorter_map.clone() {
+                    let mode = sorted_by.mode;
+                    let sorter_item = sorted_by.sorted_item;
+                    let sorter_item = sorter_item.as_str();
+                    let mut column_order: Ordering = Ordering::Greater;
+                    match sorter_item {
+                        "column_1_str" => {
+                            let column_a_1_str = a.column_1_str.clone().unwrap();
+                            let column_b_1_str = b.column_1_str.clone().unwrap();
+                            column_order = self.compare_strings(&mode, &column_a_1_str, &column_b_1_str);
+                        },
+                        "column_1_number" => {
+                            let column_a_1_number = a.column_1_number.clone().unwrap();
+                            let column_b_1_number = b.column_1_number.clone().unwrap();
+                            column_order = self.compare_numbers(&mode, &column_a_1_number, &column_b_1_number);
+                        },
+                        "column_2_str" => {
+                            let column_a_2_str = a.column_2_str.clone().unwrap();
+                            let column_b_2_str = b.column_2_str.clone().unwrap();
+                            column_order = self.compare_strings(&mode, &column_a_2_str, &column_b_2_str);
+                        },
+                        "column_2_number" => {
+                            let column_a_2_number = a.column_2_number.clone().unwrap();
+                            let column_b_2_number = b.column_2_number.clone().unwrap();
+                            column_order = self.compare_numbers(&mode, &column_a_2_number, &column_b_2_number);
+                        },
+                        "column_3_str" => {
+                            let column_a_3_str = a.column_3_str.clone().unwrap();
+                            let column_b_3_str = b.column_3_str.clone().unwrap();
+                            column_order = self.compare_strings(&mode, &column_a_3_str, &column_b_3_str);
+                        },
+                        "column_3_number" => {
+                            let column_a_3_number = a.column_3_number.clone().unwrap();
+                            let column_b_3_number = b.column_3_number.clone().unwrap();
+                            column_order = self.compare_numbers(&mode, &column_a_3_number, &column_b_3_number);
+                        },
+                        "column_4_str" => {
+                            let column_a_4_str = a.column_4_str.clone().unwrap();
+                            let column_b_4_str = b.column_4_str.clone().unwrap();
+                            column_order = self.compare_strings(&mode, &column_a_4_str, &column_b_4_str);
+                        },
+                        "column_4_number" => {
+                            let column_a_4_number = a.column_4_number.clone().unwrap();
+                            let column_b_4_number = b.column_4_number.clone().unwrap();
+                            column_order = self.compare_numbers(&mode, &column_a_4_number, &column_b_4_number);
+                        },
+                        "column_5_str" => {
+                            let column_a_5_str = a.column_5_str.clone().unwrap();
+                            let column_b_5_str = b.column_5_str.clone().unwrap();
+                            column_order = self.compare_strings(&mode, &column_a_5_str, &column_b_5_str);
+                        },
+                        "column_5_number" => {
+                            let column_a_5_number = a.column_5_number.clone().unwrap();
+                            let column_b_5_number = b.column_5_number.clone().unwrap();
+                            column_order = self.compare_numbers(&mode, &column_a_5_number, &column_b_5_number);
+                        },
+                        "column_6_str" => {
+                            let column_a_6_str = a.column_6_str.clone().unwrap();
+                            let column_b_6_str = b.column_6_str.clone().unwrap();
+                            column_order = self.compare_strings(&mode, &column_a_6_str, &column_b_6_str);
+                        },
+                        "column_6_number" => {
+                            let column_a_6_number = a.column_6_number.clone().unwrap();
+                            let column_b_6_number = b.column_6_number.clone().unwrap();
+                            column_order = self.compare_numbers(&mode, &column_a_6_number, &column_b_6_number);
+                        },
+                        "column_7_str" => {
+                            let column_a_7_str = a.column_7_str.clone().unwrap();
+                            let column_b_7_str = b.column_7_str.clone().unwrap();
+                            column_order = self.compare_strings(&mode, &column_a_7_str, &column_b_7_str);
+                        },
+                        "column_7_number" => {
+                            let column_a_7_number = a.column_7_number.clone().unwrap();
+                            let column_b_7_number = b.column_7_number.clone().unwrap();
+                            column_order = self.compare_numbers(&mode, &column_a_7_number, &column_b_7_number);
+                        },
+                        "column_8_str" => {
+                            let column_a_8_str = a.column_8_str.clone().unwrap();
+                            let column_b_8_str = b.column_8_str.clone().unwrap();
+                            column_order = self.compare_strings(&mode, &column_a_8_str, &column_b_8_str);
+                        },
+                        "column_8_number" => {
+                            let column_a_8_number = a.column_8_number.clone().unwrap();
+                            let column_b_8_number = b.column_8_number.clone().unwrap();
+                            column_order = self.compare_numbers(&mode, &column_a_8_number, &column_b_8_number);
+                        },
+                        "column_9_str" => {
+                            let column_a_9_str = a.column_9_str.clone().unwrap();
+                            let column_b_9_str = b.column_9_str.clone().unwrap();
+                            column_order = self.compare_strings(&mode, &column_a_9_str, &column_b_9_str);
+                        },
+                        "column_9_number" => {
+                            let column_a_9_number = a.column_9_number.clone().unwrap();
+                            let column_b_9_number = b.column_9_number.clone().unwrap();
+                            column_order = self.compare_numbers(&mode, &column_a_9_number, &column_b_9_number);
+                        },
+                        "column_10_str" => {
+                            let column_a_10_str = a.column_10_str.clone().unwrap();
+                            let column_b_10_str = b.column_10_str.clone().unwrap();
+                            column_order = self.compare_strings(&mode, &column_a_10_str, &column_b_10_str);
+                        },
+                        "column_10_number" => {
+                            let column_a_10_number = a.column_10_number.clone().unwrap();
+                            let column_b_10_number = b.column_10_number.clone().unwrap();
+                            column_order = self.compare_numbers(&mode, &column_a_10_number, &column_b_10_number);
+                        },
+                        __ => {
+                            // I might have column_id but I ignore since we only process SORT BY from query
+                        }
+                    }
+                    match column_order {
+                        Ordering::Greater => {},
+                        Ordering::Less => {
+                            match_order = Ordering::Less;
+                            return match_order
+                        },
+                        Ordering::Equal => {
+                            match_order = Ordering::Equal;
+                            return match_order
+                        },
+                    }
+                }
+                return match_order
+            });
+        }
+        return sorter_list
+    }
+
+    pub fn do_search(
+        &self
+    ) -> Result<Vec<SearchResultItem>, Vec<PlanetError>> {
+        // 1 - Open all partitions
+        // 2 - Execute Formula in all partitions using threads
+        // 3 - Sorting in same thread formula was executed
+        let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
+        let mut errors: Vec<PlanetError> = Vec::new();
+        let query = self.query.where_compiled.clone();
+        let folder_name = self.query.folder_name.clone();
+        let space_database = self.space_database.clone();
+        let planet_context = self.env.planet_context.clone();
+        let context = self.env.context.clone();
+        let home_dir = planet_context.home_path.clone();
+        let account_id = context.account_id.clone().unwrap_or_default();
+        let space_id = context.space_id;
+        let site_id = context.site_id.clone();
+        // TreeFolder
+        let db_folder= TreeFolder::defaults(
+            space_database.connection_pool.clone(),
+            Some(home_dir.clone().unwrap_or_default().as_str()),
+            Some(&account_id),
+            Some(space_id),
+            site_id.clone(),
+        ).unwrap();
+        let folder = db_folder.get_by_name(&folder_name);
+        if folder.is_err() {
+            let error = folder.unwrap_err();
+            errors.push(error);
+            return Err(errors)
+        }
+        let folder = folder.unwrap();
+        if *&folder.is_none() {
+            errors.push(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Could not find folder {}", &folder_name)),
+                )
+            );
+            return Err(errors)
+        }
+        let folder = folder.unwrap();
+        let folder_id = folder.id.clone().unwrap_or_default();
+        // Sorter
+        let sort_by = self.query.sort_by.clone();
+        let mut sorter_map: HashMap<String, SortedtBy> = HashMap::new();
+        // Default sort by id, used in case no SORT BY defined
+        let column = TreeFolder::get_column_by_name(
+            &String::from(ID), 
+            &folder
+        ).unwrap();
+        let column_id = column.get(ID).unwrap();
+        let sorter_item = format!("column_{}", ID);
+        let id_sorted = SortedtBy{
+            sorted_item: sorter_item,
+            mode: SelectSortMode::Ascending
+        };
+        sorter_map.insert(column_id.clone(), id_sorted);
+        let mut sorter_list: Vec<SearchSorter> = Vec::new();
+        let mut column_type_map: HashMap<String, String> = HashMap::new();
+        if sort_by.is_some() {
+            let sort_by = sort_by.unwrap();
+            let mut column_sort_id = 1;
+            for sort_by_item in sort_by {
+                let column_name = sort_by_item.column;
+                let sort_mode = sort_by_item.mode;
+                if column_name.to_lowercase() == String::from("id") {
+                    continue
+                }
+                let column = TreeFolder::get_column_by_name(
+                    &column_name, 
+                    &folder
+                );
+                if column.is_ok() {
+                    let column = column.unwrap();
+                    let column_id = column.get(ID).unwrap();
+                    let column_sort_type = self.get_column_sort_type(&column);
+                    column_type_map.insert(column_id.clone(), column_sort_type.clone());
+                    let column_sort_type = column_sort_type.as_str();
+                    let sorter_item = format!("column_{}_{}", &column_sort_id, column_sort_type);
+                    let sorted_item = SortedtBy{
+                        sorted_item: sorter_item,
+                        mode: sort_mode
+                    };
+                    sorter_map.insert(column_id.clone(), sorted_item);
+                    column_sort_id += 1;
+                }
+            }
+        }
+        // TreeFolderItem
+        let mut site_id_alt: Option<String> = None;
+        if site_id.is_some() {
+            let site_id = site_id.clone().unwrap();
+            site_id_alt = Some(site_id.clone().to_string());
+        }
+        let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
+            space_database.connection_pool.clone(),
+            home_dir.clone().unwrap_or_default().as_str(),
+            &account_id,
+            space_id,
+            site_id_alt,
+            folder_id.as_str(),
+            &db_folder,
+        );
+        if result.is_ok() {
+            let mut folder_item = result.unwrap();
+            let partitions = folder_item.get_partitions();
+            if partitions.is_ok() {
+                let partitions = partitions.unwrap();
+                for partition in partitions {
+                    let (db_tree, _index_tree) = folder_item.open_partition(&partition).unwrap();
+                    // I may need botth db and index to execute formula
+                    let iter = db_tree.iter();
+                    for db_result in iter {
+                        if db_result.is_err() {
+                            let mut errors: Vec<PlanetError> = Vec::new();
+                            errors.push(
+                                PlanetError::new(
+                                    500, 
+                                    Some(tr!("Could not fetch item from database"))
+                                )
+                            );
+                            return Err(errors)
+                        }
+                        let item_tuple = db_result.unwrap();
+                        // let item_id = item_tuple.0;
+                        let item = item_tuple.1;
+                        let item_db = item.to_vec();
+                        let item_ = EncryptedMessage::deserialize(
+                            item_db
+                        ).unwrap();
+                        let item_ = DbData::decrypt_owned(
+                            &item_, 
+                            &shared_key);
+                        let field_config_map = ColumnConfig::get_column_config_map(
+                            &planet_context,
+                            &context,
+                            &folder
+                        ).unwrap();
+                        match item_ {
+                            Ok(_) => {
+                                let item = item_.unwrap();
+                                // execute formula
+                                if query.is_some() {
+                                    let query = query.clone().unwrap();
+                                    let data_map = item.clone().data.unwrap();
+                                    // This will be used by SEARCH function, implemented when SEARCH is done
+                                    // index_data_map
+                                    let formula_result = execute_formula(
+                                        &query, 
+                                        &data_map, 
+                                        &field_config_map
+                                    );
+                                    if formula_result.is_err() {
+                                        let error = formula_result.unwrap_err();
+                                        let mut errors: Vec<PlanetError> = Vec::new();
+                                        errors.push(error);
+                                        return Err(errors)
+                                    }
+                                    let formula_result = formula_result.unwrap();
+                                    let formula_matches: bool;
+                                    if formula_result == String::from("1") {
+                                        formula_matches = true;
+                                    } else {
+                                        formula_matches = false;
+                                    }
+                                    eprintln!("SearchIterator.do_search :: formula_matches: {}", 
+                                        &formula_matches
+                                    );
+                                    if formula_matches {                                
+                                        let result = self.add_to_sorter(
+                                            &partition,
+                                            &item,
+                                            &column_type_map,
+                                            &sorter_map,
+                                            &sorter_list
+                                        );
+                                        if result.is_ok() {
+                                            let sorter_list_ = result.unwrap();
+                                            sorter_list = sorter_list_;
+                                        } else {
+                                            let mut errors: Vec<PlanetError> = Vec::new();
+                                            errors.push(
+                                                PlanetError::new(500, Some(tr!(
+                                                    "Could not sort values from query."
+                                                )))
+                                            );
+                                            return Err(errors)
+                                        }
+                                    }
+                                } else {
+                                    // Add to sorting, since no where formula, we add all items
+                                    let result = self.add_to_sorter(
+                                        &partition,
+                                        &item,
+                                        &column_type_map,
+                                        &sorter_map,
+                                        &sorter_list
+                                    );
+                                    if result.is_ok() {
+                                        let sorter_list_ = result.unwrap();
+                                        sorter_list = sorter_list_;
+                                    } else {
+                                        let mut errors: Vec<PlanetError> = Vec::new();
+                                        errors.push(
+                                            PlanetError::new(500, Some(tr!(
+                                                "Could not sort values from query."
+                                            )))
+                                        );
+                                        return Err(errors)
+                                    }
+                                }
+                            },
+                            Err(_) => {
+                                let mut errors: Vec<PlanetError> = Vec::new();
+                                errors.push(
+                                    PlanetError::new(500, Some(tr!(
+                                        "Could not fetch item from database"
+                                    )))
+                                );
+                                return Err(errors)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        eprintln!("SearchIterator.do_search :: sorter_list: {:#?}", &sorter_list);
+        sorter_list = self.sort(&sorter_list, &sorter_map);
+        eprintln!("SearchIterator.do_search :: [sorted] sorter_list: {:#?}", &sorter_list);
+        let mut result_list: Vec<SearchResultItem> = Vec::new();
+        for sorter in sorter_list {
+            let item = SearchResultItem{
+                id: Some(sorter.id),
+                partition: Some(sorter.partition),
+            };
+            result_list.push(item);
+        }
+        return Ok(result_list)
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct SelectFromFolderStatement {
 }
 
@@ -1834,19 +2572,10 @@ impl<'gb> Statement<'gb> for SelectFromFolderStatement {
             let errors = result.unwrap_err();
             return Err(errors)
         }
-        let statement = result.unwrap();
-
-        // - Consider only one partition for base algorithms. Then later on refactor and add threads
-        // - Create iterator????
-
-        // 3 - Search indices as help to find items in WHERE formula when text columns exist. Priority
-        //         here is speed.
-        // 4 - Open folder partitions, processing each in thread.
-        // 5 - Execute subqueries for the links and aggregations.
-        // 6 - Execute formula for a match.
-        // 7 - Group by items, with support for sorting inside grouping.
-        // 8 - Sorting, going through all items.
-        // 9 - Paging and fetch final data.
+        let _statement = result.unwrap();
+        // SearchIterator
+        // Paging
+        // Generate Output
         let mut errors: Vec<PlanetError> = Vec::new();
         let mut yaml_response: Vec<yaml_rust::Yaml> = Vec::new();
         let response_coded = serde_yaml::to_string("");
