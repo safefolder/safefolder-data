@@ -1366,8 +1366,8 @@ pub struct SelectCount {
 pub struct SelectFromFolderCompiledStmt {
     pub folder_name: String,
     pub columns: Option<Vec<String>>,
-    pub page: i32,
-    pub number_items: i32,
+    pub page: u32,
+    pub number_items: u32,
     pub search: Option<String>,
     pub where_source: Option<String>,
     pub where_compiled: Option<Formula>,
@@ -1380,11 +1380,11 @@ impl SelectFromFolderCompiledStmt {
 
     pub fn defaults(
         folder_name: String,
-        page: Option<i32>, 
-        number_items: Option<i32>,
+        page: Option<u32>, 
+        number_items: Option<u32>,
     ) -> SelectFromFolderCompiledStmt {
-        let page_int: i32;
-        let number_items_int: i32;
+        let page_int: u32;
+        let number_items_int: u32;
         if page.is_some() {
             page_int = page.unwrap();
         } else {
@@ -1427,8 +1427,8 @@ impl<'gb> SearchCompiler<'gb> {
         let expr = &RE_SELECT_COUNT;
         let statement_text = self.statement_text.clone();
         let is_count = expr.is_match(&statement_text);
-        let mut page: Option<i32> = None;
-        let mut number_items: Option<i32> = None;
+        let mut page: Option<u32> = None;
+        let mut number_items: Option<u32> = None;
         let mut folder_name = String::from("");
         let mut errors: Vec<PlanetError> = Vec::new();
         if is_count {
@@ -1505,14 +1505,14 @@ impl<'gb> SearchCompiler<'gb> {
                     if page_regex.is_some() || number_items_regex.is_some() {
                         if page_regex.is_some() {
                             let page_regex = page_regex.unwrap().as_str();
-                            let page_int: i32 = FromStr::from_str(page_regex).unwrap();
+                            let page_int: u32 = FromStr::from_str(page_regex).unwrap();
                             let check_text = format!("PAGE {}", &page_int);
                             statement_text_new = statement_text_new.replace(&check_text, "");
                             page = Some(page_int);
                         }
                         if number_items_regex.is_some() {
                             let number_items_regex = number_items_regex.unwrap().as_str();
-                            let number_items_int: i32 = FromStr::from_str(number_items_regex).unwrap();
+                            let number_items_int: u32 = FromStr::from_str(number_items_regex).unwrap();
                             let check_text = format!("NUMBER ITEMS {}", &number_items_int);
                             statement_text_new = statement_text_new.replace(&check_text, "");
                             number_items = Some(number_items_int);
@@ -1889,6 +1889,7 @@ impl SearchSorter {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct SearchResultItem {
     pub id: Option<String>,
     pub partition: Option<u16>,
@@ -2548,6 +2549,38 @@ impl<'gb> SearchIterator<'gb>{
 }
 
 #[derive(Debug, Clone)]
+pub struct SearchPaging{
+    pub number_items: u32,
+    pub page: u32,
+}
+impl SearchPaging {
+
+    pub fn do_paging(
+        &self,
+        results: &Vec<SearchResultItem>
+    ) -> Result<Vec<SearchResultItem>, Vec<PlanetError>> {
+        let results = results.clone();
+        let mut paged_results: Vec<SearchResultItem> = Vec::new();
+        let page = self.page.clone();
+        let number_items = self.number_items;
+        let start = (page-1)*number_items;
+        let end = page*number_items;
+        let mut count = 0;
+        for item in results {
+            if count >= end {
+                break
+            }
+            if count >= start {
+                paged_results.push(item);
+            }
+            count += 1;
+        }
+        return Ok(paged_results)
+    }
+
+}
+
+#[derive(Debug, Clone)]
 pub struct SelectFromFolderStatement {
 }
 
@@ -2572,9 +2605,31 @@ impl<'gb> Statement<'gb> for SelectFromFolderStatement {
             let errors = result.unwrap_err();
             return Err(errors)
         }
-        let _statement = result.unwrap();
-        // SearchIterator
-        // Paging
+        let statement = result.unwrap();
+        // 2 - Execute search iterator that performs query, filtering and sorting
+        let search_iterator = SearchIterator{
+            env: env,
+            space_database: space_database.clone(),
+            query: statement.clone()
+        };
+        let results = search_iterator.do_search();
+        if results.is_err() {
+            let errors = results.unwrap_err();
+            return Err(errors)
+        }
+        let results = results.unwrap();
+        // 3 - Paging
+        let paging = SearchPaging{
+            number_items: statement.number_items,
+            page: statement.page
+        };
+        let results = paging.do_paging(&results);
+        if results.is_err() {
+            let errors = results.unwrap_err();
+            return Err(errors)
+        }
+        let results = results.unwrap();
+        // 4 - Generate Final Data
         // Generate Output
         let mut errors: Vec<PlanetError> = Vec::new();
         let mut yaml_response: Vec<yaml_rust::Yaml> = Vec::new();
