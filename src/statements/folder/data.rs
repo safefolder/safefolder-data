@@ -1943,6 +1943,8 @@ pub struct SearchIterator<'gb>{
     pub query: SelectFromFolderCompiledStmt,
     pub env: &'gb Environment<'gb>,
     pub space_database: SpaceDatabase,
+    pub db_folder: Option<TreeFolder>,
+    pub folder: Option<DbData>,
 }
 
 impl<'gb> SearchIterator<'gb>{
@@ -2352,13 +2354,8 @@ impl<'gb> SearchIterator<'gb>{
     pub fn do_search(
         &self
     ) -> Result<Vec<SearchResultItem>, Vec<PlanetError>> {
-        // 1 - Open all partitions
-        // 2 - Execute Formula in all partitions using threads
-        // 3 - Sorting in same thread formula was executed
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
-        let mut errors: Vec<PlanetError> = Vec::new();
         let query = self.query.where_compiled.clone();
-        let folder_name = self.query.folder_name.clone();
         let space_database = self.space_database.clone();
         let planet_context = self.env.planet_context.clone();
         let context = self.env.context.clone();
@@ -2366,31 +2363,8 @@ impl<'gb> SearchIterator<'gb>{
         let account_id = context.account_id.clone().unwrap_or_default();
         let space_id = context.space_id;
         let site_id = context.site_id.clone();
-        // TreeFolder
-        let db_folder= TreeFolder::defaults(
-            space_database.connection_pool.clone(),
-            Some(home_dir.clone().unwrap_or_default().as_str()),
-            Some(&account_id),
-            Some(space_id),
-            site_id.clone(),
-        ).unwrap();
-        let folder = db_folder.get_by_name(&folder_name);
-        if folder.is_err() {
-            let error = folder.unwrap_err();
-            errors.push(error);
-            return Err(errors)
-        }
-        let folder = folder.unwrap();
-        if *&folder.is_none() {
-            errors.push(
-                PlanetError::new(
-                    500, 
-                    Some(tr!("Could not find folder {}", &folder_name)),
-                )
-            );
-            return Err(errors)
-        }
-        let folder = folder.unwrap();
+        let db_folder = self.db_folder.clone().unwrap();
+        let folder = self.folder.clone().unwrap();
         let folder_id = folder.id.clone().unwrap_or_default();
         // Sorter
         let sort_by = self.query.sort_by.clone();
@@ -2588,6 +2562,126 @@ impl<'gb> SearchIterator<'gb>{
             result_list.push(item);
         }
         return Ok(result_list)
+    }
+
+    pub fn do_search_count(
+        &self
+    ) -> Result<usize, Vec<PlanetError>> {
+        let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
+        let query = self.query.where_compiled.clone();
+        let space_database = self.space_database.clone();
+        let planet_context = self.env.planet_context.clone();
+        let context = self.env.context.clone();
+        let home_dir = planet_context.home_path.clone();
+        let account_id = context.account_id.clone().unwrap_or_default();
+        let space_id = context.space_id;
+        let site_id = context.site_id.clone();
+        let db_folder = self.db_folder.clone().unwrap();
+        let folder = self.folder.clone().unwrap();
+        let folder_id = folder.id.clone().unwrap_or_default();
+        // TreeFolderItem
+        let mut site_id_alt: Option<String> = None;
+        if site_id.is_some() {
+            let site_id = site_id.clone().unwrap();
+            site_id_alt = Some(site_id.clone().to_string());
+        }
+        let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
+            space_database.connection_pool.clone(),
+            home_dir.clone().unwrap_or_default().as_str(),
+            &account_id,
+            space_id,
+            site_id_alt,
+            folder_id.as_str(),
+            &db_folder,
+        );
+        let mut search_count: usize = 0;
+        if result.is_ok() {
+            let mut folder_item = result.unwrap();
+            let partitions = folder_item.get_partitions();
+            if partitions.is_ok() {
+                let partitions = partitions.unwrap();
+                for partition in partitions {
+                    let (db_tree, _index_tree) = folder_item.open_partition(&partition).unwrap();
+                    // I may need botth db and index to execute formula
+                    let iter = db_tree.iter();
+                    for db_result in iter {
+                        if db_result.is_err() {
+                            let mut errors: Vec<PlanetError> = Vec::new();
+                            errors.push(
+                                PlanetError::new(
+                                    500, 
+                                    Some(tr!("Could not fetch item from database"))
+                                )
+                            );
+                            return Err(errors)
+                        }
+                        let item_tuple = db_result.unwrap();
+                        // let item_id = item_tuple.0;
+                        let item = item_tuple.1;
+                        let item_db = item.to_vec();
+                        let item_ = EncryptedMessage::deserialize(
+                            item_db
+                        ).unwrap();
+                        let item_ = DbData::decrypt_owned(
+                            &item_, 
+                            &shared_key);
+                        let field_config_map = ColumnConfig::get_column_config_map(
+                            &planet_context,
+                            &context,
+                            &folder
+                        ).unwrap();
+                        match item_ {
+                            Ok(_) => {
+                                let item = item_.unwrap();
+                                // execute formula
+                                if query.is_some() {
+                                    let query = query.clone().unwrap();
+                                    let data_map = item.clone().data.unwrap();
+                                    // This will be used by SEARCH function, implemented when SEARCH is done
+                                    // index_data_map
+                                    let formula_result = execute_formula(
+                                        &query, 
+                                        &data_map, 
+                                        &field_config_map
+                                    );
+                                    if formula_result.is_err() {
+                                        let error = formula_result.unwrap_err();
+                                        let mut errors: Vec<PlanetError> = Vec::new();
+                                        errors.push(error);
+                                        return Err(errors)
+                                    }
+                                    let formula_result = formula_result.unwrap();
+                                    let formula_matches: bool;
+                                    if formula_result == String::from("1") {
+                                        formula_matches = true;
+                                    } else {
+                                        formula_matches = false;
+                                    }
+                                    eprintln!("SearchIterator.do_search_count :: formula_matches: {}", 
+                                        &formula_matches
+                                    );
+                                    if formula_matches {     
+                                        search_count += 1;
+                                    }
+                                } else {
+                                    search_count += 1;
+                                }
+                            },
+                            Err(_) => {
+                                let mut errors: Vec<PlanetError> = Vec::new();
+                                errors.push(
+                                    PlanetError::new(500, Some(tr!(
+                                        "Could not fetch item from database"
+                                    )))
+                                );
+                                return Err(errors)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return Ok(search_count)
     }
 }
 
@@ -2791,9 +2885,8 @@ impl<'gb> SelectFromFolderStatement {
         env: &'gb Environment<'gb>,
         space_database: &SpaceDatabase,
         search_compiler: &SearchCompiler,
-        errors: &Vec<PlanetError>,
     ) -> Result<(TreeFolder, DbData), Vec<PlanetError>> {
-        let mut errors = errors.clone();
+        let mut errors: Vec<PlanetError> = Vec::new();
         let planet_context = env.planet_context.clone();
         let context = env.context.clone();
         let folder_name = search_compiler.get_folder_name();
@@ -2841,54 +2934,23 @@ impl<'gb> SelectFromFolderStatement {
 
 }
 
-impl<'gb> Statement<'gb> for SelectFromFolderStatement {
+impl<'gb> SelectFromFolderStatement {
 
-    fn run(
+    pub fn execute_collection(
         &self,
         env: &'gb Environment<'gb>,
         space_database: &SpaceDatabase,
-        statement_text: &String,
+        statement: SelectFromFolderCompiledStmt,
+        db_folder: &TreeFolder,
+        folder: &DbData,
+        search_iterator: &SearchIterator,
+        columns: Option<Vec<String>>,
     ) -> Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>> {
-        let space_database = space_database.clone();
-        // let t_1 = Instant::now();
-        // 0 - Init
         let mut errors: Vec<PlanetError> = Vec::new();
-        let search_compiler = SearchCompiler{
-            statement_text: statement_text.clone(),
-            env: env,
-            space_database: space_database.clone()
-        };
-        let init = self.init(
-            env,
-            &space_database,
-            &search_compiler,
-            &errors,
-        );
-        if init.is_err() {
-            let errors = init.unwrap_err();
-            return Err(errors)
-        }
-        let init = init.unwrap();
-        let db_folder = init.0;
-        let folder = init.1;
-        // 1 - Compile SELECT statement into SelectFromFolderCompiledStmt
-        let result = search_compiler.do_compile(
-            Some(db_folder.clone()), 
-            Some(folder.clone())
-        );
-        if result.is_err() {
-            let errors = result.unwrap_err();
-            return Err(errors)
-        }
-        let statement = result.unwrap();
-        let columns = statement.columns.clone();
-        // TODO: Check if we only execute for a counter, no need for a list of items through search iterator
-        // 2 - Execute search iterator that performs query, filtering, sorting, sub queries, search
-        let search_iterator = SearchIterator{
-            env: env,
-            space_database: space_database.clone(),
-            query: statement.clone()
-        };
+        let db_folder = db_folder.clone();
+        let search_iterator = search_iterator.clone();
+        let folder = folder.clone();
+        let statement = statement.clone();
         let results = search_iterator.do_search();
         if results.is_err() {
             let errors = results.unwrap_err();
@@ -2922,7 +2984,6 @@ impl<'gb> Statement<'gb> for SelectFromFolderStatement {
         }
         let results = result.unwrap();
         // 5- Serialize Output
-        let mut errors: Vec<PlanetError> = Vec::new();
         let mut yaml_response: Vec<yaml_rust::Yaml> = Vec::new();
         let response_coded = serde_yaml::to_string(&results);
         if response_coded.is_err() {
@@ -2939,6 +3000,105 @@ impl<'gb> Statement<'gb> for SelectFromFolderStatement {
         ).unwrap();
         yaml_response.push(yaml_item[0].clone());
         return Ok(yaml_response)
+    }
+
+    pub fn execute_count(
+        &self,
+        search_iterator: &SearchIterator,
+    ) -> Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>> {
+        let mut errors: Vec<PlanetError> = Vec::new();
+        let search_iterator = search_iterator.clone();
+        let results = search_iterator.do_search_count();
+        if results.is_err() {
+            let errors = results.unwrap_err();
+            return Err(errors)
+        }
+        let results = results.unwrap();
+        // Serialize Output
+        let mut yaml_response: Vec<yaml_rust::Yaml> = Vec::new();
+        let response_coded = serde_yaml::to_string(&results);
+        if response_coded.is_err() {
+            let error = PlanetError::new(
+                500, 
+                Some(tr!("Error encoding statement response.")),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+        let response = response_coded.unwrap();
+        let yaml_item = yaml_rust::YamlLoader::load_from_str(
+            response.as_str()
+        ).unwrap();
+        yaml_response.push(yaml_item[0].clone());
+        return Ok(yaml_response)
+    }
+
+}
+
+impl<'gb> Statement<'gb> for SelectFromFolderStatement {
+
+    fn run(
+        &self,
+        env: &'gb Environment<'gb>,
+        space_database: &SpaceDatabase,
+        statement_text: &String,
+    ) -> Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>> {
+        let space_database = space_database.clone();
+        // let t_1 = Instant::now();
+        // 0 - Init
+        let search_compiler = SearchCompiler{
+            statement_text: statement_text.clone(),
+            env: env,
+            space_database: space_database.clone()
+        };
+        let init = self.init(
+            env,
+            &space_database,
+            &search_compiler,
+        );
+        if init.is_err() {
+            let errors = init.unwrap_err();
+            return Err(errors)
+        }
+        let init = init.unwrap();
+        let db_folder = init.0;
+        let folder = init.1;
+        // 1 - Compile SELECT statement into SelectFromFolderCompiledStmt
+        let result = search_compiler.do_compile(
+            Some(db_folder.clone()), 
+            Some(folder.clone())
+        );
+        if result.is_err() {
+            let errors = result.unwrap_err();
+            return Err(errors)
+        }
+        let statement = result.unwrap();
+        let columns = statement.columns.clone();
+        let select_count = statement.count.clone();
+        let search_iterator = SearchIterator{
+            env: env,
+            space_database: space_database.clone(),
+            query: statement.clone(),
+            db_folder: Some(db_folder.clone()), 
+            folder: Some(folder.clone())
+        };
+        if select_count.is_none() {
+            let result = self.execute_collection(
+                env,
+                &space_database,
+                statement,
+                &db_folder,
+                &folder,
+                &search_iterator,
+                columns
+            );
+            return result
+        } else {
+            let result = self.execute_count(
+                &search_iterator
+            );
+            return result
+        }
     }
 }
 
