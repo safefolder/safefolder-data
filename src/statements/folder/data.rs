@@ -2,7 +2,7 @@ extern crate tr;
 extern crate colored;
 extern crate slug;
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::time::Instant;
 use std::cmp::Ordering;
 
@@ -1421,6 +1421,32 @@ pub struct SearchCompiler<'gb>{
 
 impl<'gb> SearchCompiler<'gb> {
 
+    pub fn get_folder_name(
+        &self
+    ) -> Result<String, Vec<PlanetError>> {
+        let statement_text = self.statement_text.clone();
+        let expr = &RE_SELECT_FROM;
+        let captures = expr.captures(&statement_text);
+        let mut errors: Vec<PlanetError> = Vec::new();
+        if captures.is_some() {
+            let captures = captures.unwrap();
+            let folder_name_ = captures.name("FolderName");
+            if folder_name_.is_some() {
+                let folder_name_ = folder_name_.unwrap().as_str();
+                let folder_name = folder_name_.to_string();
+                let folder_name = folder_name.trim().to_string();
+                return Ok(folder_name)
+            }
+        }
+        errors.push(
+            PlanetError::new(
+                500, 
+                Some(tr!("Folder name not detected and is required.")),
+            )
+        );
+        return Err(errors)
+    }
+
     pub fn compile(
         &self, 
     ) -> Result<SelectFromFolderCompiledStmt, Vec<PlanetError>> {
@@ -1676,44 +1702,57 @@ impl<'gb> SearchCompiler<'gb> {
     pub fn validate(
         &self,
         mut compiled_statement: SelectFromFolderCompiledStmt,
+        db_folder: Option<TreeFolder>,
+        folder: Option<DbData>
     ) -> Result<SelectFromFolderCompiledStmt, Vec<PlanetError>> {
         let env = self.env.clone();
         let space_database = self.space_database.clone();
         let context = env.context;
         let planet_context = env.planet_context;
         let mut errors: Vec<PlanetError> = Vec::new();
+        let db_folder_wrap = db_folder.clone();
+        let folder_wrap = folder.clone();
+        let db_folder: TreeFolder;
+        let folder: DbData;
+        let mut folder_name: String = String::from("");
+        if folder_wrap.is_some() & db_folder_wrap.is_some() {
+            folder = folder_wrap.unwrap();
+            db_folder = db_folder_wrap.unwrap();
+            folder_name = folder.name.clone().unwrap();
+        } else {
+            // - Get folder and other data
+            let folder_name = compiled_statement.folder_name.clone();
+            let home_dir = planet_context.home_path.clone();
+            let account_id = context.account_id.clone().unwrap_or_default();
+            let space_id = context.space_id;
+            let site_id = context.site_id.clone();
+            let space_database = space_database.clone();
+            db_folder= TreeFolder::defaults(
+                space_database.connection_pool.clone(),
+                Some(home_dir.clone().unwrap_or_default().as_str()),
+                Some(&account_id),
+                Some(space_id),
+                site_id.clone(),
+            ).unwrap();
+            let folder_ = db_folder.get_by_name(&folder_name.clone());
+            if folder_.is_err() {
+                let error = folder_.unwrap_err();
+                errors.push(error);
+                return Err(errors)
+            }
+            let folder_ = folder_.unwrap();
+            if *&folder_.is_none() {
+                errors.push(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Could not find folder {}", &folder_name.clone())),
+                    )
+                );
+                return Err(errors)
+            }
+            folder = folder_.unwrap();
+        }
         
-        // - Get folder and other data
-        let folder_name = compiled_statement.folder_name.clone();
-        let home_dir = planet_context.home_path.clone();
-        let account_id = context.account_id.clone().unwrap_or_default();
-        let space_id = context.space_id;
-        let site_id = context.site_id.clone();
-        let space_database = space_database.clone();
-        let db_folder= TreeFolder::defaults(
-            space_database.connection_pool.clone(),
-            Some(home_dir.clone().unwrap_or_default().as_str()),
-            Some(&account_id),
-            Some(space_id),
-            site_id.clone(),
-        ).unwrap();
-        let folder = db_folder.get_by_name(&folder_name);
-        if folder.is_err() {
-            let error = folder.unwrap_err();
-            errors.push(error);
-            return Err(errors)
-        }
-        let folder = folder.unwrap();
-        if *&folder.is_none() {
-            errors.push(
-                PlanetError::new(
-                    500, 
-                    Some(tr!("Could not find folder {}", &folder_name)),
-                )
-            );
-            return Err(errors)
-        }
-        let folder = folder.unwrap();
         // - Validate columns: columns, group_by, sort
         let mut column_list: Vec<String> = Vec::new();
         if compiled_statement.columns.is_some() {
@@ -1798,6 +1837,8 @@ impl<'gb> SearchCompiler<'gb> {
 
     pub fn do_compile(
         &self,
+        db_folder: Option<TreeFolder>,
+        folder: Option<DbData>
     ) -> Result<SelectFromFolderCompiledStmt, Vec<PlanetError>> {
         // let mut errors: Vec<PlanetError> = Vec::new();
         // 1 - Compile SELECT statement into SelectFromFolderCompiledStmt
@@ -1810,7 +1851,9 @@ impl<'gb> SearchCompiler<'gb> {
         eprintln!("SelectFromFolderStatement.run :: [compiled] select: {:#?}", &statement);
         // 2 - Compile Where formula and validate query for existing columns.
         let validation = self.validate(
-            statement
+            statement,
+            db_folder,
+            folder
         );
         if validation.is_err() {
             let errors = validation.unwrap_err();
@@ -2553,6 +2596,7 @@ pub struct SearchPaging{
     pub number_items: u32,
     pub page: u32,
 }
+
 impl SearchPaging {
 
     pub fn do_paging(
@@ -2581,7 +2625,220 @@ impl SearchPaging {
 }
 
 #[derive(Debug, Clone)]
+pub struct SearchOutputData{
+}
+
+impl<'gb> SearchOutputData {
+
+    pub fn do_output(
+        &self,
+        env: &'gb Environment<'gb>,
+        space_database: &SpaceDatabase,
+        db_folder: &TreeFolder,
+        folder: &DbData,
+        results: &Vec<SearchResultItem>,
+        columns: &Option<Vec<String>>
+    ) -> Result<Vec<DbData>, Vec<PlanetError>> {
+        let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
+        let results = results.clone();
+        let columns_wrap = columns.clone();
+        let mut columns: Vec<String> = Vec::new();
+        if columns_wrap.is_some() {
+            columns = columns_wrap.unwrap();
+        }
+        let space_database = space_database.clone();
+        let planet_context = env.planet_context.clone();
+        let context = env.context.clone();
+        let home_dir = planet_context.home_path.clone();
+        let account_id = context.account_id.clone().unwrap_or_default();
+        let space_id = context.space_id;
+        let site_id = context.site_id.clone();
+        let mut site_id_alt: Option<String> = None;
+        let mut errors: Vec<PlanetError> = Vec::new();
+        if site_id.is_some() {
+            let site_id = site_id.clone().unwrap();
+            site_id_alt = Some(site_id.clone().to_string());
+        }
+        let folder_id = folder.id.clone().unwrap();
+        let folder_name = folder.name.clone().unwrap();
+        let mut partition_list: Vec<u16> = Vec::new();
+        let mut partitions: HashSet<u16> = HashSet::new();
+        let mut results_by_partition: HashMap<u16, Vec<SearchResultItem>> = HashMap::new();
+        for item in &results {
+            let partition = item.partition.unwrap();
+            if !partitions.contains(&partition) {
+                partition_list.push(partition);
+                partitions.insert(partition);
+                let map_item = results_by_partition.get(&partition);
+                if map_item.is_none() {
+                    let mut list: Vec<SearchResultItem> = Vec::new();
+                    list.push(item.clone());
+                    results_by_partition.insert(partition, list);
+                } else {
+                    let mut list = results_by_partition.get(&partition).unwrap().clone();
+                    list.push(item.clone());
+                    results_by_partition.insert(partition, list);
+                }
+            }
+        }
+        // Init TreeFolderItem
+        let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
+            space_database.connection_pool.clone(),
+            home_dir.clone().unwrap_or_default().as_str(),
+            &account_id,
+            space_id,
+            site_id_alt,
+            folder_id.as_str(),
+            &db_folder,
+        );
+        if result.is_err() {
+            let error = result.unwrap_err();
+            errors.push(error);
+            return Err(errors)
+        }
+        let mut db_items = result.unwrap();
+        let mut items: Vec<DbData> = Vec::new();
+        for partition in partition_list {
+            // Open partition, having db tree
+            let result = db_items.open_partition(&partition);
+            if result.is_err() {
+                let error = result.unwrap_err();
+                let mut errors: Vec<PlanetError> = Vec::new();
+                errors.push(error);
+                return Err(errors)
+            }
+            let result = result.unwrap();
+            let tree = result.0;
+            let partition_items = results_by_partition.get(&partition);
+            if partition_items.is_some() {
+                let partition_items = partition_items.unwrap();
+                for item in partition_items {
+                    let item_id = item.id.clone();
+                    if item_id.is_some() {
+                        let item_id = item_id.unwrap();
+                        let id_db = xid::Id::from_str(&item_id).unwrap();
+                        let id_db = id_db.as_bytes();
+                        let db_result = tree.get(&id_db);
+                        if db_result.is_err() {
+                            errors.push(
+                                PlanetError::new(
+                                    500, 
+                                    Some(tr!("Could not fetch item from database"))
+                                )
+                            );
+                        }
+                        let item_exsists = db_result.unwrap();
+                        if item_exsists.is_none() {
+                            errors.push(
+                                PlanetError::new(
+                                    404, 
+                                    Some(tr!(
+                                        "Folder Item with id \"{}\" at folder \"{}\" does not exist.", &item_id, folder_name
+                                    ))
+                                )
+                            );
+                        }
+                        if errors.len() > 0 {
+                            return Err(errors)
+                        }
+                        let item_db = item_exsists.unwrap().to_vec();
+                        let item_ = EncryptedMessage::deserialize(item_db).unwrap();
+                        let item_ = DbData::decrypt_owned(
+                            &item_, 
+                            &shared_key
+                        );
+                        match item_ {
+                            Ok(_) => {
+                                let item = item_.unwrap();
+                                if columns.len() == 0 {
+                                    items.push(item);
+                                } else {
+                                    eprintln!("SearchOutputData.do_output :: item: {:#?}", &item);
+                                    let result = db_items.filter_fields(&folder_name, &columns, &item);
+                                    if result.is_err() {
+                                        errors.push(result.unwrap_err());
+                                    }
+                                    items.push(item);
+                                }
+                            },
+                            Err(_) => {
+                                errors.push(
+                                    PlanetError::new(500, Some(tr!("Could not fetch item from database")))
+                                );
+                                return Err(errors)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if errors.len() > 0 {
+            return Err(errors)
+        }
+        return Ok(items)
+    }
+
+}
+
+#[derive(Debug, Clone)]
 pub struct SelectFromFolderStatement {
+}
+
+impl<'gb> SelectFromFolderStatement {
+
+    pub fn init(
+        &self,
+        env: &'gb Environment<'gb>,
+        space_database: &SpaceDatabase,
+        search_compiler: &SearchCompiler,
+        errors: &Vec<PlanetError>,
+    ) -> Result<(TreeFolder, DbData), Vec<PlanetError>> {
+        let mut errors = errors.clone();
+        let planet_context = env.planet_context.clone();
+        let context = env.context.clone();
+        let folder_name = search_compiler.get_folder_name();
+        if folder_name.is_err() {
+            let errors = folder_name.unwrap_err();
+            return Err(errors)
+        }
+        let folder_name = folder_name.unwrap();
+        let home_dir = planet_context.home_path.clone();
+        let account_id = context.account_id.clone().unwrap_or_default();
+        let space_id = context.space_id;
+        let site_id = context.site_id.clone();
+        let space_database = space_database.clone();
+        let db_folder= TreeFolder::defaults(
+            space_database.connection_pool.clone(),
+            Some(home_dir.clone().unwrap_or_default().as_str()),
+            Some(&account_id),
+            Some(space_id),
+            site_id.clone(),
+        ).unwrap();
+        let folder = db_folder.get_by_name(&folder_name);
+        if folder.is_err() {
+            let error = folder.unwrap_err();
+            errors.push(error);
+            return Err(errors)
+        }
+        let folder = folder.unwrap();
+        if *&folder.is_none() {
+            errors.push(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Could not find folder {}", &folder_name)),
+                )
+            );
+            return Err(errors)
+        }
+        let folder = folder.unwrap();
+        return Ok(
+            (
+                db_folder, 
+                folder
+            )
+        )
+    }
+
 }
 
 impl<'gb> Statement<'gb> for SelectFromFolderStatement {
@@ -2594,19 +2851,39 @@ impl<'gb> Statement<'gb> for SelectFromFolderStatement {
     ) -> Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>> {
         let space_database = space_database.clone();
         // let t_1 = Instant::now();
-        // 1 - Compile SELECT statement into SelectFromFolderCompiledStmt
+        // 0 - Init
+        let mut errors: Vec<PlanetError> = Vec::new();
         let search_compiler = SearchCompiler{
             statement_text: statement_text.clone(),
             env: env,
             space_database: space_database.clone()
         };
-        let result = search_compiler.do_compile();
+        let init = self.init(
+            env,
+            &space_database,
+            &search_compiler,
+            &errors,
+        );
+        if init.is_err() {
+            let errors = init.unwrap_err();
+            return Err(errors)
+        }
+        let init = init.unwrap();
+        let db_folder = init.0;
+        let folder = init.1;
+        // 1 - Compile SELECT statement into SelectFromFolderCompiledStmt
+        let result = search_compiler.do_compile(
+            Some(db_folder.clone()), 
+            Some(folder.clone())
+        );
         if result.is_err() {
             let errors = result.unwrap_err();
             return Err(errors)
         }
         let statement = result.unwrap();
-        // 2 - Execute search iterator that performs query, filtering and sorting
+        let columns = statement.columns.clone();
+        // TODO: Check if we only execute for a counter, no need for a list of items through search iterator
+        // 2 - Execute search iterator that performs query, filtering, sorting, sub queries, search
         let search_iterator = SearchIterator{
             env: env,
             space_database: space_database.clone(),
@@ -2630,10 +2907,24 @@ impl<'gb> Statement<'gb> for SelectFromFolderStatement {
         }
         let results = results.unwrap();
         // 4 - Generate Final Data
-        // Generate Output
+        let output = SearchOutputData{};
+        let result = output.do_output(
+            env,
+            &space_database,
+            &db_folder,
+            &folder,
+            &results,
+            &columns
+        );
+        if result.is_err() {
+            let errors_ = result.clone().unwrap_err();
+            errors.extend(errors_);
+        }
+        let results = result.unwrap();
+        // 5- Serialize Output
         let mut errors: Vec<PlanetError> = Vec::new();
         let mut yaml_response: Vec<yaml_rust::Yaml> = Vec::new();
-        let response_coded = serde_yaml::to_string("");
+        let response_coded = serde_yaml::to_string(&results);
         if response_coded.is_err() {
             let error = PlanetError::new(
                 500, 
@@ -2921,7 +3212,7 @@ pub fn resolve_data_statement(
                     env: env,
                     space_database: space_data.clone()
                 };
-                let response = compiler.do_compile();
+                let response = compiler.do_compile(None, None);
                 if response.is_err() {
                     let errors = response.unwrap_err();
                     return Some(Err(errors))
