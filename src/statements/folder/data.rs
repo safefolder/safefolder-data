@@ -2565,9 +2565,23 @@ impl<'gb> SearchIterator<'gb>{
     }
 
     pub fn do_search_count(
-        &self
+        &self,
+        distinct: bool,
+        column: Option<String>
     ) -> Result<usize, Vec<PlanetError>> {
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
+        let distinct = distinct.clone();
+        let column_wrap = column.clone();
+        let mut column_id: String = String::from("");
+        let folder = self.folder.clone().unwrap();
+        let has_column = column_wrap.is_some();
+        if *&has_column {
+            let column = column_wrap.unwrap();
+            let column_data = TreeFolder::get_column_by_name(
+                &column, &folder
+            ).unwrap();
+            column_id = column_data.get(ID).unwrap().clone();
+        }
         let query = self.query.where_compiled.clone();
         let space_database = self.space_database.clone();
         let planet_context = self.env.planet_context.clone();
@@ -2577,7 +2591,6 @@ impl<'gb> SearchIterator<'gb>{
         let space_id = context.space_id;
         let site_id = context.site_id.clone();
         let db_folder = self.db_folder.clone().unwrap();
-        let folder = self.folder.clone().unwrap();
         let folder_id = folder.id.clone().unwrap_or_default();
         // TreeFolderItem
         let mut site_id_alt: Option<String> = None;
@@ -2595,6 +2608,7 @@ impl<'gb> SearchIterator<'gb>{
             &db_folder,
         );
         let mut search_count: usize = 0;
+        let mut column_data_set: HashSet<String> = HashSet::new();
         if result.is_ok() {
             let mut folder_item = result.unwrap();
             let partitions = folder_item.get_partitions();
@@ -2660,11 +2674,49 @@ impl<'gb> SearchIterator<'gb>{
                                     eprintln!("SearchIterator.do_search_count :: formula_matches: {}", 
                                         &formula_matches
                                     );
-                                    if formula_matches {     
-                                        search_count += 1;
+                                    if formula_matches {
+                                        if !distinct {
+                                            if has_column {
+                                                let result = TreeFolderItem::get_value(
+                                                    &column_id, &item
+                                                );
+                                                if result.is_ok() {
+                                                    search_count += 1;
+                                                }
+                                            } else {
+                                                search_count += 1;
+                                            }
+                                        } else {
+                                            let result = TreeFolderItem::get_value(
+                                                &column_id, &item
+                                            );
+                                            if result.is_ok() {
+                                                let value = result.unwrap();
+                                                column_data_set.insert(value);
+                                            }
+                                        }
                                     }
                                 } else {
-                                    search_count += 1;
+                                    if !distinct {
+                                        if has_column {
+                                            let result = TreeFolderItem::get_value(
+                                                &column_id, &item
+                                            );
+                                            if result.is_ok() {
+                                                search_count += 1;
+                                            }
+                                        } else {
+                                            search_count += 1;
+                                        }
+                                    } else {
+                                        let result = TreeFolderItem::get_value(
+                                            &column_id, &item
+                                        );
+                                        if result.is_ok() {
+                                            let value = result.unwrap();
+                                            column_data_set.insert(value);
+                                        }
+                                    }
                                 }
                             },
                             Err(_) => {
@@ -2680,6 +2732,10 @@ impl<'gb> SearchIterator<'gb>{
                     }
                 }
             }
+        }
+        let set_length = column_data_set.len();
+        if *&set_length > 0 {
+            search_count = set_length;
         }
         return Ok(search_count)
     }
@@ -3005,10 +3061,17 @@ impl<'gb> SelectFromFolderStatement {
     pub fn execute_count(
         &self,
         search_iterator: &SearchIterator,
+        select_count: SelectCount
     ) -> Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>> {
         let mut errors: Vec<PlanetError> = Vec::new();
+        let select_count = select_count.clone();
+        let distinct = select_count.distinct;
+        let column = select_count.column;
         let search_iterator = search_iterator.clone();
-        let results = search_iterator.do_search_count();
+        let results = search_iterator.do_search_count(
+            distinct,
+            column
+        );
         if results.is_err() {
             let errors = results.unwrap_err();
             return Err(errors)
@@ -3095,7 +3158,8 @@ impl<'gb> Statement<'gb> for SelectFromFolderStatement {
             return result
         } else {
             let result = self.execute_count(
-                &search_iterator
+                &search_iterator,
+                select_count.unwrap()
             );
             return result
         }

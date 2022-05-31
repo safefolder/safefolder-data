@@ -1919,6 +1919,28 @@ impl TreeFolderItem {
         }
         return Ok(file_size)
     }
+
+    pub fn get_value(column_id: &String, item: &DbData) -> Result<String, PlanetError> {
+        let item = item.clone();
+        let data_map = item.clone().data.unwrap();
+        let column_id = column_id.clone();
+        let item_values = data_map.get(&column_id);
+        if item_values.is_some() {
+            let item_values = item_values.unwrap();
+            let value = get_value_list(item_values);
+            if value.is_some() {
+                let value = value.unwrap();
+                return Ok(value)
+            }
+        }
+        return Err(
+            PlanetError::new(
+                500, 
+                Some(tr!("Could not find item in file database.")),
+            )
+        )
+    }
+
 }
 
 impl FolderItem for TreeFolderItem {
