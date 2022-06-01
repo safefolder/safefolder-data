@@ -1012,16 +1012,12 @@ impl TreeFolder {
     ) -> Result<BTreeMap<String, String>, PlanetError> {
         let folder = tree_folder.get_by_name(folder_name).unwrap().unwrap();
         let db_columns = folder.data.unwrap();
+        let db_columns = db_columns.get(COLUMNS).unwrap();
         let mut column_id_map: BTreeMap<String, String> = BTreeMap::new();
-        for db_column in db_columns.keys() {
-            let column_config = db_columns.get(db_column).unwrap();
-            if column_config.len() == 1 {
-                // We only take items with 1 element, since we know here we have the config map, which is what we need
-                let column_config = &column_config[0];
-                let column_id = column_config.get(ID).unwrap().clone();
-                let column_name = db_column.clone();
-                column_id_map.insert(column_id, column_name);    
-            }
+        for db_column in db_columns {
+            let column_id = db_column.get(ID).unwrap().clone();
+            let column_name = db_column.get(NAME).unwrap().clone();
+            column_id_map.insert(column_id, column_name);
         }
         Ok(column_id_map)
     }
@@ -1042,7 +1038,7 @@ impl TreeFolder {
                     if column_id.is_some() {
                         let column_id = column_id.unwrap().clone();
                         let column_name = db_column.clone();
-                        column_id_map.insert(column_name, column_id);    
+                        column_id_map.insert(column_name, column_id);
                     }
                 }
             }

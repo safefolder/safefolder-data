@@ -23,7 +23,6 @@ use crate::statements::folder::schema::*;
 use crate::statements::*;
 use crate::statements::constants::*;
 use crate::planet::constants::{ID, NAME, VALUE, FALSE, COLUMNS};
-// use crate::storage::folder::{TreeFolder, TreeFolderItem, FolderItem, FolderSchema, DbData, GetItemOption};
 use crate::storage::folder::*;
 use crate::storage::{ConfigStorageColumn, generate_id};
 use crate::storage::space::{SpaceDatabase};
@@ -41,7 +40,7 @@ use crate::storage::columns::reference::*;
 use crate::storage::columns::structure::*;
 use crate::storage::columns::processing::*;
 use crate::storage::columns::media::*;
-// use crate::statements::constants::{COLUMN_ID};
+use crate::statements::constants::{COLUMN_ID};
 use crate::functions::{RE_FORMULA_QUERY, RE_FORMULA_ASSIGN, execute_formula};
 
 lazy_static! {
@@ -1994,6 +1993,7 @@ impl<'gb> SearchIterator<'gb>{
         let item = item.clone();
         let item_data = item.data.clone();
         let column_type = column_type.as_str();
+        eprintln!("get_sort_value :: column_type: {}", column_type);
         if item_data.is_some() {
             let item_data = item_data.unwrap();
             let values = item_data.get(&column_id);
@@ -2002,6 +2002,7 @@ impl<'gb> SearchIterator<'gb>{
                 let value = get_value_list(values);
                 if value.is_some() {
                     let value = value.unwrap();
+                    eprintln!("get_sort_value :: value: {}", &value);
                     match column_type {
                         COLUMN_TYPE_DURATION => {
                             let number: i64 = FromStr::from_str(value.as_str()).unwrap();
@@ -2058,31 +2059,50 @@ impl<'gb> SearchIterator<'gb>{
         sorter_list: &Vec<SearchSorter>
     ) -> Result<Vec<SearchSorter>, Vec<PlanetError>> {
         let partition = partition.clone();
-        let column_type_map = column_type_map.clone();
+        // let sort_column_type_map = sort_column_type_map.clone();
         let mut sorter_list = sorter_list.clone();
+        // eprintln!("add_to_sorter :: START sorter_list: {:#?}", &sorter_list);
+        // eprintln!("add_to_sorter :: sort_column_type_map: {:#?}", &sort_column_type_map);
+        // eprintln!("add_to_sorter :: column_type_map: {:#?}", &column_type_map);
         let item_id = item.id.clone().unwrap();
         for (sorter_column_id, sorter_column_item) in sorter_map {
             let sorter_column_item = sorter_column_item.sorted_item.clone();
-            let column_type = column_type_map.get(sorter_column_id);
-            if column_type.is_none() {
-                continue
-            }
-            let column_type = column_type.unwrap();
-            let result = self.get_sort_value(
-                item, 
-                sorter_column_id, 
-                column_type
-            );
-            if result.is_err() {
-                let mut errors: Vec<PlanetError> = Vec::new();
-                errors.push(
-                    PlanetError::new(
-                        500, 
-                        Some(tr!("Error sorting query data.")),
-                    )
+            let sort_value: SortValueMode;
+            if sorter_column_item.clone() == String::from(COLUMN_ID) {
+                // eprintln!("add_to_sorter :: I have column_id...");
+                let sort_value_ = SortValueMode{
+                    str: Some(sorter_column_id.clone()),
+                    number: None
+                };
+                sort_value = sort_value_;
+                // eprintln!("add_to_sorter :: sort_value: {:#?}", &sort_value);
+            } else {
+                // eprintln!("add_to_sorter :: sorter_column_id: {} sorter_column_item: {:?}", 
+                //     &sorter_column_id, sorter_column_item
+                // );
+                let column_type = column_type_map.get(sorter_column_id);
+                // eprintln!("add_to_sorter :: column_type: {:?}", &column_type);
+                if column_type.is_none() {
+                    continue
+                }
+                let column_type = column_type.unwrap();
+                // eprintln!("add_to_sorter :: column_type: {}", column_type);
+                let result = self.get_sort_value(
+                    item, 
+                    sorter_column_id, 
+                    column_type
                 );
+                if result.is_err() {
+                    let mut errors: Vec<PlanetError> = Vec::new();
+                    errors.push(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!("Error sorting query data.")),
+                        )
+                    );
+                }
+                sort_value = result.unwrap();
             }
-            let sort_value = result.unwrap();
             let sorter_column_item = sorter_column_item.as_str();
             let mut sorter = SearchSorter::defaults(&partition, &item_id);
             let mut column_value = String::from("");
@@ -2097,9 +2117,9 @@ impl<'gb> SearchIterator<'gb>{
             } else {
                 column_value_number = sort_value.number.unwrap();
             }
-            // if sorter_column_item.find("number").is_some() {
-            //     column_value_number = FromStr::from_str(column_value.as_str()).unwrap();
-            // }
+            // eprintln!("add_to_sorter :: column_value: {} column_value_number: {}", 
+            //     &column_value, &column_value_number
+            // );
             match sorter_column_item {
                 "column_id" => {
                     sorter.column_id = Some(column_value);
@@ -2370,26 +2390,26 @@ impl<'gb> SearchIterator<'gb>{
         let sort_by = self.query.sort_by.clone();
         let mut sorter_map: HashMap<String, SortedtBy> = HashMap::new();
         // Default sort by id, used in case no SORT BY defined
-        let column = TreeFolder::get_column_by_name(
-            &String::from(ID), 
-            &folder
-        ).unwrap();
-        let column_id = column.get(ID).unwrap();
+        let mut sort_column_type_map: HashMap<String, String> = HashMap::new();
+        let mut column_type_map: HashMap<String, String> = HashMap::new();
         let sorter_item = format!("column_{}", ID);
         let id_sorted = SortedtBy{
             sorted_item: sorter_item,
             mode: SelectSortMode::Ascending
         };
+        let column_id = generate_id().unwrap_or_default();
+        sort_column_type_map.insert(column_id.clone(), SORT_TYPE_STR.to_string());
+        // eprintln!("do_search :: ID column_id: {}", &column_id);
         sorter_map.insert(column_id.clone(), id_sorted);
         let mut sorter_list: Vec<SearchSorter> = Vec::new();
-        let mut column_type_map: HashMap<String, String> = HashMap::new();
         if sort_by.is_some() {
+            // eprintln!("do_search :: I have sort by...");
             let sort_by = sort_by.unwrap();
             let mut column_sort_id = 1;
             for sort_by_item in sort_by {
                 let column_name = sort_by_item.column;
                 let sort_mode = sort_by_item.mode;
-                if column_name.to_lowercase() == String::from("id") {
+                if column_name.to_lowercase() == String::from(ID) {
                     continue
                 }
                 let column = TreeFolder::get_column_by_name(
@@ -2399,8 +2419,10 @@ impl<'gb> SearchIterator<'gb>{
                 if column.is_ok() {
                     let column = column.unwrap();
                     let column_id = column.get(ID).unwrap();
+                    let content_type = column.get(COLUMN_TYPE).unwrap().clone();
+                    column_type_map.insert(column_id.clone(), content_type);
                     let column_sort_type = self.get_column_sort_type(&column);
-                    column_type_map.insert(column_id.clone(), column_sort_type.clone());
+                    sort_column_type_map.insert(column_id.clone(), column_sort_type.clone());
                     let column_sort_type = column_sort_type.as_str();
                     let sorter_item = format!("column_{}_{}", &column_sort_id, column_sort_type);
                     let sorted_item = SortedtBy{
@@ -2412,6 +2434,7 @@ impl<'gb> SearchIterator<'gb>{
                 }
             }
         }
+        // eprintln!("do_search :: sorter_map: {:?}", &sorter_map);
         // TreeFolderItem
         let mut site_id_alt: Option<String> = None;
         if site_id.is_some() {
@@ -2432,8 +2455,10 @@ impl<'gb> SearchIterator<'gb>{
             let partitions = folder_item.get_partitions();
             if partitions.is_ok() {
                 let partitions = partitions.unwrap();
+                // eprintln!("do_search :: partitions: {:?}", &partitions);
                 for partition in partitions {
                     let (db_tree, _index_tree) = folder_item.open_partition(&partition).unwrap();
+                    // eprintln!("do_search :: partition: {}", &partition);
                     // I may need botth db and index to execute formula
                     let iter = db_tree.iter();
                     for db_result in iter {
@@ -2449,6 +2474,7 @@ impl<'gb> SearchIterator<'gb>{
                         }
                         let item_tuple = db_result.unwrap();
                         // let item_id = item_tuple.0;
+                        // eprintln!("do_search :: item_id: {:?}", &item_id);
                         let item = item_tuple.1;
                         let item_db = item.to_vec();
                         let item_ = EncryptedMessage::deserialize(
@@ -2465,8 +2491,10 @@ impl<'gb> SearchIterator<'gb>{
                         match item_ {
                             Ok(_) => {
                                 let item = item_.unwrap();
+                                // eprintln!("do_search :: item: {:#?}", &item);
                                 // execute formula
                                 if query.is_some() {
+                                    // eprintln!("do_search :: I have WHERE...");
                                     let query = query.clone().unwrap();
                                     let data_map = item.clone().data.unwrap();
                                     // This will be used by SEARCH function, implemented when SEARCH is done
@@ -2489,9 +2517,9 @@ impl<'gb> SearchIterator<'gb>{
                                     } else {
                                         formula_matches = false;
                                     }
-                                    eprintln!("SearchIterator.do_search :: formula_matches: {}", 
-                                        &formula_matches
-                                    );
+                                    // eprintln!("SearchIterator.do_search :: formula_matches: {}", 
+                                    //     &formula_matches
+                                    // );
                                     if formula_matches {                                
                                         let result = self.add_to_sorter(
                                             &partition,
@@ -2514,6 +2542,7 @@ impl<'gb> SearchIterator<'gb>{
                                         }
                                     }
                                 } else {
+                                    // eprintln!("do_search :: No WHERE...");
                                     // Add to sorting, since no where formula, we add all items
                                     let result = self.add_to_sorter(
                                         &partition,
@@ -2525,6 +2554,7 @@ impl<'gb> SearchIterator<'gb>{
                                     if result.is_ok() {
                                         let sorter_list_ = result.unwrap();
                                         sorter_list = sorter_list_;
+                                        // eprintln!("do_search :: ALL :: sorter_list: {:#?}", &sorter_list);
                                     } else {
                                         let mut errors: Vec<PlanetError> = Vec::new();
                                         errors.push(
@@ -2550,9 +2580,9 @@ impl<'gb> SearchIterator<'gb>{
                 }
             }
         }
-        eprintln!("SearchIterator.do_search :: sorter_list: {:#?}", &sorter_list);
+        // eprintln!("SearchIterator.do_search :: sorter_list: {:#?}", &sorter_list);
         sorter_list = self.sort(&sorter_list, &sorter_map);
-        eprintln!("SearchIterator.do_search :: [sorted] sorter_list: {:#?}", &sorter_list);
+        // eprintln!("SearchIterator.do_search :: [sorted] sorter_list: {:#?}", &sorter_list);
         let mut result_list: Vec<SearchResultItem> = Vec::new();
         for sorter in sorter_list {
             let item = SearchResultItem{
@@ -2561,6 +2591,7 @@ impl<'gb> SearchIterator<'gb>{
             };
             result_list.push(item);
         }
+        // eprintln!("SearchIterator.do_search :: result_list: {:#?}", &result_list);
         return Ok(result_list)
     }
 
@@ -2829,6 +2860,10 @@ impl<'gb> SearchOutputData {
                     list.push(item.clone());
                     results_by_partition.insert(partition, list);
                 }
+            } else {
+                let mut list = results_by_partition.get(&partition).unwrap().clone();
+                list.push(item.clone());
+                results_by_partition.insert(partition, list);
             }
         }
         // Init TreeFolderItem
@@ -2903,17 +2938,19 @@ impl<'gb> SearchOutputData {
                                 if columns.len() == 0 {
                                     items.push(item);
                                 } else {
-                                    eprintln!("SearchOutputData.do_output :: item: {:#?}", &item);
                                     let result = db_items.filter_fields(&folder_name, &columns, &item);
                                     if result.is_err() {
-                                        errors.push(result.unwrap_err());
+                                        errors.push(result.clone().unwrap_err());
                                     }
+                                    let item = result.unwrap();
                                     items.push(item);
                                 }
                             },
                             Err(_) => {
                                 errors.push(
-                                    PlanetError::new(500, Some(tr!("Could not fetch item from database")))
+                                    PlanetError::new(500, Some(tr!(
+                                        "Could not fetch item from database"
+                                    )))
                                 );
                                 return Err(errors)
                             }
