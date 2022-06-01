@@ -1645,6 +1645,7 @@ impl TreeFolderItem {
     pub fn get_partitions(&mut self) -> Result<Vec<u16>, PlanetError> {
         let mut list_partitions: Vec<u16> = Vec::new();
         let count = self.total_count()?;
+        eprintln!("get_partitions :: count: {:?}", &count);
         let number_items = count.total.to_u16().unwrap();
         // 1200 items => 2 partitions
         // 1000 items => 1 partition
