@@ -54,7 +54,7 @@ lazy_static! {
     pub static ref RE_SELECT_FROM: Regex = Regex::new(r#"FROM[\s]*"(?P<FolderName>[\w\s]*)"[\s]*(WHERE|SORT BY|GROUP BY|SEARCH)*"#).unwrap();
     pub static ref RE_SELECT_COLUMNS: Regex = Regex::new(r#"SELECT[\s]*((?P<AllColumns>\*)|(?P<Columns>[\w\s,]+))[\s]*FROM"#).unwrap();
     pub static ref RE_SELECT_SORTING: Regex = Regex::new(r#"(SORT[\s]*BY[\s]*\{(?P<SortBy>[|\w\s]+)\})"#).unwrap();
-    pub static ref RE_SELECT_SORT_FIELDS: Regex = Regex::new(r#"(?P<Column>[\w\s]+)(?P<Mode>ASC|DESC)*"#).unwrap();
+    pub static ref RE_SELECT_SORT_FIELDS: Regex = Regex::new(r#"(?P<Column>[\w\s]+)(?P<Mode>ASC|DESC)+"#).unwrap();
     pub static ref RE_SELECT_GROUP_BY: Regex = Regex::new(r#"(GROUP[\s]*BY[\s]*"(?P<GroupByColumns>[\w\s,]+)")"#).unwrap();
     pub static ref RE_SELECT_GROUP_COLUMNS: Regex = Regex::new(r#"(?P<Column>[\w\s]+)"#).unwrap();
     pub static ref RE_SELECT_SEARCH: Regex = Regex::new(r#"(SEARCH[\s]*"(?P<Search>[\w\s]+)")"#).unwrap();
@@ -1599,8 +1599,17 @@ impl<'gb> SearchCompiler<'gb> {
                     let captures = captures.unwrap();
                     let sort_by = captures.name("SortBy");
                     if sort_by.is_some() {
-                        let sort_by = sort_by.unwrap().as_str();
+                        let mut sort_by = sort_by.unwrap().as_str();
+                        eprintln!("compile :: sort_by: {}", sort_by);
+                        let sort_by_: String;
                         // {COLUMN A ASC|COLUMN B DESC}
+                        if sort_by.find(SORT_MODE_ASC).is_none() && sort_by.find(SORT_MODE_DESC).is_none() {
+                            eprintln!("compile :: I add ASC since no mode defined...");
+                            sort_by_ = format!("{} ASC", sort_by);
+                            sort_by = sort_by_.as_str();
+                        }
+                        eprintln!("compile :: [2] sort_by: {}", sort_by);
+                        // let mine = sort_by.find(SORT_MODE_ASC);
                         let expr = &RE_SELECT_SORT_FIELDS;
                         let items = expr.captures_iter(sort_by);
                         let mut sort_items: Vec<SelectSortBy> = Vec::new();
@@ -1613,10 +1622,12 @@ impl<'gb> SearchCompiler<'gb> {
                             };
                             if column.is_some() {
                                 let column = column.unwrap().as_str();
+                                eprintln!("compile :: column: {}", column);
                                 sort_obj.column = column.to_string().trim().to_string();
                             }
                             if mode.is_some() {
                                 let mode = mode.unwrap().as_str();
+                                eprintln!("compile :: mode: {}", mode);
                                 match mode {
                                     SORT_MODE_ASC => {
                                         sort_obj.mode = SelectSortMode::Ascending;
@@ -1993,7 +2004,7 @@ impl<'gb> SearchIterator<'gb>{
         let item = item.clone();
         let item_data = item.data.clone();
         let column_type = column_type.as_str();
-        eprintln!("get_sort_value :: column_type: {}", column_type);
+        // eprintln!("get_sort_value :: column_type: {}", column_type);
         if item_data.is_some() {
             let item_data = item_data.unwrap();
             let values = item_data.get(&column_id);
@@ -2002,7 +2013,7 @@ impl<'gb> SearchIterator<'gb>{
                 let value = get_value_list(values);
                 if value.is_some() {
                     let value = value.unwrap();
-                    eprintln!("get_sort_value :: value: {}", &value);
+                    // eprintln!("get_sort_value :: value: {}", &value);
                     match column_type {
                         COLUMN_TYPE_DURATION => {
                             let number: i64 = FromStr::from_str(value.as_str()).unwrap();
@@ -2059,34 +2070,24 @@ impl<'gb> SearchIterator<'gb>{
         sorter_list: &Vec<SearchSorter>
     ) -> Result<Vec<SearchSorter>, Vec<PlanetError>> {
         let partition = partition.clone();
-        // let sort_column_type_map = sort_column_type_map.clone();
         let mut sorter_list = sorter_list.clone();
-        // eprintln!("add_to_sorter :: START sorter_list: {:#?}", &sorter_list);
-        // eprintln!("add_to_sorter :: sort_column_type_map: {:#?}", &sort_column_type_map);
-        // eprintln!("add_to_sorter :: column_type_map: {:#?}", &column_type_map);
         let item_id = item.id.clone().unwrap();
+        let mut sorter: SearchSorter = SearchSorter::defaults(&partition, &item_id);
         for (sorter_column_id, sorter_column_item) in sorter_map {
             let sorter_column_item = sorter_column_item.sorted_item.clone();
             let sort_value: SortValueMode;
             if sorter_column_item.clone() == String::from(COLUMN_ID) {
-                // eprintln!("add_to_sorter :: I have column_id...");
                 let sort_value_ = SortValueMode{
                     str: Some(sorter_column_id.clone()),
                     number: None
                 };
                 sort_value = sort_value_;
-                // eprintln!("add_to_sorter :: sort_value: {:#?}", &sort_value);
             } else {
-                // eprintln!("add_to_sorter :: sorter_column_id: {} sorter_column_item: {:?}", 
-                //     &sorter_column_id, sorter_column_item
-                // );
                 let column_type = column_type_map.get(sorter_column_id);
-                // eprintln!("add_to_sorter :: column_type: {:?}", &column_type);
                 if column_type.is_none() {
                     continue
                 }
                 let column_type = column_type.unwrap();
-                // eprintln!("add_to_sorter :: column_type: {}", column_type);
                 let result = self.get_sort_value(
                     item, 
                     sorter_column_id, 
@@ -2104,7 +2105,6 @@ impl<'gb> SearchIterator<'gb>{
                 sort_value = result.unwrap();
             }
             let sorter_column_item = sorter_column_item.as_str();
-            let mut sorter = SearchSorter::defaults(&partition, &item_id);
             let mut column_value = String::from("");
             let mut column_value_number: i64 = 0;
             if sort_value.str.is_some() {
@@ -2117,9 +2117,6 @@ impl<'gb> SearchIterator<'gb>{
             } else {
                 column_value_number = sort_value.number.unwrap();
             }
-            // eprintln!("add_to_sorter :: column_value: {} column_value_number: {}", 
-            //     &column_value, &column_value_number
-            // );
             match sorter_column_item {
                 "column_id" => {
                     sorter.column_id = Some(column_value);
@@ -2186,8 +2183,8 @@ impl<'gb> SearchIterator<'gb>{
                 },
                 __ => {}
             }
-            sorter_list.push(sorter);
         }
+        sorter_list.push(sorter);
         return Ok(sorter_list.clone())
     }
 
@@ -2235,6 +2232,7 @@ impl<'gb> SearchIterator<'gb>{
         sorter_map: &HashMap<String, SortedtBy>,
     ) -> Vec<SearchSorter> {
         let mut sorter_list = sorter_list.clone();
+        // eprintln!("sort :: sorter_list : {:#?}", &sorter_list);
         let only_id = sorter_map.len() == 1;
         // Case I only sort on ids
         if only_id {
@@ -2250,103 +2248,103 @@ impl<'gb> SearchIterator<'gb>{
                     let mut column_order: Ordering = Ordering::Greater;
                     match sorter_item {
                         "column_1_str" => {
-                            let column_a_1_str = a.column_1_str.clone().unwrap();
-                            let column_b_1_str = b.column_1_str.clone().unwrap();
+                            let column_a_1_str = a.column_1_str.clone().unwrap_or_default();
+                            let column_b_1_str = b.column_1_str.clone().unwrap_or_default();
                             column_order = self.compare_strings(&mode, &column_a_1_str, &column_b_1_str);
                         },
                         "column_1_number" => {
-                            let column_a_1_number = a.column_1_number.clone().unwrap();
-                            let column_b_1_number = b.column_1_number.clone().unwrap();
+                            let column_a_1_number = a.column_1_number.clone().unwrap_or_default();
+                            let column_b_1_number = b.column_1_number.clone().unwrap_or_default();
                             column_order = self.compare_numbers(&mode, &column_a_1_number, &column_b_1_number);
                         },
                         "column_2_str" => {
-                            let column_a_2_str = a.column_2_str.clone().unwrap();
-                            let column_b_2_str = b.column_2_str.clone().unwrap();
+                            let column_a_2_str = a.column_2_str.clone().unwrap_or_default();
+                            let column_b_2_str = b.column_2_str.clone().unwrap_or_default();
                             column_order = self.compare_strings(&mode, &column_a_2_str, &column_b_2_str);
                         },
                         "column_2_number" => {
-                            let column_a_2_number = a.column_2_number.clone().unwrap();
-                            let column_b_2_number = b.column_2_number.clone().unwrap();
+                            let column_a_2_number = a.column_2_number.clone().unwrap_or_default();
+                            let column_b_2_number = b.column_2_number.clone().unwrap_or_default();
                             column_order = self.compare_numbers(&mode, &column_a_2_number, &column_b_2_number);
                         },
                         "column_3_str" => {
-                            let column_a_3_str = a.column_3_str.clone().unwrap();
-                            let column_b_3_str = b.column_3_str.clone().unwrap();
+                            let column_a_3_str = a.column_3_str.clone().unwrap_or_default();
+                            let column_b_3_str = b.column_3_str.clone().unwrap_or_default();
                             column_order = self.compare_strings(&mode, &column_a_3_str, &column_b_3_str);
                         },
                         "column_3_number" => {
-                            let column_a_3_number = a.column_3_number.clone().unwrap();
-                            let column_b_3_number = b.column_3_number.clone().unwrap();
+                            let column_a_3_number = a.column_3_number.clone().unwrap_or_default();
+                            let column_b_3_number = b.column_3_number.clone().unwrap_or_default();
                             column_order = self.compare_numbers(&mode, &column_a_3_number, &column_b_3_number);
                         },
                         "column_4_str" => {
-                            let column_a_4_str = a.column_4_str.clone().unwrap();
-                            let column_b_4_str = b.column_4_str.clone().unwrap();
+                            let column_a_4_str = a.column_4_str.clone().unwrap_or_default();
+                            let column_b_4_str = b.column_4_str.clone().unwrap_or_default();
                             column_order = self.compare_strings(&mode, &column_a_4_str, &column_b_4_str);
                         },
                         "column_4_number" => {
-                            let column_a_4_number = a.column_4_number.clone().unwrap();
-                            let column_b_4_number = b.column_4_number.clone().unwrap();
+                            let column_a_4_number = a.column_4_number.clone().unwrap_or_default();
+                            let column_b_4_number = b.column_4_number.clone().unwrap_or_default();
                             column_order = self.compare_numbers(&mode, &column_a_4_number, &column_b_4_number);
                         },
                         "column_5_str" => {
-                            let column_a_5_str = a.column_5_str.clone().unwrap();
-                            let column_b_5_str = b.column_5_str.clone().unwrap();
+                            let column_a_5_str = a.column_5_str.clone().unwrap_or_default();
+                            let column_b_5_str = b.column_5_str.clone().unwrap_or_default();
                             column_order = self.compare_strings(&mode, &column_a_5_str, &column_b_5_str);
                         },
                         "column_5_number" => {
-                            let column_a_5_number = a.column_5_number.clone().unwrap();
-                            let column_b_5_number = b.column_5_number.clone().unwrap();
+                            let column_a_5_number = a.column_5_number.clone().unwrap_or_default();
+                            let column_b_5_number = b.column_5_number.clone().unwrap_or_default();
                             column_order = self.compare_numbers(&mode, &column_a_5_number, &column_b_5_number);
                         },
                         "column_6_str" => {
-                            let column_a_6_str = a.column_6_str.clone().unwrap();
-                            let column_b_6_str = b.column_6_str.clone().unwrap();
+                            let column_a_6_str = a.column_6_str.clone().unwrap_or_default();
+                            let column_b_6_str = b.column_6_str.clone().unwrap_or_default();
                             column_order = self.compare_strings(&mode, &column_a_6_str, &column_b_6_str);
                         },
                         "column_6_number" => {
-                            let column_a_6_number = a.column_6_number.clone().unwrap();
-                            let column_b_6_number = b.column_6_number.clone().unwrap();
+                            let column_a_6_number = a.column_6_number.clone().unwrap_or_default();
+                            let column_b_6_number = b.column_6_number.clone().unwrap_or_default();
                             column_order = self.compare_numbers(&mode, &column_a_6_number, &column_b_6_number);
                         },
                         "column_7_str" => {
-                            let column_a_7_str = a.column_7_str.clone().unwrap();
-                            let column_b_7_str = b.column_7_str.clone().unwrap();
+                            let column_a_7_str = a.column_7_str.clone().unwrap_or_default();
+                            let column_b_7_str = b.column_7_str.clone().unwrap_or_default();
                             column_order = self.compare_strings(&mode, &column_a_7_str, &column_b_7_str);
                         },
                         "column_7_number" => {
-                            let column_a_7_number = a.column_7_number.clone().unwrap();
-                            let column_b_7_number = b.column_7_number.clone().unwrap();
+                            let column_a_7_number = a.column_7_number.clone().unwrap_or_default();
+                            let column_b_7_number = b.column_7_number.clone().unwrap_or_default();
                             column_order = self.compare_numbers(&mode, &column_a_7_number, &column_b_7_number);
                         },
                         "column_8_str" => {
-                            let column_a_8_str = a.column_8_str.clone().unwrap();
-                            let column_b_8_str = b.column_8_str.clone().unwrap();
+                            let column_a_8_str = a.column_8_str.clone().unwrap_or_default();
+                            let column_b_8_str = b.column_8_str.clone().unwrap_or_default();
                             column_order = self.compare_strings(&mode, &column_a_8_str, &column_b_8_str);
                         },
                         "column_8_number" => {
-                            let column_a_8_number = a.column_8_number.clone().unwrap();
-                            let column_b_8_number = b.column_8_number.clone().unwrap();
+                            let column_a_8_number = a.column_8_number.clone().unwrap_or_default();
+                            let column_b_8_number = b.column_8_number.clone().unwrap_or_default();
                             column_order = self.compare_numbers(&mode, &column_a_8_number, &column_b_8_number);
                         },
                         "column_9_str" => {
-                            let column_a_9_str = a.column_9_str.clone().unwrap();
-                            let column_b_9_str = b.column_9_str.clone().unwrap();
+                            let column_a_9_str = a.column_9_str.clone().unwrap_or_default();
+                            let column_b_9_str = b.column_9_str.clone().unwrap_or_default();
                             column_order = self.compare_strings(&mode, &column_a_9_str, &column_b_9_str);
                         },
                         "column_9_number" => {
-                            let column_a_9_number = a.column_9_number.clone().unwrap();
-                            let column_b_9_number = b.column_9_number.clone().unwrap();
+                            let column_a_9_number = a.column_9_number.clone().unwrap_or_default();
+                            let column_b_9_number = b.column_9_number.clone().unwrap_or_default();
                             column_order = self.compare_numbers(&mode, &column_a_9_number, &column_b_9_number);
                         },
                         "column_10_str" => {
-                            let column_a_10_str = a.column_10_str.clone().unwrap();
-                            let column_b_10_str = b.column_10_str.clone().unwrap();
+                            let column_a_10_str = a.column_10_str.clone().unwrap_or_default();
+                            let column_b_10_str = b.column_10_str.clone().unwrap_or_default();
                             column_order = self.compare_strings(&mode, &column_a_10_str, &column_b_10_str);
                         },
                         "column_10_number" => {
-                            let column_a_10_number = a.column_10_number.clone().unwrap();
-                            let column_b_10_number = b.column_10_number.clone().unwrap();
+                            let column_a_10_number = a.column_10_number.clone().unwrap_or_default();
+                            let column_b_10_number = b.column_10_number.clone().unwrap_or_default();
                             column_order = self.compare_numbers(&mode, &column_a_10_number, &column_b_10_number);
                         },
                         __ => {
