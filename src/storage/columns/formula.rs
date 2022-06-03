@@ -37,9 +37,9 @@ impl FormulaColumn {
         let formula = config.formula;
         if formula.is_some() {
             let formula = formula.unwrap();
+            eprintln!("FormulaColumn.create_config :: formula: {}", &formula);
             let formula_format = config.formula_format.unwrap();
-            // let field_type_map = field_type_map.clone();
-            // let field_name_map = field_name_map.clone();
+            eprintln!("FormulaColumn.create_config :: formula_format: {}", &formula_format);
             let db_folder = db_folder.clone();
             let table_name = table_name.clone();
             let formula_compiled = Formula::defaults(

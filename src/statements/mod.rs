@@ -18,9 +18,9 @@ use crate::statements::folder::schema::resolve_schema_statement;
 use crate::statements::folder::data::resolve_data_statement;
 
 lazy_static! {
-    pub static ref RE_WITH_OPTIONS: Regex = Regex::new(r#"(?P<Name>\w+)=(?P<Value>(\d+)|(true|false|True|False)|([a-zA-Z0-9{}|]+)|([\s\S]+)|("[\w\s]+)")"#).unwrap();
-    pub static ref RE_OPTION_LIST_ITEMS: Regex = Regex::new(r#"(?P<Item>((\d+)|([a-zA-Z0-9]+)|(true|false|True|False)|(---\\n[\S\s]+)|(null)))"#).unwrap();
-    pub static ref RE_DATA_LONG_TEXT: Regex = Regex::new(r#"(?P<Text>"""[\s\S\n\t][^"""]+""")"#).unwrap();
+    pub static ref RE_WITH_OPTIONS: Regex = Regex::new(r#"(?P<Name>\w+)=(?P<Value>(\d+)|(true|false|True|False)|([a-zA-Z0-9{}|$_]+)|("[\w\s]+)")"#).unwrap();
+    pub static ref RE_OPTION_LIST_ITEMS: Regex = Regex::new(r#"(?P<Item>((\d+)|([a-zA-Z0-9$_]+)|(true|false|True|False)|(---\\n[\S\s]+)|(null)))"#).unwrap();
+    pub static ref RE_DATA_LONG_TEXT: Regex = Regex::new(r#"(?P<Text>"{3}(.*?)"{3})"#).unwrap();
     pub static ref RE_STMT_VARIABLES: Regex = Regex::new(r#"(?P<Var>\{[\w\s.]+\})"#).unwrap();
 }
 

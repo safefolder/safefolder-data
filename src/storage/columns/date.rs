@@ -53,6 +53,8 @@ impl StorageColumn for DateColumn {
                     field_config_map.insert(DATE_FORMAT.to_string(), DATE_FORMAT_ISO.to_string());
                 },
             }
+        } else {
+            field_config_map.insert(DATE_FORMAT.to_string(), DATE_FORMAT_FRIENDLY.to_string());
         }
         if time_format.is_some() {
             let time_format = time_format.unwrap();
@@ -67,6 +69,8 @@ impl StorageColumn for DateColumn {
                 );
             }
             field_config_map.insert(TIME_FORMAT.to_string(), time_format_str.to_string());
+        } else {
+            field_config_map.insert(TIME_FORMAT.to_string(), "24".to_string());
         }
         return Ok(field_config_map)
     }

@@ -46,16 +46,25 @@ impl StorageColumn for SmallTextColumn {
         &mut self, 
         column_config_map: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
-        let column_config_map = column_config_map.clone();
-        // No special attributes so far for small text field
+        let mut column_config_map = column_config_map.clone();
+        let config = self.config.clone();
+        let max_length = config.max_length;
+        if max_length.is_some() {
+            let max_length = max_length.unwrap();
+            column_config_map.insert(String::from(MAX_LENGTH), max_length);
+        }
         return Ok(column_config_map)
     }
     fn get_config(
         &mut self, 
-        _: &BTreeMap<String, String>,
+        column_config_map: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {
-        let config = self.config.clone();
-        // No special attributes so far for small text field
+        let mut config = self.config.clone();
+        let max_length = column_config_map.get(MAX_LENGTH);
+        if max_length.is_some() {
+            let max_length = max_length.unwrap();
+            config.max_length = Some(max_length.clone());
+        }
         return Ok(config)
     }
     fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, Vec<PlanetError>> {

@@ -56,8 +56,8 @@ use crate::storage::columns::{
 };
 
 lazy_static! {
-    pub static ref RE_CREATE_FOLDER_MAIN: Regex = Regex::new(r#"CREATE[\s]+FOLDER[\s]+"*(?P<FolderName>[\w\s]+)"*\s+\([\n\t\s]*(?P<Config>.[^)]+),*\);"#).unwrap();
-    pub static ref RE_CREATE_FOLDER_CONFIG: Regex = Regex::new(r#"([\s]*LANGUAGE (?P<Language>spanish|english|french|german|italian|portuguese|norwegian|swedish|danish),*)|([\s]*NAME COLUMN (?P<NameConfig>(SmallText|LongText|Number|Currency|Percentage|GenerateNumber|Phone|Email|Url|Rating)),*)|([\s]*("(?P<Column>[\w\s]+)")[\s]+(?P<ColumnType>SmallText|LongText|Checkbox|Number|Select|Currency|Percentage|GenerateNumber|Phone|Email|Url|Rating|Object|File|Date|Formula|Duration|CreatedTime|LastModifiedTime|CreatedBy|LastModifiedBy|Link|Reference|Language|GenerateId|Stats))([\s]*[WITH]*[\s]*(?P<Options>[\w\s"\$=\{\}\|]*)),|([\s]*SUB FOLDER (?P<SubFolderName>[\w\s]+)),|([\s]*SUB FOLDER (?P<SubFolderNameAlt>[\w\s]+) WITH (?P<SubFolderOptions>[\w\s"\$=\{\}\|]*)),|([\s]*SEARCH RELEVANCE WITH (?P<SearchRelevanceOptions>[\w\s"\$=\{\}\|]*)),"#).unwrap();
+    pub static ref RE_CREATE_FOLDER_MAIN: Regex = Regex::new(r#"CREATE[\s]+FOLDER[\s]+"*(?P<FolderName>[\w\s]+)"*\s+\([\n\t\s]*(?P<Config>[\s\S]+),*\);"#).unwrap();
+    pub static ref RE_CREATE_FOLDER_CONFIG: Regex = Regex::new(r#"([\s]*LANGUAGE (?P<Language>spanish|english|french|german|italian|portuguese|norwegian|swedish|danish),*)|([\s]*NAME COLUMN (?P<NameConfig>(SmallText|LongText|Number|Currency|Percentage|GenerateNumber|Phone|Email|Url|Rating)),*)|([\s]*("(?P<Column>[\w\s]+)")[\s]+(?P<ColumnType>SmallText|LongText|Checkbox|Number|Select|Currency|Percentage|GenerateNumber|Phone|Email|Url|Rating|Object|File|Date|Formula|Duration|CreatedTime|LastModifiedTime|CreatedBy|LastModifiedBy|Link|Reference|Language|GenerateId|Stats))([\s]*[WITH]*[\s]*(?P<Options>[\w\s"\$=\{\}\|\(\)]*)),|([\s]*SUB FOLDER (?P<SubFolderName>[\w\s]+)),|([\s]*SUB FOLDER (?P<SubFolderNameAlt>[\w\s]+) WITH (?P<SubFolderOptions>[\w\s"\$=\{\}\|]*)),|([\s]*SEARCH RELEVANCE WITH (?P<SearchRelevanceOptions>[\w\s"\$=\{\}\|]*)),"#).unwrap();
     pub static ref RE_LIST_FOLDERS: Regex = Regex::new(r#"LIST[\s]+FOLDERS;"#).unwrap();
     pub static ref RE_DESCRIBE_FOLDER: Regex = Regex::new(r#"DESCRIBE[\s]+FOLDER[\s]+(?P<FolderName>[\w\s]+);"#).unwrap();
     pub static ref RE_DROP_FOLDER: Regex = Regex::new(r#"DROP[\s]+FOLDER[\s]+(?P<FolderName>[\w\s]+);"#).unwrap();
@@ -103,11 +103,62 @@ pub const WITH_CONTENT_TYPES: &str = "ContentTypes";
 pub const WITH_MODE: &str = "Mode";
 
 pub const ALLOWED_WITH_OPTIONS: [&str; 24] = [
-    WITH_PARENT, WITH_REQUIRED, WITH_OPTIONS, WITH_NUMBER_DECIMALS, WITH_CURRENCY_SYMBOL, 
-    WITH_MAXIMUM, WITH_MINIMUM, WITH_SET_MINIMUM, WITH_SET_MAXIMUM, WITH_IS_SET, WITH_MANY, 
-    WITH_DEFAULT, WITH_FORMULA, WITH_FORMULA_FORMAT, WITH_DATE_FORMAT, WITH_TIME_FORMAT, 
-    WITH_LINKED_FOLDER, WITH_DELETE_ON_LINK_DROP, WITH_RELATED_COLUMN, WITH_SEQUENCE, 
-    WITH_MAX_LENGTH, WITH_STATS_FUNCTION, WITH_CONTENT_TYPES, WITH_MODE
+    WITH_PARENT, 
+    WITH_REQUIRED, 
+    WITH_OPTIONS, 
+    WITH_NUMBER_DECIMALS, 
+    WITH_CURRENCY_SYMBOL, 
+    WITH_MAXIMUM, 
+    WITH_MINIMUM, 
+    WITH_SET_MINIMUM, 
+    WITH_SET_MAXIMUM, 
+    WITH_IS_SET, 
+    WITH_MANY, 
+    WITH_DEFAULT, 
+    WITH_FORMULA, 
+    WITH_FORMULA_FORMAT, 
+    WITH_DATE_FORMAT, 
+    WITH_TIME_FORMAT, 
+    WITH_LINKED_FOLDER, 
+    WITH_DELETE_ON_LINK_DROP, 
+    WITH_RELATED_COLUMN, 
+    WITH_SEQUENCE, 
+    WITH_MAX_LENGTH, 
+    WITH_STATS_FUNCTION, 
+    WITH_CONTENT_TYPES, 
+    WITH_MODE
+];
+
+pub const ALLOWED_COLUMN_TYPES: [&str; 29] = [
+    COLUMN_TYPE_CHECKBOX, 
+    COLUMN_TYPE_CREATED_BY, 
+    COLUMN_TYPE_CREATED_TIME, 
+    COLUMN_TYPE_CURRENCY, 
+    COLUMN_TYPE_DATE, 
+    COLUMN_TYPE_DURATION, 
+    COLUMN_TYPE_EMAIL, 
+    COLUMN_TYPE_FILE, 
+    COLUMN_TYPE_FORMULA, 
+    COLUMN_TYPE_GENERATE_ID, 
+    COLUMN_TYPE_GENERATE_NUMBER, 
+    COLUMN_TYPE_LANGUAGE, 
+    COLUMN_TYPE_LAST_MODIFIED_BY, 
+    COLUMN_TYPE_LAST_MODIFIED_TIME, 
+    COLUMN_TYPE_LINK, 
+    COLUMN_TYPE_LONG_TEXT, 
+    COLUMN_TYPE_NUMBER, 
+    COLUMN_TYPE_OBJECT, 
+    COLUMN_TYPE_PERCENTAGE, 
+    COLUMN_TYPE_PHONE, 
+    COLUMN_TYPE_RATING, 
+    COLUMN_TYPE_REFERENCE, 
+    COLUMN_TYPE_SELECT, 
+    COLUMN_TYPE_SET, 
+    COLUMN_TYPE_SMALL_TEXT, 
+    COLUMN_TYPE_STATEMENT, 
+    COLUMN_TYPE_STATS, 
+    COLUMN_TYPE_TEXT, 
+    COLUMN_TYPE_URL
 ];
 
 
@@ -801,16 +852,36 @@ impl CreateFolderCompiledStmt {
 
 }
 
-pub fn process_column(column_str: &str, column_type: &str, item: &Captures) -> Result<ColumnConfig, Vec<PlanetError>> {
+pub fn process_column(
+    column_str: &str, 
+    column_type: &str, 
+    item: &Captures,
+    long_text: Option<DataValueLongText>
+) -> Result<ColumnConfig, Vec<PlanetError>> {
     let mut column = ColumnConfig::defaults(None);
     let name = column_str.trim().to_string();
-    column.column_type = Some(column_type.to_string());
-    column.name = Some(name);
-    column.id = generate_id();    
-    let options = item.name("Options");
     let mut errors: Vec<PlanetError> = Vec::new();
+    let column_type = column_type.to_string();
+    // eprintln!("process_column :: column_type: {}", &column_type);
+    let has_column_type = ALLOWED_COLUMN_TYPES.contains(&column_type.as_str());
+    if !has_column_type {
+        errors.push(
+            PlanetError::new(
+                500, 
+                Some(
+                    tr!("Statement compile error: Column type \"{}\" not allowed.", &column_type)
+                ),
+            )
+        );
+        return Err(errors)
+    }
+    column.column_type = Some(column_type.clone());
+    column.name = Some(name);
+    column.id = generate_id();
+    let options = item.name("Options");    
     if options.is_some() {
         let options = options.unwrap().as_str();
+        // eprintln!("process_column :: options: {}", options);
         let result = WithOptions::defaults(
             &options.to_string()
         );
@@ -819,6 +890,7 @@ pub fn process_column(column_str: &str, column_type: &str, item: &Captures) -> R
             errors.push(error);
         } else {
             let with_options_obj = result.unwrap();
+            // eprintln!("process_column :: options obj: {:#?}", with_options_obj);
             let with_options = &with_options_obj.options;
             // Validate I have allowed options
             let mut is_valid = true;
@@ -923,7 +995,24 @@ pub fn process_column(column_str: &str, column_type: &str, item: &Captures) -> R
                     let formula = &with_options_obj.get_single_value(
                         WITH_FORMULA
                     );
-                    column.formula = Some(formula.clone());
+                    // eprintln!("process_column :: formula: {}", formula);
+                    if long_text.is_some() {
+                        let long_text = long_text.unwrap();
+                        let has_placeholder = DataValueLongText::has_placeholder(formula);
+                        if has_placeholder {
+                            let map = long_text.map;
+                            let formula_source = map.get(formula);
+                            if formula_source.is_some() {
+                                let formula_source = formula_source.unwrap();
+                                // eprintln!("process_column :: formula_source: {}", formula_source);
+                                column.formula = Some(formula_source.clone());
+                            }                            
+                        } else {
+                            column.formula = Some(formula.clone());
+                        }
+                    } else {
+                        column.formula = Some(formula.clone());
+                    }
                 }
                 if *&with_options.contains_key(WITH_FORMULA_FORMAT) {
                     let formula_format = &with_options_obj.get_single_value(
@@ -1024,6 +1113,25 @@ pub fn process_column(column_str: &str, column_type: &str, item: &Captures) -> R
             }
         }
     }
+    // Validations for options for column types that are required
+    let column_type = column_type.as_str();
+    if column_type == COLUMN_TYPE_FORMULA {
+        let has_formula = column.formula.is_some();
+        let has_formula_format = column.formula_format.is_some();
+        if !has_formula {
+            errors.push(
+                PlanetError::new(
+                    500, 
+                    Some(
+                        tr!("Statement compile error: Formula column requires formula string with \"Formula\" option.")
+                    ),
+                )
+            );
+        }
+        if !has_formula_format {
+            column.formula_format = Some(FORMULA_FORMAT_TEXT.to_string());
+        }
+    }
     if errors.len() > 0 {
         return Err(errors)
     }
@@ -1057,13 +1165,40 @@ impl<'gb> StatementCompiler<'gb, CreateFolderCompiledStmt> for CreateFolderState
             return Err(errors)
         }
         let captures = expr.captures(&statement_text);
-        if captures.is_some() {
-            let captures = captures.unwrap();
-            let folder_name = captures.name("FolderName").unwrap().as_str();
-            compiled_statement.folder_name = folder_name.to_string();
+        let config: &str;
+        if captures.is_none() {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Create folder syntax not valid.")
+                ),
+            );
+            errors.push(error);
+            return Err(errors)
         }
+        let captures = captures.unwrap();
+        let folder_name = captures.name("FolderName").unwrap().as_str();
+        compiled_statement.folder_name = folder_name.to_string();
+        config = captures.name("Config").unwrap().as_str();
+        // eprintln!("CreateFolderStatement.compile :: config: {}", config);
+        let long_text = DataValueLongText::defaults(
+            &config.to_string()
+        );
+        if long_text.is_err() {
+            let error = PlanetError::new(
+                500, 
+                Some(
+                    tr!("Create folder syntax not valid.")
+                ),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+        let long_text = long_text.unwrap();
+        let statement_text_processed = long_text.clone().parsed_text;
+        // eprintln!("CreateFolderStatement.compile :: statement_text_processed: {}", &statement_text_processed);
         let expr = &RE_CREATE_FOLDER_CONFIG;
-        let items = expr.captures_iter(&statement_text.as_str());
+        let items = expr.captures_iter(&statement_text_processed.as_str());
         let mut sub_folders: Vec<SubFolderConfig> = Vec::new();
         let mut columns: Vec<ColumnConfig> = Vec::new();
         for item in items {
@@ -1163,10 +1298,18 @@ impl<'gb> StatementCompiler<'gb, CreateFolderCompiledStmt> for CreateFolderState
                 }
             } else if column.is_some() && column_type.is_some() {
                 // Column
-                // Here I need compilation of options the same as in subfolders, being common software
                 let column_str = column.unwrap().as_str();
                 let column_type = column_type.unwrap().as_str();
-                let result = process_column(column_str, column_type, &item);
+                let result = process_column(
+                    column_str, 
+                    column_type, 
+                    &item,
+                    Some(long_text.clone())
+                );
+                if result.is_err() {
+                    let errors = result.unwrap_err();
+                    return Err(errors)
+                }
                 if result.is_ok() {
                     let column = result.unwrap();
                     columns.push(column);
@@ -2043,7 +2186,7 @@ impl<'gb> StatementCompiler<'gb, ColumnCompiledStmt> for AddColumnStatement {
             let column_type = item.name("ColumnType");
             let column_str = column.unwrap().as_str();
             let column_type = column_type.unwrap().as_str();
-            let result = process_column(column_str, column_type, &item);
+            let result = process_column(column_str, column_type, &item, None);
             if result.is_ok() {
                 let column = result.unwrap();
                 let mut compiled = ColumnCompiledStmt::defaults(
@@ -2299,7 +2442,7 @@ impl<'gb> StatementCompiler<'gb, ColumnCompiledStmt> for ModifyColumnStatement {
                 column_str = column.unwrap().as_str();
                 column_type_str = column_type.unwrap().as_str();
             }
-            let result = process_column(column_str, column_type_str, &item);
+            let result = process_column(column_str, column_type_str, &item, None);
             if result.is_ok() {
                 let column = result.unwrap();
                 let mut compiled = ColumnCompiledStmt::defaults(

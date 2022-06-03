@@ -1821,6 +1821,7 @@ impl<'gb> SearchCompiler<'gb> {
                     "AND({}, {})", &search_func, where_source
                 );
             }
+            eprintln!("SelectFromFolderStatement.validate :: where_source: {}", &where_source);
             let formula_query = Formula::defaults(
                 &where_source, 
                 &String::from("bool"), 
@@ -1857,8 +1858,7 @@ impl<'gb> SearchCompiler<'gb> {
             let errors = statement.unwrap_err();
             return Err(errors)
         }
-        let statement = statement.unwrap();
-        eprintln!("SelectFromFolderStatement.run :: [compiled] select: {:#?}", &statement);
+        let statement = statement.unwrap();        
         // 2 - Compile Where formula and validate query for existing columns.
         let validation = self.validate(
             statement,
@@ -1870,6 +1870,7 @@ impl<'gb> SearchCompiler<'gb> {
             return Err(errors)
         }
         let statement = validation.unwrap();
+        eprintln!("SearchCompiler.do_compile :: [compiled] select: {:#?}", &statement);
         return Ok(statement)
     }
 

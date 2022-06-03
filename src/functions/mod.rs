@@ -284,7 +284,10 @@ impl Formula {
             let db_table = db_folder.unwrap();
             let table_name = folder_name.unwrap();
             let field_type_map_ = TreeFolder::get_column_type_map(&folder)?;
-            let field_name_map_ = TreeFolder::get_column_name_map(&db_table, &table_name)?;
+            let field_name_map_ = TreeFolder::get_column_name_map(
+                &db_table, 
+                &table_name
+            )?;
             for (column_name, column_type) in field_type_map_.clone() {
                 let mut column_config = ColumnConfig::defaults(None);
                 column_config.column_type = Some(column_type);
@@ -1448,14 +1451,14 @@ pub fn get_assignment_reference(
     let mut reference_name: String = String::from("");
     let mut items_new: Vec<String> = Vec::new();
     let mut item_replaced: String;
+    eprintln!("get_assignment_reference :: items: {:#?}", items);
+    eprintln!("get_assignment_reference :: properties_map: {:#?}", &properties_map);
     for (count, item) in items.iter().enumerate() {
         let mut item = item.clone();
         // |  {Status}  |
-        // eprintln!("compile_formula_query :: item: *{}*", item);
-        // let mut item_ = *item;
         let item_ = item.trim();
         item = item_.to_string();
-        // eprintln!("compile_formula_query :: item: *{}*", item);
+        // eprintln!("get_assignment_reference :: item: *{}*", item);
         if count == 0 {
             // {Column A} => $column_id
             // let mut item_string = item_.to_string();
