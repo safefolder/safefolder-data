@@ -338,12 +338,12 @@ impl ConfigStorageColumn for ColumnConfig {
     fn get_column_config_map(
         planet_context: &PlanetContext,
         context: &Context,
-        table: &DbData
+        folder: &DbData
     ) -> Result<BTreeMap<String, ColumnConfig>, PlanetError> {
         let columns = ColumnConfig::get_config(
             planet_context,
             context,
-            table
+            folder
         );
         if columns.is_ok() {
             let columns = columns.unwrap().clone();

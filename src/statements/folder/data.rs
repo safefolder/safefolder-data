@@ -41,7 +41,7 @@ use crate::storage::columns::structure::*;
 use crate::storage::columns::processing::*;
 use crate::storage::columns::media::*;
 use crate::statements::constants::{COLUMN_ID};
-use crate::functions::{RE_FORMULA_QUERY, RE_FORMULA_ASSIGN, execute_formula};
+use crate::functions::{RE_FORMULA_QUERY, execute_formula, RE_FORMULA_ASSIGN};
 
 lazy_static! {
     pub static ref RE_INSERT_INTO_FOLDER_MAIN: Regex = Regex::new(r#"INSERT INTO FOLDER (?P<FolderName>[\w\s]+)[\s\t\n]*(?P<Items>\([\s\S]+\));"#).unwrap();
@@ -1805,13 +1805,15 @@ impl<'gb> SearchCompiler<'gb> {
             let mut where_source = where_source.unwrap();
             let expr = &RE_FORMULA_ASSIGN;
             let is_assign_function = expr.is_match(&where_source);
-            eprintln!("SelectFromFolderStatement.validate :: is_assign_function: {}", &is_assign_function);
+            if is_assign_function {
+                where_source = format!("AND({})", where_source);
+            }
+            
             let field_config_map = ColumnConfig::get_column_config_map(
                 planet_context,
                 context,
                 &folder
             ).unwrap();
-            let field_config_map_wrap = Some(field_config_map.clone());
             // Modify formula in case we have general SEARCH in the statement
             let stmt_search = compiled_statement.search.clone();
             if stmt_search.is_some() {
@@ -1821,23 +1823,26 @@ impl<'gb> SearchCompiler<'gb> {
                     "AND({}, {})", &search_func, where_source
                 );
             }
-            eprintln!("SelectFromFolderStatement.validate :: where_source: {}", &where_source);
+            let mut properties_map: HashMap<String, ColumnConfig> = HashMap::new();
+            for (k, v) in field_config_map.clone() {
+                properties_map.insert(k, v);
+            }
             let formula_query = Formula::defaults(
                 &where_source, 
                 &String::from("bool"), 
-                Some(folder), 
                 None, 
+                Some(properties_map), 
                 Some(db_folder), 
                 Some(folder_name.clone()), 
-                is_assign_function,
-                field_config_map_wrap.clone()
+                false,
+                None
             );
             if formula_query.is_err() {
                 let error = formula_query.unwrap_err();
                 errors.push(error);
             } else {
                 let formula_query = formula_query.unwrap();
-                compiled_statement.where_compiled = Some(formula_query);
+                compiled_statement.where_compiled = Some(formula_query.clone());
             }
         }
         if errors.len() > 0 {
@@ -1870,7 +1875,6 @@ impl<'gb> SearchCompiler<'gb> {
             return Err(errors)
         }
         let statement = validation.unwrap();
-        eprintln!("SearchCompiler.do_compile :: [compiled] select: {:#?}", &statement);
         return Ok(statement)
     }
 

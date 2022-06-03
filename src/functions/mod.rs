@@ -281,12 +281,12 @@ impl Formula {
         let mut properties_map_: HashMap<String, ColumnConfig> = HashMap::new();
         if folder.is_some() {
             let folder = folder.unwrap();
-            let db_table = db_folder.unwrap();
-            let table_name = folder_name.unwrap();
+            let db_folder = db_folder.unwrap();
+            let folder_name = folder_name.unwrap();
             let field_type_map_ = TreeFolder::get_column_type_map(&folder)?;
             let field_name_map_ = TreeFolder::get_column_name_map(
-                &db_table, 
-                &table_name
+                &db_folder, 
+                &folder_name
             )?;
             for (column_name, column_type) in field_type_map_.clone() {
                 let mut column_config = ColumnConfig::defaults(None);

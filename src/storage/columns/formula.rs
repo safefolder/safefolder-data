@@ -29,7 +29,7 @@ impl FormulaColumn {
         field_config_map: &BTreeMap<String, String>,
         properties_map: &HashMap<String, ColumnConfig>,
         db_folder: &TreeFolder,
-        table_name: &String,
+        folder_name: &String,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
         let mut field_config_map = field_config_map.clone();
         let config = self.config.clone();
@@ -40,15 +40,16 @@ impl FormulaColumn {
             eprintln!("FormulaColumn.create_config :: formula: {}", &formula);
             let formula_format = config.formula_format.unwrap();
             eprintln!("FormulaColumn.create_config :: formula_format: {}", &formula_format);
+            eprintln!("FormulaColumn.create_config :: properties_map: {:#?}", &properties_map);
             let db_folder = db_folder.clone();
-            let table_name = table_name.clone();
+            let folder_name = folder_name.clone();
             let formula_compiled = Formula::defaults(
                 &formula,
                 &formula_format,
                 None,
                 Some(properties_map),
                 Some(db_folder),
-                Some(table_name),
+                Some(folder_name),
                 false,
                 None
             )?;
