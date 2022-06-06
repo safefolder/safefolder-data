@@ -6,6 +6,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::time::Instant;
 use std::cmp::Ordering;
 
+use rust_decimal::prelude::ToPrimitive;
 use tr::tr;
 use regex::Regex;
 use lazy_static::lazy_static;
@@ -1713,7 +1714,8 @@ impl<'gb> SearchCompiler<'gb> {
         &self,
         mut compiled_statement: SelectFromFolderCompiledStmt,
         db_folder: Option<TreeFolder>,
-        folder: Option<DbData>
+        folder: Option<DbData>,
+        column_config_map: BTreeMap<String, ColumnConfig>
     ) -> Result<SelectFromFolderCompiledStmt, Vec<PlanetError>> {
         let env = self.env.clone();
         let space_database = self.space_database.clone();
@@ -1731,7 +1733,6 @@ impl<'gb> SearchCompiler<'gb> {
             folder_name = folder.name.clone().unwrap();
         } else {
             // - Get folder and other data
-            let folder_name = compiled_statement.folder_name.clone();
             let home_dir = planet_context.home_path.clone();
             let account_id = context.account_id.clone().unwrap_or_default();
             let space_id = context.space_id;
@@ -1744,23 +1745,6 @@ impl<'gb> SearchCompiler<'gb> {
                 Some(space_id),
                 site_id.clone(),
             ).unwrap();
-            let folder_ = db_folder.get_by_name(&folder_name.clone());
-            if folder_.is_err() {
-                let error = folder_.unwrap_err();
-                errors.push(error);
-                return Err(errors)
-            }
-            let folder_ = folder_.unwrap();
-            if *&folder_.is_none() {
-                errors.push(
-                    PlanetError::new(
-                        500, 
-                        Some(tr!("Could not find folder {}", &folder_name.clone())),
-                    )
-                );
-                return Err(errors)
-            }
-            folder = folder_.unwrap();
         }
         
         // - Validate columns: columns, group_by, sort
@@ -1808,12 +1792,6 @@ impl<'gb> SearchCompiler<'gb> {
             if is_assign_function {
                 where_source = format!("AND({})", where_source);
             }
-            
-            let field_config_map = ColumnConfig::get_column_config_map(
-                planet_context,
-                context,
-                &folder
-            ).unwrap();
             // Modify formula in case we have general SEARCH in the statement
             let stmt_search = compiled_statement.search.clone();
             if stmt_search.is_some() {
@@ -1824,7 +1802,7 @@ impl<'gb> SearchCompiler<'gb> {
                 );
             }
             let mut properties_map: HashMap<String, ColumnConfig> = HashMap::new();
-            for (k, v) in field_config_map.clone() {
+            for (k, v) in column_config_map.clone() {
                 properties_map.insert(k, v);
             }
             let formula_query = Formula::defaults(
@@ -1854,7 +1832,8 @@ impl<'gb> SearchCompiler<'gb> {
     pub fn do_compile(
         &self,
         db_folder: Option<TreeFolder>,
-        folder: Option<DbData>
+        folder: Option<DbData>,
+        column_config_map: BTreeMap<String, ColumnConfig>
     ) -> Result<SelectFromFolderCompiledStmt, Vec<PlanetError>> {
         // let mut errors: Vec<PlanetError> = Vec::new();
         // 1 - Compile SELECT statement into SelectFromFolderCompiledStmt
@@ -1868,7 +1847,8 @@ impl<'gb> SearchCompiler<'gb> {
         let validation = self.validate(
             statement,
             db_folder,
-            folder
+            folder,
+            column_config_map
         );
         if validation.is_err() {
             let errors = validation.unwrap_err();
@@ -2818,11 +2798,15 @@ impl<'gb> SearchOutputData {
         &self,
         env: &'gb Environment<'gb>,
         space_database: &SpaceDatabase,
+        statement: SelectFromFolderCompiledStmt,
         db_folder: &TreeFolder,
         folder: &DbData,
         results: &Vec<SearchResultItem>,
-        columns: &Option<Vec<String>>
-    ) -> Result<Vec<DbData>, Vec<PlanetError>> {
+        columns: &Option<Vec<String>>,
+        total: usize,
+        elapsed_time: usize,
+        column_config_map: BTreeMap<String, ColumnConfig>
+    ) -> Result<String, Vec<PlanetError>> {
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let results = results.clone();
         let columns_wrap = columns.clone();
@@ -2895,6 +2879,7 @@ impl<'gb> SearchOutputData {
                 errors.push(error);
                 return Err(errors)
             }
+
             let result = result.unwrap();
             let tree = result.0;
             let partition_items = results_by_partition.get(&partition);
@@ -2965,9 +2950,242 @@ impl<'gb> SearchOutputData {
         if errors.len() > 0 {
             return Err(errors)
         }
-        return Ok(items)
+        let page = statement.page.to_usize().unwrap();
+        let result = SelectResult::serialize_yaml(
+            total, 
+            elapsed_time, 
+            page, 
+            items, 
+            folder,
+            column_config_map
+        );
+        return Ok(result)
     }
 
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SelectResultData {
+    pub id: String,
+    pub slug: String,
+    pub name: String,
+    pub data: BTreeMap<String, Vec<BTreeMap<String, String>>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SelectResult {
+    pub total: usize,
+    pub time: usize,
+    pub page: usize,
+    pub data_count: usize,
+    pub data: Vec<SelectResultData>,
+}
+impl SelectResult {
+    pub fn defaults(
+        total: usize,
+        time: usize,
+        page: usize,
+        items: Vec<DbData>,
+        folder: &DbData
+    ) -> Self {
+        let data_count = items.len();
+        let mut data: Vec<SelectResultData> = Vec::new();
+        for item in items {
+            let item_data = item.data.unwrap();
+            let mut data_new: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
+            for (k, v) in item_data {
+                let column_id = k;
+                let column = TreeFolder::get_column_by_id(&column_id, folder);
+                if column.is_err() {
+                    continue;
+                }
+                let column = column.unwrap();
+                let column_name = column.get(NAME);
+                if column_name.is_none() {
+                    continue
+                }
+                let column_name = column_name.unwrap().clone();
+                data_new.insert(column_name, v);
+            }
+            let data_item = SelectResultData{
+                id: item.id.unwrap(),
+                slug: item.slug.unwrap(),
+                name: item.name.unwrap(),
+                data: data_new
+            };
+            data.push(data_item);
+        }
+        let obj = Self{
+            total: total,
+            time: time,
+            page: page,
+            data_count: data_count,
+            data: data
+        };
+        return obj
+    }
+
+    pub fn serialize_yaml (
+        total: usize,
+        time: usize,
+        page: usize,
+        items: Vec<DbData>,
+        folder: &DbData,
+        column_config_map: BTreeMap<String, ColumnConfig>
+    ) -> String {
+        let data_count = items.len();
+        let mut yaml_string = String::from("---\n");
+        let folder = folder.clone();
+        let text_columns = [
+            COLUMN_TYPE_SMALL_TEXT, COLUMN_TYPE_CREATED_BY, COLUMN_TYPE_CREATED_TIME, COLUMN_TYPE_DATE, COLUMN_TYPE_EMAIL,
+            COLUMN_TYPE_DURATION, COLUMN_TYPE_GENERATE_ID, COLUMN_TYPE_FILE, COLUMN_TYPE_LANGUAGE, COLUMN_TYPE_LAST_MODIFIED_BY,
+            COLUMN_TYPE_LAST_MODIFIED_TIME, COLUMN_TYPE_PHONE, COLUMN_TYPE_CHECKBOX, COLUMN_TYPE_FORMULA,
+            COLUMN_TYPE_LINK, COLUMN_TYPE_REFERENCE
+        ];
+        let explicit_text_columns = [
+            COLUMN_TYPE_LONG_TEXT, COLUMN_TYPE_SELECT, COLUMN_TYPE_TEXT, COLUMN_TYPE_URL
+        ];
+        let number_columns = [
+            COLUMN_TYPE_NUMBER, COLUMN_TYPE_GENERATE_NUMBER, COLUMN_TYPE_PERCENTAGE, COLUMN_TYPE_RATING, COLUMN_TYPE_STATS
+        ];
+        let object_columns = [
+            COLUMN_TYPE_OBJECT, COLUMN_TYPE_STATEMENT
+        ];
+        yaml_string.push_str(format!("{column}: {value}\n", 
+            column=String::from("total"), 
+            value=total
+        ).as_str());
+        yaml_string.push_str(format!("{column}: {value}\n", 
+            column=String::from("time"), 
+            value=time
+        ).as_str());
+        yaml_string.push_str(format!("{column}: {value}\n", 
+            column=String::from("page"), 
+            value=page
+        ).as_str());
+        yaml_string.push_str(format!("{column}: {value}\n", 
+            column=String::from("data_count"), 
+            value=data_count
+        ).as_str());
+        yaml_string.push_str(format!("{column}:\n", 
+            column=String::from("data"), 
+        ).as_str());
+        for item in items {
+            let item_data = item.data.unwrap();
+            let item_id = item.id.unwrap();
+            let item_name = item.name.unwrap();
+            let item_slug = item.slug.unwrap();
+            yaml_string.push_str(format!("  - id: {item_id}\n", item_id=item_id).as_str());
+            yaml_string.push_str(format!("    name: {item_name}\n", item_name=item_name).as_str());
+            yaml_string.push_str(format!("    slug: {item_slug}\n", item_slug=item_slug).as_str());
+            if item_data.len() > 0 {
+                yaml_string.push_str(format!("    data:\n").as_str());
+            }
+            let mut item_data_sorted: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
+            for (k, v) in item_data {
+                let column_id = k;
+                let column = TreeFolder::get_column_by_id(&column_id, &folder);
+                if column.is_err() {
+                    continue;
+                }
+                let column = column.unwrap();
+                let column_name = column.get(NAME);
+                if column_name.is_none() {
+                    continue
+                }
+                let column_name = column_name.unwrap().clone();
+                item_data_sorted.insert(column_name, v);
+            }
+            for (column_name, v) in item_data_sorted {
+                let column_config = column_config_map.get(&column_name);
+                if column_config.is_none() {
+                    continue
+                }
+                let column_config = column_config.unwrap().clone();
+                let column_type = column_config.column_type;
+                if column_type.is_none() {
+                    continue
+                }
+                let column_type = column_type.unwrap();
+                let column_type = column_type.as_str();
+                let mut is_set = false;
+                let is_set_str = column_config.is_set;
+                if is_set_str.is_some() {
+                    let is_set_str = is_set_str.unwrap();
+                    if is_set_str == String::from("1") || is_set_str.to_lowercase() == String::from("true") {
+                        is_set = true;
+                    }
+                }
+                let column_name = column_config.name.unwrap();
+                if text_columns.contains(&column_type) {
+                    if !is_set {
+                        let value = get_value_list(&v).unwrap();
+                        yaml_string.push_str(format!("      {field}: {value}\n", field=&column_name, value=value).as_str());
+                    } else {
+                        let values = v;
+                        yaml_string.push_str(format!("      {field}:\n", field=&column_name).as_str());
+                        for value in values {
+                            let value = value.get(VALUE);
+                            if value.is_some() {
+                                let value = value.unwrap().clone();
+                                yaml_string.push_str(format!("        - {value}\n", value=value).as_str()); 
+                            }
+                        }
+                    }
+                } else if number_columns.contains(&column_type) {
+                    if !is_set {
+                        let value = get_value_list(&v).unwrap();
+                        yaml_string.push_str(format!("      {field}: {value}\n", field=&column_name, value=value).as_str());
+                    } else {
+                        let values = v;
+                        yaml_string.push_str(format!("      {field}:\n", field=&column_name).as_str());
+                        for value in values {
+                            let value = value.get(VALUE);
+                            if value.is_some() {
+                                let value = value.unwrap().clone();
+                                yaml_string.push_str(format!("        - {value}\n", value=value).as_str()); 
+                            }                            
+                        }
+                    }
+                } else if explicit_text_columns.contains(&column_type) {
+                    if !is_set {
+                        let value = get_value_list(&v).unwrap();
+                        yaml_string.push_str(format!("      {field}: \"{value}\"\n", field=&column_name, value=value).as_str());
+                    } else {
+                        let values = v;
+                        yaml_string.push_str(format!("      {field}:\n", field=&column_name).as_str());
+                        for value in values {
+                            let value = value.get(VALUE);
+                            if value.is_some() {
+                                let value = value.unwrap().clone();
+                                yaml_string.push_str(format!("        - \"{value}\"\n", value=value).as_str()); 
+                            }                            
+                        }
+                    }
+                } else if object_columns.contains(&column_type) {
+                    if !is_set {
+                        let value = get_value_list(&v).unwrap();
+                        let value_items: Vec<&str> = value.split("---\n").collect();
+                        let value = value_items[1].to_string();
+                        yaml_string.push_str(format!("      {field}:\n", field=&column_name).as_str());
+                        yaml_string.push_str(format!("        {}:\n", &value).as_str());
+                    } else {
+                        let values = v;
+                        yaml_string.push_str(format!("      {field}:\n", field=&column_name).as_str());
+                        for value in values {
+                            let value = value.get(VALUE).unwrap().clone();
+                            let value = value.replace("\\n", "\n");
+                            let value_items: Vec<&str> = value.split("---\n").collect();
+                            let value = value_items[1].to_string();
+                            yaml_string.push_str(format!("        - {}\n", &value).as_str());
+                        }
+                    }
+                }
+            }
+        }
+        eprintln!("serialize_yaml :: yaml_string: {}", &yaml_string);
+        return yaml_string
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -3041,6 +3259,8 @@ impl<'gb> SelectFromFolderStatement {
         folder: &DbData,
         search_iterator: &SearchIterator,
         columns: Option<Vec<String>>,
+        start_time: Instant,
+        column_config_map: BTreeMap<String, ColumnConfig>
     ) -> Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>> {
         let mut errors: Vec<PlanetError> = Vec::new();
         let db_folder = db_folder.clone();
@@ -3053,6 +3273,7 @@ impl<'gb> SelectFromFolderStatement {
             return Err(errors)
         }
         let results = results.unwrap();
+        let total = results.len();
         // 3 - Paging
         let paging = SearchPaging{
             number_items: statement.number_items,
@@ -3066,13 +3287,18 @@ impl<'gb> SelectFromFolderStatement {
         let results = results.unwrap();
         // 4 - Generate Final Data
         let output = SearchOutputData{};
+        let elapsed_time = start_time.elapsed().as_millis().to_usize().unwrap();
         let result = output.do_output(
             env,
             &space_database,
+            statement.clone(),
             &db_folder,
             &folder,
             &results,
-            &columns
+            &columns,
+            total,
+            elapsed_time,
+            column_config_map
         );
         if result.is_err() {
             let errors_ = result.clone().unwrap_err();
@@ -3081,18 +3307,8 @@ impl<'gb> SelectFromFolderStatement {
         let results = result.unwrap();
         // 5- Serialize Output
         let mut yaml_response: Vec<yaml_rust::Yaml> = Vec::new();
-        let response_coded = serde_yaml::to_string(&results);
-        if response_coded.is_err() {
-            let error = PlanetError::new(
-                500, 
-                Some(tr!("Error encoding statement response.")),
-            );
-            errors.push(error);
-            return Err(errors)
-        }
-        let response = response_coded.unwrap();
         let yaml_item = yaml_rust::YamlLoader::load_from_str(
-            response.as_str()
+            results.as_str()
         ).unwrap();
         yaml_response.push(yaml_item[0].clone());
         return Ok(yaml_response)
@@ -3147,7 +3363,7 @@ impl<'gb> Statement<'gb> for SelectFromFolderStatement {
         statement_text: &String,
     ) -> Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>> {
         let space_database = space_database.clone();
-        // let t_1 = Instant::now();
+        let start_time = Instant::now();
         // 0 - Init
         let search_compiler = SearchCompiler{
             statement_text: statement_text.clone(),
@@ -3166,10 +3382,16 @@ impl<'gb> Statement<'gb> for SelectFromFolderStatement {
         let init = init.unwrap();
         let db_folder = init.0;
         let folder = init.1;
+        let column_config_map = ColumnConfig::get_column_config_map(
+            env.planet_context,
+            env.context,
+            &folder
+        ).unwrap();
         // 1 - Compile SELECT statement into SelectFromFolderCompiledStmt
         let result = search_compiler.do_compile(
             Some(db_folder.clone()), 
-            Some(folder.clone())
+            Some(folder.clone()),
+            column_config_map.clone()
         );
         if result.is_err() {
             let errors = result.unwrap_err();
@@ -3193,7 +3415,9 @@ impl<'gb> Statement<'gb> for SelectFromFolderStatement {
                 &db_folder,
                 &folder,
                 &search_iterator,
-                columns
+                columns,
+                start_time,
+                column_config_map
             );
             return result
         } else {
@@ -3476,7 +3700,25 @@ pub fn resolve_data_statement(
                     env: env,
                     space_database: space_data.clone()
                 };
-                let response = compiler.do_compile(None, None);
+                let obj = SelectFromFolderStatement{};
+                let init = obj.init(
+                    env,
+                    &space_data,
+                    &compiler,
+                );
+                let init = init.unwrap();
+                let db_folder = init.0;
+                let folder = init.1;
+                let column_config_map = ColumnConfig::get_column_config_map(
+                    env.planet_context,
+                    env.context,
+                    &folder
+                ).unwrap();
+                let response = compiler.do_compile(
+                    Some(db_folder), 
+                    Some(folder),
+                    column_config_map
+                );
                 if response.is_err() {
                     let errors = response.unwrap_err();
                     return Some(Err(errors))

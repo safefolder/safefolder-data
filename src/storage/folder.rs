@@ -704,6 +704,45 @@ impl TreeFolder {
             )
         );
     }
+
+    pub fn get_column_by_id(
+        column_id: &String, 
+        folder: &DbData
+    ) -> Result<BTreeMap<String, String>, PlanetError> {
+        let folder = folder.clone();
+        let folder_data = folder.data;
+        if folder_data.is_some() {
+            let folder_data = folder_data.unwrap();
+            let columns = folder_data.get(COLUMNS);
+            if columns.is_some() {
+                let columns = columns.unwrap();
+                for column in columns {
+                    let column_id_db = column.get(ID);
+                    if column_id_db.is_none() {
+                        // Raise error
+                        return Err(
+                            PlanetError::new(
+                                500, 
+                                Some(tr!("Could not get column for column id \"{}\".", column_id)),
+                            )
+                        );
+                    }
+                    let column_id_db = column_id_db.unwrap().clone();
+                    if column_id_db.to_lowercase() == column_id.to_lowercase() {
+                        return Ok(
+                            column.clone()
+                        )
+                    }
+                }
+            }
+        }
+        return Err(
+            PlanetError::new(
+                500, 
+                Some(tr!("Could not get colum for column_id \"{}\".", column_id)),
+            )
+        );
+    }
 }
 
 impl FolderSchema for TreeFolder {
