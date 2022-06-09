@@ -933,7 +933,7 @@ impl<'gb> Statement<'gb> for InsertIntoFolderStatement {
                                                 home_dir.clone().unwrap_or_default().as_str(),
                                                 &account_id,
                                                 space_id,
-                                                Some(site_id.clone().unwrap().to_string()),
+                                                site_id.clone(),
                                                 remote_folder_id.as_str(),
                                                 &db_folder,
                                             );

@@ -136,14 +136,13 @@ impl<'gb> ObjectStorageColumn<'gb> for LinkColumn<'gb> {
         &self, 
         data: &Vec<String>, 
     ) -> Result<Vec<String>, Vec<PlanetError>> {
-        //eprintln!("LinkColumn.validate :: data: {:?}", data);
+        eprintln!("LinkColumn.validate :: data: {:?}", data);
         let data = data.clone();
         let config = self.config.clone();
         let linked_folder = config.linked_folder.unwrap();
         let db_folder = self.db_folder.clone().unwrap();
-        // eprintln!("LinkColumn.validate  :: linked_folder: {}", &linked_folder);
+        eprintln!("LinkColumn.validate  :: linked_folder: {}", &linked_folder);
         let folder = db_folder.get_by_name(&linked_folder);
-        // let folder = db_folder.get(&linked_folder_id);
         if folder.is_err() {
             let error = folder.unwrap_err();
             let mut errors: Vec<PlanetError> = Vec::new();
@@ -186,7 +185,7 @@ impl<'gb> ObjectStorageColumn<'gb> for LinkColumn<'gb> {
             home_dir.unwrap_or_default().as_str(),
             &account_id,
             space_id,
-            Some(site_id.unwrap().to_string()),
+            site_id,
             &linked_folder_id,
             &db_folder,
         );
@@ -202,7 +201,7 @@ impl<'gb> ObjectStorageColumn<'gb> for LinkColumn<'gb> {
         let mut db_folder_item = result.unwrap();
         // I will check I am able to fetch the link remote by id and fetch name
         for item_id in data.clone() {
-            //eprintln!("LinkColumn.validate  :: item_id: {}", &item_id);
+            eprintln!("LinkColumn.validate  :: item_id: {}", &item_id);
             let item = db_folder_item.get(
                 &folder_name, 
                 GetItemOption::ById(item_id), 
