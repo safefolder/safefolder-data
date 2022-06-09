@@ -1344,7 +1344,7 @@ impl TreeFolderItem {
         return Ok(())
     }
 
-    fn get_partition(
+    pub fn get_partition(
         &mut self,
         item_id: &str,
     ) -> Result<u16, PlanetError> {

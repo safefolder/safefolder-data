@@ -95,14 +95,16 @@ pub const WITH_DATE_FORMAT: &str = "DateFormat";
 pub const WITH_TIME_FORMAT: &str = "TimeFormat";
 pub const WITH_LINKED_FOLDER: &str = "LinkedFolder";
 pub const WITH_DELETE_ON_LINK_DROP: &str = "DeleteOnLinkDrop";
-pub const WITH_RELATED_COLUMN: &str = "RelatedColumn";
+pub const WITH_LINK_COLUMN: &str = "LinkColumn";
+pub const WITH_REMOTE_COLUMN: &str = "RemoteColumn";
 pub const WITH_SEQUENCE: &str = "Sequence";
 pub const WITH_MAX_LENGTH: &str = "MaxLength";
 pub const WITH_STATS_FUNCTION: &str = "StatsFunction";
+pub const WITH_RELATED_COLUMN: &str = "RelatedColumn";
 pub const WITH_CONTENT_TYPES: &str = "ContentTypes";
 pub const WITH_MODE: &str = "Mode";
 
-pub const ALLOWED_WITH_OPTIONS: [&str; 24] = [
+pub const ALLOWED_WITH_OPTIONS: [&str; 26] = [
     WITH_PARENT, 
     WITH_REQUIRED, 
     WITH_OPTIONS, 
@@ -121,12 +123,14 @@ pub const ALLOWED_WITH_OPTIONS: [&str; 24] = [
     WITH_TIME_FORMAT, 
     WITH_LINKED_FOLDER, 
     WITH_DELETE_ON_LINK_DROP, 
-    WITH_RELATED_COLUMN, 
+    WITH_LINK_COLUMN, 
+    WITH_REMOTE_COLUMN,
     WITH_SEQUENCE, 
     WITH_MAX_LENGTH, 
     WITH_STATS_FUNCTION, 
+    WITH_RELATED_COLUMN,
     WITH_CONTENT_TYPES, 
-    WITH_MODE
+    WITH_MODE,
 ];
 
 pub const ALLOWED_COLUMN_TYPES: [&str; 29] = [
@@ -227,7 +231,8 @@ pub struct ColumnConfig {
     pub number_decimals: Option<i8>,
     pub linked_folder: Option<String>,
     pub delete_on_link_drop: Option<bool>,
-    pub related_column: Option<String>,
+    pub link_column: Option<String>,
+    pub remote_column: Option<String>,
     pub sequence: Option<String>,
     pub maximum: Option<String>,
     pub minimum: Option<String>,
@@ -236,6 +241,7 @@ pub struct ColumnConfig {
     pub max_length: Option<String>,
     pub is_set: Option<String>,
     pub stats_function: Option<String>,
+    pub related_column: Option<String>,
     pub content_types: Option<Vec<String>>,
     pub mode: Option<String>,
     pub statements: Option<String>,
@@ -264,7 +270,8 @@ impl ConfigStorageColumn for ColumnConfig {
             number_decimals: None,
             linked_folder: None,
             delete_on_link_drop: None,
-            related_column: None,
+            link_column: None,
+            remote_column: None,
             sequence: None,
             maximum: None,
             minimum: None,
@@ -273,6 +280,7 @@ impl ConfigStorageColumn for ColumnConfig {
             max_length: None,
             is_set: None,
             stats_function: None,
+            related_column: None,
             content_types: None,
             mode: None,
             statements: None,
@@ -317,7 +325,8 @@ impl ConfigStorageColumn for ColumnConfig {
                     number_decimals: None,
                     linked_folder: None,
                     delete_on_link_drop: None,
-                    related_column: None,
+                    link_column: None,
+                    remote_column: None,        
                     sequence: None,
                     maximum: None,
                     minimum: None,
@@ -326,6 +335,7 @@ impl ConfigStorageColumn for ColumnConfig {
                     max_length: None,
                     is_set: None,
                     stats_function: None,
+                    related_column: None,
                     content_types: None,
                     mode: None,
                     statements: None,
@@ -1066,11 +1076,17 @@ pub fn process_column(
                         column.delete_on_link_drop = Some(false);
                     }
                 }
-                if *&with_options.contains_key(WITH_RELATED_COLUMN) {
-                    let related_column = &with_options_obj.get_single_value(
-                        WITH_RELATED_COLUMN
+                if *&with_options.contains_key(WITH_LINK_COLUMN) {
+                    let link_column = &with_options_obj.get_single_value(
+                        WITH_LINK_COLUMN
                     );
-                    column.related_column = Some(related_column.clone());
+                    column.link_column = Some(link_column.clone());
+                }
+                if *&with_options.contains_key(WITH_REMOTE_COLUMN) {
+                    let remote_column = &with_options_obj.get_single_value(
+                        WITH_REMOTE_COLUMN
+                    );
+                    column.remote_column = Some(remote_column.clone());
                 }
                 if *&with_options.contains_key(WITH_SEQUENCE) {
                     let sequence = &with_options_obj.get_single_value(
@@ -1130,6 +1146,29 @@ pub fn process_column(
         }
         if !has_formula_format {
             column.formula_format = Some(FORMULA_FORMAT_TEXT.to_string());
+        }
+    } else if column_type == COLUMN_TYPE_REFERENCE {
+        let has_link_column = column.link_column.is_some();
+        let has_remote_column = column.remote_column.is_some();
+        if !has_link_column {
+            errors.push(
+                PlanetError::new(
+                    500, 
+                    Some(
+                        tr!("Statement compile error: You need to define the Link column to use for the reference.")
+                    ),
+                )
+            );
+        }
+        if !has_remote_column {
+            errors.push(
+                PlanetError::new(
+                    500, 
+                    Some(
+                        tr!("Statement compile error: Remote column is required for references.")
+                    ),
+                )
+            );
         }
     }
     if errors.len() > 0 {
@@ -1489,6 +1528,7 @@ impl<'gb> Statement<'gb> for CreateFolderStatement {
                     if map.is_err() {
                         let error = map.clone().unwrap_err();
                         errors.push(error);
+                        return Err(errors)
                     }
                     let map = map.clone().unwrap();
                     let map_list = &column.map_collections_db();

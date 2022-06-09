@@ -805,10 +805,10 @@ impl StorageColumn for StatsColumn {
                 )
             }
         }
-        let related_column = config.related_column;
-        if related_column.is_some() {
-            let related_column = related_column.unwrap();
-            field_config_map.insert(RELATED_COLUMN.to_string(), related_column);
+        let link_column = config.link_column;
+        if link_column.is_some() {
+            let link_column = link_column.unwrap();
+            field_config_map.insert(LINK_COLUMN.to_string(), link_column);
         } else {
             return Err(
                 PlanetError::new(
@@ -843,10 +843,10 @@ impl StorageColumn for StatsColumn {
                 )
             }
         }
-        let related_column = field_config_map.get(RELATED_COLUMN);
-        if related_column.is_some() {
-            let related_column = related_column.unwrap();
-            config.related_column = Some(related_column.clone());
+        let link_column = field_config_map.get(LINK_COLUMN);
+        if link_column.is_some() {
+            let link_column = link_column.unwrap();
+            config.link_column = Some(link_column.clone());
         } else {
             return Err(
                 PlanetError::new(

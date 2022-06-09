@@ -978,6 +978,7 @@ pub fn process_function(
     let field_config_map = field_config_map.clone();
     let mut func = function.clone();
     let data = data_map_wrap.clone();
+    eprintln!("process_function :: data: {:#?}", &data);
     let conf: BTreeMap<String, ColumnConfig>;
     if field_config_map.is_some() {
         conf = field_config_map.unwrap();

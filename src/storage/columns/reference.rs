@@ -79,7 +79,7 @@ impl<'gb> ObjectStorageColumn<'gb> for LinkColumn<'gb> {
                         Some(tr!("Folder \"{}\" not found.", &linked_folder)),
                     )
                 );
-            }    
+            }
         }
         field_config_map.insert(LINKED_FOLDER.to_string(), linked_folder);
         // These are options, not required
@@ -269,47 +269,69 @@ impl<'gb> ObjectStorageColumn<'gb> for ReferenceColumn<'gb> {
         let db_folder = self.db_folder.clone().unwrap();
         let mut field_config_map = field_config_map.clone();
         let config = self.config.clone();
-        let related_column = config.related_column;
-        if related_column.is_none() {
+        let link_column = config.link_column;
+        let remote_column = config.remote_column;
+        if link_column.is_none() {
             let name = config.name.unwrap_or_default();
             return Err(
                 PlanetError::new(
                     500, 
-                    Some(tr!("Column not configured for reference: \"{}\". It needs 
-                    to have \"related_column\"", name)),
+                    Some(tr!("Column not configured for reference: \"{}\". \"LinkColumn\" is required.", name)),
                 )
             );
         }
-        let related_column = related_column.unwrap();
-        let related_column_obj = properties_map.get(&related_column);
-        if related_column_obj.is_none() {
+        let link_column = link_column.unwrap();
+        let link_column_obj = properties_map.get(&link_column);
+        if link_column_obj.is_none() {
             return Err(
                 PlanetError::new(
                     500, 
-                    Some(tr!("Related Column \"{}\" not found.", &related_column)),
+                    Some(tr!("Link Column \"{}\" not found.", &link_column)),
                 )
             );
         }
-        //eprintln!("Reference.create_config :: related_column: {}", &related_column);
-        let related = properties_map.get(&related_column);
-        if related.is_some() {
-            let related = related.unwrap().clone();
-            let many = related.many.unwrap();
-            if many {
-                field_config_map.insert(String::from(MANY), String::from(TRUE));
-            } else {
+        let link = properties_map.get(&link_column);
+        let mut linked_folder = String::from("");
+        if link.is_some() {
+            let link = link.unwrap().clone();
+            let many = link.many;
+            linked_folder = link.linked_folder.unwrap();
+            if many.is_none() {
                 field_config_map.insert(String::from(MANY), String::from(FALSE));
+            } else {
+                let many = many.unwrap();
+                if many {
+                    field_config_map.insert(String::from(MANY), String::from(TRUE));
+                } else {
+                    field_config_map.insert(String::from(MANY), String::from(FALSE));
+                }
             }
         }
-        field_config_map.insert(RELATED_COLUMN.to_string(), related_column);
-        // formula
+        field_config_map.insert(LINK_COLUMN.to_string(), link_column);
+        // Remote column
+        if remote_column.is_some() {
+            let remote_column = remote_column.unwrap();
+            let has_column = db_folder.has_column(&linked_folder, &remote_column);
+            if !has_column {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Column \"{}\" does not exist at \"{}\" folder.", 
+                            &remote_column, &linked_folder
+                    )),
+                    )
+                );
+            }
+            field_config_map.insert(String::from(REMOTE_COLUMN), remote_column);
+        }
+        // Formula
         let formula = config.formula;
         if formula.is_some() {
             let formula = formula.unwrap();
             let formula_format = config.formula_format.unwrap();
             // let field_type_map = field_type_map.clone();
             // let field_name_map = field_name_map.clone();
-            
+
             let folder_name = folder_name.clone();
             let formula_compiled = Formula::defaults(
                 &formula,
