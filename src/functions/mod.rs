@@ -13,7 +13,9 @@ use regex::{Regex, CaptureMatches};
 use tr::tr;
 use xlformula_engine::{calculate, parse_formula, NoReference, NoCustomFunction};
 
+use crate::planet::constants::*;
 use crate::storage::ConfigStorageColumn;
+use crate::storage::constants::*;
 use crate::storage::folder::{DbData, TreeFolder, get_value_list};
 use crate::statements::folder::schema::*;
 use crate::functions::constants::*;
@@ -35,11 +37,11 @@ lazy_static! {
     pub static ref RE_FORMULA_FIELD_FUNCTIONS: Regex = Regex::new(r#"(?P<func>[A-Z]+[("\d,-.;_:+$€\s\w{})]+)"#).unwrap();
     pub static ref RE_FUNCTION_ATTRS_OLD: Regex = Regex::new(r#"("[\w\s-]+")|(\{[\w\s]+\})|([A-Z]+\(["\w\s]+\))|([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)"#).unwrap();
     pub static ref RE_FUNCTION_ATTRS: Regex = Regex::new(r#"[A-Z]+\((?P<attrs>.+)\)"#).unwrap();
-    pub static ref RE_ATTR_TYPE_RESOLVE: Regex = Regex::new(r#"(?P<ref>\{[\w\s]+\}$)|(?P<formula>[A-Z]+\(.+\).*)|(?P<bool>TRUE|FALSE)|(?P<number>^[+-]?[0-9]+\.?[0-9]*|^\.[0-9]+)|(?P<null>null)|(?P<assign>\{[\w\s]+\}[\s]*[=<>]+[\s]*((\d+)|("*[\w\s]+"*)))|(?P<string>\\{0,}"*[,;_.\\$€:\-\+\{\}\w\s-]*\\{0,}"*)"#).unwrap();
+    pub static ref RE_ATTR_TYPE_RESOLVE: Regex = Regex::new(r#"(?P<ref>\{[\w\s.]+\}$)|(?P<formula>[A-Z]+\(.+\).*)|(?P<bool>TRUE|FALSE)|(?P<number>^[+-]?[0-9]+\.?[0-9]*|^\.[0-9]+)|(?P<null>null)|(?P<assign>\{[\w\s.]+\}[\s]*[=<>]+[\s]*((\d+)|("*[\w\s]+"*)))|(?P<string>\\{0,}"*[,;_.\\$€:\-\+\{\}\w\s-]*\\{0,}"*)"#).unwrap();
     pub static ref RE_FORMULA_FUNCTION_PIECES: Regex = Regex::new(r#"[A-Z]+\(((.[^()]*)|())\)"#).unwrap();
     pub static ref RE_FORMULA_FUNCTION_VARIABLES: Regex = Regex::new(r#"(?P<func>\$func_\d)"#).unwrap();
     pub static ref RE_FORMULA_VARIABLES: Regex = Regex::new(r#"(?P<formula>\$formula_\d)"#).unwrap();
-    pub static ref RE_FORMULA_ASSIGN: Regex = Regex::new(r#"^(?P<assign>(?P<name>\{[\s\w]+\})[\s\t]{0,}(?P<op>=|>|<|>=|<=)[\s\t]{0,}((?P<formula>\$formula_*\d*)|(?P<value>"*[\.\w\d\s]+"*)))"#).unwrap();
+    pub static ref RE_FORMULA_ASSIGN: Regex = Regex::new(r#"^(?P<assign>(?P<name>\{[\s\w.]+\})[\s\t]{0,}(?P<op>=|>|<|>=|<=)[\s\t]{0,}((?P<formula>\$formula_*\d*)|(?P<value>"*[\.\w\d\s]+"*)))"#).unwrap();
 }
 
 // achiever planet functions
@@ -380,8 +382,8 @@ impl Formula {
                 _ => {}
             }
         }
-        //eprintln!("Formula :: formula_processed_str: {}", formula_processed_str);
-        //eprintln!("Formula :: do_compile_assignment: {}", &do_compile_assignment);
+        // eprintln!("Formula :: formula_processed_str: {}", formula_processed_str);
+        // eprintln!("Formula :: do_compile_assignment: {}", &do_compile_assignment);
         if do_compile_assignment {
             // Since I have no functions, reference will be an assignment
             let assignment = compile_assignment(
@@ -413,7 +415,7 @@ pub fn compile_assignment(
     field_config_map: &BTreeMap<String, ColumnConfig>
 ) -> Result<Option<AttributeAssign>, PlanetError> {
     //eprintln!("compile_assignment...");
-    //eprintln!("compile_assignment :: formula: {}", &formula);
+    // eprintln!("compile_assignment :: formula: {}", &formula);
     let field_config_map = field_config_map.clone();
     let field_config_map_wrap = Some(field_config_map);
     let formula = formula.clone();
@@ -468,27 +470,37 @@ pub fn compile_assignment(
             &assign, &formula_assign
         )?;
         //eprintln!("compile_assignment: items: {:?} op: {:?}", &items, &attribute_operator);
-        let (reference_name, items_new) = get_assignment_reference(
+        let (items_new, column_config) = get_assignment_reference(
             &items, 
             properties_map.clone()
         )?;
         //eprintln!("compile_assignment: reference_name: {} items_new: {:?}", &reference_name, &items_new);
-        let column_config = properties_map.get(&reference_name).unwrap().clone();
-        let field_type = column_config.column_type;
-        //eprintln!("compile_assignment: field_type: {:?}", &field_type);
+        // let column_config = properties_map.get(&reference_name).unwrap().clone();
+        let column_type = column_config.column_type;
+        // eprintln!("compile_assignment: colunn_type: {:?}", &column_type);
         let mut attribute_type: AttributeType = AttributeType::Text;
-        if field_type.is_some() {
+        let mut assign_name = items_new[0].clone();
+        // eprintln!("compile_assignment: [1] assign_name: {}", &assign_name);
+        if column_type.is_some() {
             //eprintln!("compile_assignment: I have field_type...");
-            let field_type = field_type.unwrap();
+            let column_type = column_type.unwrap();
             //eprintln!("compile_assignment: field_type: {}", field_type);
-            attribute_type = get_attribute_type(&field_type, None);
-            //eprintln!("compile_assignment: attribute_type: {:?}", &attribute_type);
+            attribute_type = get_attribute_type(&column_type, None);
+            // eprintln!("compile_assignment: attribute_type: {:?}", &attribute_type);
+            let column_type_str = column_type.as_str();
+            if column_type_str == COLUMN_TYPE_LINK {
+                let has_id = assign_name.find("id").is_some();
+                if !has_id {
+                    assign_name = format!("{}.Name", &assign_name);
+                }
+            }
         }
+        // eprintln!("compile_assignment: [2] assign_name: {}", &assign_name);
         // {Counter} = 23
         // {My Column} = TRIM(" hola ")
         assignment = Some(
             AttributeAssign::defaults(
-                &items_new[0].clone(), 
+                &assign_name, 
                 &attribute_operator, 
                 &items_new[1].clone(),
                 &attribute_type
@@ -758,7 +770,7 @@ pub fn compile_function_text(
             );
         }
         let attr_type_resolve = attr_type_resolve.unwrap();
-        //eprintln!("compile_function_text :: attr_type_resolve: {:?}", &attr_type_resolve);
+        eprintln!("compile_function_text :: attr_type_resolve: {:?}", &attr_type_resolve);
         let attr_type_ref = attr_type_resolve.name("ref");
         let attr_type_formula = attr_type_resolve.name("formula");
         let attr_type_bool = attr_type_resolve.name("bool");
@@ -1448,12 +1460,19 @@ pub fn get_attribute_type(field_type: &String, formula_format: Option<String>) -
 pub fn get_assignment_reference(
     items: &Vec<String>, 
     properties_map: HashMap<String, ColumnConfig>
-) -> Result<(String, Vec<String>), PlanetError> {
-    let mut reference_name: String = String::from("");
+) -> Result<
+    (
+        Vec<String>,
+        ColumnConfig
+    ), PlanetError> {
+    // let mut reference_name: String = String::from("");
     let mut items_new: Vec<String> = Vec::new();
     let mut item_replaced: String;
-    eprintln!("get_assignment_reference :: items: {:#?}", items);
-    eprintln!("get_assignment_reference :: properties_map: {:#?}", &properties_map);
+    // eprintln!("get_assignment_reference :: items: {:#?}", items);
+    // eprintln!("get_assignment_reference :: properties_map: {:#?}", &properties_map);
+    let id_sep = format!(".{}", ID);
+    let mut column_config: ColumnConfig = ColumnConfig::defaults(None);
+    let id_sep = id_sep.as_str();
     for (count, item) in items.iter().enumerate() {
         let mut item = item.clone();
         // |  {Status}  |
@@ -1464,18 +1483,37 @@ pub fn get_assignment_reference(
             // {Column A} => $column_id
             // let mut item_string = item_.to_string();
             item = item.replace("{", "}").replace("}", "");
-            reference_name = item.clone();
+            // reference_name = item.clone();
             // let column_id = &field_name_map.get(&item).unwrap();
-            let column_config = properties_map.get(&item).unwrap().clone();
-            let column_id = column_config.id.unwrap();
-            let column_id = column_id.clone();
-            //eprintln!("compile_formula_query :: column_id: {}", column_id);
+            let has_id = item.find(id_sep).is_some();
+            // eprintln!("get_assignment_reference :: has_id: {}", &has_id);
+            let mut column_id: String;
+            if has_id {
+                let item_fields: Vec<&str> = item.split(id_sep).collect();
+                let item_new = item_fields[0];
+                column_config = properties_map.get(item_new).unwrap().clone();
+                // reference_name = item.to_string();
+                column_id = column_config.id.clone().unwrap();
+                column_id = column_id.clone();
+                column_id = format!("{}.{}", &column_id, ID);
+            } else {
+                column_config = properties_map.get(&item).unwrap().clone();
+                column_id = column_config.id.clone().unwrap();
+                column_id = column_id.clone();
+            }
+            // eprintln!("get_assignment_reference :: column_id: {}", column_id);
             item = column_id.clone();
         }
         item_replaced = item.replace("\"", "");
         items_new.push(item_replaced);
     }
-    return Ok((reference_name, items_new));
+    // eprintln!("get_assignment_reference :: items_new: {:?} reference_name: {}", &items_new, &reference_name);
+    return Ok(
+        (
+            items_new,
+            column_config
+        )
+    );
 }
 
 pub fn parse_assign_operator(
@@ -1534,52 +1572,97 @@ pub fn check_assignment(
     //eprintln!("check_assignment :: attr_type: {:#?}", &attr_type);
     let column_id = attr_assignment.name;
     let column_id = column_id.as_str();
-    let db_value = db_data_map.get(column_id).unwrap();
-    let db_value = get_value_list(db_value);
+    let name_sep = format!(".{}", NAME_CAMEL);
+    let name_sep = name_sep.as_str();
+    let id_sep = format!(".{}", ID);
+    let id_sep = id_sep.as_str();
+    let has_obj_name = column_id.find(name_sep).is_some();
+    let has_obj_id = column_id.find(id_sep).is_some();
+    // let mut db_value: Option<String> = None;
+    let mut db_values: Option<Vec<String>> = None;
+    if has_obj_name {
+        
+        let column_name_fields: Vec<&str> = column_id.split(name_sep).collect();
+        let column_id = column_name_fields[0];
+        let obj_data = db_data_map.get(column_id);
+        if obj_data.is_some() {
+            let obj_data_list = obj_data.unwrap();
+            let mut list: Vec<String> = Vec::new();
+            for obj_data in obj_data_list {
+                let item_value = obj_data.get(NAME_CAMEL).unwrap();
+                list.push(item_value.clone());
+            }
+            db_values = Some(list);
+        }
+    } else if has_obj_id {
+        let column_name_fields: Vec<&str> = column_id.split(id_sep).collect();
+        let column_id = column_name_fields[0];
+        let obj_data = db_data_map.get(column_id);
+        if obj_data.is_some() {
+            let obj_data_list = obj_data.unwrap();
+            let mut list: Vec<String> = Vec::new();
+            for obj_data in obj_data_list {
+                let item_value = obj_data.get(ID).unwrap();
+                list.push(item_value.clone());
+            }
+            db_values = Some(list);
+        }
+    } else {
+        let db_value = db_data_map.get(column_id).unwrap();
+        let mut list: Vec<String> = Vec::new();
+        for item in db_value {
+            let item_value = item.get(VALUE).unwrap();
+            list.push(item_value.clone());
+        }
+        db_values = Some(list);
+    }
+    eprintln!("check_assignment :: db_values: {:#?}", &db_values);
     let mut check: bool = false;
-    if db_value.is_some() {
-        let db_value = db_value.unwrap();
+    if db_values.is_some() {
+        let db_values = db_values.unwrap();
         let op = attr_assignment.op;
         let mut value = attr_assignment.value;
         // We have case when we try to compare dates, but is not supported, functions would need to be used.
         // Greater and smaller is used for numbers
         // TODO: Match for bool {Column} = true. How???? TRUE() right?
-        match attr_type {
-            AttributeType::Text | AttributeType::Date => {
-                match op {
-                    FormulaOperator::Eq => {
-                        value = value.replace("\"", "");
-                        check = check_string_equal(&db_value, &value)?;
-                    },
-                    _ => {
-                        return Err(
-                            PlanetError::new(
-                                500, 
-                                Some(tr!("Assignment for string only support equal operator.")),
-                            )
-                        );
-                    },
-                }    
-            },
-            AttributeType::Number => {
-                let value = value.as_str();
-                let value: f64 = FromStr::from_str(value).unwrap();
-                let db_value: f64 = FromStr::from_str(&db_value).unwrap();
-                //eprintln!("check_assignment :: db_value: {}", &db_value);
-                //eprintln!("check_assignment :: op: {:?}", &op);
-                //eprintln!("check_assignment :: value: {:?}", &value);
-                check = check_float_compare(&value, &db_value, op)?;
-            },
-            _ => {
-                return Err(
-                    PlanetError::new(
-                        500, 
-                        Some(tr!("Assignment type not supported. We only support 
-                        Text, Number, Bool and Date")),
-                    )
-                );
+        for db_value in db_values {
+            match attr_type {
+                AttributeType::Text | AttributeType::Date => {
+                    match op {
+                        FormulaOperator::Eq => {
+                            value = value.replace("\"", "");
+                            check = check_string_equal(&db_value, &value)?;
+                        },
+                        _ => {
+                            return Err(
+                                PlanetError::new(
+                                    500, 
+                                    Some(tr!("Assignment for string only support equal operator.")),
+                                )
+                            );
+                        },
+                    }    
+                },
+                AttributeType::Number => {
+                    let value = value.as_str();
+                    let value: f64 = FromStr::from_str(value).unwrap();
+                    let db_value: f64 = FromStr::from_str(&db_value).unwrap();
+                    //eprintln!("check_assignment :: db_value: {}", &db_value);
+                    //eprintln!("check_assignment :: op: {:?}", &op);
+                    //eprintln!("check_assignment :: value: {:?}", &value);
+                    check = check_float_compare(&value, &db_value, op.clone())?;
+                },
+                _ => {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!("Assignment type not supported. We only support 
+                            Text, Number, Bool and Date")),
+                        )
+                    );
+                }
             }
-        }    
+        }
     }
     return Ok(check)
 }
