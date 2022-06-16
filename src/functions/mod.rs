@@ -990,7 +990,7 @@ pub fn process_function(
     let field_config_map = field_config_map.clone();
     let mut func = function.clone();
     let data = data_map_wrap.clone();
-    eprintln!("process_function :: data: {:#?}", &data);
+    // eprintln!("process_function :: data: {:#?}", &data);
     let conf: BTreeMap<String, ColumnConfig>;
     if field_config_map.is_some() {
         conf = field_config_map.unwrap();
@@ -1572,16 +1572,16 @@ pub fn check_assignment(
     //eprintln!("check_assignment :: attr_type: {:#?}", &attr_type);
     let column_id = attr_assignment.name;
     let column_id = column_id.as_str();
+    // eprintln!("check_assignment :: column_id: {}", column_id);
     let name_sep = format!(".{}", NAME_CAMEL);
     let name_sep = name_sep.as_str();
     let id_sep = format!(".{}", ID);
     let id_sep = id_sep.as_str();
     let has_obj_name = column_id.find(name_sep).is_some();
     let has_obj_id = column_id.find(id_sep).is_some();
-    // let mut db_value: Option<String> = None;
+    // eprintln!("check_assignment :: has_obj_name: {} has_obj_id: {}", &has_obj_name, &has_obj_id);
     let mut db_values: Option<Vec<String>> = None;
-    if has_obj_name {
-        
+    if has_obj_name {        
         let column_name_fields: Vec<&str> = column_id.split(name_sep).collect();
         let column_id = column_name_fields[0];
         let obj_data = db_data_map.get(column_id);
@@ -1600,12 +1600,18 @@ pub fn check_assignment(
         let obj_data = db_data_map.get(column_id);
         if obj_data.is_some() {
             let obj_data_list = obj_data.unwrap();
+            // eprintln!("check_assignment :: obj_data_list: {:#?}", &obj_data_list);
             let mut list: Vec<String> = Vec::new();
             for obj_data in obj_data_list {
-                let item_value = obj_data.get(ID).unwrap();
-                list.push(item_value.clone());
+                let item_value = obj_data.get(ID);
+                if item_value.is_some() {
+                    let item_value = item_value.unwrap();
+                    list.push(item_value.clone());
+                }
             }
-            db_values = Some(list);
+            if list.len() > 0 {
+                db_values = Some(list);
+            }
         }
     } else {
         let db_value = db_data_map.get(column_id).unwrap();
@@ -1616,7 +1622,7 @@ pub fn check_assignment(
         }
         db_values = Some(list);
     }
-    eprintln!("check_assignment :: db_values: {:#?}", &db_values);
+    // eprintln!("check_assignment :: db_values: {:#?}", &db_values);
     let mut check: bool = false;
     if db_values.is_some() {
         let db_values = db_values.unwrap();

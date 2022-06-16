@@ -51,7 +51,7 @@ lazy_static! {
     pub static ref RE_INSERT_INTO_FOLDER_ITEM_KEYS: Regex = Regex::new(r#"([\s\t]*(?P<Key>[\w\s]+)=[\s\t]*(?P<Value>[\s\S][^,\n)]*),*)"#).unwrap();
     pub static ref RE_INSERT_INTO_FOLDER_SUBFOLDERS: Regex = Regex::new(r#"(SUB FOLDER (?P<SubFolderId>[\w]+)([\s]*WITH[\s]*(?P<SubFolderIsReference>IsReference[\s]*=[\s]*(true|false)))*,*)"#).unwrap();
     pub static ref RE_SELECT: Regex = Regex::new(r#"SELECT[\s]*[\s\S]*[\s]*FROM[\s]*[\s\S]*;"#).unwrap();
-    pub static ref RE_SELECT_COUNT: Regex = Regex::new(r#"SELECT[\s]*((?P<CountAll>COUNT\(\*\))|(COUNT\(DISTINCT[\s]+(?P<CountColumnDis>[\w\s]+)\))|(COUNT\((?P<CountColumn>[\w\s]+)\)))[\s]*FROM[\s]*"(?P<FolderName>[\w\s]+)";"#).unwrap();
+    pub static ref RE_SELECT_COUNT: Regex = Regex::new(r#"SELECT[\s]*((?P<CountAll>COUNT\(\*\))|(COUNT\(DISTINCT[\s]+(?P<CountColumnDis>[\w\s]+)\))|(COUNT\((?P<CountColumn>[\w\s]+)\)))[\s]*FROM[\s]*"(?P<FolderName>[\w\s]+)"([\s\S])*;"#).unwrap();
     pub static ref RE_SELECT_PAGING: Regex = Regex::new(r#"([\s]*PAGE[\s]*(?P<Page>[\d]+))*([\s]*NUMBER ITEMS[\s]*(?P<NumberItems>[\d]+))*"#).unwrap();
     pub static ref RE_SELECT_FROM: Regex = Regex::new(r#"FROM[\s]*"(?P<FolderName>[\w\s]*)"[\s]*(WHERE|SORT BY|GROUP BY|SEARCH)*"#).unwrap();
     pub static ref RE_SELECT_COLUMNS: Regex = Regex::new(r#"SELECT[\s]*((?P<AllColumns>\*)|(?P<Columns>[\w\s,]+))[\s]*FROM"#).unwrap();
@@ -1458,6 +1458,11 @@ impl<'gb> SearchCompiler<'gb> {
         let mut number_items: Option<u32> = None;
         let mut folder_name = String::from("");
         let mut errors: Vec<PlanetError> = Vec::new();
+        let mut statement: SelectFromFolderCompiledStmt = SelectFromFolderCompiledStmt::defaults(
+            folder_name.clone(), 
+            page, 
+            number_items
+        );
         if is_count {
             let captures = expr.captures(&statement_text);
             if captures.is_some() {
@@ -1476,13 +1481,10 @@ impl<'gb> SearchCompiler<'gb> {
                             500, 
                             Some(tr!("Folder name not detected and is required.")),
                         )
-                    )
+                    );
+                    return Err(errors)
                 }
-                let mut statement = SelectFromFolderCompiledStmt::defaults(
-                    folder_name, 
-                    page, 
-                    number_items
-                );
+                statement.folder_name = folder_name.clone();
                 if count_all.is_some() {
                     let count = SelectCount{
                         column: None,
@@ -1490,7 +1492,6 @@ impl<'gb> SearchCompiler<'gb> {
                         distinct: false,
                     };
                     statement.count = Some(count);
-                    return Ok(statement)
                 } else {
                     let count_column_: &str;
                     let mut distinct = false;
@@ -1506,207 +1507,203 @@ impl<'gb> SearchCompiler<'gb> {
                         distinct: distinct,
                     };
                     statement.count = Some(count);
-                    return Ok(statement)
                 }
             }
-        } else {
-            let statement_text = statement_text.clone();
-            let statement_text = statement_text.replace("\n", "").clone();
-            let expr = &RE_SELECT;
-            let is_match = expr.is_match(&statement_text);
-            if !is_match {
-                errors.push(
-                    PlanetError::new(
-                        500, 
-                        Some(tr!("Bad syntax for SELECT statement.")),
-                    )
+        }
+        let statement_text = statement_text.clone();
+        let statement_text = statement_text.replace("\n", "").clone();
+        let expr = &RE_SELECT;
+        let is_match = expr.is_match(&statement_text);
+        if !is_match {
+            errors.push(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Bad syntax for SELECT statement.")),
                 )
-            } else {
-                // 1 - Paging
-                let expr = &RE_SELECT_PAGING;
-                let captures_iter = expr.captures_iter(&statement_text);
-                let mut statement_text_new = statement_text.clone();
-                for captures in captures_iter {
-                    let page_regex = captures.name("Page");
-                    let number_items_regex = captures.name("NumberItems");
-                    if page_regex.is_some() || number_items_regex.is_some() {
-                        if page_regex.is_some() {
-                            let page_regex = page_regex.unwrap().as_str();
-                            let page_int: u32 = FromStr::from_str(page_regex).unwrap();
-                            let check_text = format!("PAGE {}", &page_int);
-                            statement_text_new = statement_text_new.replace(&check_text, "");
-                            page = Some(page_int);
-                        }
-                        if number_items_regex.is_some() {
-                            let number_items_regex = number_items_regex.unwrap().as_str();
-                            let number_items_int: u32 = FromStr::from_str(number_items_regex).unwrap();
-                            let check_text = format!("NUMBER ITEMS {}", &number_items_int);
-                            statement_text_new = statement_text_new.replace(&check_text, "");
-                            number_items = Some(number_items_int);
-                        }
+            )
+        } else {
+            // 1 - Paging
+            let expr = &RE_SELECT_PAGING;
+            let captures_iter = expr.captures_iter(&statement_text);
+            let mut statement_text_new = statement_text.clone();
+            for captures in captures_iter {
+                let page_regex = captures.name("Page");
+                let number_items_regex = captures.name("NumberItems");
+                if page_regex.is_some() || number_items_regex.is_some() {
+                    if page_regex.is_some() {
+                        let page_regex = page_regex.unwrap().as_str();
+                        let page_int: u32 = FromStr::from_str(page_regex).unwrap();
+                        let check_text = format!("PAGE {}", &page_int);
+                        statement_text_new = statement_text_new.replace(&check_text, "");
+                        page = Some(page_int);
+                    }
+                    if number_items_regex.is_some() {
+                        let number_items_regex = number_items_regex.unwrap().as_str();
+                        let number_items_int: u32 = FromStr::from_str(number_items_regex).unwrap();
+                        let check_text = format!("NUMBER ITEMS {}", &number_items_int);
+                        statement_text_new = statement_text_new.replace(&check_text, "");
+                        number_items = Some(number_items_int);
                     }
                 }
-                let mut statement_text = statement_text_new;
-                // 2 - From
-                let expr = &RE_SELECT_FROM;
-                let captures = expr.captures(&statement_text);
-                if captures.is_some() {
-                    let captures = captures.unwrap();
-                    let folder_name_ = captures.name("FolderName");
-                    if folder_name_.is_some() {
-                        let folder_name_ = folder_name_.unwrap().as_str();
-                        folder_name = folder_name_.to_string();
-                        folder_name = folder_name.trim().to_string();
-                        let check_text = format!("FROM \"{}\"", &folder_name);
-                        statement_text = statement_text.replace(
-                            &check_text, 
-                            "FROM {from}"
-                        );
-                    } else {
+            }
+            let mut statement_text = statement_text_new;
+            // 2 - From
+            let expr = &RE_SELECT_FROM;
+            let captures = expr.captures(&statement_text);
+            if captures.is_some() {
+                let captures = captures.unwrap();
+                let folder_name_ = captures.name("FolderName");
+                if folder_name_.is_some() {
+                    let folder_name_ = folder_name_.unwrap().as_str();
+                    folder_name = folder_name_.to_string();
+                    folder_name = folder_name.trim().to_string();
+                    let check_text = format!("FROM \"{}\"", &folder_name);
+                    statement_text = statement_text.replace(
+                        &check_text, 
+                        "FROM {from}"
+                    );
+                } else {
+                    errors.push(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!("Folder name is required.")),
+                        )
+                    );
+                    return Err(errors)
+                }
+            }
+            if page.is_some() {
+                statement.page = page.unwrap();
+            }
+            if number_items.is_some() {
+                statement.number_items = number_items.unwrap();
+            }
+            statement.folder_name = folder_name.clone();
+            // 3 - Columns
+            let expr = &RE_SELECT_COLUMNS;
+            let captures = expr.captures(&statement_text);
+            if captures.is_some() {
+                let captures = captures.unwrap();
+                let columns = captures.name("Columns");
+                if columns.is_some() {
+                    let columns_str = columns.unwrap().as_str();
+                    let columns_: Vec<&str> = columns_str.split(",").collect();
+                    let columns: Vec<String> = columns_.iter().map(|&s|s.trim().into()).collect();
+                    statement.columns = Some(columns);
+                    let check_text = format!("SELECT {}", columns_str);
+                    statement_text = statement_text.replace(
+                        &check_text, 
+                        ""
+                    );
+                }
+            }
+            // 4 - Sort By
+            let expr_1 = &RE_SELECT_SORTING;
+            let captures = expr_1.captures(&statement_text);
+            if captures.is_some() {
+                let captures = captures.unwrap();
+                let sort_by = captures.name("SortBy");
+                if sort_by.is_some() {
+                    let mut sort_by = sort_by.unwrap().as_str();
+                    let sort_by_: String;
+                    // {COLUMN A ASC|COLUMN B DESC}
+                    if sort_by.find(SORT_MODE_ASC).is_none() && sort_by.find(SORT_MODE_DESC).is_none() {
+                        sort_by_ = format!("{} ASC", sort_by);
+                        sort_by = sort_by_.as_str();
+                    }
+                    // let mine = sort_by.find(SORT_MODE_ASC);
+                    let expr = &RE_SELECT_SORT_FIELDS;
+                    let items = expr.captures_iter(sort_by);
+                    let mut sort_items: Vec<SelectSortBy> = Vec::new();
+                    for item in items {
+                        let column = item.name("Column");
+                        let mode = item.name("Mode");
+                        let mut sort_obj = SelectSortBy{
+                            column: String::from(""),
+                            mode: SelectSortMode::Ascending
+                        };
+                        if column.is_some() {
+                            let column = column.unwrap().as_str();
+                            sort_obj.column = column.to_string().trim().to_string();
+                        }
+                        if mode.is_some() {
+                            let mode = mode.unwrap().as_str();
+                            match mode {
+                                SORT_MODE_ASC => {
+                                    sort_obj.mode = SelectSortMode::Ascending;
+                                },
+                                SORT_MODE_DESC => {
+                                    sort_obj.mode = SelectSortMode::Descending;
+                                },
+                                _ => {}
+                            }
+                        } else {
+                            sort_obj.mode = SelectSortMode::Ascending;
+                        }
+                        sort_items.push(sort_obj);
+                    }
+                    if sort_items.len() > 0 {
+                        statement.sort_by = Some(sort_items);
+                        statement_text = expr_1.replace(&statement_text, "").to_string();
+                    }
+                }
+            }
+            // 5 - Group By
+            let expr_1 = &RE_SELECT_GROUP_BY;
+            let captures = expr_1.captures(&statement_text);
+            if captures.is_some() {
+                let captures = captures.unwrap();
+                let group_by_columns = captures.name("GroupByColumns");
+                if group_by_columns.is_some() {
+                    let group_by_columns = group_by_columns.unwrap().as_str();
+                    // Column A, Column B
+                    let expr = &RE_SELECT_GROUP_COLUMNS;
+                    let columns = expr.captures_iter(group_by_columns);
+                    let mut columns_string: Vec<String> = Vec::new();
+                    for column in columns {
+                        let column_str = column.name("Column").unwrap().as_str();
+                        columns_string.push(column_str.to_string().trim().to_string());
+                    }
+                    if columns_string.len() > 0 {
+                        statement.group_by = Some(columns_string);
+                        statement_text = expr_1.replace(&statement_text, "").to_string();
+                    }
+                }
+            }
+            // 6 - Search
+            let expr = &RE_SELECT_SEARCH;
+            let captures = expr.captures(&statement_text);
+            if captures.is_some() {
+                let captures = captures.unwrap();
+                let search = captures.name("Search");
+                if search.is_some() {
+                    let search = search.unwrap().as_str();
+                    statement.search = Some(search.to_string());
+                    statement_text = expr.replace(&statement_text, "").to_string();
+                }
+            }
+            // 7 - Where
+            let expr_1 = &RE_SELECT_WHERE;
+            let captures = expr_1.captures(&statement_text);
+            if captures.is_some() {
+                let captures = captures.unwrap();
+                let where_formula = captures.name("Where");
+                if where_formula.is_some() {
+                    let where_formula_str = where_formula.unwrap().as_str();
+                    let expr = &RE_FORMULA_QUERY;
+                    let is_valid = expr.is_match(where_formula_str);
+                    statement.where_source = Some(where_formula_str.to_string());
+                    if !is_valid {
                         errors.push(
                             PlanetError::new(
                                 500, 
-                                Some(tr!("Folder name is required.")),
+                                Some(tr!("WHERE formula is not valid.")),
                             )
                         )
                     }
                 }
-                let mut statement = SelectFromFolderCompiledStmt::defaults(
-                    folder_name, 
-                    page, 
-                    number_items
-                );
-                // 3 - Columns
-                let expr = &RE_SELECT_COLUMNS;
-                let captures = expr.captures(&statement_text);
-                if captures.is_some() {
-                    let captures = captures.unwrap();
-                    let columns = captures.name("Columns");
-                    if columns.is_some() {
-                        let columns_str = columns.unwrap().as_str();
-                        let columns_: Vec<&str> = columns_str.split(",").collect();
-                        let columns: Vec<String> = columns_.iter().map(|&s|s.trim().into()).collect();
-                        statement.columns = Some(columns);
-                        let check_text = format!("SELECT {}", columns_str);
-                        statement_text = statement_text.replace(
-                            &check_text, 
-                            ""
-                        );
-                    }
-                }
-                // 4 - Sort By
-                let expr_1 = &RE_SELECT_SORTING;
-                let captures = expr_1.captures(&statement_text);
-                if captures.is_some() {
-                    let captures = captures.unwrap();
-                    let sort_by = captures.name("SortBy");
-                    if sort_by.is_some() {
-                        let mut sort_by = sort_by.unwrap().as_str();
-                        eprintln!("compile :: sort_by: {}", sort_by);
-                        let sort_by_: String;
-                        // {COLUMN A ASC|COLUMN B DESC}
-                        if sort_by.find(SORT_MODE_ASC).is_none() && sort_by.find(SORT_MODE_DESC).is_none() {
-                            eprintln!("compile :: I add ASC since no mode defined...");
-                            sort_by_ = format!("{} ASC", sort_by);
-                            sort_by = sort_by_.as_str();
-                        }
-                        eprintln!("compile :: [2] sort_by: {}", sort_by);
-                        // let mine = sort_by.find(SORT_MODE_ASC);
-                        let expr = &RE_SELECT_SORT_FIELDS;
-                        let items = expr.captures_iter(sort_by);
-                        let mut sort_items: Vec<SelectSortBy> = Vec::new();
-                        for item in items {
-                            let column = item.name("Column");
-                            let mode = item.name("Mode");
-                            let mut sort_obj = SelectSortBy{
-                                column: String::from(""),
-                                mode: SelectSortMode::Ascending
-                            };
-                            if column.is_some() {
-                                let column = column.unwrap().as_str();
-                                eprintln!("compile :: column: {}", column);
-                                sort_obj.column = column.to_string().trim().to_string();
-                            }
-                            if mode.is_some() {
-                                let mode = mode.unwrap().as_str();
-                                eprintln!("compile :: mode: {}", mode);
-                                match mode {
-                                    SORT_MODE_ASC => {
-                                        sort_obj.mode = SelectSortMode::Ascending;
-                                    },
-                                    SORT_MODE_DESC => {
-                                        sort_obj.mode = SelectSortMode::Descending;
-                                    },
-                                    _ => {}
-                                }
-                            } else {
-                                sort_obj.mode = SelectSortMode::Ascending;
-                            }
-                            sort_items.push(sort_obj);
-                        }
-                        if sort_items.len() > 0 {
-                            statement.sort_by = Some(sort_items);
-                            statement_text = expr_1.replace(&statement_text, "").to_string();
-                        }
-                    }
-                }
-                // 5 - Group By
-                let expr_1 = &RE_SELECT_GROUP_BY;
-                let captures = expr_1.captures(&statement_text);
-                if captures.is_some() {
-                    let captures = captures.unwrap();
-                    let group_by_columns = captures.name("GroupByColumns");
-                    if group_by_columns.is_some() {
-                        let group_by_columns = group_by_columns.unwrap().as_str();
-                        // Column A, Column B
-                        let expr = &RE_SELECT_GROUP_COLUMNS;
-                        let columns = expr.captures_iter(group_by_columns);
-                        let mut columns_string: Vec<String> = Vec::new();
-                        for column in columns {
-                            let column_str = column.name("Column").unwrap().as_str();
-                            columns_string.push(column_str.to_string().trim().to_string());
-                        }
-                        if columns_string.len() > 0 {
-                            statement.group_by = Some(columns_string);
-                            statement_text = expr_1.replace(&statement_text, "").to_string();
-                        }
-                    }
-                }
-                // 6 - Search
-                let expr = &RE_SELECT_SEARCH;
-                let captures = expr.captures(&statement_text);
-                if captures.is_some() {
-                    let captures = captures.unwrap();
-                    let search = captures.name("Search");
-                    if search.is_some() {
-                        let search = search.unwrap().as_str();
-                        statement.search = Some(search.to_string());
-                        statement_text = expr.replace(&statement_text, "").to_string();
-                    }
-                }
-                // 7 - Where
-                let expr_1 = &RE_SELECT_WHERE;
-                let captures = expr_1.captures(&statement_text);
-                if captures.is_some() {
-                    let captures = captures.unwrap();
-                    let where_formula = captures.name("Where");
-                    if where_formula.is_some() {
-                        let where_formula_str = where_formula.unwrap().as_str();
-                        let expr = &RE_FORMULA_QUERY;
-                        let is_valid = expr.is_match(where_formula_str);
-                        statement.where_source = Some(where_formula_str.to_string());
-                        if !is_valid {
-                            errors.push(
-                                PlanetError::new(
-                                    500, 
-                                    Some(tr!("WHERE formula is not valid.")),
-                                )
-                            )
-                        }
-                    }
-                }
-                return Ok(statement)
             }
+            return Ok(statement)
         }
         return Err(errors)
     }
@@ -1843,7 +1840,8 @@ impl<'gb> SearchCompiler<'gb> {
             let errors = statement.unwrap_err();
             return Err(errors)
         }
-        let statement = statement.unwrap();        
+        let statement = statement.unwrap();
+        eprintln!("do_compile :: statement: {:#?}", &statement);
         // 2 - Compile Where formula and validate query for existing columns.
         let validation = self.validate(
             statement,
@@ -1856,6 +1854,7 @@ impl<'gb> SearchCompiler<'gb> {
             return Err(errors)
         }
         let statement = validation.unwrap();
+        eprintln!("SearchCompiler.do_compile :: statement: {:#?}", &statement);
         return Ok(statement)
     }
 
@@ -2355,21 +2354,195 @@ impl<'gb> SearchIterator<'gb>{
         return sorter_list
     }
 
-    pub fn do_search(
-        &self
-    ) -> Result<Vec<SearchResultItem>, Vec<PlanetError>> {
-        let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
-        let query = self.query.where_compiled.clone();
-        let space_database = self.space_database.clone();
-        let planet_context = self.env.planet_context.clone();
-        let context = self.env.context.clone();
-        let home_dir = planet_context.home_path.clone();
-        let account_id = context.account_id.clone().unwrap_or_default();
-        let space_id = context.space_id;
-        let site_id = context.site_id.clone();
-        let db_folder = self.db_folder.clone().unwrap();
-        let folder = self.folder.clone().unwrap();
-        let folder_id = folder.id.clone().unwrap_or_default();
+    fn fetch_remote_link_data(
+        &self,
+        remote_folder_map: &HashMap<String, HashMap<u16, TreeFolderItem>>,
+        linked_folder_name: &String,
+        item_data_list: &Vec<BTreeMap<String, String>>,
+        remote_folder_data_map: &HashMap<String, HashMap<String, DbData>>,
+        column_id: &String,
+        data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
+    ) -> Result<BTreeMap<String, Vec<BTreeMap<String, String>>>, PlanetError> {
+        eprintln!("SearchIterator.fetch_remote_link_data :: [no] I have no data on remote folder data map");
+        let remote_folder_map = remote_folder_map.clone();
+        let linked_folder_name = linked_folder_name.clone();
+        let item_data_list = item_data_list.clone();
+        let mut remote_folder_data_map = remote_folder_data_map.clone();
+        let column_id = column_id.clone();
+        let mut data_map = data_map.clone();
+        let partitions_map = remote_folder_map.get(&linked_folder_name);
+        if partitions_map.is_some() {
+            let partitions_map = partitions_map.unwrap();
+            let db_remote_folder_item = partitions_map.get(&1).unwrap();
+            let mut item_data_list_new: Vec<BTreeMap<String, String>> = Vec::new();
+            for linked_data_item in item_data_list {
+                let linked_data_item_id = linked_data_item.get(ID);
+                let mut item_data_new: BTreeMap<String, String> = BTreeMap::new();
+                if linked_data_item_id.is_some() {
+                    let linked_data_item_id = linked_data_item_id.unwrap();
+                    item_data_new.insert(ID.to_string(), linked_data_item_id.clone());
+                    let partition = db_remote_folder_item.clone().get_partition(
+                        linked_data_item_id
+                    );
+                    if partition.is_ok() {
+                        let partition = partition.unwrap();
+                        let tree_folder_item = partitions_map.get(&partition);
+                        if tree_folder_item.is_some() {
+                            let mut tree_folder_item = tree_folder_item.unwrap().clone();
+                            let remote_item = tree_folder_item.get(
+                                &linked_folder_name, 
+                                GetItemOption::ById(linked_data_item_id.clone()), 
+                                None
+                            );
+                            if remote_item.is_ok() {
+                                let remote_item = remote_item.unwrap();
+                                // eprintln!("SearchIterator.fetch_remote_link_data :: remote_item: {:#?}", &remote_item);
+                                let remote_item_name = remote_item.name.clone().unwrap();
+                                let remote_item_data = remote_item.data.clone().unwrap();
+                                item_data_new.insert(NAME_CAMEL.to_string(), remote_item_name);
+                                for (column_id, column_data) in remote_item_data {
+                                    let value = get_value_list(&column_data);
+                                    if value.is_some() {
+                                        let value = value.unwrap();
+                                        item_data_new.insert(column_id, value);
+                                    }
+                                }
+                                let mut map: HashMap<String, DbData> = HashMap::new();
+                                map.insert(linked_data_item_id.clone(), remote_item.clone());
+                                remote_folder_data_map.insert(linked_folder_name.clone(), map.clone());
+                            }
+                        }
+                    }
+                }
+                item_data_list_new.push(item_data_new);
+            }
+            data_map.insert(column_id.clone(), item_data_list_new);
+        }
+        return Ok(data_map)
+    }
+
+    fn process_item_links(
+        &self,
+        data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
+        links_folder_by_column_id: &HashMap<String, String>,
+        remote_folder_data_map: &HashMap<String, HashMap<String, DbData>>,
+        remote_folder_map: &HashMap<String, HashMap<u16, TreeFolderItem>>,
+        column_config_map: &BTreeMap<String, ColumnConfig>,
+        remote_folder_obj_map: &HashMap<String, DbData>,
+    ) -> BTreeMap<String, Vec<BTreeMap<String, String>>> {
+        let mut data_map = data_map.clone();
+        let links_folder_by_column_id = links_folder_by_column_id.clone();
+        let remote_folder_data_map = remote_folder_data_map.clone();
+        let remote_folder_map = remote_folder_map.clone();
+        let column_config_map = column_config_map.clone();
+        let remote_folder_obj_map = remote_folder_obj_map.clone();
+        // Inject data from LINKS into data_map.
+        for (column_id, item_data_list) in data_map.clone() {
+            let item_data_list = item_data_list.clone();
+            let link_item = links_folder_by_column_id.get(&column_id);
+            if link_item.is_some() {
+                let linked_folder_name = link_item.unwrap();
+                let remote_data = remote_folder_data_map.get(linked_folder_name);
+                let have_remote_data = remote_data.is_some();
+                if have_remote_data {
+                    let remote_data = remote_data.unwrap();
+                    let mut item_data_list_new: Vec<BTreeMap<String, String>> = Vec::new();
+                    for linked_data_item in item_data_list.clone() {
+                        let linked_data_item_id = linked_data_item.get(ID).unwrap();
+                        let remote_item = remote_data.get(linked_data_item_id);
+                        let mut item_data_new: BTreeMap<String, String> = BTreeMap::new();
+                        if remote_item.is_some() {
+                            let remote_item = remote_item.unwrap();
+                            let remote_item_name = remote_item.name.clone().unwrap();
+                            item_data_new.insert(NAME_CAMEL.to_string(), remote_item_name);
+                            item_data_list_new.push(item_data_new);
+                        } else {
+                            let result = self.fetch_remote_link_data(
+                                &remote_folder_map,
+                                linked_folder_name,
+                                &item_data_list,
+                                &remote_folder_data_map,
+                                &column_id,
+                                &data_map,
+                            );
+                            if result.is_ok() {
+                                data_map = result.unwrap();
+                            }
+                        }
+                    }
+                    data_map.insert(column_id.clone(), item_data_list_new);
+                } else {
+                    let result = self.fetch_remote_link_data(
+                        &remote_folder_map,
+                        linked_folder_name,
+                        &item_data_list,
+                        &remote_folder_data_map,
+                        &column_id,
+                        &data_map,
+                    );
+                    if result.is_ok() {
+                        data_map = result.unwrap();
+                    }
+                }
+            }
+        }
+        // REFERENCE
+        for (_column_name, column) in &column_config_map {
+            let column_type = column.column_type.clone().unwrap();
+            let local_column_id = column.id.clone().unwrap();
+            let column_type = column_type.as_str();
+            if column_type == COLUMN_TYPE_REFERENCE {
+                let link_column = column.link_column.clone();
+                let remote_column = column.remote_column.clone();
+                if link_column.is_some() && remote_column.is_some() {
+                    let link_column = link_column.unwrap();
+                    let remote_column_name = remote_column.unwrap();
+                    let local_link_config = &column_config_map.get(&link_column);
+                    if local_link_config.is_some() {
+                        let local_link_config = local_link_config.unwrap();
+                        let linked_folder_name = local_link_config.linked_folder.clone().unwrap();
+                        let remote_folder = remote_folder_obj_map.get(&linked_folder_name);
+                        if remote_folder.is_some() {
+                            let remote_folder = remote_folder.unwrap();
+                            let remote_column = TreeFolder::get_column_by_name(
+                                &remote_column_name, 
+                                &remote_folder
+                            ).unwrap();
+                            let remote_column_id = remote_column.get(ID).unwrap().clone();
+                            let local_link_column_id = local_link_config.id.clone().unwrap();
+                            let remote_data = data_map.get(
+                                &local_link_column_id
+                            );
+                            if remote_data.is_some() {
+                                let remote_data = remote_data.unwrap();
+                                let mut remote_reference_data: Vec<BTreeMap<String, String>> = Vec::new();
+                                for item in remote_data {
+                                    let my_data = item.get(&remote_column_id);
+                                    if my_data.is_some() {
+                                        let my_data = my_data.unwrap();
+                                        let mut map: BTreeMap<String, String> = BTreeMap::new();
+                                        map.insert(VALUE.to_string(), my_data.clone());
+                                        remote_reference_data.push(map);
+                                    }
+                                }
+                                data_map.insert(local_column_id, remote_reference_data);
+                            }    
+                        }
+                    }
+                }
+            }
+        }
+        return data_map.clone()
+    }
+
+    fn prepare_sorting(
+        &self,
+        folder: &DbData
+    ) -> (
+        HashMap<String, SortedtBy>,
+        HashMap<String, String>
+    ) {
+        let folder = folder.clone();
         // Sorter
         let sort_by = self.query.sort_by.clone();
         let mut sorter_map: HashMap<String, SortedtBy> = HashMap::new();
@@ -2383,11 +2556,8 @@ impl<'gb> SearchIterator<'gb>{
         };
         let column_id = generate_id().unwrap_or_default();
         sort_column_type_map.insert(column_id.clone(), SORT_TYPE_STR.to_string());
-        // eprintln!("do_search :: ID column_id: {}", &column_id);
         sorter_map.insert(column_id.clone(), id_sorted);
-        let mut sorter_list: Vec<SearchSorter> = Vec::new();
         if sort_by.is_some() {
-            // eprintln!("do_search :: I have sort by...");
             let sort_by = sort_by.unwrap();
             let mut column_sort_id = 1;
             for sort_by_item in sort_by {
@@ -2418,12 +2588,32 @@ impl<'gb> SearchIterator<'gb>{
                 }
             }
         }
-        let field_config_map = ColumnConfig::get_column_config_map(
-            &planet_context,
-            &context,
-            &folder
-        ).unwrap();
-        // eprintln!("do_search :: sorter_map: {:?}", &sorter_map);
+        return (
+            sorter_map, 
+            column_type_map
+        )
+    }
+
+    fn prepare_links(
+        &self,
+        column_config_map: &BTreeMap<String, ColumnConfig>
+    ) -> Result<(
+        HashMap<String, HashMap<u16, TreeFolderItem>>,
+        HashMap<String, String>,
+        HashMap<String, DbData>,
+        TreeFolderItem
+    ), Vec<PlanetError>> {
+        let column_config_map = column_config_map.clone();
+        let space_database = self.space_database.clone();
+        let planet_context = self.env.planet_context.clone();
+        let context = self.env.context.clone();
+        let home_dir = planet_context.home_path.clone();
+        let account_id = context.account_id.clone().unwrap_or_default();
+        let space_id = context.space_id;
+        let site_id = context.site_id.clone();
+        let db_folder = self.db_folder.clone().unwrap();
+        let folder = self.folder.clone().unwrap();
+        let folder_id = folder.id.clone().unwrap_or_default();
         // TreeFolderItem
         let mut site_id_alt: Option<String> = None;
         if site_id.is_some() {
@@ -2439,28 +2629,29 @@ impl<'gb> SearchIterator<'gb>{
             folder_id.as_str(),
             &db_folder,
         );
+        // Prepare data for LINKS: remote_folder_map and links_folder_by_column_id
         if result.is_ok() {
-            let mut db_folder_item = result.unwrap();
-
+            let db_folder_item = result.unwrap();
             let mut remote_folder_map: HashMap<String, HashMap<u16, TreeFolderItem>> = HashMap::new();
             let mut links_folder_by_column_id: HashMap<String, String> = HashMap::new();
-            for (_column_name, column) in &field_config_map {
+            let mut remote_folder_obj_map: HashMap<String, DbData> = HashMap::new();
+            for (_column_name, column) in &column_config_map {
                 let column_type = column.column_type.clone().unwrap();
                 let column_id = column.id.clone().unwrap();
                 let column_type = column_type.as_str();
-                eprintln!("SearchIterator.do_search :: column_type: {}", column_type);
+                // eprintln!("SearchIterator.do_search :: column_type: {}", column_type);
                 if column_type == COLUMN_TYPE_LINK {
                     let linked_folder_name = column.linked_folder.clone().unwrap();
-                    eprintln!("SearchIterator.do_search :: linked_folder_name: {}", &linked_folder_name);
+                    // eprintln!("SearchIterator.do_search :: linked_folder_name: {}", &linked_folder_name);
                     links_folder_by_column_id.insert(column_id, linked_folder_name.clone());
                     let already_processed = &remote_folder_map.get(&linked_folder_name);
-                    eprintln!("SearchIterator.do_search :: already_processed: {:?}", already_processed);
+                    // eprintln!("SearchIterator.do_search :: already_processed: {:?}", already_processed);
                     if already_processed.is_some() {
                         continue
                     }
                     let linked_folder_obj = db_folder.get_by_name(&linked_folder_name);
                     let linked_folder_obj = linked_folder_obj.unwrap().unwrap();
-                    let linked_folder_id = linked_folder_obj.id.unwrap();
+                    let linked_folder_id = linked_folder_obj.clone().id.unwrap();
                     let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
                         space_database.connection_pool.clone(),
                         home_dir.clone().unwrap_or_default().as_str(),
@@ -2485,7 +2676,7 @@ impl<'gb> SearchIterator<'gb>{
                         return Err(errors)
                     }
                     let remote_partitions = remote_partitions.unwrap();
-                    eprintln!("SearchIterator.do_search :: remote_partitions: {:?}", &remote_partitions);
+                    // eprintln!("SearchIterator.do_search :: remote_partitions: {:?}", &remote_partitions);
                     let mut map: HashMap<u16, TreeFolderItem> = HashMap::new();
                     for remote_partition in remote_partitions {
                         let tree_folder_item = db_remote_folder_item.open_partition(&remote_partition);
@@ -2496,150 +2687,143 @@ impl<'gb> SearchIterator<'gb>{
                             return Err(errors)
                         }
                         let tree_folder_item = tree_folder_item.unwrap();
-                        let tree_folder_item = tree_folder_item.1;
+                        let tree_folder_item = tree_folder_item.0;
                         db_remote_folder_item.tree = Some(tree_folder_item);
                         map.insert(remote_partition, db_remote_folder_item.clone());
                     }
-                    remote_folder_map.insert(linked_folder_name, map);
+                    remote_folder_map.insert(linked_folder_name.clone(), map);
+                    remote_folder_obj_map.insert(linked_folder_name.clone(), linked_folder_obj.clone());
                 }
             }
             // eprintln!("SearchIterator.do_search :: remote_folder_map: {:#?}", &remote_folder_map);
-            eprintln!("SearchIterator.do_search :: links_folder_by_column_id: {:#?}", &links_folder_by_column_id);
+            // eprintln!("SearchIterator.do_search :: links_folder_by_column_id: {:#?}", &links_folder_by_column_id);
+            return Ok(
+                (
+                    remote_folder_map,
+                    links_folder_by_column_id,
+                    remote_folder_obj_map,
+                    db_folder_item
+                )
+            )
+        }
+        let mut errors: Vec<PlanetError> = Vec::new();
+        let error = PlanetError::new(
+            500, 
+            Some(tr!("Error in preparing for links processing."))
+        );
+        errors.push(error);
+        return Err(errors)
+    }
 
-            let partitions = db_folder_item.get_partitions();
-            if partitions.is_ok() {
-                let partitions = partitions.unwrap();
-                // eprintln!("do_search :: partitions: {:?}", &partitions);
-                for partition in partitions {
-                    let (db_tree, _index_tree) = db_folder_item.open_partition(&partition).unwrap();
-                    // eprintln!("do_search :: partition: {}", &partition);
-                    // I may need botth db and index to execute formula
-                    let iter = db_tree.iter();
-                    for db_result in iter {
-                        if db_result.is_err() {
-                            let mut errors: Vec<PlanetError> = Vec::new();
-                            errors.push(
-                                PlanetError::new(
-                                    500, 
-                                    Some(tr!("Could not fetch item from database"))
-                                )
-                            );
-                            return Err(errors)
-                        }
-                        let item_tuple = db_result.unwrap();
-                        // let item_id = item_tuple.0;
-                        // eprintln!("do_search :: item_id: {:?}", &item_id);
-                        let item = item_tuple.1;
-                        let item_db = item.to_vec();
-                        let item_ = EncryptedMessage::deserialize(
-                            item_db
-                        ).unwrap();
-                        let item_ = DbData::decrypt_owned(
-                            &item_, 
-                            &shared_key);
-                        match item_ {
-                            Ok(_) => {
-                                let item = item_.unwrap();
-                                // eprintln!("do_search :: item: {:#?}", &item);
-                                // execute formula
-                                if query.is_some() {
-                                    let query = query.clone().unwrap();
-                                    let mut data_map = item.clone().data.unwrap();
-                                    eprintln!("SearchIterator.do_search :: data_map: {:#?}", &data_map);
-                                    eprintln!("SearchIterator.do_search :: query: {:#?}", &query);
+    pub fn do_search(
+        &self
+    ) -> Result<Vec<SearchResultItem>, Vec<PlanetError>> {
+        let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
+        let query = self.query.where_compiled.clone();
+        let planet_context = self.env.planet_context.clone();
+        let context = self.env.context.clone();
+        let folder = self.folder.clone().unwrap();
+        // Sorter
+        let mut sorter_list: Vec<SearchSorter> = Vec::new();
+        let sorter_tuple = self.prepare_sorting(&folder);
+        let sorter_map = sorter_tuple.0;
+        let column_type_map = sorter_tuple.1;
+        // Get columns config for current folder
+        let column_config_map = ColumnConfig::get_column_config_map(
+            &planet_context,
+            &context,
+            &folder
+        ).unwrap();
 
-                                    // Inject data from links into data_map, I send the struct with remote folder partitions
-                                    for (column_id, item_data_list) in data_map.clone() {
-                                        let link_item = links_folder_by_column_id.get(&column_id);
-                                        if link_item.is_some() {
-                                            let linked_folder_name = link_item.unwrap();
-                                            let partitions_map = remote_folder_map.get(linked_folder_name);
-                                            if partitions_map.is_some() {
-                                                let partitions_map = partitions_map.unwrap();
-                                                let db_remote_folder_item = partitions_map.get(&1).unwrap();
-                                                let mut item_data_list_new: Vec<BTreeMap<String, String>> = Vec::new();
-                                                for linked_data_item in item_data_list {
-                                                    let linked_data_item_id = linked_data_item.get(ID);
-                                                    let mut item_data_new: BTreeMap<String, String> = BTreeMap::new();
-                                                    if linked_data_item_id.is_some() {
-                                                        let linked_data_item_id = linked_data_item_id.unwrap();
-                                                        item_data_new.insert(ID.to_string(), linked_data_item_id.clone());
-                                                        let partition = db_remote_folder_item.clone().get_partition(
-                                                            linked_data_item_id
-                                                        );
-                                                        if partition.is_ok() {
-                                                            let partition = partition.unwrap();
-                                                            let tree_folder_item = partitions_map.get(&partition);
-                                                            if tree_folder_item.is_some() {
-                                                                let mut tree_folder_item = tree_folder_item.unwrap().clone();
-                                                                let remote_item = tree_folder_item.get(
-                                                                    linked_folder_name, 
-                                                                    GetItemOption::ById(linked_data_item_id.clone()), 
-                                                                    None
-                                                                );
-                                                                if remote_item.is_ok() {
-                                                                    let remote_item = remote_item.unwrap();
-                                                                    let remote_item_name = remote_item.name.unwrap();
-                                                                    item_data_new.insert(NAME_CAMEL.to_string(), remote_item_name);
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                    item_data_list_new.push(item_data_new);
-                                                }
-                                                data_map.insert(column_id.clone(), item_data_list_new);
-                                            }
-                                        }
-                                    }
-                                    eprintln!("SearchIterator.do_search :: [after links embbed] data_map: {:#?}", &data_map);
+        let result = self.prepare_links(&column_config_map);
+        if result.is_err() {
+            let errors = result.unwrap_err();
+            return Err(errors)
+        }
+        let links_tuple = result.unwrap();
+        let remote_folder_map = links_tuple.0;
+        let links_folder_by_column_id = links_tuple.1;
+        let remote_folder_obj_map = links_tuple.2;
+        let mut db_folder_item = links_tuple.3;
 
-                                    // This will be used by SEARCH function, implemented when SEARCH is done
-                                    // index_data_map
-                                    let formula_result = execute_formula(
-                                        &query, 
-                                        &data_map, 
-                                        &field_config_map
-                                    );
-                                    if formula_result.is_err() {
-                                        let error = formula_result.unwrap_err();
-                                        let mut errors: Vec<PlanetError> = Vec::new();
-                                        errors.push(error);
-                                        return Err(errors)
-                                    }
-                                    let formula_result = formula_result.unwrap();
-                                    let formula_matches: bool;
-                                    if formula_result == String::from("1") {
-                                        formula_matches = true;
-                                    } else {
-                                        formula_matches = false;
-                                    }
-                                    // eprintln!("SearchIterator.do_search :: formula_matches: {}", 
-                                    //     &formula_matches
-                                    // );
-                                    if formula_matches {                                
-                                        let result = self.add_to_sorter(
-                                            &partition,
-                                            &item,
-                                            &column_type_map,
-                                            &sorter_map,
-                                            &sorter_list
-                                        );
-                                        if result.is_ok() {
-                                            let sorter_list_ = result.unwrap();
-                                            sorter_list = sorter_list_;
-                                        } else {
-                                            let mut errors: Vec<PlanetError> = Vec::new();
-                                            errors.push(
-                                                PlanetError::new(500, Some(tr!(
-                                                    "Could not sort values from query."
-                                                )))
-                                            );
-                                            return Err(errors)
-                                        }
-                                    }
+        let partitions = db_folder_item.get_partitions();
+        if partitions.is_ok() {
+            let partitions = partitions.unwrap();
+            // eprintln!("do_search :: partitions: {:?}", &partitions);
+            let remote_folder_data_map: HashMap<String, HashMap<String, DbData>> = HashMap::new();
+            for partition in partitions {
+                let (db_tree, _index_tree) = db_folder_item.open_partition(&partition).unwrap();
+                // eprintln!("do_search :: partition: {}", &partition);
+                // I may need botth db and index to execute formula
+                let iter = db_tree.iter();
+                // folder name => item id => DbData
+                for db_result in iter {
+                    if db_result.is_err() {
+                        let mut errors: Vec<PlanetError> = Vec::new();
+                        errors.push(
+                            PlanetError::new(
+                                500, 
+                                Some(tr!("Could not fetch item from database"))
+                            )
+                        );
+                        return Err(errors)
+                    }
+                    let item_tuple = db_result.unwrap();
+                    // let item_id = item_tuple.0;
+                    // eprintln!("do_search :: item_id: {:?}", &item_id);
+                    let item = item_tuple.1;
+                    let item_db = item.to_vec();
+                    let item_ = EncryptedMessage::deserialize(
+                        item_db
+                    ).unwrap();
+                    let item_ = DbData::decrypt_owned(
+                        &item_, 
+                        &shared_key);
+                    match item_ {
+                        Ok(_) => {
+                            let item = item_.unwrap();
+                            // eprintln!("do_search :: item: {:#?}", &item);
+                            // execute formula
+                            if query.is_some() {
+                                let query = query.clone().unwrap();
+                                let mut data_map = item.clone().data.unwrap();
+                                // eprintln!("SearchIterator.do_search :: data_map: {:#?}", &data_map);
+                                // eprintln!("SearchIterator.do_search :: query: {:#?}", &query);
+
+                                // Inject data from LINKS and REFERENCES into data_map.
+                                data_map = self.process_item_links(
+                                    &data_map,
+                                    &links_folder_by_column_id,
+                                    &remote_folder_data_map,
+                                    &remote_folder_map,
+                                    &column_config_map,
+                                    &remote_folder_obj_map,
+                                );
+
+                                // This will be used by SEARCH function, implemented when SEARCH is done
+                                // index_data_map
+                                let formula_result = execute_formula(
+                                    &query, 
+                                    &data_map, 
+                                    &column_config_map
+                                );
+                                if formula_result.is_err() {
+                                    let error = formula_result.unwrap_err();
+                                    let mut errors: Vec<PlanetError> = Vec::new();
+                                    errors.push(error);
+                                    return Err(errors)
+                                }
+                                let formula_result = formula_result.unwrap();
+                                let formula_matches: bool;
+                                if formula_result == String::from("1") {
+                                    formula_matches = true;
                                 } else {
-                                    // eprintln!("do_search :: No WHERE...");
-                                    // Add to sorting, since no where formula, we add all items
+                                    formula_matches = false;
+                                }
+                                // eprintln!("SearchIterator.do_search :: formula_matches: {}", 
+                                //     &formula_matches
+                                // );
+                                if formula_matches {
                                     let result = self.add_to_sorter(
                                         &partition,
                                         &item,
@@ -2650,7 +2834,6 @@ impl<'gb> SearchIterator<'gb>{
                                     if result.is_ok() {
                                         let sorter_list_ = result.unwrap();
                                         sorter_list = sorter_list_;
-                                        // eprintln!("do_search :: ALL :: sorter_list: {:#?}", &sorter_list);
                                     } else {
                                         let mut errors: Vec<PlanetError> = Vec::new();
                                         errors.push(
@@ -2661,16 +2844,39 @@ impl<'gb> SearchIterator<'gb>{
                                         return Err(errors)
                                     }
                                 }
-                            },
-                            Err(_) => {
-                                let mut errors: Vec<PlanetError> = Vec::new();
-                                errors.push(
-                                    PlanetError::new(500, Some(tr!(
-                                        "Could not fetch item from database"
-                                    )))
+                            } else {
+                                // eprintln!("do_search :: No WHERE...");
+                                // Add to sorting, since no where formula, we add all items
+                                let result = self.add_to_sorter(
+                                    &partition,
+                                    &item,
+                                    &column_type_map,
+                                    &sorter_map,
+                                    &sorter_list
                                 );
-                                return Err(errors)
+                                if result.is_ok() {
+                                    let sorter_list_ = result.unwrap();
+                                    sorter_list = sorter_list_;
+                                    // eprintln!("do_search :: ALL :: sorter_list: {:#?}", &sorter_list);
+                                } else {
+                                    let mut errors: Vec<PlanetError> = Vec::new();
+                                    errors.push(
+                                        PlanetError::new(500, Some(tr!(
+                                            "Could not sort values from query."
+                                        )))
+                                    );
+                                    return Err(errors)
+                                }
                             }
+                        },
+                        Err(_) => {
+                            let mut errors: Vec<PlanetError> = Vec::new();
+                            errors.push(
+                                PlanetError::new(500, Some(tr!(
+                                    "Could not fetch item from database"
+                                )))
+                            );
+                            return Err(errors)
                         }
                     }
                 }
@@ -2710,123 +2916,116 @@ impl<'gb> SearchIterator<'gb>{
             column_id = column_data.get(ID).unwrap().clone();
         }
         let query = self.query.where_compiled.clone();
-        let space_database = self.space_database.clone();
         let planet_context = self.env.planet_context.clone();
         let context = self.env.context.clone();
-        let home_dir = planet_context.home_path.clone();
-        let account_id = context.account_id.clone().unwrap_or_default();
-        let space_id = context.space_id;
-        let site_id = context.site_id.clone();
-        let db_folder = self.db_folder.clone().unwrap();
-        let folder_id = folder.id.clone().unwrap_or_default();
-        let field_config_map = ColumnConfig::get_column_config_map(
+
+        // Columns config map
+        let column_config_map = ColumnConfig::get_column_config_map(
             &planet_context,
             &context,
             &folder
         ).unwrap();
-        // TreeFolderItem
-        let mut site_id_alt: Option<String> = None;
-        if site_id.is_some() {
-            let site_id = site_id.clone().unwrap();
-            site_id_alt = Some(site_id.clone().to_string());
+
+        let result = self.prepare_links(&column_config_map);
+        if result.is_err() {
+            let errors = result.unwrap_err();
+            return Err(errors)
         }
-        let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
-            space_database.connection_pool.clone(),
-            home_dir.clone().unwrap_or_default().as_str(),
-            &account_id,
-            space_id,
-            site_id_alt,
-            folder_id.as_str(),
-            &db_folder,
-        );
+        let links_tuple = result.unwrap();
+        let remote_folder_map = links_tuple.0;
+        let links_folder_by_column_id = links_tuple.1;
+        let remote_folder_obj_map = links_tuple.2;
+        let mut folder_item = links_tuple.3;
+
+        // TreeFolderItem
+        // let mut site_id_alt: Option<String> = None;
+        // if site_id.is_some() {
+        //     let site_id = site_id.clone().unwrap();
+        //     site_id_alt = Some(site_id.clone().to_string());
+        // }
+        // let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
+        //     space_database.connection_pool.clone(),
+        //     home_dir.clone().unwrap_or_default().as_str(),
+        //     &account_id,
+        //     space_id,
+        //     site_id_alt,
+        //     folder_id.as_str(),
+        //     &db_folder,
+        // );
         let mut search_count: usize = 0;
         let mut column_data_set: HashSet<String> = HashSet::new();
-        if result.is_ok() {
-            let mut folder_item = result.unwrap();
-            let partitions = folder_item.get_partitions();
-            if partitions.is_ok() {
-                let partitions = partitions.unwrap();
-                for partition in partitions {
-                    let (db_tree, _index_tree) = folder_item.open_partition(&partition).unwrap();
-                    // I may need botth db and index to execute formula
-                    let iter = db_tree.iter();
-                    for db_result in iter {
-                        if db_result.is_err() {
-                            let mut errors: Vec<PlanetError> = Vec::new();
-                            errors.push(
-                                PlanetError::new(
-                                    500, 
-                                    Some(tr!("Could not fetch item from database"))
-                                )
-                            );
-                            return Err(errors)
-                        }
-                        let item_tuple = db_result.unwrap();
-                        // let item_id = item_tuple.0;
-                        let item = item_tuple.1;
-                        let item_db = item.to_vec();
-                        let item_ = EncryptedMessage::deserialize(
-                            item_db
-                        ).unwrap();
-                        let item_ = DbData::decrypt_owned(
-                            &item_, 
-                            &shared_key);
-                        match item_ {
-                            Ok(_) => {
-                                let item = item_.unwrap();
-                                // execute formula
-                                if query.is_some() {
-                                    let query = query.clone().unwrap();
-                                    let data_map = item.clone().data.unwrap();
+        // let mut folder_item = result.unwrap();
+        let partitions = folder_item.get_partitions();
+        if partitions.is_ok() {
+            let partitions = partitions.unwrap();
+            let remote_folder_data_map: HashMap<String, HashMap<String, DbData>> = HashMap::new();
+            for partition in partitions {
+                let (db_tree, _index_tree) = folder_item.open_partition(&partition).unwrap();
+                // I may need botth db and index to execute formula
+                let iter = db_tree.iter();
+                for db_result in iter {
+                    if db_result.is_err() {
+                        let mut errors: Vec<PlanetError> = Vec::new();
+                        errors.push(
+                            PlanetError::new(
+                                500, 
+                                Some(tr!("Could not fetch item from database"))
+                            )
+                        );
+                        return Err(errors)
+                    }
+                    let item_tuple = db_result.unwrap();
+                    // let item_id = item_tuple.0;
+                    let item = item_tuple.1;
+                    let item_db = item.to_vec();
+                    let item_ = EncryptedMessage::deserialize(
+                        item_db
+                    ).unwrap();
+                    let item_ = DbData::decrypt_owned(
+                        &item_, 
+                        &shared_key);
+                    match item_ {
+                        Ok(_) => {
+                            let item = item_.unwrap();
+                            // execute formula
+                            if query.is_some() {
+                                let query = query.clone().unwrap();
+                                let mut data_map = item.clone().data.unwrap();
 
-                                    // TODO: Inject link data from remote folders, common function
+                                // Inject data from LINKS and REFERENCES into data_map.
+                                data_map = self.process_item_links(
+                                    &data_map,
+                                    &links_folder_by_column_id,
+                                    &remote_folder_data_map,
+                                    &remote_folder_map,
+                                    &column_config_map,
+                                    &remote_folder_obj_map,
+                                );
 
-                                    // This will be used by SEARCH function, implemented when SEARCH is done
-                                    // index_data_map
-                                    let formula_result = execute_formula(
-                                        &query, 
-                                        &data_map, 
-                                        &field_config_map
-                                    );
-                                    if formula_result.is_err() {
-                                        let error = formula_result.unwrap_err();
-                                        let mut errors: Vec<PlanetError> = Vec::new();
-                                        errors.push(error);
-                                        return Err(errors)
-                                    }
-                                    let formula_result = formula_result.unwrap();
-                                    let formula_matches: bool;
-                                    if formula_result == String::from("1") {
-                                        formula_matches = true;
-                                    } else {
-                                        formula_matches = false;
-                                    }
-                                    eprintln!("SearchIterator.do_search_count :: formula_matches: {}", 
-                                        &formula_matches
-                                    );
-                                    if formula_matches {
-                                        if !distinct {
-                                            if has_column {
-                                                let result = TreeFolderItem::get_value(
-                                                    &column_id, &item
-                                                );
-                                                if result.is_ok() {
-                                                    search_count += 1;
-                                                }
-                                            } else {
-                                                search_count += 1;
-                                            }
-                                        } else {
-                                            let result = TreeFolderItem::get_value(
-                                                &column_id, &item
-                                            );
-                                            if result.is_ok() {
-                                                let value = result.unwrap();
-                                                column_data_set.insert(value);
-                                            }
-                                        }
-                                    }
+                                // This will be used by SEARCH function, implemented when SEARCH is done
+                                // index_data_map
+                                let formula_result = execute_formula(
+                                    &query, 
+                                    &data_map, 
+                                    &column_config_map
+                                );
+                                if formula_result.is_err() {
+                                    let error = formula_result.unwrap_err();
+                                    let mut errors: Vec<PlanetError> = Vec::new();
+                                    errors.push(error);
+                                    return Err(errors)
+                                }
+                                let formula_result = formula_result.unwrap();
+                                let formula_matches: bool;
+                                if formula_result == String::from("1") {
+                                    formula_matches = true;
                                 } else {
+                                    formula_matches = false;
+                                }
+                                eprintln!("SearchIterator.do_search_count :: formula_matches: {}", 
+                                    &formula_matches
+                                );
+                                if formula_matches {
                                     if !distinct {
                                         if has_column {
                                             let result = TreeFolderItem::get_value(
@@ -2848,16 +3047,37 @@ impl<'gb> SearchIterator<'gb>{
                                         }
                                     }
                                 }
-                            },
-                            Err(_) => {
-                                let mut errors: Vec<PlanetError> = Vec::new();
-                                errors.push(
-                                    PlanetError::new(500, Some(tr!(
-                                        "Could not fetch item from database"
-                                    )))
-                                );
-                                return Err(errors)
+                            } else {
+                                if !distinct {
+                                    if has_column {
+                                        let result = TreeFolderItem::get_value(
+                                            &column_id, &item
+                                        );
+                                        if result.is_ok() {
+                                            search_count += 1;
+                                        }
+                                    } else {
+                                        search_count += 1;
+                                    }
+                                } else {
+                                    let result = TreeFolderItem::get_value(
+                                        &column_id, &item
+                                    );
+                                    if result.is_ok() {
+                                        let value = result.unwrap();
+                                        column_data_set.insert(value);
+                                    }
+                                }
                             }
+                        },
+                        Err(_) => {
+                            let mut errors: Vec<PlanetError> = Vec::new();
+                            errors.push(
+                                PlanetError::new(500, Some(tr!(
+                                    "Could not fetch item from database"
+                                )))
+                            );
+                            return Err(errors)
                         }
                     }
                 }
@@ -2985,29 +3205,66 @@ impl<'gb> SearchOutputData {
             return Err(errors)
         }
         let mut db_items = result.unwrap();
-        // Prepare :: TreeFolderItem and data for LINKS
+        // Prepare LINKS and REFERENCES
         // folder_name => {column_id} => map data
         let mut link_data: HashMap<String, HashMap<String, Vec<BTreeMap<String, String>>>> = HashMap::new();
         let mut link_tree_map: HashMap<String, TreeFolderItem> = HashMap::new();
         let mut links_map: HashMap<String, ColumnConfig> = HashMap::new();
-        for (_column_name, config) in &column_config_map {
-            let column_id = config.id.clone().unwrap();
+        let mut ref_map: HashMap<String, Vec<(String, String)>> = HashMap::new();
+        for (link_column_name, config) in &column_config_map {
+            let local_column_id = config.id.clone().unwrap();
             let linked_folder_name = config.linked_folder.clone();
-            let column_type = config.column_type.clone().unwrap();
-            let column_type_str = column_type.as_str();
-            if column_type_str == COLUMN_TYPE_LINK && linked_folder_name.is_some() {
+            let local_column_type = config.column_type.clone().unwrap();
+            let local_column_type_str = local_column_type.as_str();
+            if local_column_type_str == COLUMN_TYPE_LINK && linked_folder_name.is_some() {
+                // remote and local column id for references way to relate to the link pointing to references
                 let linked_folder_name = linked_folder_name.unwrap();
+                let remote_folder = db_folder.get_by_name(&linked_folder_name);
+                if remote_folder.is_err() {
+                    let error = remote_folder.unwrap_err();
+                    let mut errors: Vec<PlanetError> = Vec::new();
+                    errors.push(error);
+                    return Err(errors)
+                }
+                let remote_folder = remote_folder.unwrap().unwrap();
+                // I need a list of references for link
+                let mut ref_list: Vec<(String, String)> = Vec::new();
+                for (ref_column_name, local_config) in &column_config_map {
+                    let local_column_type = local_config.column_type.clone().unwrap();
+                    let local_column_type_str = local_column_type.as_str();
+                    if local_column_type_str == COLUMN_TYPE_REFERENCE {
+                        eprintln!("do_output :: ref_column_name: {}", ref_column_name);
+                        let remote_column = local_config.remote_column.clone();
+                        let link_column = local_config.link_column.clone();
+                        if remote_column.is_some() && link_column.is_some() {
+                            let remote_column_name = remote_column.unwrap();
+                            let link_column = link_column.unwrap();
+                            if link_column.to_lowercase() == link_column_name.clone().to_lowercase() {
+                                let local_column_id = local_config.id.clone().unwrap();
+                                let column = TreeFolder::get_column_by_name(
+                                    &remote_column_name, 
+                                    &remote_folder
+                                ).unwrap();
+                                let remote_column_id = column.get(ID).unwrap().clone();
+                                ref_list.push((local_column_id, remote_column_id));
+                            }
+                        }
+                    }
+                }
+                if ref_list.len() > 0 {
+                    ref_map.insert(local_column_id.clone(), ref_list);
+                }
                 let map_linked_folder = link_data.get(&linked_folder_name);
-                links_map.insert(column_id.clone(), config.clone());
+                links_map.insert(local_column_id.clone(), config.clone());
                 if map_linked_folder.is_some() {
                     let mut map_linked_folder = map_linked_folder.unwrap().clone();
                     let list: Vec<BTreeMap<String, String>> = Vec::new();
-                    map_linked_folder.insert(column_id, list);
+                    map_linked_folder.insert(local_column_id, list);
                     link_data.insert(linked_folder_name, map_linked_folder);
                 } else {
                     let mut column_id_map: HashMap<String, Vec<BTreeMap<String, String>>> = HashMap::new();
                     let list: Vec<BTreeMap<String, String>> = Vec::new();
-                    column_id_map.insert(column_id, list);
+                    column_id_map.insert(local_column_id, list);
                     link_data.insert(linked_folder_name.clone(), column_id_map);
                     let linked_folder = db_folder.get_by_name(&linked_folder_name).unwrap().unwrap();
                     let linked_folder_id = linked_folder.id.unwrap();
@@ -3024,8 +3281,9 @@ impl<'gb> SearchOutputData {
                 }
             }
         }
-        // eprintln!("do_output :: link_data: {:#?}", &link_data);
+        // These items are the ones being sent to the serializer to display data
         let mut items: Vec<DbData> = Vec::new();
+        let mut linked_item_data_map: BTreeMap<String, DbData> = BTreeMap::new();
         for partition in partition_list {
             // Open partition, having db tree
             let result = db_items.open_partition(&partition);
@@ -3079,15 +3337,13 @@ impl<'gb> SearchOutputData {
                         match item_ {
                             Ok(_) => {
                                 let mut item = item_.unwrap();
-                                // eprintln!("do_output :: item: {:#?}", &item);
-                                // eprintln!("do_output :: column_config_map: {:#?}", &column_config_map);
                                 let data = item.data.clone();
                                 if data.is_some() {
                                     let mut data = data.unwrap();
                                     // Get data for remote LINK folders and insert into link_data map.
                                     for (column_id, item_data) in data.clone() {
                                         let link_config = links_map.get(&column_id);
-                                        if link_config.is_some() {                                            
+                                        if link_config.is_some() {
                                             let link_config = link_config.unwrap();
                                             let linked_folder_name = link_config.linked_folder.clone().unwrap();
                                             let link_data_item = link_data.get(&linked_folder_name);
@@ -3098,7 +3354,6 @@ impl<'gb> SearchOutputData {
                                                     let mut map_list = map_list.unwrap().clone();
                                                     let count = map_list.len();
                                                     if count == 0 {
-                                                        // eprintln!("do_output :: [no] I have no data on link_data for column {}", &column_id);
                                                         let mut item_data_new: Vec<BTreeMap<String, String>> = Vec::new();
                                                         let tree_folder_item = link_tree_map.get(&linked_folder_name);
                                                         if tree_folder_item.is_some() {
@@ -3108,35 +3363,77 @@ impl<'gb> SearchOutputData {
                                                                 // Check map for item data
                                                                 let linked_item = tree_folder_item.get(
                                                                     &linked_folder_name, 
-                                                                    GetItemOption::ById(item_id), 
+                                                                    GetItemOption::ById(item_id.clone()), 
                                                                     None
                                                                 );
                                                                 if linked_item.is_ok() {
                                                                     let linked_item = linked_item.unwrap();
+                                                                    let linked_item_data = &linked_item.data.clone().unwrap();
+                                                                    linked_item_data_map.insert(item_id.clone(), linked_item.clone());
                                                                     let linked_item_name = linked_item.name.unwrap();
                                                                     item.insert(NAME_CAMEL.to_string(), linked_item_name);
                                                                     item_data_new.push(item);
+                                                                    // REFERENCES
+                                                                    let ref_data = ref_map.get(&column_id);
+                                                                    if ref_data.is_some() {
+                                                                        let ref_data_list = ref_data.unwrap();
+                                                                        for ref_data in ref_data_list {
+                                                                            let ref_data = ref_data.clone();
+                                                                            let local_ref_column_id = ref_data.0;
+                                                                            let remote_ref_column_id = ref_data.1;
+                                                                            let ref_item = linked_item_data.get(
+                                                                                &remote_ref_column_id
+                                                                            );
+                                                                            if ref_item.is_some() {
+                                                                                let ref_item = ref_item.unwrap();
+                                                                                data.insert(local_ref_column_id, ref_item.clone());
+                                                                            }
+                                                                        }
+                                                                    }
                                                                 }
                                                             }
-                                                            // eprintln!("do_output :: [0] item_data_new: {:#?}", &item_data_new);
                                                             data.insert(column_id.clone(), item_data_new.clone());
                                                             map_list = item_data_new;
                                                             link_data_item.insert(column_id.clone(), map_list);
                                                             link_data.insert(linked_folder_name.clone(), link_data_item);
                                                         }
                                                     } else {
-                                                        // eprintln!("do_output :: [yes] I have data on link_data for column {}", &column_id);
                                                         data.insert(column_id.clone(), map_list.clone());
+                                                        // REFERENCES
+                                                        for map_item in map_list {
+                                                            let item_id = map_item.get(ID);
+                                                            if item_id.is_some() {
+                                                                let item_id = item_id.unwrap().clone();
+                                                                let linked_item = linked_item_data_map.get(&item_id);
+                                                                if linked_item.is_some() {
+                                                                    let linked_item = linked_item.unwrap().clone();
+                                                                    let linked_item_data = &linked_item.data.clone().unwrap();
+                                                                    let ref_data = ref_map.get(&column_id);
+                                                                    if ref_data.is_some() {
+                                                                        let ref_data_list = ref_data.unwrap();
+                                                                        for ref_data in ref_data_list {
+                                                                            let ref_data = ref_data.clone();
+                                                                            let local_ref_column_id = ref_data.0;
+                                                                            let remote_ref_column_id = ref_data.1;
+                                                                            let ref_item = linked_item_data.get(
+                                                                                &remote_ref_column_id
+                                                                            );
+                                                                            if ref_item.is_some() {
+                                                                                let ref_item = ref_item.unwrap();
+                                                                                data.insert(local_ref_column_id, ref_item.clone());
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             }
                                         }
                                     }
-                                    // eprintln!("do_output :: data: {:#?}", &data);
                                     item.data = Some(data);
                                 }
-                                // eprintln!("do_output :: link_data: {:#?}", &link_data);
-                                // eprintln!("do_output :: item: {:#?}", &item);
                                 if columns.len() == 0 {
                                     items.push(item);
                                 } else {
@@ -3175,7 +3472,6 @@ impl<'gb> SearchOutputData {
         );
         return Ok(result)
     }
-
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -2309,9 +2309,11 @@ impl FolderItem for TreeFolderItem {
                 match item_ {
                     Ok(_) => {
                         let mut item = item_.unwrap();
+                        // eprintln!("TreeFolderItem.get :: item: {:#?}", &item);
                         if columns.is_none() {
-                            Ok(item)    
+                            Ok(item)
                         } else {
+                            eprintln!("TreeFolderItem.get :: I filter by columns: {:?}", &columns);
                             // eprintln!("get :: item: {:#?}", &item);
                             // If columns is informed, then I need to remove from item.data columns not requested
                             // data: Some(

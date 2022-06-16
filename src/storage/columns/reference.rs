@@ -352,9 +352,19 @@ impl<'gb> ObjectStorageColumn<'gb> for ReferenceColumn<'gb> {
     }
     fn get_config(
         &mut self, 
-        _: &BTreeMap<String, String>,
+        column_config_map: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {
-        let config = self.config.clone();
+        let mut config = self.config.clone();
+        let link_column = column_config_map.get(LINK_COLUMN);
+        if link_column.is_some() {
+            let link_column = link_column.unwrap();
+            config.link_column = Some(link_column.clone());
+        }
+        let remote_column = column_config_map.get(REMOTE_COLUMN);
+        if remote_column.is_some() {
+            let remote_column = remote_column.unwrap();
+            config.remote_column = Some(remote_column.clone());
+        }
         return Ok(config)
     }
     fn validate(
