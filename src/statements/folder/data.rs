@@ -3130,41 +3130,11 @@ pub struct SearchOutputData{
 
 impl<'gb> SearchOutputData {
 
-    pub fn do_output(
+    fn prepare_items_partition(
         &self,
-        env: &'gb Environment<'gb>,
-        space_database: &SpaceDatabase,
-        statement: SelectFromFolderCompiledStmt,
-        db_folder: &TreeFolder,
-        folder: &DbData,
-        results: &Vec<SearchResultItem>,
-        columns: &Option<Vec<String>>,
-        total: usize,
-        elapsed_time: usize,
-        column_config_map: BTreeMap<String, ColumnConfig>
-    ) -> Result<String, Vec<PlanetError>> {
-        let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
+        results: &Vec<SearchResultItem>
+    ) -> (Vec<u16>, HashMap<u16, Vec<SearchResultItem>>) {
         let results = results.clone();
-        let columns_wrap = columns.clone();
-        let mut columns: Vec<String> = Vec::new();
-        if columns_wrap.is_some() {
-            columns = columns_wrap.unwrap();
-        }
-        let space_database = space_database.clone();
-        let planet_context = env.planet_context.clone();
-        let context = env.context.clone();
-        let home_dir = planet_context.home_path.clone();
-        let account_id = context.account_id.clone().unwrap_or_default();
-        let space_id = context.space_id;
-        let site_id = context.site_id.clone();
-        let mut site_id_alt: Option<String> = None;
-        let mut errors: Vec<PlanetError> = Vec::new();
-        if site_id.is_some() {
-            let site_id = site_id.clone().unwrap();
-            site_id_alt = Some(site_id.clone().to_string());
-        }
-        let folder_id = folder.id.clone().unwrap();
-        let folder_name = folder.name.clone().unwrap();
         let mut partition_list: Vec<u16> = Vec::new();
         let mut partitions: HashSet<u16> = HashSet::new();
         let mut results_by_partition: HashMap<u16, Vec<SearchResultItem>> = HashMap::new();
@@ -3189,22 +3159,35 @@ impl<'gb> SearchOutputData {
                 results_by_partition.insert(partition, list);
             }
         }
-        // Init TreeFolderItem
-        let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
-            space_database.connection_pool.clone(),
-            home_dir.clone().unwrap_or_default().as_str(),
-            &account_id,
-            space_id,
-            site_id_alt.clone(),
-            folder_id.as_str(),
-            &db_folder,
-        );
-        if result.is_err() {
-            let error = result.unwrap_err();
-            errors.push(error);
-            return Err(errors)
+        return (
+            partition_list, 
+            results_by_partition
+        )
+    }
+
+    fn prepare_links_references(
+        &self,
+        env: &'gb Environment<'gb>,
+        space_database: &SpaceDatabase,
+        column_config_map: BTreeMap<String, ColumnConfig>,
+        db_folder: &TreeFolder,
+    ) -> Result<(
+        HashMap<String, HashMap<String, Vec<BTreeMap<String, String>>>>,
+        HashMap<String, TreeFolderItem>,
+        HashMap<String, ColumnConfig>,
+        HashMap<String, Vec<(String, String)>>
+    ), Vec<PlanetError>> {
+        let planet_context = env.planet_context.clone();
+        let context = env.context.clone();
+        let home_dir = planet_context.home_path.clone();
+        let account_id = context.account_id.clone().unwrap_or_default();
+        let space_id = context.space_id;
+        let site_id = context.site_id.clone();
+        let mut site_id_alt: Option<String> = None;
+        if site_id.is_some() {
+            let site_id = site_id.clone().unwrap();
+            site_id_alt = Some(site_id.clone().to_string());
         }
-        let mut db_items = result.unwrap();
         // Prepare LINKS and REFERENCES
         // folder_name => {column_id} => map data
         let mut link_data: HashMap<String, HashMap<String, Vec<BTreeMap<String, String>>>> = HashMap::new();
@@ -3281,9 +3264,197 @@ impl<'gb> SearchOutputData {
                 }
             }
         }
+        return Ok(
+            (
+                link_data,
+                link_tree_map,
+                links_map,
+                ref_map
+            )
+        )
+    }
+
+    fn do_data_links(
+        &self,
+        data: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
+        links_map: &HashMap<String, ColumnConfig>,
+        link_data: &HashMap<String, HashMap<String, Vec<BTreeMap<String, String>>>>,
+        link_tree_map: &HashMap<String, TreeFolderItem>,
+        ref_map: &HashMap<String, Vec<(String, String)>>,
+    ) -> BTreeMap<String, Vec<BTreeMap<String, String>>> {
+        let mut data = data.clone();
+        let mut link_data = link_data.clone();
+        let mut linked_item_data_map: BTreeMap<String, DbData> = BTreeMap::new();
+        // Get data for remote LINK folders and insert into link_data map.
+        for (column_id, item_data) in data.clone() {
+            let link_config = links_map.get(&column_id);
+            if link_config.is_some() {
+                let link_config = link_config.unwrap();
+                let linked_folder_name = link_config.linked_folder.clone().unwrap();
+                let link_data_item = link_data.get(&linked_folder_name);
+                if link_data_item.is_some() {
+                    let mut link_data_item = link_data_item.unwrap().clone();
+                    let map_list = link_data_item.get(&column_id);
+                    if map_list.is_some() {
+                        let mut map_list = map_list.unwrap().clone();
+                        let count = map_list.len();
+                        if count == 0 {
+                            let mut item_data_new: Vec<BTreeMap<String, String>> = Vec::new();
+                            let tree_folder_item = link_tree_map.get(&linked_folder_name);
+                            if tree_folder_item.is_some() {
+                                let mut tree_folder_item = tree_folder_item.unwrap().clone();
+                                for mut item in item_data {
+                                    let item_id = item.get(ID).unwrap().clone();
+                                    // Check map for item data
+                                    let linked_item = tree_folder_item.get(
+                                        &linked_folder_name, 
+                                        GetItemOption::ById(item_id.clone()), 
+                                        None
+                                    );
+                                    if linked_item.is_ok() {
+                                        let linked_item = linked_item.unwrap();
+                                        let linked_item_data = &linked_item.data.clone().unwrap();
+                                        linked_item_data_map.insert(item_id.clone(), linked_item.clone());
+                                        let linked_item_name = linked_item.name.unwrap();
+                                        item.insert(NAME_CAMEL.to_string(), linked_item_name);
+                                        item_data_new.push(item);
+                                        // REFERENCES
+                                        let ref_data = ref_map.get(&column_id);
+                                        if ref_data.is_some() {
+                                            let ref_data_list = ref_data.unwrap();
+                                            for ref_data in ref_data_list {
+                                                let ref_data = ref_data.clone();
+                                                let local_ref_column_id = ref_data.0;
+                                                let remote_ref_column_id = ref_data.1;
+                                                let ref_item = linked_item_data.get(
+                                                    &remote_ref_column_id
+                                                );
+                                                if ref_item.is_some() {
+                                                    let ref_item = ref_item.unwrap();
+                                                    data.insert(local_ref_column_id, ref_item.clone());
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                data.insert(column_id.clone(), item_data_new.clone());
+                                map_list = item_data_new;
+                                link_data_item.insert(column_id.clone(), map_list);
+                                link_data.insert(linked_folder_name.clone(), link_data_item);
+                            }
+                        } else {
+                            data.insert(column_id.clone(), map_list.clone());
+                            // REFERENCES
+                            for map_item in map_list {
+                                let item_id = map_item.get(ID);
+                                if item_id.is_some() {
+                                    let item_id = item_id.unwrap().clone();
+                                    let linked_item = linked_item_data_map.get(&item_id);
+                                    if linked_item.is_some() {
+                                        let linked_item = linked_item.unwrap().clone();
+                                        let linked_item_data = &linked_item.data.clone().unwrap();
+                                        let ref_data = ref_map.get(&column_id);
+                                        if ref_data.is_some() {
+                                            let ref_data_list = ref_data.unwrap();
+                                            for ref_data in ref_data_list {
+                                                let ref_data = ref_data.clone();
+                                                let local_ref_column_id = ref_data.0;
+                                                let remote_ref_column_id = ref_data.1;
+                                                let ref_item = linked_item_data.get(
+                                                    &remote_ref_column_id
+                                                );
+                                                if ref_item.is_some() {
+                                                    let ref_item = ref_item.unwrap();
+                                                    data.insert(local_ref_column_id, ref_item.clone());
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return data.clone()
+    }
+
+    pub fn do_output(
+        &self,
+        env: &'gb Environment<'gb>,
+        space_database: &SpaceDatabase,
+        statement: SelectFromFolderCompiledStmt,
+        db_folder: &TreeFolder,
+        folder: &DbData,
+        results: &Vec<SearchResultItem>,
+        columns: &Option<Vec<String>>,
+        total: usize,
+        elapsed_time: usize,
+        column_config_map: BTreeMap<String, ColumnConfig>
+    ) -> Result<String, Vec<PlanetError>> {
+        let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
+        let results = results.clone();
+        let columns_wrap = columns.clone();
+        let mut columns: Vec<String> = Vec::new();
+        if columns_wrap.is_some() {
+            columns = columns_wrap.unwrap();
+        }
+        let space_database = space_database.clone();
+        let planet_context = env.planet_context.clone();
+        let context = env.context.clone();
+        let home_dir = planet_context.home_path.clone();
+        let account_id = context.account_id.clone().unwrap_or_default();
+        let space_id = context.space_id;
+        let site_id = context.site_id.clone();
+        let mut site_id_alt: Option<String> = None;
+        let mut errors: Vec<PlanetError> = Vec::new();
+        if site_id.is_some() {
+            let site_id = site_id.clone().unwrap();
+            site_id_alt = Some(site_id.clone().to_string());
+        }
+        let folder_id = folder.id.clone().unwrap();
+        let folder_name = folder.name.clone().unwrap();
+        // Group results from search iterator in partitions and list of partitions we need to display output
+        let (
+            partition_list, 
+            results_by_partition
+        ) = self.prepare_items_partition(&results);
+        // Init TreeFolderItem
+        let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
+            space_database.connection_pool.clone(),
+            home_dir.clone().unwrap_or_default().as_str(),
+            &account_id,
+            space_id,
+            site_id_alt.clone(),
+            folder_id.as_str(),
+            &db_folder,
+        );
+        if result.is_err() {
+            let error = result.unwrap_err();
+            errors.push(error);
+            return Err(errors)
+        }
+        let mut db_items = result.unwrap();
+        // Prepare for LINKS and REFERENCES
+        let links_tuple = self.prepare_links_references(
+            env, 
+            &space_database, 
+            column_config_map.clone(), 
+            db_folder
+        );
+        if links_tuple.is_err() {
+            let errors = links_tuple.unwrap_err();
+            return Err(errors)
+        }
+        let (
+            link_data,
+            link_tree_map,
+            links_map,
+            ref_map
+        ) = links_tuple.unwrap();
         // These items are the ones being sent to the serializer to display data
         let mut items: Vec<DbData> = Vec::new();
-        let mut linked_item_data_map: BTreeMap<String, DbData> = BTreeMap::new();
         for partition in partition_list {
             // Open partition, having db tree
             let result = db_items.open_partition(&partition);
@@ -3341,97 +3512,13 @@ impl<'gb> SearchOutputData {
                                 if data.is_some() {
                                     let mut data = data.unwrap();
                                     // Get data for remote LINK folders and insert into link_data map.
-                                    for (column_id, item_data) in data.clone() {
-                                        let link_config = links_map.get(&column_id);
-                                        if link_config.is_some() {
-                                            let link_config = link_config.unwrap();
-                                            let linked_folder_name = link_config.linked_folder.clone().unwrap();
-                                            let link_data_item = link_data.get(&linked_folder_name);
-                                            if link_data_item.is_some() {
-                                                let mut link_data_item = link_data_item.unwrap().clone();
-                                                let map_list = link_data_item.get(&column_id);
-                                                if map_list.is_some() {
-                                                    let mut map_list = map_list.unwrap().clone();
-                                                    let count = map_list.len();
-                                                    if count == 0 {
-                                                        let mut item_data_new: Vec<BTreeMap<String, String>> = Vec::new();
-                                                        let tree_folder_item = link_tree_map.get(&linked_folder_name);
-                                                        if tree_folder_item.is_some() {
-                                                            let mut tree_folder_item = tree_folder_item.unwrap().clone();
-                                                            for mut item in item_data {
-                                                                let item_id = item.get(ID).unwrap().clone();
-                                                                // Check map for item data
-                                                                let linked_item = tree_folder_item.get(
-                                                                    &linked_folder_name, 
-                                                                    GetItemOption::ById(item_id.clone()), 
-                                                                    None
-                                                                );
-                                                                if linked_item.is_ok() {
-                                                                    let linked_item = linked_item.unwrap();
-                                                                    let linked_item_data = &linked_item.data.clone().unwrap();
-                                                                    linked_item_data_map.insert(item_id.clone(), linked_item.clone());
-                                                                    let linked_item_name = linked_item.name.unwrap();
-                                                                    item.insert(NAME_CAMEL.to_string(), linked_item_name);
-                                                                    item_data_new.push(item);
-                                                                    // REFERENCES
-                                                                    let ref_data = ref_map.get(&column_id);
-                                                                    if ref_data.is_some() {
-                                                                        let ref_data_list = ref_data.unwrap();
-                                                                        for ref_data in ref_data_list {
-                                                                            let ref_data = ref_data.clone();
-                                                                            let local_ref_column_id = ref_data.0;
-                                                                            let remote_ref_column_id = ref_data.1;
-                                                                            let ref_item = linked_item_data.get(
-                                                                                &remote_ref_column_id
-                                                                            );
-                                                                            if ref_item.is_some() {
-                                                                                let ref_item = ref_item.unwrap();
-                                                                                data.insert(local_ref_column_id, ref_item.clone());
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                }
-                                                            }
-                                                            data.insert(column_id.clone(), item_data_new.clone());
-                                                            map_list = item_data_new;
-                                                            link_data_item.insert(column_id.clone(), map_list);
-                                                            link_data.insert(linked_folder_name.clone(), link_data_item);
-                                                        }
-                                                    } else {
-                                                        data.insert(column_id.clone(), map_list.clone());
-                                                        // REFERENCES
-                                                        for map_item in map_list {
-                                                            let item_id = map_item.get(ID);
-                                                            if item_id.is_some() {
-                                                                let item_id = item_id.unwrap().clone();
-                                                                let linked_item = linked_item_data_map.get(&item_id);
-                                                                if linked_item.is_some() {
-                                                                    let linked_item = linked_item.unwrap().clone();
-                                                                    let linked_item_data = &linked_item.data.clone().unwrap();
-                                                                    let ref_data = ref_map.get(&column_id);
-                                                                    if ref_data.is_some() {
-                                                                        let ref_data_list = ref_data.unwrap();
-                                                                        for ref_data in ref_data_list {
-                                                                            let ref_data = ref_data.clone();
-                                                                            let local_ref_column_id = ref_data.0;
-                                                                            let remote_ref_column_id = ref_data.1;
-                                                                            let ref_item = linked_item_data.get(
-                                                                                &remote_ref_column_id
-                                                                            );
-                                                                            if ref_item.is_some() {
-                                                                                let ref_item = ref_item.unwrap();
-                                                                                data.insert(local_ref_column_id, ref_item.clone());
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
+                                    data = self.do_data_links(
+                                        &data, 
+                                        &links_map, 
+                                        &link_data, 
+                                        &link_tree_map, 
+                                        &ref_map
+                                    );
                                     item.data = Some(data);
                                 }
                                 if columns.len() == 0 {
