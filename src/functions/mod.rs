@@ -1620,10 +1620,10 @@ pub fn check_assignment(
     attr_type: AttributeType,
     db_data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
 ) -> Result<bool, PlanetError> {
-    //eprintln!("check_assignment...");
-    //eprintln!("check_assignment :: db_data_map: {:#?}", db_data_map);
-    //eprintln!("check_assignment :: attr_assignment: {:#?}", &attr_assignment);
-    eprintln!("check_assignment :: attr_type: {:#?}", &attr_type);
+    // eprintln!("check_assignment...");
+    // eprintln!("check_assignment :: db_data_map: {:#?}", db_data_map);
+    // eprintln!("check_assignment :: attr_assignment: {:#?}", &attr_assignment);
+    // eprintln!("check_assignment :: attr_type: {:#?}", &attr_type);
     let column_id = attr_assignment.name;
     let column_id = column_id.as_str();
     // eprintln!("check_assignment :: column_id: {}", column_id);
@@ -1631,6 +1631,7 @@ pub fn check_assignment(
     let name_sep = name_sep.as_str();
     let id_sep = format!(".{}", ID);
     let id_sep = id_sep.as_str();
+    let is_null = &attr_assignment.value.clone() == NULL;
     let has_obj_name = column_id.find(name_sep).is_some();
     let has_obj_id = column_id.find(id_sep).is_some();
     // eprintln!("check_assignment :: has_obj_name: {} has_obj_id: {}", &has_obj_name, &has_obj_id);
@@ -1666,6 +1667,11 @@ pub fn check_assignment(
             if list.len() > 0 {
                 db_values = Some(list);
             }
+        }
+    } else if is_null {
+        let not_found = db_data_map.get(column_id).is_none();
+        if not_found {
+            return Ok(true)
         }
     } else {
         let db_value = db_data_map.get(column_id).unwrap();

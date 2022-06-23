@@ -12,6 +12,7 @@ pub const SERDE_ERROR_TYPE_UNKNOWN_FIELD: &str = "unknown field";
 pub const SERDE_ERROR_TYPE_MISSING_FIELD: &str = "missing field";
 pub const SERDE_ERROR_TYPE_DUPLICATE_FIELD: &str = "duplicate field";
 
+pub const NULL: &str = "null";
 pub const ACCOUNT_ID: &str = "account_id";
 pub const SPACE_ID: &str = "space_id";
 pub const SITE_ID: &str = "site_id";

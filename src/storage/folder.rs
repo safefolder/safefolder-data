@@ -2031,6 +2031,21 @@ impl FolderItem for TreeFolderItem {
                 db_data.data = Some(data.clone());
             }
             eprintln!("TreeFolderItem.insert :: db_data: {:#?}", &db_data);
+            // TODO: Insert missing data as None in db
+            let tree_folder = self.tree_folder.clone();
+            let folder = tree_folder.get_by_name(folder_name);
+            if folder.is_ok() {
+                let folder = folder.unwrap();
+                if folder.is_some() {
+                    let folder = folder.unwrap();
+                    let folder_data = folder.data.unwrap();
+                    let columns = folder_data.get(COLUMNS);
+                    if columns.is_some() {
+                        let columns = columns.unwrap();
+                        eprintln!("TreeFolderItem.insert :: columns: {:#?}", columns);
+                    }
+                }
+            }
             let encrypted_data = db_data.encrypt(&shared_key).unwrap();
             let encoded: Vec<u8> = encrypted_data.serialize();
             let id = db_data.id.clone().unwrap();

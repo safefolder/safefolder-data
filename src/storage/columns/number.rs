@@ -859,14 +859,14 @@ impl StorageColumn for StatsColumn {
         }
         return Ok(config)
     }
-    fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, Vec<PlanetError>> {
+    fn validate(&self, _data: &Vec<String>) -> Result<Vec<String>, Vec<PlanetError>> {
         let config = self.config.clone();
-        eprintln!("StatsColumn.validate :: config: {:#?}", &config);
-        eprintln!("StatsColumn.validate :: data: {:#?}", &data);
+        // eprintln!("StatsColumn.validate :: config: {:#?}", &config);
+        // eprintln!("StatsColumn.validate :: data: {:#?}", &data);
         let stats_function = config.stats_function;
         let related_column = self.config.related_column.clone().unwrap();
         let data_map = self.data_map.clone().unwrap();
-        eprintln!("StatsColumn.validate :: data_map: {:#?}", &data_map);
+        // eprintln!("StatsColumn.validate :: data_map: {:#?}", &data_map);
         let column_config_map = self.column_config_map.clone();
         if column_config_map.is_none() {
             let error = PlanetError::new(
@@ -905,7 +905,7 @@ impl StorageColumn for StatsColumn {
         let mut data_new: Vec<String> = Vec::new();
         if stats_function.is_some() {
             let stats_function = stats_function.unwrap();
-            eprintln!("StatsColumn.validate :: stats_function: {}", &stats_function);
+            // eprintln!("StatsColumn.validate :: stats_function: {}", &stats_function);
             let stats_function = stats_function.as_str();
             let formula: String;
             let formula_format = String::from(FORMULA_FORMAT_NUMBER);
@@ -931,18 +931,6 @@ impl StorageColumn for StatsColumn {
                 STATS_FUNCTION_SUM => {
                     formula = format!("SUM({{{}}})", &related_column);
                 },
-                // STATS_FUNCTION_AND => {
-                //     formula_format = String::from(FORMULA_FORMAT_CHECK);
-                //     formula = format!("AND({{{}}})", &related_column);
-                // },
-                // STATS_FUNCTION_OR => {
-                //     formula_format = String::from(FORMULA_FORMAT_CHECK);
-                //     formula = format!("OR({{{}}})", &related_column);
-                // },
-                // STATS_FUNCTION_XOR => {
-                //     formula_format = String::from(FORMULA_FORMAT_CHECK);
-                //     formula = format!("XOR({{{}}})", &related_column);
-                // },
                 _ => {
                     let error = PlanetError::new(
                         500, 
@@ -955,7 +943,7 @@ impl StorageColumn for StatsColumn {
                     return Err(errors)
                 }
             }
-            eprintln!("StatsColumn.validate :: formula: {:#?}", &formula);
+            // eprintln!("StatsColumn.validate :: formula: {:#?}", &formula);
             let formula_compiled = Formula::defaults(
                 &formula,
                 &formula_format,
@@ -987,7 +975,7 @@ impl StorageColumn for StatsColumn {
             let formula_result = formula_result.unwrap();
             data_new.push(formula_result);
         }
-        eprintln!("StatsColumn.validate :: data_new: {:#?}", &data_new);
+        // eprintln!("StatsColumn.validate :: data_new: {:#?}", &data_new);
         return Ok(data_new)
     }
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {

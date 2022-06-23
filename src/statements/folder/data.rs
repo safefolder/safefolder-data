@@ -2650,7 +2650,11 @@ impl<'gb> SearchIterator<'gb>{
                         continue
                     }
                     let linked_folder_obj = db_folder.get_by_name(&linked_folder_name);
-                    let linked_folder_obj = linked_folder_obj.unwrap().unwrap();
+                    let linked_folder_obj = linked_folder_obj.unwrap();
+                    if linked_folder_obj.is_none() {
+                        continue
+                    }
+                    let linked_folder_obj = linked_folder_obj.unwrap();
                     let linked_folder_id = linked_folder_obj.clone().id.unwrap();
                     let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
                         space_database.connection_pool.clone(),
@@ -3270,7 +3274,11 @@ impl<'gb> SearchOutputData {
                     errors.push(error);
                     return Err(errors)
                 }
-                let remote_folder = remote_folder.unwrap().unwrap();
+                let remote_folder = remote_folder.unwrap();
+                if remote_folder.is_none() {
+                    continue
+                }
+                let remote_folder = remote_folder.unwrap();
                 // I need a list of references for link
                 let mut ref_list: Vec<(String, String)> = Vec::new();
                 for (ref_column_name, local_config) in &column_config_map {
