@@ -145,13 +145,17 @@ impl FunctionAttribute {
     }
     pub fn replace(&self, data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>) -> Self {
         // data_map :: {id} => Value
+        eprintln!("FunctionAttribute.replace :: data_map: {:#?}", data_map);
         let mut item = self.id.clone();
+        eprintln!("FunctionAttribute.replace :: item: {}", &item);
         let remove_quotes = self.remove_quotes.unwrap();
+        eprintln!("FunctionAttribute.replace :: remove_quotes: {}", &remove_quotes);
         if remove_quotes == true {
             item = item.replace("\"", "");
         }
         let item_string: String;
         let skip_curl = self.skip_curl;
+        eprintln!("FunctionAttribute.replace :: skip_curl: {:?}", &skip_curl);
         let mut obj = self.clone();
         if skip_curl.is_none() {
             let item_find = item.find("{");
@@ -160,6 +164,7 @@ impl FunctionAttribute {
                 let item_value = data_map.get(&item);
                 if item_value.is_some() {
                     let item_value = item_value.unwrap().clone();
+                    eprintln!("FunctionAttribute.replace :: [1] item_value: {:#?}", &item_value);
                     let item_value = get_value_list(&item_value);
                     if item_value.is_some() {
                         item_string = item_value.unwrap();
@@ -174,6 +179,7 @@ impl FunctionAttribute {
             let item_value = data_map.get(&item);
             if item_value.is_some() {
                 let item_value = item_value.unwrap().clone();
+                eprintln!("FunctionAttribute.replace :: [2] item_value: {:#?}", &item_value);
                 let item_value = get_value_list(&item_value);
                 if item_value.is_some() {
                     item_string = item_value.unwrap();
@@ -1264,6 +1270,54 @@ impl FunctionAttributeItem {
         };
         return obj
     }
+    pub fn get_values(
+        &self,
+        data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
+        column_config_map: &BTreeMap<String, ColumnConfig>
+    ) -> Result<Vec<String>, PlanetError> {
+        let attribute_id = self.id.clone().unwrap_or_default();
+        let attribute_name = self.name.clone().unwrap();
+        let config = column_config_map.get(&attribute_name);
+        let mut items: Vec<String> = Vec::new();
+        if config.is_some() {
+            let config = config.unwrap();
+            let column_type = config.column_type.clone().unwrap();
+            let column_type_str = column_type.as_str();
+            if column_type_str == COLUMN_TYPE_LINK {
+                let value_list = data_map.get(&attribute_id);
+                if value_list.is_some() {
+                    let value_list = value_list.unwrap();
+                    for value_obj in value_list {
+                        let value = value_obj.get(ID);
+                        if value.is_some() {
+                            let value = value.unwrap().clone();
+                            items.push(value);
+                        }
+                    }
+                    return Ok(items)
+                }
+            } else {
+                let value_list = data_map.get(&attribute_id);
+                if value_list.is_some() {
+                    let value_list = value_list.unwrap();
+                    for value_obj in value_list {
+                        let value = value_obj.get(VALUE);
+                        if value.is_some() {
+                            let value = value.unwrap().clone();
+                            items.push(value);
+                        }
+                    }
+                    return Ok(items)
+                }
+            }
+        }
+        return Err(
+            PlanetError::new(
+                500, 
+                Some(tr!("Error in fetching item values for sets, links or references.")),
+            )
+        );
+    }
     pub fn get_value(
         &self, 
         data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
@@ -1569,7 +1623,7 @@ pub fn check_assignment(
     //eprintln!("check_assignment...");
     //eprintln!("check_assignment :: db_data_map: {:#?}", db_data_map);
     //eprintln!("check_assignment :: attr_assignment: {:#?}", &attr_assignment);
-    //eprintln!("check_assignment :: attr_type: {:#?}", &attr_type);
+    eprintln!("check_assignment :: attr_type: {:#?}", &attr_type);
     let column_id = attr_assignment.name;
     let column_id = column_id.as_str();
     // eprintln!("check_assignment :: column_id: {}", column_id);

@@ -22,20 +22,20 @@ pub struct If {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, ColumnConfig>,
+    column_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl If {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
-        field_config_map: &BTreeMap<String, ColumnConfig>,
+        column_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
-        let field_config_map = field_config_map.clone();
+        let column_config_map = column_config_map.clone();
         return Self{
             function: function, 
             data_map: data_map, 
             attributes: None,
-            field_config_map: field_config_map
+            column_config_map: column_config_map
         };
     }
 }
@@ -102,9 +102,9 @@ impl StructureFunction for If {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
-        let field_config_map = self.field_config_map.clone();
+        let column_config_map = self.column_config_map.clone();
         let condition_item = attributes[0].clone();
-        let condition_value = condition_item.get_value(data_map, &field_config_map)?;
+        let condition_value = condition_item.get_value(data_map, &column_config_map)?;
         let expr_true_item = attributes[1].clone();
         let expr_false_item = attributes[2].clone();
         let is_assignment = condition_item.assignment.is_some();
@@ -121,10 +121,10 @@ impl StructureFunction for If {
         let result: String;
         if check {
             // Return expr_true
-            result = expr_true_item.get_value(data_map, &field_config_map)?;
+            result = expr_true_item.get_value(data_map, &column_config_map)?;
         } else {
             // Return expr_false
-            result = expr_false_item.get_value(data_map, &field_config_map)?;
+            result = expr_false_item.get_value(data_map, &column_config_map)?;
         }
         return Ok(result)
     }
@@ -135,20 +135,20 @@ pub struct And {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, ColumnConfig>,
+    column_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl And {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
-        field_config_map: &BTreeMap<String, ColumnConfig>,
+        column_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
-        let field_config_map = field_config_map.clone();
+        let column_config_map = column_config_map.clone();
         return Self{
             function: function, 
             data_map: data_map, 
             attributes: None,
-            field_config_map: field_config_map,
+            column_config_map: column_config_map,
         };
     }
 }
@@ -162,6 +162,9 @@ impl StructureFunction for And {
         //    OR({This Field}=78, {Other Field}="hola"),
         //    {This Way}=TRIM(" other ")
         // )
+        // 3.
+        // AND({Column A}, {Column B})
+        //   Checks if not Null or bool all true
         let function_parse = &self.function.clone().unwrap();
         let data_map = self.data_map.clone();
         let expr = &RE_LOGIC_ATTRS;
@@ -206,7 +209,7 @@ impl StructureFunction for And {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
-        let field_config_map = self.field_config_map.clone();
+        let column_config_map = self.column_config_map.clone();
         let mut result: String = String::from("1");
         for attribute in attributes {
             // I can have assignment or logic formula to execute
@@ -218,9 +221,18 @@ impl StructureFunction for And {
                     break
                 }
             } else {
-                // Like OR, NOT, etc...
-                let formula_result = attribute.get_value(data_map, &field_config_map)?;
-                if formula_result == String::from("0") {
+                let value = attribute.value.clone();
+                if value.is_some() {
+                    // Like OR, NOT, etc...
+                    let formula_result = attribute.get_value(
+                        data_map, 
+                        &column_config_map
+                    )?;
+                    if formula_result == String::from("0") {
+                        result = String::from("0");
+                        break;
+                    }
+                } else {
                     result = String::from("0");
                     break;
                 }
@@ -235,20 +247,20 @@ pub struct Or {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, ColumnConfig>,
+    column_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Or {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
-        field_config_map: &BTreeMap<String, ColumnConfig>,
+        column_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
-        let field_config_map = field_config_map.clone();
+        let column_config_map = column_config_map.clone();
         return Self{
             function: function, 
             data_map: data_map, 
             attributes: None,
-            field_config_map: field_config_map,
+            column_config_map: column_config_map,
         };
     }
 }
@@ -306,7 +318,7 @@ impl StructureFunction for Or {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
-        let field_config_map = self.field_config_map.clone();
+        let column_config_map = self.column_config_map.clone();
         let mut result: String = String::from("0");
         for attribute in attributes {
             // I can have assignment or logic formula to execute
@@ -319,7 +331,7 @@ impl StructureFunction for Or {
                 }
             } else {
                 // Like OR, NOT, etc...
-                let formula_result = attribute.get_value(data_map, &field_config_map)?;
+                let formula_result = attribute.get_value(data_map, &column_config_map)?;
                 if formula_result == String::from("1") {
                     result = String::from("1");
                     break
@@ -335,20 +347,20 @@ pub struct Not {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, ColumnConfig>,
+    column_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Not {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
-        field_config_map: &BTreeMap<String, ColumnConfig>,
+        column_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
-        let field_config_map = field_config_map.clone();
+        let column_config_map = column_config_map.clone();
         return Self{
             function: function, 
             data_map: data_map, 
             attributes: None,
-            field_config_map: field_config_map,
+            column_config_map: column_config_map,
         };
     }
 }
@@ -406,7 +418,7 @@ impl StructureFunction for Not {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
-        let field_config_map = self.field_config_map.clone();
+        let column_config_map = self.column_config_map.clone();
         let mut result: String = String::from("1");
         for attribute in attributes {
             // I can have assignment or logic formula to execute
@@ -419,7 +431,7 @@ impl StructureFunction for Not {
                 }
             } else {
                 // Like OR, NOT, etc...
-                let formula_result = attribute.get_value(data_map, &field_config_map)?;
+                let formula_result = attribute.get_value(data_map, &column_config_map)?;
                 if formula_result == String::from("1") {
                     result = String::from("0");
                     break
@@ -435,20 +447,20 @@ pub struct Xor {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, ColumnConfig>,
+    column_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Xor {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
-        field_config_map: &BTreeMap<String, ColumnConfig>,
+        column_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
-        let field_config_map = field_config_map.clone();
+        let column_config_map = column_config_map.clone();
         return Self{
             function: function, 
             data_map: data_map, 
             attributes: None,
-            field_config_map: field_config_map,
+            column_config_map: column_config_map,
         };
     }
 }
@@ -506,7 +518,7 @@ impl StructureFunction for Xor {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
-        let field_config_map = self.field_config_map.clone();
+        let column_config_map = self.column_config_map.clone();
         let mut result: String = String::from("0");
         let mut count = 0;
         for attribute in attributes {
@@ -520,7 +532,7 @@ impl StructureFunction for Xor {
                 }
             } else {
                 // Like OR, NOT, etc...
-                let formula_result = attribute.get_value(data_map, &field_config_map)?;
+                let formula_result = attribute.get_value(data_map, &column_config_map)?;
                 if formula_result == String::from("1") {
                     result = String::from("1");
                     count += 1;

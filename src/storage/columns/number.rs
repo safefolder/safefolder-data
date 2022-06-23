@@ -742,7 +742,7 @@ impl StorageColumn for RatingColumn {
 pub struct StatsColumn {
     pub config: ColumnConfig,
     pub allowed_functions: [String; 10],
-    pub field_config_map: Option<BTreeMap<String, ColumnConfig>>,
+    pub column_config_map: Option<BTreeMap<String, ColumnConfig>>,
     pub folder_name: Option<String>,
     pub db_folder: Option<TreeFolder>,
     pub properties_map: Option<HashMap<String, ColumnConfig>>,
@@ -751,7 +751,7 @@ pub struct StatsColumn {
 impl StatsColumn {
     pub fn defaults(
         field_config: &ColumnConfig,
-        field_config_map: Option<BTreeMap<String, ColumnConfig>>,
+        column_config_map: Option<BTreeMap<String, ColumnConfig>>,
         folder_name: Option<String>,
         db_folder: Option<TreeFolder>,
         properties_map: Option<HashMap<String, ColumnConfig>>,
@@ -772,7 +772,7 @@ impl StatsColumn {
                 STATS_FUNCTION_OR.to_string(),
                 STATS_FUNCTION_XOR.to_string(),
             ],
-            field_config_map: field_config_map,
+            column_config_map: column_config_map,
             folder_name: folder_name,
             db_folder: db_folder,
             properties_map: properties_map,
@@ -784,16 +784,16 @@ impl StatsColumn {
 impl StorageColumn for StatsColumn {
     fn create_config(
         &mut self, 
-        field_config_map: &BTreeMap<String, String>,
+        column_config_map: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
-        let mut field_config_map = field_config_map.clone();
+        let mut column_config_map = column_config_map.clone();
         let config = self.config.clone();
         let stats_function = config.stats_function;
         if stats_function.is_some() {
             let stats_function = stats_function.unwrap();
             let check = self.allowed_functions.contains(&stats_function);
             if check {
-                field_config_map.insert(STATS_FUNCTION.to_string(), stats_function);
+                column_config_map.insert(STATS_FUNCTION.to_string(), stats_function);
             } else {
                 return Err(
                     PlanetError::new(
@@ -805,10 +805,10 @@ impl StorageColumn for StatsColumn {
                 )
             }
         }
-        let link_column = config.link_column;
-        if link_column.is_some() {
-            let link_column = link_column.unwrap();
-            field_config_map.insert(LINK_COLUMN.to_string(), link_column);
+        let related_column = config.related_column;
+        if related_column.is_some() {
+            let related_column = related_column.unwrap();
+            column_config_map.insert(RELATED_COLUMN.to_string(), related_column);
         } else {
             return Err(
                 PlanetError::new(
@@ -819,14 +819,14 @@ impl StorageColumn for StatsColumn {
                 )
             )
         }
-        return Ok(field_config_map)
+        return Ok(column_config_map)
     }
     fn get_config(
         &mut self, 
-        field_config_map: &BTreeMap<String, String>,
+        column_config_map: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {
         let mut config = self.config.clone();
-        let stats_function = field_config_map.get(STATS_FUNCTION);
+        let stats_function = column_config_map.get(STATS_FUNCTION);
         if stats_function.is_some() {
             let stats_function = stats_function.unwrap();
             let check = self.allowed_functions.contains(stats_function);
@@ -843,10 +843,10 @@ impl StorageColumn for StatsColumn {
                 )
             }
         }
-        let link_column = field_config_map.get(LINK_COLUMN);
-        if link_column.is_some() {
-            let link_column = link_column.unwrap();
-            config.link_column = Some(link_column.clone());
+        let related_column = column_config_map.get(RELATED_COLUMN);
+        if related_column.is_some() {
+            let related_column = related_column.unwrap();
+            config.related_column = Some(related_column.clone());
         } else {
             return Err(
                 PlanetError::new(
@@ -861,34 +861,43 @@ impl StorageColumn for StatsColumn {
     }
     fn validate(&self, data: &Vec<String>) -> Result<Vec<String>, Vec<PlanetError>> {
         let config = self.config.clone();
+        eprintln!("StatsColumn.validate :: config: {:#?}", &config);
+        eprintln!("StatsColumn.validate :: data: {:#?}", &data);
         let stats_function = config.stats_function;
         let related_column = self.config.related_column.clone().unwrap();
         let data_map = self.data_map.clone().unwrap();
-        let field_config_map = self.field_config_map.clone();
-        if field_config_map.is_none() {
+        eprintln!("StatsColumn.validate :: data_map: {:#?}", &data_map);
+        let column_config_map = self.column_config_map.clone();
+        if column_config_map.is_none() {
             let error = PlanetError::new(
                 500, 
                 Some(tr!(
-                    "Init error for \"field_config_map\"."
+                    "Init error for \"column_config_map\"."
                 )),
             );
             let mut errors: Vec<PlanetError> = Vec::new();
             errors.push(error);
             return Err(errors)
         }
-        let field_config_map = field_config_map.unwrap();
-        let has_column = data_map.get(&related_column).is_some();
-        if !has_column {
-            let error = PlanetError::new(
-                500, 
-                Some(tr!(
-                    "Column object data has no column values for \"{}\".", &related_column
-                )),
-            );
-            let mut errors: Vec<PlanetError> = Vec::new();
-            errors.push(error);
-            return Err(errors)
+        let column_config_map = column_config_map.unwrap();
+        let related_column_config = column_config_map.get(&related_column);
+        if related_column_config.is_some() {
+            let related_column_config = related_column_config.unwrap();
+            let related_column_id = related_column_config.id.clone().unwrap();
+            let has_column = data_map.get(&related_column_id).is_some();
+            if !has_column {
+                let error = PlanetError::new(
+                    500, 
+                    Some(tr!(
+                        "Column object data has no column values for \"{}\".", &related_column
+                    )),
+                );
+                let mut errors: Vec<PlanetError> = Vec::new();
+                errors.push(error);
+                return Err(errors)
+            }    
         }
+        
         let folder_name = self.folder_name.clone().unwrap();
         let db_folder = self.db_folder.clone().unwrap();
         let properties_map = self.properties_map.clone().unwrap();
@@ -896,84 +905,89 @@ impl StorageColumn for StatsColumn {
         let mut data_new: Vec<String> = Vec::new();
         if stats_function.is_some() {
             let stats_function = stats_function.unwrap();
+            eprintln!("StatsColumn.validate :: stats_function: {}", &stats_function);
             let stats_function = stats_function.as_str();
-            for _data_item in data {
-                let formula: String;
-                let mut formula_format = String::from(FORMULA_FORMAT_NUMBER);
-                match stats_function {
-                    STATS_FUNCTION_COUNT => {
-                        formula = format!("COUNT({{{}}})", &related_column);
-                    },
-                    STATS_FUNCTION_COUNTA => {
-                        formula = format!("COUNTA({{{}}})", &related_column);
-                    },
-                    STATS_FUNCTION_COUNTALL => {
-                        formula = format!("COUNTALL({{{}}})", &related_column);
-                    },
-                    STATS_FUNCTION_MAX => {
-                        formula = format!("MAX({{{}}})", &related_column);
-                    },
-                    STATS_FUNCTION_MIN => {
-                        formula = format!("MIN({{{}}})", &related_column);
-                    },
-                    STATS_FUNCTION_AVG => {
-                        formula = format!("AVG({{{}}})", &related_column);
-                    },
-                    STATS_FUNCTION_SUM => {
-                        formula = format!("SUM({{{}}})", &related_column);
-                    },
-                    STATS_FUNCTION_AND => {
-                        formula_format = String::from(FORMULA_FORMAT_CHECK);
-                        formula = format!("AND({{{}}})", &related_column);
-                    },
-                    STATS_FUNCTION_OR => {
-                        formula_format = String::from(FORMULA_FORMAT_CHECK);
-                        formula = format!("OR({{{}}})", &related_column);
-                    },
-                    STATS_FUNCTION_XOR => {
-                        formula_format = String::from(FORMULA_FORMAT_CHECK);
-                        formula = format!("XOR({{{}}})", &related_column);
-                    },
-                    _ => {
-                        let error = PlanetError::new(
-                            500, 
-                            Some(tr!(
-                                "Stats function \"{}\" not allowed", &stats_function
-                            )),
-                        );
-                        let mut errors: Vec<PlanetError> = Vec::new();
-                        errors.push(error);
-                        return Err(errors)
-                    }
-                }
-                let formula_compiled = Formula::defaults(
-                    &formula,
-                    &formula_format,
-                    None,
-                    Some(properties_map.clone()),
-                    Some(db_folder.clone()),
-                    Some(folder_name.clone()),
-                    false,
-                    None
-                );
-                if formula_compiled.is_err() {
-                    let error = formula_compiled.unwrap_err();
+            let formula: String;
+            let formula_format = String::from(FORMULA_FORMAT_NUMBER);
+            match stats_function {
+                STATS_FUNCTION_COUNT => {
+                    formula = format!("COUNT({{{}}})", &related_column);
+                },
+                STATS_FUNCTION_COUNTA => {
+                    formula = format!("COUNTA({{{}}})", &related_column);
+                },
+                STATS_FUNCTION_COUNTALL => {
+                    formula = format!("COUNTALL({{{}}})", &related_column);
+                },
+                STATS_FUNCTION_MAX => {
+                    formula = format!("MAX({{{}}})", &related_column);
+                },
+                STATS_FUNCTION_MIN => {
+                    formula = format!("MIN({{{}}})", &related_column);
+                },
+                STATS_FUNCTION_AVG => {
+                    formula = format!("AVG({{{}}})", &related_column);
+                },
+                STATS_FUNCTION_SUM => {
+                    formula = format!("SUM({{{}}})", &related_column);
+                },
+                // STATS_FUNCTION_AND => {
+                //     formula_format = String::from(FORMULA_FORMAT_CHECK);
+                //     formula = format!("AND({{{}}})", &related_column);
+                // },
+                // STATS_FUNCTION_OR => {
+                //     formula_format = String::from(FORMULA_FORMAT_CHECK);
+                //     formula = format!("OR({{{}}})", &related_column);
+                // },
+                // STATS_FUNCTION_XOR => {
+                //     formula_format = String::from(FORMULA_FORMAT_CHECK);
+                //     formula = format!("XOR({{{}}})", &related_column);
+                // },
+                _ => {
+                    let error = PlanetError::new(
+                        500, 
+                        Some(tr!(
+                            "Stats function \"{}\" not allowed", &stats_function
+                        )),
+                    );
                     let mut errors: Vec<PlanetError> = Vec::new();
                     errors.push(error);
                     return Err(errors)
                 }
-                let formula_compiled = formula_compiled.unwrap();
-                let formula_result = execute_formula(&formula_compiled, &data_map, &field_config_map);
-                if formula_result.is_err() {
-                    let error = formula_result.unwrap_err();
-                    let mut errors: Vec<PlanetError> = Vec::new();
-                    errors.push(error);
-                    return Err(errors)
-                }
-                let formula_result = formula_result.unwrap();
-                data_new.push(formula_result);
             }
+            eprintln!("StatsColumn.validate :: formula: {:#?}", &formula);
+            let formula_compiled = Formula::defaults(
+                &formula,
+                &formula_format,
+                None,
+                Some(properties_map.clone()),
+                Some(db_folder.clone()),
+                Some(folder_name.clone()),
+                false,
+                None
+            );
+            if formula_compiled.is_err() {
+                let error = formula_compiled.unwrap_err();
+                let mut errors: Vec<PlanetError> = Vec::new();
+                errors.push(error);
+                return Err(errors)
+            }
+            let formula_compiled = formula_compiled.unwrap();
+            let formula_result = execute_formula(
+                &formula_compiled, 
+                &data_map, 
+                &column_config_map
+            );
+            if formula_result.is_err() {
+                let error = formula_result.unwrap_err();
+                let mut errors: Vec<PlanetError> = Vec::new();
+                errors.push(error);
+                return Err(errors)
+            }
+            let formula_result = formula_result.unwrap();
+            data_new.push(formula_result);
         }
+        eprintln!("StatsColumn.validate :: data_new: {:#?}", &data_new);
         return Ok(data_new)
     }
     fn get_yaml_out(&self, yaml_string: &String, value: &String) -> String {

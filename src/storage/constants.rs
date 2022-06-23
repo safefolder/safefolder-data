@@ -70,6 +70,7 @@ pub const LINKED_FOLDER: &str = "linked_folder";
 pub const DELETE_ON_LINK_DROP: &str = "delete_on_link_drop";
 pub const LINK_COLUMN: &str = "link_column";
 pub const REMOTE_COLUMN: &str = "remote_column";
+pub const REMOTE_COLUMN_TYPE: &str = "remote_column_type";
 pub const RELATED_COLUMN: &str = "related_column";
 pub const LANGUAGE_COLUMN: &str = "Language";
 pub const TEXT_COLUMN: &str = "Text";

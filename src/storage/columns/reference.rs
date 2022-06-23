@@ -44,11 +44,11 @@ impl<'gb> LinkColumn<'gb> {
 impl<'gb> ObjectStorageColumn<'gb> for LinkColumn<'gb> {
     fn create_config(
         &mut self, 
-        field_config_map: &BTreeMap<String, String>,
+        column_config_map: &BTreeMap<String, String>,
         _: &HashMap<String, ColumnConfig>,
         _: &String,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
-        let mut field_config_map = field_config_map.clone();
+        let mut column_config_map = column_config_map.clone();
         let config = self.config.clone();
         let many = config.many;
         let linked_folder = config.linked_folder;
@@ -81,7 +81,7 @@ impl<'gb> ObjectStorageColumn<'gb> for LinkColumn<'gb> {
                 );
             }
         }
-        field_config_map.insert(LINKED_FOLDER.to_string(), linked_folder);
+        column_config_map.insert(LINKED_FOLDER.to_string(), linked_folder);
         // These are options, not required
         if many.is_some() {
             let many = many.unwrap();
@@ -89,7 +89,7 @@ impl<'gb> ObjectStorageColumn<'gb> for LinkColumn<'gb> {
             if many {
                 many_string = String::from(TRUE);
             }
-            field_config_map.insert(MANY.to_string(), many_string);
+            column_config_map.insert(MANY.to_string(), many_string);
         }
         if delete_on_link_drop.is_some() {
             let delete_on_link_drop = delete_on_link_drop.unwrap();
@@ -97,19 +97,19 @@ impl<'gb> ObjectStorageColumn<'gb> for LinkColumn<'gb> {
             if delete_on_link_drop {
                 delete_on_link_drop_string = String::from(TRUE);
             }
-            field_config_map.insert(DELETE_ON_LINK_DROP.to_string(), delete_on_link_drop_string);
+            column_config_map.insert(DELETE_ON_LINK_DROP.to_string(), delete_on_link_drop_string);
         }
-        return Ok(field_config_map)
+        return Ok(column_config_map)
     }
     fn get_config(
         &mut self, 
-        field_config_map: &BTreeMap<String, String>,
+        column_config_map: &BTreeMap<String, String>,
     ) -> Result<ColumnConfig, PlanetError> {
-        let field_config_map = field_config_map.clone();
+        let column_config_map = column_config_map.clone();
         let mut config = self.config.clone();
-        let many = field_config_map.get(MANY);
-        let linked_folder = field_config_map.get(LINKED_FOLDER);
-        let delete_on_link_drop = field_config_map.get(DELETE_ON_LINK_DROP);
+        let many = column_config_map.get(MANY);
+        let linked_folder = column_config_map.get(LINKED_FOLDER);
+        let delete_on_link_drop = column_config_map.get(DELETE_ON_LINK_DROP);
         if many.is_some() {
             let many = many.unwrap().clone().to_lowercase();
             if many == String::from("1") || many == String::from(TRUE) {
@@ -261,12 +261,15 @@ impl<'gb> ReferenceColumn<'gb> {
 impl<'gb> ObjectStorageColumn<'gb> for ReferenceColumn<'gb> {
     fn create_config(
         &mut self, 
-        field_config_map: &BTreeMap<String, String>,
+        column_config_map: &BTreeMap<String, String>,
         properties_map: &HashMap<String, ColumnConfig>,
         folder_name: &String,
     ) -> Result<BTreeMap<String, String>, PlanetError> {
+        eprintln!("ReferenceColumn.create_config...");
         let db_folder = self.db_folder.clone().unwrap();
-        let mut field_config_map = field_config_map.clone();
+        let mut column_config_map = column_config_map.clone();
+        eprintln!("ReferenceColumn.create_config :: column_config_map: {:#?}", &column_config_map);
+        eprintln!("ReferenceColumn.create_config :: properties_map: {:#?}", &properties_map);
         let config = self.config.clone();
         let link_column = config.link_column;
         let remote_column = config.remote_column;
@@ -296,17 +299,17 @@ impl<'gb> ObjectStorageColumn<'gb> for ReferenceColumn<'gb> {
             let many = link.many;
             linked_folder = link.linked_folder.unwrap();
             if many.is_none() {
-                field_config_map.insert(String::from(MANY), String::from(FALSE));
+                column_config_map.insert(String::from(MANY), String::from(FALSE));
             } else {
                 let many = many.unwrap();
                 if many {
-                    field_config_map.insert(String::from(MANY), String::from(TRUE));
+                    column_config_map.insert(String::from(MANY), String::from(TRUE));
                 } else {
-                    field_config_map.insert(String::from(MANY), String::from(FALSE));
+                    column_config_map.insert(String::from(MANY), String::from(FALSE));
                 }
             }
         }
-        field_config_map.insert(LINK_COLUMN.to_string(), link_column);
+        column_config_map.insert(LINK_COLUMN.to_string(), link_column);
         // Remote column
         if remote_column.is_some() {
             let remote_column = remote_column.unwrap();
@@ -321,7 +324,38 @@ impl<'gb> ObjectStorageColumn<'gb> for ReferenceColumn<'gb> {
                     )
                 );
             }
-            field_config_map.insert(String::from(REMOTE_COLUMN), remote_column);
+            column_config_map.insert(String::from(REMOTE_COLUMN), remote_column.clone());
+            let linked_folder_obj = db_folder.get_by_name(&linked_folder);
+            if linked_folder_obj.is_ok() {
+                let linked_folder_obj = linked_folder_obj.unwrap().unwrap();
+                let column = TreeFolder::get_column_by_name(
+                    &remote_column, 
+                    &linked_folder_obj
+                );
+                if column.is_ok() {
+                    let column = column.unwrap();
+                    let remote_column_type = column.get(COLUMN_TYPE).unwrap().clone();
+                    column_config_map.insert(String::from(REMOTE_COLUMN_TYPE), remote_column_type);
+                } else {
+                    return Err(
+                        PlanetError::new(
+                            500, 
+                            Some(tr!("Could not fetch remote column \"{}\".", 
+                                &remote_column
+                        )),
+                        )
+                    );
+                }
+            } else {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Could not fetch remote cfolder \"{}\".", 
+                            &linked_folder
+                    )),
+                    )
+                );
+            }
         }
         // Formula
         let formula = config.formula;
@@ -342,13 +376,13 @@ impl<'gb> ObjectStorageColumn<'gb> for ReferenceColumn<'gb> {
                 false,
                 None
             )?;
-            field_config_map.insert(String::from(FORMULA), formula);
-            field_config_map.insert(String::from(FORMULA_FORMAT), formula_format);
+            column_config_map.insert(String::from(FORMULA), formula);
+            column_config_map.insert(String::from(FORMULA_FORMAT), formula_format);
             let formula_serialized = serde_yaml::to_string(&formula_compiled).unwrap();
-            field_config_map.insert(String::from(FORMULA_COMPILED), formula_serialized);
+            column_config_map.insert(String::from(FORMULA_COMPILED), formula_serialized);
         }
-        //eprintln!("Reference.create_config :: end field_config_map: {:#?}", &field_config_map);
-        return Ok(field_config_map)
+        //eprintln!("Reference.create_config :: end column_config_map: {:#?}", &column_config_map);
+        return Ok(column_config_map)
     }
     fn get_config(
         &mut self, 
@@ -364,6 +398,11 @@ impl<'gb> ObjectStorageColumn<'gb> for ReferenceColumn<'gb> {
         if remote_column.is_some() {
             let remote_column = remote_column.unwrap();
             config.remote_column = Some(remote_column.clone());
+        }
+        let remote_column_type = column_config_map.get(REMOTE_COLUMN_TYPE);
+        if remote_column_type.is_some() {
+            let remote_column_type = remote_column_type.unwrap();
+            config.remote_column_type = Some(remote_column_type.clone());
         }
         return Ok(config)
     }

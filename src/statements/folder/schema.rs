@@ -233,6 +233,7 @@ pub struct ColumnConfig {
     pub delete_on_link_drop: Option<bool>,
     pub link_column: Option<String>,
     pub remote_column: Option<String>,
+    pub remote_column_type: Option<String>,
     pub sequence: Option<String>,
     pub maximum: Option<String>,
     pub minimum: Option<String>,
@@ -272,6 +273,7 @@ impl ConfigStorageColumn for ColumnConfig {
             delete_on_link_drop: None,
             link_column: None,
             remote_column: None,
+            remote_column_type: None,
             sequence: None,
             maximum: None,
             minimum: None,
@@ -326,7 +328,8 @@ impl ConfigStorageColumn for ColumnConfig {
                     linked_folder: None,
                     delete_on_link_drop: None,
                     link_column: None,
-                    remote_column: None,        
+                    remote_column: None,
+                    remote_column_type: None,
                     sequence: None,
                     maximum: None,
                     minimum: None,
@@ -588,6 +591,17 @@ impl ConfigStorageColumn for ColumnConfig {
                             );
                             column_config = obj.get_config(column_config_map)?;
                         },
+                        COLUMN_TYPE_STATS => {
+                            let mut obj = StatsColumn::defaults(
+                                &column_config,
+                                None,
+                                Some(folder_name.clone()),
+                                None,
+                                None,
+                                None,
+                            );
+                            column_config = obj.get_config(column_config_map)?;
+                        },
                         _ => {}
                     }
                     let _ = &map_columns_by_id.insert(column_id, column_config.clone());
@@ -777,6 +791,18 @@ impl ConfigStorageColumn for ColumnConfig {
                     &map,
                     &env,
                     &space_database
+                )?;
+            },
+            COLUMN_TYPE_STATS => {
+                map = StatsColumn::defaults(
+                    &propertty_config_,
+                    None,
+                    Some(folder_name.clone()),
+                    Some(db_folder.clone()),
+                    Some(properties_map.clone()),
+                    None,
+                ).create_config(
+                    &map
                 )?;
             },
             _ => {}
@@ -1105,6 +1131,12 @@ pub fn process_column(
                         WITH_STATS_FUNCTION
                     );
                     column.stats_function = Some(stats_function.clone());
+                }
+                if *&with_options.contains_key(WITH_RELATED_COLUMN) {
+                    let related_column = &with_options_obj.get_single_value(
+                        WITH_RELATED_COLUMN
+                    );
+                    column.related_column = Some(related_column.clone());
                 }
                 if *&with_options.contains_key(WITH_CONTENT_TYPES) {
                     let content_types = with_options.get(
@@ -2277,6 +2309,7 @@ impl<'gb> Statement<'gb> for AddColumnStatement {
         }
         let mut errors: Vec<PlanetError> = Vec::new();
         let column_compiled = statement.unwrap();
+        eprintln!("AddColumnStatement.run :: column_compiled: {:#?}", &column_compiled);
         let home_dir = planet_context.home_path.clone();
         let account_id = context.account_id.clone().unwrap_or_default();
         let space_id = context.space_id;
@@ -2556,6 +2589,15 @@ impl<'gb> Statement<'gb> for ModifyColumnStatement {
                 let folder = folder.unwrap();
                 if folder.is_some() {
                     let mut folder = folder.unwrap();
+                    let column_config_map = ColumnConfig::get_column_config_map(
+                        &planet_context,
+                        &context,
+                        &folder
+                    ).unwrap();
+                    let mut columns_map: HashMap<String, ColumnConfig> = HashMap::new();
+                    for (k, v) in &column_config_map {
+                        columns_map.insert(k.clone(), v.clone());
+                    }
                     let data = folder.data;
                     if data.is_some() {
                         let mut data = data.unwrap();
@@ -2570,7 +2612,6 @@ impl<'gb> Statement<'gb> for ModifyColumnStatement {
                             for column_item in column_list {
                                 let column_item_name = column_item.get(NAME).unwrap().clone();
                                 if column_item_name.to_lowercase().as_str() == column_name_str.to_lowercase() {
-                                    let mut columns_map: HashMap<String, ColumnConfig> = HashMap::new();
                                     columns_map.insert(column_name.clone(), column.clone());
                                     let map = &column.create_config(
                                         planet_context,
@@ -2583,6 +2624,7 @@ impl<'gb> Statement<'gb> for ModifyColumnStatement {
                                     if map.is_err() {
                                         let error = map.clone().unwrap_err();
                                         errors.push(error);
+                                        return Err(errors)
                                     }
                                     let map = map.clone().unwrap();
                                     column_list_new.push(map);

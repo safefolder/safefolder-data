@@ -2715,6 +2715,54 @@ impl<'gb> SearchIterator<'gb>{
         return Err(errors)
     }
 
+    fn process_stats(
+        &self,
+        data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
+        column_config_map: &BTreeMap<String, ColumnConfig>
+    ) -> Result<BTreeMap<String, Vec<BTreeMap<String, String>>>, Vec<PlanetError>> {
+        let mut data_map = data_map.clone();
+        let column_config_map = column_config_map.clone();
+        let mut properties_map: HashMap<String, ColumnConfig> = HashMap::new();
+        for (k, v) in &column_config_map {
+            properties_map.insert(k.clone(), v.clone());
+        }
+        let db_folder = self.db_folder.clone().unwrap();
+        let folder = self.folder.clone().unwrap();
+        let folder_name = folder.name.clone().unwrap();
+        for (_column_name, config) in column_config_map.clone() {
+            let column_type = config.column_type.clone().unwrap();
+            let column_type_str = column_type.as_str();
+            let column_id = config.id.clone().unwrap();
+            if column_type_str == COLUMN_TYPE_STATS {
+                let stats_column = StatsColumn::defaults(
+                    &config.clone(), 
+                    Some(column_config_map.clone()),
+                    Some(folder_name.clone()), 
+                    Some(db_folder.clone()), 
+                    Some(properties_map.clone()), 
+                    Some(data_map.clone())
+                );
+                let data: Vec<String> = Vec::new();
+                let result = stats_column.validate(&data);
+                if result.is_err() {
+                    let errors = result.unwrap_err();
+                    return Err(errors)
+                }
+                let items = result.unwrap();
+                let item = items[0].clone();
+                eprintln!("SearchIterator.process_stats :: column: {} value: {}", &_column_name, &item);
+                let mut value_list: Vec<BTreeMap<String, String>> = Vec::new();
+                let mut value_obj: BTreeMap<String, String> = BTreeMap::new();
+                value_obj.insert(VALUE.to_string(), item);
+                value_list.push(value_obj);
+                data_map.insert(column_id, value_list);
+            }
+        }        
+        return Ok(
+            data_map
+        )
+    }
+
     pub fn do_search(
         &self
     ) -> Result<Vec<SearchResultItem>, Vec<PlanetError>> {
@@ -2735,6 +2783,8 @@ impl<'gb> SearchIterator<'gb>{
             &folder
         ).unwrap();
 
+        // TODO: I need to have a check in query if query is searching for links or
+        // references
         let result = self.prepare_links(&column_config_map);
         if result.is_err() {
             let errors = result.unwrap_err();
@@ -2790,6 +2840,8 @@ impl<'gb> SearchIterator<'gb>{
                                 // eprintln!("SearchIterator.do_search :: data_map: {:#?}", &data_map);
                                 // eprintln!("SearchIterator.do_search :: query: {:#?}", &query);
 
+                                // TODO: I need to have a check in query if query is searching for links or
+                                // references
                                 // Inject data from LINKS and REFERENCES into data_map.
                                 data_map = self.process_item_links(
                                     &data_map,
@@ -2799,6 +2851,18 @@ impl<'gb> SearchIterator<'gb>{
                                     &column_config_map,
                                     &remote_folder_obj_map,
                                 );
+
+                                // TODO: I need to have a check in query if query is searching for stats
+                                // Inject data from STATS columns into data_map.
+                                let result = self.process_stats(
+                                    &data_map,
+                                    &column_config_map,
+                                );
+                                if result.is_err() {
+                                    let errors = result.unwrap_err();
+                                    return Err(errors)
+                                }
+                                data_map = result.unwrap();
 
                                 // This will be used by SEARCH function, implemented when SEARCH is done
                                 // index_data_map
@@ -2937,21 +3001,6 @@ impl<'gb> SearchIterator<'gb>{
         let remote_folder_obj_map = links_tuple.2;
         let mut folder_item = links_tuple.3;
 
-        // TreeFolderItem
-        // let mut site_id_alt: Option<String> = None;
-        // if site_id.is_some() {
-        //     let site_id = site_id.clone().unwrap();
-        //     site_id_alt = Some(site_id.clone().to_string());
-        // }
-        // let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
-        //     space_database.connection_pool.clone(),
-        //     home_dir.clone().unwrap_or_default().as_str(),
-        //     &account_id,
-        //     space_id,
-        //     site_id_alt,
-        //     folder_id.as_str(),
-        //     &db_folder,
-        // );
         let mut search_count: usize = 0;
         let mut column_data_set: HashSet<String> = HashSet::new();
         // let mut folder_item = result.unwrap();
@@ -3001,6 +3050,18 @@ impl<'gb> SearchIterator<'gb>{
                                     &column_config_map,
                                     &remote_folder_obj_map,
                                 );
+
+                                // TODO: I need to have a check in query if query is searching for stats
+                                // Inject data from STATS columns into data_map.
+                                let result = self.process_stats(
+                                    &data_map,
+                                    &column_config_map,
+                                );
+                                if result.is_err() {
+                                    let errors = result.unwrap_err();
+                                    return Err(errors)
+                                }
+                                data_map = result.unwrap();
 
                                 // This will be used by SEARCH function, implemented when SEARCH is done
                                 // index_data_map
@@ -3380,6 +3441,56 @@ impl<'gb> SearchOutputData {
         return data.clone()
     }
 
+    fn do_stats(
+        &self,
+        data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
+        db_folder: &TreeFolder,
+        folder: &DbData,
+        column_config_map: &BTreeMap<String, ColumnConfig>
+    ) -> Result<BTreeMap<String, Vec<BTreeMap<String, String>>>, Vec<PlanetError>> {
+        let mut data_map = data_map.clone();
+        let column_config_map = column_config_map.clone();
+        let mut properties_map: HashMap<String, ColumnConfig> = HashMap::new();
+        for (k, v) in &column_config_map {
+            properties_map.insert(k.clone(), v.clone());
+        }
+        let db_folder = db_folder.clone();
+        let folder = folder.clone();
+        let folder_name = folder.name.clone().unwrap();
+        for (_column_name, config) in column_config_map.clone() {
+            let column_type = config.column_type.clone().unwrap();
+            let column_type_str = column_type.as_str();
+            let column_id = config.id.clone().unwrap();
+            if column_type_str == COLUMN_TYPE_STATS {
+                let stats_column = StatsColumn::defaults(
+                    &config.clone(), 
+                    Some(column_config_map.clone()),
+                    Some(folder_name.clone()), 
+                    Some(db_folder.clone()), 
+                    Some(properties_map.clone()), 
+                    Some(data_map.clone())
+                );
+                let data: Vec<String> = Vec::new();
+                let result = stats_column.validate(&data);
+                if result.is_err() {
+                    let errors = result.unwrap_err();
+                    return Err(errors)
+                }
+                let items = result.unwrap();
+                let item = items[0].clone();
+                let mut value_list: Vec<BTreeMap<String, String>> = Vec::new();
+                let mut value_obj: BTreeMap<String, String> = BTreeMap::new();
+                value_obj.insert(VALUE.to_string(), item);
+                value_list.push(value_obj);
+                data_map.insert(column_id, value_list);
+            }
+        }        
+        return Ok(
+            data_map
+        )
+    }
+
+
     pub fn do_output(
         &self,
         env: &'gb Environment<'gb>,
@@ -3511,6 +3622,8 @@ impl<'gb> SearchOutputData {
                                 let data = item.data.clone();
                                 if data.is_some() {
                                     let mut data = data.unwrap();
+
+                                    // TODO: Check that I request link columns
                                     // Get data for remote LINK folders and insert into link_data map.
                                     data = self.do_data_links(
                                         &data, 
@@ -3519,6 +3632,21 @@ impl<'gb> SearchOutputData {
                                         &link_tree_map, 
                                         &ref_map
                                     );
+
+                                    // TODO: Check that I request stats columns
+                                    // Get data for stats.
+                                    let results = self.do_stats(
+                                        &data, 
+                                        &db_folder,
+                                        &folder,
+                                        &column_config_map.clone()
+                                    );
+                                    if results.is_err() {
+                                        let errors = results.unwrap_err();
+                                        return Err(errors)
+                                    }
+                                    data = results.unwrap();
+
                                     item.data = Some(data);
                                 }
                                 if columns.len() == 0 {
