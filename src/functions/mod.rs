@@ -420,8 +420,8 @@ pub fn compile_assignment(
     table_name: Option<String>,
     field_config_map: &BTreeMap<String, ColumnConfig>
 ) -> Result<Option<AttributeAssign>, PlanetError> {
-    //eprintln!("compile_assignment...");
-    // eprintln!("compile_assignment :: formula: {}", &formula);
+    eprintln!("compile_assignment...");
+    eprintln!("compile_assignment :: formula: {}", &formula);
     let field_config_map = field_config_map.clone();
     let field_config_map_wrap = Some(field_config_map);
     let formula = formula.clone();
@@ -1466,15 +1466,16 @@ pub fn fetch_logical_op(attribute: &str) -> &str {
     let has_equal = attribute.find("=").is_some();
     let has_greater = attribute.find(">").is_some();
     let has_smaller = attribute.find("<").is_some();
-    let has_equal_or_greater = attribute.find("=>").is_some();
+    let has_equal_or_greater = attribute.find(">=").is_some();
     let has_smaller_or_equal = attribute.find("<=").is_some();
-    if has_equal == true {
+    if has_equal && !has_equal_or_greater && !has_smaller_or_equal {
         log_op = "=";
+        return log_op
     } else {
         if has_greater == true && has_equal_or_greater == false {
             log_op = ">";
         } else if has_greater == true && has_equal_or_greater == true {
-            log_op = "=>";
+            log_op = ">=";
         } else if has_smaller == true && has_smaller_or_equal == false {
             log_op = "<";
         } else if has_smaller == true && has_smaller_or_equal == true {
@@ -1489,25 +1490,30 @@ pub fn get_attribute_type(field_type: &String, formula_format: Option<String>) -
     let field_type = field_type.to_lowercase();
     let field_type = field_type.as_str();
     let attr_type: AttributeType;
-    match field_type {
-        "checkbox" => {attr_type = AttributeType::Bool},
-        "small text" => {attr_type = AttributeType::Text},
-        "long text" => {attr_type = AttributeType::Text},
-        "select" => {attr_type = AttributeType::Text},
-        "number" => {attr_type = AttributeType::Number},
-        _ => {attr_type = AttributeType::Text},
-    }
+    eprintln!("get_attribute_type :: field_type: {} formula_format: {:?}", &field_type, &formula_format);
     if field_type == "formula" && formula_format.is_some() {
         let formula_format = formula_format.unwrap().to_lowercase();
         let formula_format = formula_format.as_str();
-        return match formula_format {
-            "text" => AttributeType::Text,
-            "number" => AttributeType::Number,
-            "date" => AttributeType::Date,
-            "bool" => AttributeType::Bool,
-            _ => AttributeType::Text,
+        match formula_format {
+            "text" => {attr_type = AttributeType::Text},
+            "number" => {attr_type = AttributeType::Number},
+            "date" => {attr_type = AttributeType::Date},
+            "bool" => {attr_type = AttributeType::Bool},
+            _ => {attr_type = AttributeType::Text},
         }
+    } else {
+        match field_type {
+            "checkbox" => {attr_type = AttributeType::Bool},
+            "small text" => {attr_type = AttributeType::Text},
+            "long text" => {attr_type = AttributeType::Text},
+            "select" => {attr_type = AttributeType::Text},
+            "number" => {attr_type = AttributeType::Number},
+            "link" => {attr_type = AttributeType::Number},
+            "stats" => {attr_type = AttributeType::Number},
+            _ => {attr_type = AttributeType::Text},
+        }    
     }
+    eprintln!("get_attribute_type :: attr_type: {:?}", &attr_type);
     return attr_type
 }
 
@@ -1537,6 +1543,8 @@ pub fn get_assignment_reference(
             // {Column A} => $column_id
             // let mut item_string = item_.to_string();
             item = item.replace("{", "}").replace("}", "");
+            item = item.replace("<", "").replace(">", "");
+            // eprintln!("get_assignment_reference :: item: {}", &item);
             // reference_name = item.clone();
             // let column_id = &field_name_map.get(&item).unwrap();
             let has_id = item.find(id_sep).is_some();
@@ -1574,7 +1582,9 @@ pub fn parse_assign_operator(
     attr_source: &str, 
     formula: &String
 ) -> Result<(Vec<String>, FormulaOperator), PlanetError> {
+    eprintln!("parse_assign_operator :: attr_source: {}", attr_source);
     let log_op = fetch_logical_op(attr_source);
+    eprintln!("parse_assign_operator :: log_op: {}", log_op);
     let items: Vec<&str>;
     let attribute_operator: FormulaOperator;
     match log_op {
@@ -1582,7 +1592,7 @@ pub fn parse_assign_operator(
             items = attr_source.split(log_op).collect();
             attribute_operator = FormulaOperator::Eq;
         },
-        "=>" => {
+        ">=" => {
             items = attr_source.split(log_op).collect();
             attribute_operator = FormulaOperator::GreaterOrEqual;
         },
@@ -1611,7 +1621,9 @@ pub fn parse_assign_operator(
     for item_str in items {
         let item_string: String = item_str.to_string();
         items_string.push(item_string);
-    }    
+    }
+    eprintln!("parse_assign_operator :: formula: {} attribute_operator: {:?} items_string: {:?}", 
+    formula, &attribute_operator, &items_string);
     return Ok((items_string, attribute_operator))
 }
 
@@ -1620,9 +1632,9 @@ pub fn check_assignment(
     attr_type: AttributeType,
     db_data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
 ) -> Result<bool, PlanetError> {
-    // eprintln!("check_assignment...");
-    // eprintln!("check_assignment :: db_data_map: {:#?}", db_data_map);
-    // eprintln!("check_assignment :: attr_assignment: {:#?}", &attr_assignment);
+    eprintln!("check_assignment...");
+    eprintln!("check_assignment :: db_data_map: {:#?}", db_data_map);
+    eprintln!("check_assignment :: attr_assignment: {:#?}", &attr_assignment);
     // eprintln!("check_assignment :: attr_type: {:#?}", &attr_type);
     let column_id = attr_assignment.name;
     let column_id = column_id.as_str();
@@ -1674,13 +1686,16 @@ pub fn check_assignment(
             return Ok(true)
         }
     } else {
-        let db_value = db_data_map.get(column_id).unwrap();
-        let mut list: Vec<String> = Vec::new();
-        for item in db_value {
-            let item_value = item.get(VALUE).unwrap();
-            list.push(item_value.clone());
+        let db_value = db_data_map.get(column_id);
+        if db_value.is_some() {
+            let db_value = db_value.unwrap();
+            let mut list: Vec<String> = Vec::new();
+            for item in db_value {
+                let item_value = item.get(VALUE).unwrap();
+                list.push(item_value.clone());
+            }
+            db_values = Some(list);    
         }
-        db_values = Some(list);
     }
     // eprintln!("check_assignment :: db_values: {:#?}", &db_values);
     let mut check: bool = false;
@@ -1713,10 +1728,11 @@ pub fn check_assignment(
                     let value = value.as_str();
                     let value: f64 = FromStr::from_str(value).unwrap();
                     let db_value: f64 = FromStr::from_str(&db_value).unwrap();
-                    //eprintln!("check_assignment :: db_value: {}", &db_value);
-                    //eprintln!("check_assignment :: op: {:?}", &op);
-                    //eprintln!("check_assignment :: value: {:?}", &value);
-                    check = check_float_compare(&value, &db_value, op.clone())?;
+                    eprintln!("check_assignment :: db_value: {}", &db_value);
+                    eprintln!("check_assignment :: op: {:?}", &op);
+                    eprintln!("check_assignment :: value: {:?}", &value);
+                    check = check_float_compare(&db_value, &value, op.clone())?;
+                    eprintln!("check_assignment :: check: {}", &check);
                 },
                 _ => {
                     return Err(

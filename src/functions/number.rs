@@ -1433,6 +1433,7 @@ impl NumberFunction for Boolean {
 
 pub fn check_float_compare(value: &f64, compare_to: &f64, op: FormulaOperator) -> Result<bool, PlanetError> {
     let mut check: bool = false;
+    // eprintln!("check_float_compare :: value: {} compare_to: {}, op: {:?}", value, compare_to, &op);
     match op {
         FormulaOperator::Greater => {
             if value > compare_to {
