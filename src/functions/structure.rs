@@ -104,7 +104,9 @@ impl StructureFunction for If {
         let data_map = &self.data_map.clone().unwrap();
         let column_config_map = self.column_config_map.clone();
         let condition_item = attributes[0].clone();
-        let condition_value = condition_item.get_value(data_map, &column_config_map)?;
+        let condition_value = condition_item.get_value(
+            data_map, None, &column_config_map
+        )?;
         let expr_true_item = attributes[1].clone();
         let expr_false_item = attributes[2].clone();
         let is_assignment = condition_item.assignment.is_some();
@@ -121,10 +123,14 @@ impl StructureFunction for If {
         let result: String;
         if check {
             // Return expr_true
-            result = expr_true_item.get_value(data_map, &column_config_map)?;
+            result = expr_true_item.get_value(
+                data_map, None, &column_config_map
+            )?;
         } else {
             // Return expr_false
-            result = expr_false_item.get_value(data_map, &column_config_map)?;
+            result = expr_false_item.get_value(
+                data_map, None, &column_config_map
+            )?;
         }
         return Ok(result)
     }
@@ -226,6 +232,7 @@ impl StructureFunction for And {
                     // Like OR, NOT, etc...
                     let formula_result = attribute.get_value(
                         data_map, 
+                        None, 
                         &column_config_map
                     )?;
                     if formula_result == String::from("0") {
@@ -331,7 +338,9 @@ impl StructureFunction for Or {
                 }
             } else {
                 // Like OR, NOT, etc...
-                let formula_result = attribute.get_value(data_map, &column_config_map)?;
+                let formula_result = attribute.get_value(
+                    data_map, None, &column_config_map
+                )?;
                 if formula_result == String::from("1") {
                     result = String::from("1");
                     break
@@ -431,7 +440,9 @@ impl StructureFunction for Not {
                 }
             } else {
                 // Like OR, NOT, etc...
-                let formula_result = attribute.get_value(data_map, &column_config_map)?;
+                let formula_result = attribute.get_value(
+                    data_map, None, &column_config_map
+                )?;
                 if formula_result == String::from("1") {
                     result = String::from("0");
                     break
@@ -532,7 +543,9 @@ impl StructureFunction for Xor {
                 }
             } else {
                 // Like OR, NOT, etc...
-                let formula_result = attribute.get_value(data_map, &column_config_map)?;
+                let formula_result = attribute.get_value(
+                    data_map, None, &column_config_map
+                )?;
                 if formula_result == String::from("1") {
                     result = String::from("1");
                     count += 1;

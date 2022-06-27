@@ -167,7 +167,7 @@ impl CollectionStatsFunction for Stats {
             }
         } else {
             let sequence_item = attributes[0].clone();
-            let mut sequence = sequence_item.get_value(data_map, &column_config_map)?;
+            let mut sequence = sequence_item.get_value(data_map, None, &column_config_map)?;
             sequence = sequence.replace("\"", "");
             let sequence_str_list: Vec<&str> = sequence.split(",").collect();
             for mut item in sequence_str_list {

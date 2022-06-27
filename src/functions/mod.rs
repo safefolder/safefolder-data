@@ -38,7 +38,7 @@ lazy_static! {
     pub static ref RE_FUNCTION_ATTRS_OLD: Regex = Regex::new(r#"("[\w\s-]+")|(\{[\w\s]+\})|([A-Z]+\(["\w\s]+\))|([+-]?[0-9]+\.?[0-9]*|\.[0-9]+)"#).unwrap();
     pub static ref RE_FUNCTION_ATTRS: Regex = Regex::new(r#"[A-Z]+\((?P<attrs>.+)\)"#).unwrap();
     pub static ref RE_ATTR_TYPE_RESOLVE: Regex = Regex::new(r#"(?P<ref>\{[\w\s.]+\}$)|(?P<formula>[A-Z]+\(.+\).*)|(?P<bool>TRUE|FALSE)|(?P<number>^[+-]?[0-9]+\.?[0-9]*|^\.[0-9]+)|(?P<null>null)|(?P<assign>\{[\w\s.]+\}[\s]*[=<>]+[\s]*((\d+)|("*[\w\s]+"*)))|(?P<string>\\{0,}"*[,;_.\\$€:\-\+\{\}\w\s-]*\\{0,}"*)"#).unwrap();
-    pub static ref RE_FORMULA_FUNCTION_PIECES: Regex = Regex::new(r#"[A-Z]+\(((.[^()]*)|())\)"#).unwrap();
+    pub static ref RE_FORMULA_FUNCTION_PIECES: Regex = Regex::new(r#"[A-Z_]+\(((.[^()]*)|())\)"#).unwrap();
     pub static ref RE_FORMULA_FUNCTION_VARIABLES: Regex = Regex::new(r#"(?P<func>\$func_\d)"#).unwrap();
     pub static ref RE_FORMULA_VARIABLES: Regex = Regex::new(r#"(?P<formula>\$formula_\d)"#).unwrap();
     pub static ref RE_FORMULA_ASSIGN: Regex = Regex::new(r#"^(?P<assign>(?P<name>\{[\s\w.]+\})[\s\t]{0,}(?P<op>=|>|<|>=|<=)[\s\t]{0,}((?P<formula>\$formula_*\d*)|(?P<value>"*[\.\w\d\s]+"*)))"#).unwrap();
@@ -264,17 +264,17 @@ impl Formula {
         db_folder: Option<TreeFolder>,
         folder_name: Option<String>,
         is_assign_function: bool,
-        field_config_map: Option<BTreeMap<String, ColumnConfig>>,
+        column_config_map: Option<BTreeMap<String, ColumnConfig>>,
     ) -> Result<Self, PlanetError> {
         //eprintln!("Formula...");
         // If I have an error in compilation, then does not validate. Compilation uses validate of functions.
         // This function is the one does compilation from string formula to FormulaFieldCompiled
         let formula_origin = formula.clone();
         let properties_map = properties_map.clone();
-        let field_config_map_ = field_config_map.clone();
-        let mut field_config_map: BTreeMap<String, ColumnConfig> = BTreeMap::new();
+        let field_config_map_ = column_config_map.clone();
+        let mut column_config_map: BTreeMap<String, ColumnConfig> = BTreeMap::new();
         if field_config_map_.is_some() {
-            field_config_map = field_config_map_.unwrap();
+            column_config_map = field_config_map_.unwrap();
         }
         // let field_name_map_i = field_name_map.clone();
         let db_table_i = db_folder.clone();
@@ -336,7 +336,7 @@ impl Formula {
                     &properties_map_,
                     db_table_i.clone(),
                     table_name_i.clone(),
-                    Some(field_config_map.clone())
+                    Some(column_config_map.clone())
                 )?;
                 if is_assign_function {
                     main_function.function_type = FunctionType::Assign;
@@ -360,7 +360,8 @@ impl Formula {
             let function_parse = process_function(
                 &function_parse, 
                 None,
-                Some(field_config_map.clone())
+                None,
+                Some(column_config_map.clone())
             )?;
             let validate = function_parse.validate;
             // eprintln!("Formula :: validate: {}", &validate);
@@ -399,7 +400,7 @@ impl Formula {
                 properties_map_, 
                 db_table_i.clone(),
                 table_name_i.clone(),
-                &field_config_map
+                &column_config_map
             )?;
             if assignment.is_some() {
                 let assignment = assignment.unwrap();
@@ -418,12 +419,12 @@ pub fn compile_assignment(
     properties_map: HashMap<String, ColumnConfig>,
     db_table: Option<TreeFolder>,
     table_name: Option<String>,
-    field_config_map: &BTreeMap<String, ColumnConfig>
+    column_config_map: &BTreeMap<String, ColumnConfig>
 ) -> Result<Option<AttributeAssign>, PlanetError> {
     eprintln!("compile_assignment...");
     eprintln!("compile_assignment :: formula: {}", &formula);
-    let field_config_map = field_config_map.clone();
-    let field_config_map_wrap = Some(field_config_map);
+    let column_config_map = column_config_map.clone();
+    let field_config_map_wrap = Some(column_config_map);
     let formula = formula.clone();
     let formula_string = formula.to_string();
     let expr = &RE_FORMULA_ASSIGN;
@@ -707,11 +708,11 @@ pub fn compile_function_text(
     properties_map: &HashMap<String, ColumnConfig>,
     db_table: Option<TreeFolder>,
     table_name: Option<String>,
-    field_config_map: Option<BTreeMap<String, ColumnConfig>>,
+    column_config_map: Option<BTreeMap<String, ColumnConfig>>,
 ) -> Result<CompiledFunction, PlanetError> {
-    //eprintln!("compile_function_text :: function_text: {}", &function_text);
-    let field_config_map_wrap = field_config_map.clone();
-    let field_config_map: BTreeMap<String, ColumnConfig> = BTreeMap::new();
+    // eprintln!("compile_function_text :: function_text: {}", &function_text);
+    let field_config_map_wrap = column_config_map.clone();
+    let column_config_map: BTreeMap<String, ColumnConfig> = BTreeMap::new();
     let formula_format = formula_format.clone();
     let properties_map = properties_map.clone();
     // eprintln!("compile_function_text :: field_type_map: {:#?}", &field_type_map);
@@ -724,6 +725,7 @@ pub fn compile_function_text(
     function_parse.text = Some(function_text.to_string());
     let function_parse = process_function(
         &function_parse, 
+        None,
         None,
         field_config_map_wrap.clone(),
     )?;
@@ -883,7 +885,7 @@ pub fn compile_function_text(
                 properties_map.clone(), 
                 db_table.clone(),
                 table_name.clone(),
-                &field_config_map
+                &column_config_map
             )?;
             // let function_attrib = assignment.clone().unwrap();
             function_attribute.assignment = assignment.clone();
@@ -928,11 +930,13 @@ pub struct FunctionParse {
     attributes: Option<Vec<String>>,
     compiled_attributes: Option<Vec<FunctionAttributeItem>>,
     result: Option<FunctionResult>,
-    field_config_map: BTreeMap<String, ColumnConfig>,
+    column_config_map: BTreeMap<String, ColumnConfig>,
+    score: Option<usize>,
+    has_search_match: Option<bool>,
 }
 impl FunctionParse {
     pub fn defaults(name: &String) -> Self {
-        let field_config_map: BTreeMap<String, ColumnConfig> = BTreeMap::new();
+        let column_config_map: BTreeMap<String, ColumnConfig> = BTreeMap::new();
         let obj = FunctionParse{
             name: name.clone(),
             text: None,
@@ -940,7 +944,9 @@ impl FunctionParse {
             attributes: None,
             compiled_attributes: None,
             result: None,
-            field_config_map: field_config_map,
+            column_config_map: column_config_map,
+            score: None,
+            has_search_match: None,
         };
         return obj;
     }
@@ -985,7 +991,8 @@ pub fn prepare_function_parse(
 pub fn process_function(
     function_parse: &FunctionParse, 
     data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
-    field_config_map: Option<BTreeMap<String, ColumnConfig>>,
+    index_data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
+    column_config_map: Option<BTreeMap<String, ColumnConfig>>,
 ) -> Result<FunctionParse, PlanetError> {
     // let list_items = Some(expr.captures_iter(function_text));
     // I need either check or list of attributes, so I have only one function to deal with Regex expr.
@@ -993,13 +1000,13 @@ pub fn process_function(
     // eprintln!("process_function :: function: {:#?}", &function);
     let data_map_wrap = data_map;
     let function_name = function.name.as_str();
-    let field_config_map = field_config_map.clone();
+    let column_config_map = column_config_map.clone();
     let mut func = function.clone();
     let data = data_map_wrap.clone();
     // eprintln!("process_function :: data: {:#?}", &data);
     let conf: BTreeMap<String, ColumnConfig>;
-    if field_config_map.is_some() {
-        conf = field_config_map.unwrap();
+    if column_config_map.is_some() {
+        conf = column_config_map.unwrap();
     } else {
         conf = BTreeMap::new();
     }
@@ -1168,6 +1175,22 @@ pub fn process_function(
         FUNCTION_XOR => {
             func = Xor::defaults(Some(func), data.clone(), &conf).handle()?;
         },
+        FUNCTION_MATCH_ANY => {
+            func = MatchAny::defaults(
+                Some(func), 
+                data.clone(), 
+                index_data_map.clone(),
+                &conf
+            ).handle()?;
+        },
+        FUNCTION_MATCH_ALL => {
+            func = MatchAll::defaults(
+                Some(func), 
+                data.clone(), 
+                index_data_map.clone(),
+                &conf
+            ).handle()?;
+        },
         _ => {
             return Err(
                 PlanetError::new(
@@ -1321,10 +1344,12 @@ impl FunctionAttributeItem {
     pub fn get_value(
         &self, 
         data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
-        field_config_map: &BTreeMap<String, ColumnConfig>
+        index_data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
+        column_config_map: &BTreeMap<String, ColumnConfig>
     ) -> Result<String, PlanetError> {
         let data_map = data_map.clone();
-        let field_config_map = field_config_map.clone();
+        let index_data_map = index_data_map.clone();
+        let column_config_map = column_config_map.clone();
         let is_reference = self.is_reference;
         let formula = self.formula.clone();
         let attribute_id = self.id.clone().unwrap_or_default();
@@ -1346,11 +1371,13 @@ impl FunctionAttributeItem {
             // I execute the formula and return value
             // execute_formula(formula: &Formula, data_map: &BTreeMap<String, String>)
             let formula = formula.unwrap();
-            value = execute_formula(
+            let result = execute_formula(
                 &formula, 
                 &data_map,
-                &field_config_map
+                index_data_map.clone(),
+                &column_config_map
             )?;
+            value = result.result;
             //eprintln!("FunctionAttributeItem.get_value :: {}={}", &attribute_id, &value);
         } else if has_assignment {
             let check = self.check_assignment(&data_map);
@@ -1378,21 +1405,40 @@ impl FunctionAttributeItem {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FormulaExecution {
+    pub result: String,
+    pub search_score: Option<usize>,
+    pub matched: bool,
+}
+impl FormulaExecution {
+    pub fn defaults(result: &String) -> Self {
+        let obj: Self = Self{
+            result: result.clone(),
+            search_score: None,
+            matched: false,
+        };
+        return obj
+    }
+}
+
 pub fn execute_formula(
     formula: &Formula, 
     data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
-    field_config_map: &BTreeMap<String, ColumnConfig>,
-) -> Result<String, PlanetError> {
+    index_data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
+    column_config_map: &BTreeMap<String, ColumnConfig>,
+) -> Result<FormulaExecution, PlanetError> {
     // 23 + LOG(34)
     // FUNC(attr1, attr2, ...)
     // FUNC(FUNC(attr1, attr2, ...))
     // This needs to execute the formula for a field
     // The type will depend on the formula_format on what we return
     // 1. I execute the functions in the formula and substitute result by placeholder and call LIB
-    let field_config_map = field_config_map.clone();
-    let field_config_map_wrap = Some(field_config_map);
+    let column_config_map = column_config_map.clone();
+    let field_config_map_wrap = Some(column_config_map);
     let functions = formula.functions.clone();
     let mut formula_str = formula.formula.clone();
+    let mut score_total: usize = 0;
     if functions.is_some() {
         // $func1 => Function compiled
         let functions = functions.unwrap();
@@ -1405,39 +1451,49 @@ pub fn execute_formula(
             let function_parse = process_function(
                 &function_parse, 
                 Some(data_map.clone()),
+                index_data_map.clone(),
                 field_config_map_wrap.clone()
             )?;
             // eprintln!("execute_formula_field :: function_parse: {:#?}", &function_parse);
             // eprintln!("execute_formula_field :: function: {:#?}", function.clone());
-            let function_result = function_parse.result.unwrap();
-            let result_str = function_result.text;
-            let result_number = function_result.number;
-            let result_date = function_result.date;
-            let result_bool = function_result.check;
-            if result_str.is_some() {
-                let result_str = result_str.unwrap();
-                let replaced_str = result_str.as_str();
-                formula_str = formula_str.replace(function_key, replaced_str);
-                formula_str = format!("{}{}{}", String::from("\""), formula_str, String::from("\""));
-            } else if result_number.is_some() {
-                let result_number = result_number.unwrap();
-                let replaced_str = result_number.to_string();
-                let replaced_str = replaced_str.as_str();
-                formula_str = formula_str.replace(function_key, replaced_str);
-            } else if result_date.is_some() {
-                let result_date = result_date.unwrap();
-                let replaced_str = result_date.as_str();
-                formula_str = formula_str.replace(function_key, replaced_str);
-                formula_str = format!("{}{}{}", String::from("\""), formula_str, String::from("\""));
-            } else if result_bool.is_some() {
-                let result_bool = result_bool.unwrap();
-                let replaced_str: &str;
-                if result_bool == true {
-                    replaced_str = "1";
+            if function_parse.has_search_match.is_some() {
+                let has_search_match = function_parse.has_search_match.unwrap();
+                if has_search_match {
+                    let score = function_parse.score.unwrap();
+                    score_total += score;
+                    formula_str = formula_str.replace(function_key, "1");    
                 } else {
-                    replaced_str = "0";
+                    let function_result = function_parse.result.unwrap();
+                    let result_str = function_result.text;
+                    let result_number = function_result.number;
+                    let result_date = function_result.date;
+                    let result_bool = function_result.check;
+                    if result_str.is_some() {
+                        let result_str = result_str.unwrap();
+                        let replaced_str = result_str.as_str();
+                        formula_str = formula_str.replace(function_key, replaced_str);
+                        formula_str = format!("{}{}{}", String::from("\""), formula_str, String::from("\""));
+                    } else if result_number.is_some() {
+                        let result_number = result_number.unwrap();
+                        let replaced_str = result_number.to_string();
+                        let replaced_str = replaced_str.as_str();
+                        formula_str = formula_str.replace(function_key, replaced_str);
+                    } else if result_date.is_some() {
+                        let result_date = result_date.unwrap();
+                        let replaced_str = result_date.as_str();
+                        formula_str = formula_str.replace(function_key, replaced_str);
+                        formula_str = format!("{}{}{}", String::from("\""), formula_str, String::from("\""));
+                    } else if result_bool.is_some() {
+                        let result_bool = result_bool.unwrap();
+                        let replaced_str: &str;
+                        if result_bool == true {
+                            replaced_str = "1";
+                        } else {
+                            replaced_str = "0";
+                        }
+                        formula_str = formula_str.replace(function_key, replaced_str);
+                    }        
                 }
-                formula_str = formula_str.replace(function_key, replaced_str);
             }
         }
     }
@@ -1458,7 +1514,14 @@ pub fn execute_formula(
     let result = calculate::result_to_string(result);
     // eprintln!("execute_formula_field :: perf : exec: {} µs", &t_exec_1.elapsed().as_micros());
     let result = result.trim().to_string();
-    return Ok(result)
+    let mut formula_execution = FormulaExecution::defaults(&result);
+    if result == String::from("1") {
+        formula_execution.matched = true;
+    }
+    if score_total != 0 {
+        formula_execution.search_score = Some(score_total);
+    }
+    return Ok(formula_execution.clone())
 }
 
 pub fn fetch_logical_op(attribute: &str) -> &str {
@@ -1491,6 +1554,7 @@ pub fn get_attribute_type(field_type: &String, formula_format: Option<String>) -
     let field_type = field_type.as_str();
     let attr_type: AttributeType;
     eprintln!("get_attribute_type :: field_type: {} formula_format: {:?}", &field_type, &formula_format);
+    // TODO: Reference needs the format of referenced column
     if field_type == "formula" && formula_format.is_some() {
         let formula_format = formula_format.unwrap().to_lowercase();
         let formula_format = formula_format.as_str();

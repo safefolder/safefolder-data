@@ -87,20 +87,20 @@ pub struct Date {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, ColumnConfig>,
+    column_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Date {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
-        field_config_map: &BTreeMap<String, ColumnConfig>,
+        column_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
-        let field_config_map = field_config_map.clone();
+        let column_config_map = column_config_map.clone();
         return Self{
             function: function, 
             data_map: data_map, 
             attributes: None,
-            field_config_map: field_config_map
+            column_config_map: column_config_map
         };
     }
 }
@@ -144,13 +144,13 @@ impl DateFunction for Date {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
-        let field_config_map = self.field_config_map.clone();
+        let column_config_map = self.column_config_map.clone();
         let year_item = attributes[0].clone();
-        let year_value = year_item.get_value(data_map, &field_config_map)?;
+        let year_value = year_item.get_value(data_map, None, &column_config_map)?;
         let month_item = attributes[1].clone();
-        let month_value = month_item.get_value(data_map, &field_config_map)?;
+        let month_value = month_item.get_value(data_map, None, &column_config_map)?;
         let day_item = attributes[2].clone();
-        let day_value = day_item.get_value(data_map, &field_config_map)?;
+        let day_value = day_item.get_value(data_map, None, &column_config_map)?;
         let date_only = NaiveDate::parse_from_str(
             format!(
                 "{year}-{month}-{day}",
@@ -176,20 +176,20 @@ pub struct DateTimeParse {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, ColumnConfig>,
+    column_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl DateTimeParse {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
-        field_config_map: &BTreeMap<String, ColumnConfig>,
+        column_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
-        let field_config_map = field_config_map.clone();
+        let column_config_map = column_config_map.clone();
         return Self{
             function: function, 
             data_map: data_map, 
             attributes: None,
-            field_config_map: field_config_map,
+            column_config_map: column_config_map,
         };
     }
 }
@@ -288,10 +288,10 @@ impl DateTimeFunction for DateTimeParse {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
         let date_item = attributes[0].clone();
-        let field_config_map = self.field_config_map.clone();
-        let mut date = date_item.get_value(data_map, &field_config_map)?;
+        let column_config_map = self.column_config_map.clone();
+        let mut date = date_item.get_value(data_map, None, &column_config_map)?;
         let mode_item = attributes[1].clone();
-        let mode = mode_item.get_value(data_map, &field_config_map)?;
+        let mode = mode_item.get_value(data_map, None, &column_config_map)?;
         let mode = mode.as_str();
         let mut replacement_string = String::from("");
         date = date.replace("\"", "");
@@ -341,7 +341,7 @@ impl DateTimeFunction for DateTimeParse {
             // Reference and I use date_format and time_format from the reference config field
             if date_item.is_reference {
                 let field_name = date_item.name.unwrap();
-                let fmt = get_date_format(&field_name, &field_config_map);
+                let fmt = get_date_format(&field_name, &column_config_map);
                 let fmt = fmt.as_str();
 
                 let date_obj = DateTime::parse_from_str(
@@ -374,20 +374,20 @@ pub struct DateParse {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, ColumnConfig>,
+    column_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl DateParse {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
-        field_config_map: &BTreeMap<String, ColumnConfig>,
+        column_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
-        let field_config_map = field_config_map.clone();
+        let column_config_map = column_config_map.clone();
         return Self{
             function: function, 
             data_map: data_map, 
             attributes: None,
-            field_config_map: field_config_map
+            column_config_map: column_config_map
         };
     }
 }
@@ -510,13 +510,13 @@ impl DateParseFunction for DateParse {
     fn execute(&self, date_parse_option: DateParseOption) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
-        let field_config_map = self.field_config_map.clone();
+        let column_config_map = self.column_config_map.clone();
         let date_item = attributes[0].clone();
-        let mut date = date_item.get_value(data_map, &field_config_map)?;
+        let mut date = date_item.get_value(data_map, None, &column_config_map)?;
         let mode_item = attributes[1].clone();
         let mode = mode_item.value.unwrap_or_default();
         let mode = mode.as_str();
-        let field_config_map = self.field_config_map.clone();
+        let column_config_map = self.column_config_map.clone();
         let mut replacement_string = String::from("");
         date = date.replace("\"", "");
         let mut is_string_output = false;
@@ -608,7 +608,7 @@ impl DateParseFunction for DateParse {
         } else {
             if date_item.is_reference {
                 let field_name = date_item.name.unwrap();
-                let fmt = get_date_format(&field_name, &field_config_map);
+                let fmt = get_date_format(&field_name, &column_config_map);
                 let fmt = fmt.as_str();
                 let date_obj = DateTime::parse_from_str(
                     &date, 
@@ -652,20 +652,20 @@ pub struct Now {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, ColumnConfig>,
+    column_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Now {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
-        field_config_map: &BTreeMap<String, ColumnConfig>
+        column_config_map: &BTreeMap<String, ColumnConfig>
     ) -> Self {
-        let field_config_map = field_config_map.clone();
+        let column_config_map = column_config_map.clone();
         return Self{
             function: function, 
             data_map: data_map, 
             attributes: None,
-            field_config_map: field_config_map
+            column_config_map: column_config_map
         };
     }
 }
@@ -710,20 +710,20 @@ pub struct Today {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, ColumnConfig>,
+    column_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Today {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
-        field_config_map: &BTreeMap<String, ColumnConfig>,
+        column_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
-        let field_config_map = field_config_map.clone();
+        let column_config_map = column_config_map.clone();
         return Self{
             function: function, 
             data_map: data_map, 
             attributes: None,
-            field_config_map: field_config_map
+            column_config_map: column_config_map
         };
     }
 }
@@ -776,20 +776,20 @@ pub struct Days {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, ColumnConfig>,
+    column_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Days {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
-        field_config_map: &BTreeMap<String, ColumnConfig>
+        column_config_map: &BTreeMap<String, ColumnConfig>
     ) -> Self {
-        let field_config_map = field_config_map.clone();
+        let column_config_map = column_config_map.clone();
         return Self{
             function: function, 
             data_map: data_map, 
             attributes: None,
-            field_config_map: field_config_map
+            column_config_map: column_config_map
         };
     }
 }
@@ -849,15 +849,15 @@ impl DateFunction for Days {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
         let start_date_item = attributes[0].clone();
-        let field_config_map = self.field_config_map.clone();
-        let start_date_value = start_date_item.get_value(data_map, &field_config_map)?;
+        let column_config_map = self.column_config_map.clone();
+        let start_date_value = start_date_item.get_value(data_map, None, &column_config_map)?;
         let end_date_item = attributes[1].clone();
-        let end_date_value = end_date_item.get_value(data_map, &field_config_map)?;
+        let end_date_value = end_date_item.get_value(data_map, None, &column_config_map)?;
         let number_days: i64;
         let replacement_string: String;
         if start_date_item.is_reference {
             let field_name = start_date_item.name.unwrap();
-            let fmt = get_date_format(&field_name, &field_config_map);
+            let fmt = get_date_format(&field_name, &column_config_map);
             let fmt = fmt.as_str();
             let start_date_obj = NaiveDate::parse_from_str(
                 start_date_value.as_str(), 
@@ -892,20 +892,20 @@ pub struct DateAddDiff {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, ColumnConfig>,
+    column_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl DateAddDiff {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
-        field_config_map: &BTreeMap<String, ColumnConfig>
+        column_config_map: &BTreeMap<String, ColumnConfig>
     ) -> Self {
-        let field_config_map = field_config_map.clone();
+        let column_config_map = column_config_map.clone();
         return Self{
             function: function, 
             data_map: data_map, 
             attributes: None,
-            field_config_map: field_config_map
+            column_config_map: column_config_map
         };
     }
 }
@@ -1003,13 +1003,13 @@ impl DateAddDiffFunction for DateAddDiff {
     fn execute(&self, operation: DateDeltaOperation) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
-        let field_config_map = self.field_config_map.clone();
+        let column_config_map = self.column_config_map.clone();
         let date_item = attributes[0].clone();
-        let date_value = date_item.get_value(data_map, &field_config_map)?;
+        let date_value = date_item.get_value(data_map, None, &column_config_map)?;
         let number_item = attributes[1].clone();
-        let number_value = number_item.get_value(data_map, &field_config_map)?;
+        let number_value = number_item.get_value(data_map, None, &column_config_map)?;
         let units_item = attributes[2].clone();
-        let units_value = units_item.get_value(data_map, &field_config_map)?;
+        let units_value = units_item.get_value(data_map, None, &column_config_map)?;
         let replacement_string: String;
         let new_date: DateTime<FixedOffset>;
         let date_obj: DateTime<FixedOffset>;
@@ -1030,9 +1030,9 @@ impl DateAddDiffFunction for DateAddDiff {
         };
         if date_item.is_reference {
             let field_name = date_item.name.unwrap();
-            let fmt = get_date_format(&field_name, &field_config_map);
+            let fmt = get_date_format(&field_name, &column_config_map);
             let fmt = fmt.as_str();
-            let field_config = field_config_map.get(&field_name);
+            let field_config = column_config_map.get(&field_name);
             has_time = false;
             if field_config.is_some() {
                 let field_config = field_config.unwrap().clone();
@@ -1164,20 +1164,20 @@ pub struct DateFormatFunc {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, ColumnConfig>,
+    column_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl DateFormatFunc {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
-        field_config_map: &BTreeMap<String, ColumnConfig>
+        column_config_map: &BTreeMap<String, ColumnConfig>
     ) -> Self {
-        let field_config_map = field_config_map.clone();
+        let column_config_map = column_config_map.clone();
         return Self{
             function: function, 
             data_map: data_map, 
             attributes: None,
-            field_config_map: field_config_map
+            column_config_map: column_config_map
         };
     }
 }
@@ -1253,18 +1253,18 @@ impl DateFunction for DateFormatFunc {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
-        let field_config_map = self.field_config_map.clone();
+        let column_config_map = self.column_config_map.clone();
         let date_item = attributes[0].clone();
-        let date_value = date_item.get_value(data_map, &field_config_map)?;
+        let date_value = date_item.get_value(data_map, None, &column_config_map)?;
         let format_item = attributes[1].clone();
-        let format_value = format_item.get_value(data_map, &field_config_map)?;
+        let format_value = format_item.get_value(data_map, None, &column_config_map)?;
         let mode_item = attributes[2].clone();
-        let mode_value = mode_item.get_value(data_map, &field_config_map)?;
+        let mode_value = mode_item.get_value(data_map, None, &column_config_map)?;
         let date_obj_wrap: Option<DateTime<FixedOffset>>;
         let date_string: String;
         if date_item.is_reference {
             let field_name = date_item.name.unwrap();
-            let fmt = get_date_format(&field_name, &field_config_map);
+            let fmt = get_date_format(&field_name, &column_config_map);
             let fmt = fmt.as_str();
             let date_obj = DateTime::parse_from_str(
                 &date_value, 
@@ -1497,10 +1497,10 @@ fn get_rust_date_format(date_obj: DateTime<FixedOffset>, mut format: String) -> 
     return format;
 }
 
-fn get_date_format(field_name: &String, field_config_map: &BTreeMap<String, ColumnConfig>) -> String {
+fn get_date_format(field_name: &String, column_config_map: &BTreeMap<String, ColumnConfig>) -> String {
     let field_name = field_name.clone();
-    let field_config_map = field_config_map.clone();
-    let field_config = field_config_map.get(&field_name);
+    let column_config_map = column_config_map.clone();
+    let field_config = column_config_map.get(&field_name);
     let fmt_string: String;
     let mut fmt = "";
     if field_config.is_some() {

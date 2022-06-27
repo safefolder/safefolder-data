@@ -1,4 +1,5 @@
 use std::str::FromStr;
+use asciifolding::fold_to_ascii;
 use regex::Regex;
 use std::{collections::BTreeMap};
 use lazy_static::lazy_static;
@@ -6,6 +7,7 @@ use lazy_static::lazy_static;
 use crate::planet::PlanetError;
 
 use crate::functions::*;
+use crate::storage::columns::text::{RE_TEXT, get_stop_words_by_language, get_stemmer_by_language};
 use crate::storage::folder::*;
 
 lazy_static! {
@@ -22,6 +24,7 @@ lazy_static! {
     pub static ref RE_REPT: Regex = Regex::new(r#"^REPT\([\s\n\t]{0,}((?P<text>(("[\w\s\W]+")|([A-Z]+\(.[^)]+\))))|(?P<text_ref>\{[\w\s]+\}))[\s\n\t]{0,},[\s\n\t]{0,}(?P<number_times>\d+)[\s\t\n]{0,}\)"#).unwrap();
     pub static ref RE_SUBSTITUTE: Regex = Regex::new(r#"^SUBSTITUTE\([\s\n\t]{0,}((?P<text>(("[\w\s]+")|([A-Z]+\(.[^)]+\))))|(?P<text_ref>(\{[\w\s]+\})))[\s\n\t]{0,},[\s\n\t]{0,}(?P<old_text>(("[\w\s]+")[\s\n\t]{0,})|([A-Z]+\(.[^)]+\))),[\s\n\t]{0,}(?P<new_text>(("[\w\s]+")|([A-Z]+\(.[^)]+\))))[\s\t\n]{0,}\)"#).unwrap();
     pub static ref RE_TRIM: Regex = Regex::new(r#"^TRIM\([\s\n\t]{0,}((?P<text>"[\w\s]+")|(?P<text_ref>\{[\w\s]+\})|(?P<func>[A-Z]+\(.[^()]+\)))[\s\n\t]{0,}\)"#).unwrap();
+    pub static ref RE_MATCH_ANY: Regex = Regex::new(r#"^MATCH_ANY\([\s\n\t]*(?P<Columns>\{[\w\s|]*\}),[\s\n\t]*"(?P<Match>[\s\S]*)"[\s\t\n]*\)"#).unwrap();
 }
 
 pub trait TextFunction {
@@ -34,20 +37,20 @@ pub struct Concat {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, ColumnConfig>,
+    column_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Concat {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
-        field_config_map: &BTreeMap<String, ColumnConfig>
+        column_config_map: &BTreeMap<String, ColumnConfig>
     ) -> Self {
-        let field_config_map = field_config_map.clone();
+        let column_config_map = column_config_map.clone();
         return Self{
             function: function, 
             data_map: data_map, 
             attributes: None,
-            field_config_map: field_config_map,
+            column_config_map: column_config_map,
         };
     }
 }
@@ -84,13 +87,13 @@ impl TextFunction for Concat {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
-        let field_config_map = self.field_config_map.clone();
+        let column_config_map = self.column_config_map.clone();
         let mut attributes_processed: Vec<String> = Vec::new();
         // Case 1: In a formula field, no ref, CONCAT("My ", "places")
         // Case 2: In a formula field, ref, CONCAT("My "", {Column})
         // Case 3: I have function as attribute: CONCAT("My "", TRIM({Column}))
         for attribute_item in attributes {
-            let attribute = attribute_item.get_value(data_map, &field_config_map)?;
+            let attribute = attribute_item.get_value(data_map, None, &column_config_map)?;
             attributes_processed.push(attribute);
         }
         let result = attributes_processed.join("");
@@ -103,20 +106,20 @@ pub struct Trim {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, ColumnConfig>,
+    column_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Trim {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
-        field_config_map: &BTreeMap<String, ColumnConfig>,
+        column_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
-        let field_config_map = field_config_map.clone();
+        let column_config_map = column_config_map.clone();
         return Self{
             function: function, 
             data_map: data_map, 
             attributes: None,
-            field_config_map: field_config_map
+            column_config_map: column_config_map
         };
     }
 }
@@ -168,10 +171,10 @@ impl TextFunction for Trim {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
-        let field_config_map = self.field_config_map.clone();
+        let column_config_map = self.column_config_map.clone();
         let attributes = attributes.clone();
         let attribute_item = attributes[0].clone();
-        let attribute = attribute_item.get_value(data_map, &field_config_map)?;
+        let attribute = attribute_item.get_value(data_map, None, &column_config_map)?;
         let result = attribute.trim().to_string();
         return Ok(result);
     
@@ -183,20 +186,20 @@ pub struct Format {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, ColumnConfig>,
+    column_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Format {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
-        field_config_map: &BTreeMap<String, ColumnConfig>,
+        column_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
-        let field_config_map = field_config_map.clone();
+        let column_config_map = column_config_map.clone();
         return Self{
             function: function, 
             data_map: data_map, 
             attributes: None,
-            field_config_map: field_config_map,
+            column_config_map: column_config_map,
         };
     }
 }
@@ -278,20 +281,20 @@ pub struct JoinList {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, ColumnConfig>,
+    column_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl JoinList {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
-        field_config_map: &BTreeMap<String, ColumnConfig>,
+        column_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
-        let field_config_map = field_config_map.clone();
+        let column_config_map = column_config_map.clone();
         return Self{
             function: function, 
             data_map: data_map, 
             attributes: None,
-            field_config_map: field_config_map,
+            column_config_map: column_config_map,
         };
     }
 }
@@ -394,20 +397,20 @@ pub struct Length {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, ColumnConfig>,
+    column_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Length {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
-        field_config_map: &BTreeMap<String, ColumnConfig>,
+        column_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
-        let field_config_map = field_config_map.clone();
+        let column_config_map = column_config_map.clone();
         return Self{
             function: function, 
             data_map: data_map, 
             attributes: None,
-            field_config_map: field_config_map
+            column_config_map: column_config_map
         };
     }
 }
@@ -460,10 +463,10 @@ impl TextFunction for Length {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
-        let field_config_map = self.field_config_map.clone();
+        let column_config_map = self.column_config_map.clone();
         let attributes = attributes.clone();
         let attribute_item = attributes[0].clone();
-        let attribute = attribute_item.get_value(data_map, &field_config_map)?;
+        let attribute = attribute_item.get_value(data_map, None, &column_config_map)?;
         let length = attribute.len().to_string();
         return Ok(length)
     }
@@ -474,20 +477,20 @@ pub struct Lower {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, ColumnConfig>,
+    column_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Lower {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
-        field_config_map: &BTreeMap<String, ColumnConfig>,
+        column_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
-        let field_config_map = field_config_map.clone();
+        let column_config_map = column_config_map.clone();
         return Self{
             function: function, 
             data_map: data_map, 
             attributes: None,
-            field_config_map: field_config_map,
+            column_config_map: column_config_map,
         };
     }
 }
@@ -540,10 +543,10 @@ impl TextFunction for Lower {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
-        let field_config_map = self.field_config_map.clone();
+        let column_config_map = self.column_config_map.clone();
         let attributes = attributes.clone();
         let attribute_item = attributes[0].clone();
-        let attribute = attribute_item.get_value(data_map, &field_config_map)?;
+        let attribute = attribute_item.get_value(data_map, None, &column_config_map)?;
         let result_lower = attribute.to_lowercase();
         return Ok(result_lower)
     }
@@ -554,20 +557,20 @@ pub struct Upper {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, ColumnConfig>,
+    column_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Upper {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
-        field_config_map: &BTreeMap<String, ColumnConfig>,
+        column_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
-        let field_config_map = field_config_map.clone();
+        let column_config_map = column_config_map.clone();
         return Self{
             function: function, 
             data_map: data_map, 
             attributes: None,
-            field_config_map: field_config_map,
+            column_config_map: column_config_map,
         };
     }
 }
@@ -620,10 +623,10 @@ impl TextFunction for Upper {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
-        let field_config_map = self.field_config_map.clone();
+        let column_config_map = self.column_config_map.clone();
         let attributes = attributes.clone();
         let attribute_item = attributes[0].clone();
-        let attribute = attribute_item.get_value(data_map, &field_config_map)?;
+        let attribute = attribute_item.get_value(data_map, None, &column_config_map)?;
         let result_upper = attribute.to_uppercase();
         return Ok(result_upper)
     }
@@ -634,20 +637,20 @@ pub struct Replace {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, ColumnConfig>,
+    column_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Replace {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
-        field_config_map: &BTreeMap<String, ColumnConfig>,
+        column_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
-        let field_config_map = field_config_map.clone();
+        let column_config_map = column_config_map.clone();
         return Self{
             function: function, 
             data_map: data_map, 
             attributes: None,
-            field_config_map: field_config_map,
+            column_config_map: column_config_map,
         };
     }
 }
@@ -699,18 +702,18 @@ impl TextFunction for Replace {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
-        let field_config_map = self.field_config_map.clone();
+        let column_config_map = self.column_config_map.clone();
         let attributes = attributes.clone();
         let old_text = attributes[0].clone();
-        let old_text_value = old_text.get_value(data_map, &field_config_map)?;
+        let old_text_value = old_text.get_value(data_map, None, &column_config_map)?;
         let start_num = attributes[1].clone();
-        let start_num_value = start_num.get_value(data_map, &field_config_map)?;
+        let start_num_value = start_num.get_value(data_map, None, &column_config_map)?;
         let start_num_value: u32 = FromStr::from_str(start_num_value.as_str()).unwrap();
         let num_chars = attributes[2].clone();
-        let num_chars_value = num_chars.get_value(data_map, &field_config_map)?;
+        let num_chars_value = num_chars.get_value(data_map, None, &column_config_map)?;
         let num_chars_value: u32 = FromStr::from_str(num_chars_value.as_str()).unwrap();
         let new_text = attributes[3].clone();
-        let new_text_value = new_text.get_value(data_map, &field_config_map)?;
+        let new_text_value = new_text.get_value(data_map, None, &column_config_map)?;
         let replacement_string: String;
         let mut piece: String = String::from("");
         for (i, item) in old_text_value.chars().enumerate() {
@@ -731,20 +734,20 @@ pub struct Mid {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, ColumnConfig>,
+    column_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Mid {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
-        field_config_map: &BTreeMap<String, ColumnConfig>,
+        column_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
-        let field_config_map = field_config_map.clone();
+        let column_config_map = column_config_map.clone();
         return Self{
             function: function, 
             data_map: data_map, 
             attributes: None,
-            field_config_map: field_config_map,
+            column_config_map: column_config_map,
         };
     }
 }
@@ -795,15 +798,15 @@ impl TextFunction for Mid {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
-        let field_config_map = self.field_config_map.clone();
+        let column_config_map = self.column_config_map.clone();
         let attributes = attributes.clone();
         let text = attributes[0].clone();
-        let text_value = text.get_value(data_map, &field_config_map)?;
+        let text_value = text.get_value(data_map, None, &column_config_map)?;
         let start_num = attributes[1].clone();
-        let start_num_value = start_num.get_value(data_map, &field_config_map)?;
+        let start_num_value = start_num.get_value(data_map, None, &column_config_map)?;
         let start_num_value: usize = FromStr::from_str(start_num_value.as_str()).unwrap();
         let num_chars = attributes[2].clone();
-        let num_chars_value = num_chars.get_value(data_map, &field_config_map)?;
+        let num_chars_value = num_chars.get_value(data_map, None, &column_config_map)?;
         let num_chars_value: usize = FromStr::from_str(num_chars_value.as_str()).unwrap();
         
         let mut text_new = String::from("");
@@ -823,20 +826,20 @@ pub struct Rept {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, ColumnConfig>,
+    column_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Rept {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
-        field_config_map: &BTreeMap<String, ColumnConfig>,
+        column_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
-        let field_config_map = field_config_map.clone();
+        let column_config_map = column_config_map.clone();
         return Self{
             function: function, 
             data_map: data_map, 
             attributes: None,
-            field_config_map: field_config_map
+            column_config_map: column_config_map
         };
     }
 }
@@ -885,12 +888,12 @@ impl TextFunction for Rept {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
-        let field_config_map = self.field_config_map.clone();
+        let column_config_map = self.column_config_map.clone();
         let attributes = attributes.clone();
         let text = attributes[0].clone();
-        let text_value = text.get_value(data_map, &field_config_map)?;
+        let text_value = text.get_value(data_map, None, &column_config_map)?;
         let number_times = attributes[1].clone();
-        let number_times_value = number_times.get_value(data_map, &field_config_map)?;
+        let number_times_value = number_times.get_value(data_map, None, &column_config_map)?;
         let number_times_value: usize = FromStr::from_str(number_times_value.as_str()).unwrap();
         let text_value_str = text_value.as_str();
         let text_value_str = text_value_str.repeat(number_times_value);
@@ -903,20 +906,20 @@ pub struct Substitute {
     function: Option<FunctionParse>,
     data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     attributes: Option<Vec<FunctionAttributeItem>>,
-    field_config_map: BTreeMap<String, ColumnConfig>,
+    column_config_map: BTreeMap<String, ColumnConfig>,
 }
 impl Substitute {
     pub fn defaults(
         function: Option<FunctionParse>, 
         data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
-        field_config_map: &BTreeMap<String, ColumnConfig>,
+        column_config_map: &BTreeMap<String, ColumnConfig>,
     ) -> Self {
-        let field_config_map = field_config_map.clone();
+        let column_config_map = column_config_map.clone();
         return Self{
             function: function, 
             data_map: data_map, 
             attributes: None,
-            field_config_map: field_config_map,
+            column_config_map: column_config_map,
         };
     }
 }
@@ -953,7 +956,7 @@ impl TextFunction for Substitute {
                 }
                 attributes_.push(prepare_string_attribute(attr_old_text));
                 attributes_.push(prepare_string_attribute(attr_new_text));
-                function.attributes = Some(attributes_);    
+                function.attributes = Some(attributes_);
             }
         }
         if data_map_wrap.is_some() {
@@ -967,19 +970,337 @@ impl TextFunction for Substitute {
     fn execute(&self) -> Result<String, PlanetError> {
         let attributes = self.attributes.clone().unwrap();
         let data_map = &self.data_map.clone().unwrap();
-        let field_config_map = self.field_config_map.clone();
+        let column_config_map = self.column_config_map.clone();
         let attributes = attributes.clone();
         let text = attributes[0].clone();
-        let mut text_value = text.get_value(data_map, &field_config_map)?;
+        let mut text_value = text.get_value(data_map, None, &column_config_map)?;
         let old_text = attributes[1].clone();
-        let old_text_value = old_text.get_value(data_map, &field_config_map)?;
+        let old_text_value = old_text.get_value(data_map, None, &column_config_map)?;
         let old_text_value = old_text_value.as_str();
         let new_text = attributes[2].clone();
-        let new_text_value = new_text.get_value(data_map, &field_config_map)?;
+        let new_text_value = new_text.get_value(data_map, None, &column_config_map)?;
         let new_text_value = new_text_value.as_str();
 
         text_value = text_value.replace(old_text_value, new_text_value);
         return Ok(text_value)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MatchAny {
+    function: Option<FunctionParse>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
+    index_data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    column_config_map: BTreeMap<String, ColumnConfig>,
+}
+impl MatchAny {
+    pub fn defaults(
+        function: Option<FunctionParse>, 
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
+        index_data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
+        column_config_map: &BTreeMap<String, ColumnConfig>,
+    ) -> Self {
+        let column_config_map = column_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            index_data_map,
+            attributes: None,
+            column_config_map: column_config_map,
+        };
+    }
+}
+impl TextFunction for  MatchAny {
+    fn handle(&mut self) -> Result<FunctionParse, PlanetError> {
+        // MATCH_ANY({Column}, "My keyword search")
+        let function_parse = &self.function.clone().unwrap();
+        let data_map = self.data_map.clone();
+        let expr = &RE_MATCH_ANY;
+        let mut function = function_parse.clone();
+        let data_map_wrap = data_map.clone();
+        let (
+            function_text_wrap, 
+            function_text, 
+            compiled_attributes,
+            mut function_result,
+            data_map,
+        ) = prepare_function_parse(function_parse, data_map.clone());
+        if function_text_wrap.is_some() {
+            function.validate = Some(expr.is_match(function_text.as_str()));
+            if function.validate.unwrap() {
+                let matches = expr.captures(function_text.as_str()).unwrap();
+                let text_query = matches.name("Match");
+                let columns = matches.name("Columns");
+                let mut attributes_: Vec<String> = Vec::new();
+                if columns.is_some() {
+                    let columns = columns.unwrap().as_str().to_string();
+                    attributes_.push(prepare_string_attribute(columns));
+                }
+                if text_query.is_some() {
+                    let text_query = text_query.unwrap().as_str().to_string();
+                    attributes_.push(prepare_string_attribute(text_query));
+                }
+                function.attributes = Some(attributes_);
+            }
+        }
+        if data_map_wrap.is_some() {
+            self.attributes = Some(compiled_attributes.clone());
+            self.data_map = Some(data_map.clone());
+            let result = self.execute()?;
+            let result = result.as_str();
+            if result == "0" {
+                // Formulas that do MATCH_ANY would end up Column="", failing on the formula
+                function_result.text = Some(String::from(""));
+                function.has_search_match = Some(false);
+            } else {
+                // I have a full text search match
+                let score: usize = FromStr::from_str(result).unwrap();
+                function.score = Some(score);
+                function.has_search_match = Some(true);
+            }
+            function.result = Some(function_result.clone());
+        }
+        return Ok(function)
+    }
+    fn execute(&self) -> Result<String, PlanetError> {
+        let attributes = self.attributes.clone().unwrap();
+        let data_map = &self.data_map.clone().unwrap();
+        let index_data_map = &self.index_data_map.clone().unwrap();
+        let column = attributes[0].clone();
+        let text_query = attributes[1].clone();
+        let text_query = text_query.value.unwrap();
+        let column_name = column.value.unwrap();
+        let column_name = column_name.replace("{", "").replace("}", "");
+        let column_config_map = self.column_config_map.clone();
+        let config = column_config_map.get(&column_name);
+        if config.is_none() {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Column Not Found at column config.")),
+                )
+            );
+        }
+        let config = config.unwrap();
+        let column_id = config.id.clone().unwrap();
+        let text_query_processed = fold_to_ascii(&text_query);
+        let expr = &RE_TEXT;
+        let words = expr.captures_iter(text_query_processed.as_str());
+        let mut language_code: String = LANGUAGE_CODE_ENGLISH.to_string();
+        for (_column_name, v) in column_config_map.clone() {
+            let column_type = v.column_type.unwrap();
+            let column_type = column_type.as_str();
+            let config_column_id = v.id.unwrap();
+            if column_type == COLUMN_TYPE_LANGUAGE {
+                let language_code_ = data_map.get(&config_column_id);
+                if language_code_.is_some() {
+                    let language_code_ = language_code_.unwrap();
+                    let language_code_ = get_value_list(language_code_);
+                    if language_code_.is_some() {
+                        let language_code_ = language_code_.unwrap();
+                        language_code = language_code_;
+                    }
+                }
+            }
+        }
+        let stop_words = get_stop_words_by_language(&language_code);
+        let stemmer = get_stemmer_by_language(&language_code);
+        let mut score: usize = 0;
+        for word in words {
+            let word = word.get(0).unwrap().as_str();
+            let is_stop = stop_words.contains(&word.to_string());
+            if is_stop {
+                continue
+            }
+            let stem = stemmer.stem(word);
+            let stem = stem.to_string();
+            let matched_word = index_data_map.get(&stem);
+            if matched_word.is_some() {
+                let matched_word = matched_word.unwrap();
+                for item in matched_word {
+                    let item_value = item.get(VALUE);
+                    if item_value.is_some() {
+                        let item_value = item_value.unwrap();
+                        let fields: Vec<&str> = item_value.split(",").collect();
+                        if fields.len() > 0 {
+                            for field in fields {
+                                let tuple: Vec<&str> = field.split(":").collect();
+                                let index_column_id = tuple[0];
+                                if index_column_id.to_lowercase() == column_id.to_lowercase() {
+                                    let score_str = tuple[1];
+                                    score = FromStr::from_str(score_str).unwrap();
+                                    break
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return Ok(score.to_string())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MatchAll {
+    function: Option<FunctionParse>,
+    data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
+    index_data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
+    attributes: Option<Vec<FunctionAttributeItem>>,
+    column_config_map: BTreeMap<String, ColumnConfig>,
+}
+impl MatchAll {
+    pub fn defaults(
+        function: Option<FunctionParse>, 
+        data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
+        index_data_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
+        column_config_map: &BTreeMap<String, ColumnConfig>,
+    ) -> Self {
+        let column_config_map = column_config_map.clone();
+        return Self{
+            function: function, 
+            data_map: data_map, 
+            index_data_map,
+            attributes: None,
+            column_config_map: column_config_map,
+        };
+    }
+}
+impl TextFunction for  MatchAll {
+    fn handle(&mut self) -> Result<FunctionParse, PlanetError> {
+        // MATCH_ALL({Column}, "My keyword search")
+        let function_parse = &self.function.clone().unwrap();
+        let data_map = self.data_map.clone();
+        let expr = &RE_MATCH_ANY;
+        let mut function = function_parse.clone();
+        let data_map_wrap = data_map.clone();
+        let (
+            function_text_wrap, 
+            function_text, 
+            compiled_attributes,
+            mut function_result,
+            data_map,
+        ) = prepare_function_parse(function_parse, data_map.clone());
+        if function_text_wrap.is_some() {
+            function.validate = Some(expr.is_match(function_text.as_str()));
+            if function.validate.unwrap() {
+                let matches = expr.captures(function_text.as_str()).unwrap();
+                let text_query = matches.name("Match");
+                let columns = matches.name("Columns");
+                let mut attributes_: Vec<String> = Vec::new();
+                if columns.is_some() {
+                    let columns = columns.unwrap().as_str().to_string();
+                    attributes_.push(prepare_string_attribute(columns));
+                }
+                if text_query.is_some() {
+                    let text_query = text_query.unwrap().as_str().to_string();
+                    attributes_.push(prepare_string_attribute(text_query));
+                }
+                function.attributes = Some(attributes_);
+            }
+        }
+        if data_map_wrap.is_some() {
+            self.attributes = Some(compiled_attributes.clone());
+            self.data_map = Some(data_map.clone());
+            let result = self.execute()?;
+            let result = result.as_str();
+            if result == "0" {
+                // Formulas that do MATCH_ANY would end up Column="", failing on the formula
+                function_result.text = Some(String::from(""));
+                function.has_search_match = Some(false);
+            } else {
+                // I have a full text search match
+                let score: usize = FromStr::from_str(result).unwrap();
+                function.score = Some(score);
+                function.has_search_match = Some(true);
+            }
+            function.result = Some(function_result.clone());
+        }
+        return Ok(function)
+    }
+    fn execute(&self) -> Result<String, PlanetError> {
+        let attributes = self.attributes.clone().unwrap();
+        let data_map = &self.data_map.clone().unwrap();
+        let index_data_map = &self.index_data_map.clone().unwrap();
+        let column = attributes[0].clone();
+        let text_query = attributes[1].clone();
+        let text_query = text_query.value.unwrap();
+        let column_name = column.value.unwrap();
+        let column_name = column_name.replace("{", "").replace("}", "");
+        let column_config_map = self.column_config_map.clone();
+        let config = column_config_map.get(&column_name);
+        if config.is_none() {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Column Not Found at column config.")),
+                )
+            );
+        }
+        let config = config.unwrap();
+        let column_id = config.id.clone().unwrap();
+        let text_query_processed = fold_to_ascii(&text_query);
+        let expr = &RE_TEXT;
+        let words = expr.captures_iter(text_query_processed.as_str());
+        let mut language_code: String = LANGUAGE_CODE_ENGLISH.to_string();
+        for (_column_name, v) in column_config_map.clone() {
+            let column_type = v.column_type.unwrap();
+            let column_type = column_type.as_str();
+            let config_column_id = v.id.unwrap();
+            if column_type == COLUMN_TYPE_LANGUAGE {
+                let language_code_ = data_map.get(&config_column_id);
+                if language_code_.is_some() {
+                    let language_code_ = language_code_.unwrap();
+                    let language_code_ = get_value_list(language_code_);
+                    if language_code_.is_some() {
+                        let language_code_ = language_code_.unwrap();
+                        language_code = language_code_;
+                    }
+                }
+            }
+        }
+        let stop_words = get_stop_words_by_language(&language_code);
+        let stemmer = get_stemmer_by_language(&language_code);
+        let mut score: usize = 0;
+        let mut all_words_check = true;
+        for word in words {
+            let word = word.get(0).unwrap().as_str();
+            let is_stop = stop_words.contains(&word.to_string());
+            if is_stop {
+                continue
+            }
+            let stem = stemmer.stem(word);
+            let stem = stem.to_string();
+            let matched_word = index_data_map.get(&stem);
+            if matched_word.is_some() {
+                let matched_word = matched_word.unwrap();
+                for item in matched_word {
+                    let item_value = item.get(VALUE);
+                    if item_value.is_some() {
+                        let item_value = item_value.unwrap();
+                        let fields: Vec<&str> = item_value.split(",").collect();
+                        if fields.len() > 0 {
+                            for field in fields {
+                                let tuple: Vec<&str> = field.split(":").collect();
+                                let index_column_id = tuple[0];
+                                if index_column_id.to_lowercase() == column_id.to_lowercase() {
+                                    let score_str = tuple[1];
+                                    let score_item: usize = FromStr::from_str(score_str).unwrap();
+                                    score += score_item;
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                all_words_check = false;
+            }
+        }
+        if !all_words_check {
+            score = 0;
+        }
+        return Ok(score.to_string())
     }
 }
 

@@ -20,7 +20,6 @@ pub const FUNCTION_WEEK: &str = "WEEK";
 pub const FUNCTION_WEEKDAY: &str = "WEEKDAY";
 pub const FUNCTION_YEAR: &str = "YEAR";
 pub const FUNCTION_IF: &str = "IF";
-pub const FUNCTION_MATCH: &str = "MATCH";
 pub const FUNCTION_MID: &str = "MID";
 pub const FUNCTION_REPT: &str = "REPT";
 pub const FUNCTION_SUBSTITUTE: &str = "SUBSTITUTE";
@@ -54,6 +53,8 @@ pub const FUNCTION_AND: &str = "AND";
 pub const FUNCTION_OR: &str = "OR";
 pub const FUNCTION_NOT: &str = "NOT";
 pub const FUNCTION_XOR: &str = "XOR";
+pub const FUNCTION_MATCH_ANY: &str = "MATCH_ANY";
+pub const FUNCTION_MATCH_ALL: &str = "MATCH_ALL";
 
 pub const DATE_MODE_HUMAN_TIME: &str = "human_time";
 pub const DATE_MODE_ISO: &str = "iso";

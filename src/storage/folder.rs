@@ -19,7 +19,7 @@ use serde_encrypt::{
     AsSharedKey, EncryptedMessage,
 };
 use slug::slugify;
-use sled::Tree;
+use sled::{Tree, IVec};
 use std::fs::{File, remove_file, create_dir_all};
 use chacha20poly1305::{ChaCha20Poly1305}; // Or `XChaCha20Poly1305`
 use chacha20poly1305::aead::{NewAead, stream};
@@ -1975,6 +1975,49 @@ impl TreeFolderItem {
                 Some(tr!("Could not find item in file database.")),
             )
         )
+    }
+
+    pub fn get_index_item(
+        index_tree: sled::Tree, 
+        item_id: &IVec
+    ) -> Result<DbData, PlanetError> {
+        let item_id = item_id.clone();
+        let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
+        let index_item = index_tree.get(item_id);
+        if index_item.is_err() {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Could not find item in index database.")),
+                )
+            )
+        }
+        let index_item = index_item.unwrap();
+        if index_item.is_none() {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Index item is empty.")),
+                )
+            )
+        }
+        let index_item = index_item.unwrap().to_vec();
+        let index_item_ = EncryptedMessage::deserialize(
+            index_item
+        ).unwrap();
+        let index_item_ = DbData::decrypt_owned(
+            &index_item_, 
+            &shared_key);
+        if index_item_.is_err() {
+            return Err(
+                PlanetError::new(
+                    500, 
+                    Some(tr!("Error decrypting the index item object.")),
+                )
+            )
+        }
+        let index_item = index_item_.unwrap();
+        return Ok(index_item)
     }
 
 }

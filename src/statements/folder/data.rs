@@ -19,6 +19,7 @@ use serde_encrypt::{
 };
 
 use crate::functions::Formula;
+use crate::functions::constants::{FUNCTION_MATCH_ANY, FUNCTION_MATCH_ALL};
 use crate::statements::folder::config::*;
 use crate::storage::constants::*;
 use crate::statements::folder::schema::*;
@@ -59,7 +60,6 @@ lazy_static! {
     pub static ref RE_SELECT_SORT_FIELDS: Regex = Regex::new(r#"(?P<Column>[\w\s]+)(?P<Mode>ASC|DESC)+"#).unwrap();
     pub static ref RE_SELECT_GROUP_BY: Regex = Regex::new(r#"(GROUP[\s]*BY[\s]*"(?P<GroupByColumns>[\w\s,]+)")"#).unwrap();
     pub static ref RE_SELECT_GROUP_COLUMNS: Regex = Regex::new(r#"(?P<Column>[\w\s]+)"#).unwrap();
-    pub static ref RE_SELECT_SEARCH: Regex = Regex::new(r#"(SEARCH[\s]*"(?P<Search>[\w\s]+)")"#).unwrap();
     pub static ref RE_SELECT_WHERE: Regex = Regex::new(r#"WHERE[\s]*(?P<Where>[\s\S]+);+"#).unwrap();
 }
 
@@ -1369,7 +1369,7 @@ pub struct SelectFromFolderCompiledStmt {
     pub columns: Option<Vec<String>>,
     pub page: u32,
     pub number_items: u32,
-    pub search: Option<String>,
+    pub has_search: bool,
     pub where_source: Option<String>,
     pub where_compiled: Option<Formula>,
     pub group_by: Option<Vec<String>>,
@@ -1401,7 +1401,7 @@ impl SelectFromFolderCompiledStmt {
             page: page_int,
             number_items: number_items_int,
             columns: None,
-            search: None,
+            has_search: false,
             where_source: None,
             where_compiled: None,
             group_by: None,
@@ -1463,6 +1463,11 @@ impl<'gb> SearchCompiler<'gb> {
             page, 
             number_items
         );
+        let has_match_any = &statement_text.find(FUNCTION_MATCH_ANY);
+        let has_match_all = &statement_text.find(FUNCTION_MATCH_ALL);
+        if has_match_all.is_some() || has_match_any.is_some() {
+            statement.has_search = true;
+        }
         if is_count {
             let captures = expr.captures(&statement_text);
             if captures.is_some() {
@@ -1670,19 +1675,7 @@ impl<'gb> SearchCompiler<'gb> {
                     }
                 }
             }
-            // 6 - Search
-            let expr = &RE_SELECT_SEARCH;
-            let captures = expr.captures(&statement_text);
-            if captures.is_some() {
-                let captures = captures.unwrap();
-                let search = captures.name("Search");
-                if search.is_some() {
-                    let search = search.unwrap().as_str();
-                    statement.search = Some(search.to_string());
-                    statement_text = expr.replace(&statement_text, "").to_string();
-                }
-            }
-            // 7 - Where
+            // 6 - Where
             let expr_1 = &RE_SELECT_WHERE;
             let captures = expr_1.captures(&statement_text);
             if captures.is_some() {
@@ -1790,15 +1783,6 @@ impl<'gb> SearchCompiler<'gb> {
             if is_assign_function {
                 where_source = format!("AND({})", where_source);
             }
-            // Modify formula in case we have general SEARCH in the statement
-            let stmt_search = compiled_statement.search.clone();
-            if stmt_search.is_some() {
-                let stmt_search = stmt_search.unwrap();
-                let search_func = format!("SEARCH(\"Text\", \"{}\")", stmt_search);
-                where_source = format!(
-                    "AND({}, {})", &search_func, where_source
-                );
-            }
             let mut properties_map: HashMap<String, ColumnConfig> = HashMap::new();
             for (k, v) in column_config_map.clone() {
                 properties_map.insert(k, v);
@@ -1874,6 +1858,7 @@ pub struct SearchSorter{
     pub partition: u16,
     pub id: String,
     pub column_id: Option<String>,
+    pub score: Option<i64>,
     pub column_1_str: Option<String>,
     pub column_1_number: Option<i64>,
     pub column_2_str: Option<String>,
@@ -1902,6 +1887,7 @@ impl SearchSorter {
             partition: partition.clone(),
             id: id.clone(),
             column_id: None,
+            score: None,
             column_1_str: None,
             column_2_str: None,
             column_3_str: None,
@@ -2067,6 +2053,22 @@ impl<'gb> SearchIterator<'gb>{
                     number: None
                 };
                 sort_value = sort_value_;
+            } else if sorter_column_item.clone() == String::from(SCORE) {
+                let data = item.data.clone().unwrap();
+                let score_str = data.get(SCORE);
+                if score_str.is_some() {
+                    let score_str = score_str.unwrap();
+                    let score_str = get_value_list(score_str).unwrap();
+                    let score_str = score_str.as_str();
+                    let score: i64 = FromStr::from_str(score_str).unwrap();
+                    let sort_value_ = SortValueMode{
+                        str: None,
+                        number: Some(score)
+                    };
+                    sort_value = sort_value_;
+                } else {
+                    continue
+                }
             } else {
                 let column_type = column_type_map.get(sorter_column_id);
                 if column_type.is_none() {
@@ -2103,8 +2105,11 @@ impl<'gb> SearchIterator<'gb>{
                 column_value_number = sort_value.number.unwrap();
             }
             match sorter_column_item {
-                "column_id" => {
+                COLUMN_ID => {
                     sorter.column_id = Some(column_value);
+                },
+                SCORE => {
+                    sorter.score = Some(column_value_number);
                 },
                 "column_1_str" => {
                     sorter.column_1_str = Some(column_value);
@@ -2216,12 +2221,20 @@ impl<'gb> SearchIterator<'gb>{
         sorter_list: &Vec<SearchSorter>,
         sorter_map: &HashMap<String, SortedtBy>,
     ) -> Vec<SearchSorter> {
+        let has_search = self.query.has_search.clone();
         let mut sorter_list = sorter_list.clone();
         // eprintln!("sort :: sorter_list : {:#?}", &sorter_list);
-        let only_id = sorter_map.len() == 1;
-        // Case I only sort on ids
-        if only_id {
-            sorter_list.sort();
+        let only_one = sorter_map.len() == 1;
+        // Case I only sort on ids or score in case full text search
+        if only_one {
+            if has_search {
+                // I sort DESC on score
+                sorter_list.sort();
+                sorter_list.reverse();
+            } else {
+                // I sort ASC on ids
+                sorter_list.sort();
+            }    
         } else {
             // I sort each column independently
             sorter_list.sort_by(|a, b| {
@@ -2546,17 +2559,28 @@ impl<'gb> SearchIterator<'gb>{
         // Sorter
         let sort_by = self.query.sort_by.clone();
         let mut sorter_map: HashMap<String, SortedtBy> = HashMap::new();
+        // has_search
+        let has_search = self.query.has_search.clone();
         // Default sort by id, used in case no SORT BY defined
         let mut sort_column_type_map: HashMap<String, String> = HashMap::new();
         let mut column_type_map: HashMap<String, String> = HashMap::new();
-        let sorter_item = format!("column_{}", ID);
-        let id_sorted = SortedtBy{
-            sorted_item: sorter_item,
-            mode: SelectSortMode::Ascending
-        };
-        let column_id = generate_id().unwrap_or_default();
-        sort_column_type_map.insert(column_id.clone(), SORT_TYPE_STR.to_string());
-        sorter_map.insert(column_id.clone(), id_sorted);
+        if !has_search {
+            let sorter_item = COLUMN_ID.to_string();
+            let id_sorted = SortedtBy{
+                sorted_item: sorter_item,
+                mode: SelectSortMode::Ascending
+            };
+            let column_id = generate_id().unwrap_or_default();
+            sort_column_type_map.insert(column_id.clone(), SORT_TYPE_STR.to_string());
+            sorter_map.insert(column_id.clone(), id_sorted);
+        } else {
+            let id_sorted = SortedtBy{
+                sorted_item: SCORE.to_string(),
+                mode: SelectSortMode::Descending
+            };
+            sort_column_type_map.insert(SCORE.to_string(), SORT_TYPE_NUMBER.to_string());
+            sorter_map.insert(SCORE.to_string(), id_sorted);
+        }
         if sort_by.is_some() {
             let sort_by = sort_by.unwrap();
             let mut column_sort_id = 1;
@@ -2588,6 +2612,7 @@ impl<'gb> SearchIterator<'gb>{
                 }
             }
         }
+        eprintln!("SearchIterator.prepare_sorting :: sorter_map: {:#?}", &sorter_map);
         return (
             sorter_map, 
             column_type_map
@@ -2806,7 +2831,7 @@ impl<'gb> SearchIterator<'gb>{
             // eprintln!("do_search :: partitions: {:?}", &partitions);
             let remote_folder_data_map: HashMap<String, HashMap<String, DbData>> = HashMap::new();
             for partition in partitions {
-                let (db_tree, _index_tree) = db_folder_item.open_partition(&partition).unwrap();
+                let (db_tree, index_tree) = db_folder_item.open_partition(&partition).unwrap();
                 // eprintln!("do_search :: partition: {}", &partition);
                 // I may need botth db and index to execute formula
                 let iter = db_tree.iter();
@@ -2823,7 +2848,7 @@ impl<'gb> SearchIterator<'gb>{
                         return Err(errors)
                     }
                     let item_tuple = db_result.unwrap();
-                    // let item_id = item_tuple.0;
+                    let item_id = item_tuple.0;
                     // eprintln!("do_search :: item_id: {:?}", &item_id);
                     let item = item_tuple.1;
                     let item_db = item.to_vec();
@@ -2835,7 +2860,19 @@ impl<'gb> SearchIterator<'gb>{
                         &shared_key);
                     match item_ {
                         Ok(_) => {
-                            let item = item_.unwrap();
+                            let mut item = item_.unwrap();
+                            let index_result = TreeFolderItem::get_index_item(
+                                index_tree.clone(), 
+                                &item_id
+                            );
+                            if index_result.is_err() {
+                                let error = index_result.unwrap_err();
+                                let mut errors: Vec<PlanetError> = Vec::new();
+                                errors.push(error);
+                                return Err(errors)
+                            }
+                            let index_item = index_result.unwrap();
+                            let index_data_map = index_item.data.unwrap();
                             // eprintln!("do_search :: item: {:#?}", &item);
                             // execute formula
                             if query.is_some() {
@@ -2873,6 +2910,7 @@ impl<'gb> SearchIterator<'gb>{
                                 let formula_result = execute_formula(
                                     &query, 
                                     &data_map, 
+                                    Some(index_data_map),
                                     &column_config_map
                                 );
                                 if formula_result.is_err() {
@@ -2882,12 +2920,18 @@ impl<'gb> SearchIterator<'gb>{
                                     return Err(errors)
                                 }
                                 let formula_result = formula_result.unwrap();
-                                let formula_matches: bool;
-                                if formula_result == String::from("1") {
-                                    formula_matches = true;
-                                } else {
-                                    formula_matches = false;
+                                let search_score = formula_result.search_score.clone();
+                                if search_score.is_some() {
+                                    let search_score = search_score.unwrap();
+                                    let mut data = item.data.clone().unwrap();
+                                    let mut items: Vec<BTreeMap<String, String>> = Vec::new();
+                                    let mut map: BTreeMap<String, String> = BTreeMap::new();
+                                    map.insert(VALUE.to_string(), search_score.to_string());
+                                    items.push(map);
+                                    data.insert(SCORE.to_string(), items);
+                                    item.data = Some(data);
                                 }
+                                let formula_matches = formula_result.matched.clone();
                                 // eprintln!("SearchIterator.do_search :: formula_matches: {}", 
                                 //     &formula_matches
                                 // );
@@ -3013,7 +3057,7 @@ impl<'gb> SearchIterator<'gb>{
             let partitions = partitions.unwrap();
             let remote_folder_data_map: HashMap<String, HashMap<String, DbData>> = HashMap::new();
             for partition in partitions {
-                let (db_tree, _index_tree) = folder_item.open_partition(&partition).unwrap();
+                let (db_tree, index_tree) = folder_item.open_partition(&partition).unwrap();
                 // I may need botth db and index to execute formula
                 let iter = db_tree.iter();
                 for db_result in iter {
@@ -3028,7 +3072,7 @@ impl<'gb> SearchIterator<'gb>{
                         return Err(errors)
                     }
                     let item_tuple = db_result.unwrap();
-                    // let item_id = item_tuple.0;
+                    let item_id = item_tuple.0;
                     let item = item_tuple.1;
                     let item_db = item.to_vec();
                     let item_ = EncryptedMessage::deserialize(
@@ -3040,6 +3084,18 @@ impl<'gb> SearchIterator<'gb>{
                     match item_ {
                         Ok(_) => {
                             let item = item_.unwrap();
+                            let index_result = TreeFolderItem::get_index_item(
+                                index_tree.clone(), 
+                                &item_id
+                            );
+                            if index_result.is_err() {
+                                let error = index_result.unwrap_err();
+                                let mut errors: Vec<PlanetError> = Vec::new();
+                                errors.push(error);
+                                return Err(errors)
+                            }
+                            let index_item = index_result.unwrap();
+                            let index_data_map = index_item.data.unwrap();
                             // execute formula
                             if query.is_some() {
                                 let query = query.clone().unwrap();
@@ -3072,6 +3128,7 @@ impl<'gb> SearchIterator<'gb>{
                                 let formula_result = execute_formula(
                                     &query, 
                                     &data_map, 
+                                    Some(index_data_map),
                                     &column_config_map
                                 );
                                 if formula_result.is_err() {
@@ -3081,12 +3138,7 @@ impl<'gb> SearchIterator<'gb>{
                                     return Err(errors)
                                 }
                                 let formula_result = formula_result.unwrap();
-                                let formula_matches: bool;
-                                if formula_result == String::from("1") {
-                                    formula_matches = true;
-                                } else {
-                                    formula_matches = false;
-                                }
+                                let formula_matches = formula_result.matched.clone();
                                 eprintln!("SearchIterator.do_search_count :: formula_matches: {}", 
                                     &formula_matches
                                 );

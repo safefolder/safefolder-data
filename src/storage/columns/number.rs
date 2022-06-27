@@ -964,6 +964,7 @@ impl StorageColumn for StatsColumn {
             let formula_result = execute_formula(
                 &formula_compiled, 
                 &data_map, 
+                None,
                 &column_config_map
             );
             if formula_result.is_err() {
@@ -973,7 +974,7 @@ impl StorageColumn for StatsColumn {
                 return Err(errors)
             }
             let formula_result = formula_result.unwrap();
-            data_new.push(formula_result);
+            data_new.push(formula_result.result);
         }
         // eprintln!("StatsColumn.validate :: data_new: {:#?}", &data_new);
         return Ok(data_new)

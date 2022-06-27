@@ -122,11 +122,11 @@ impl NumberFunction for Ceiling {
         let data_map = &self.data_map.clone().unwrap();
         let column_config_map = self.column_config_map.clone();
         let attribute_item = attributes[0].clone();
-        let number_string = attribute_item.get_value(data_map, &column_config_map)?;
+        let number_string = attribute_item.get_value(data_map, None, &column_config_map)?;
         let number_str = number_string.as_str();
         let mut number: f64 = FromStr::from_str(number_str).unwrap();
         let significance_item = attributes[1].clone();
-        let significance_string = significance_item.get_value(data_map, &column_config_map)?;
+        let significance_string = significance_item.get_value(data_map, None, &column_config_map)?;
         let mut significance: i8 = FromStr::from_str(&significance_string.as_str()).unwrap();
         significance = significance - 1;
         number = round::ceil(number, significance);
@@ -209,11 +209,11 @@ impl NumberFunction for Floor {
         let data_map = &self.data_map.clone().unwrap();
         let column_config_map = self.column_config_map.clone();
         let attribute_item = attributes[0].clone();
-        let number_string = attribute_item.get_value(data_map, &column_config_map)?;
+        let number_string = attribute_item.get_value(data_map, None, &column_config_map)?;
         let number_str = number_string.as_str();
         let mut number: f64 = FromStr::from_str(number_str).unwrap();
         let significance_item = attributes[1].clone();
-        let significance_string = significance_item.get_value(data_map, &column_config_map)?;
+        let significance_string = significance_item.get_value(data_map, None, &column_config_map)?;
         let mut significance: i8 = FromStr::from_str(&significance_string.as_str()).unwrap();
         significance = significance - 1;
         number = round::floor(number, significance);
@@ -308,7 +308,7 @@ impl NumberFunction for Count {
         } else {
             let mut items: Vec<String> = Vec::new();
             for attribute in attributes {
-                let attribute_value = attribute.get_value(data_map, &column_config_map)?;
+                let attribute_value = attribute.get_value(data_map, None, &column_config_map)?;
                 items.push(attribute_value);
             }
             let count = items.len();
@@ -427,7 +427,9 @@ impl NumberFunction for CountA {
         } else {
             let mut items: Vec<String> = Vec::new();
             for attribute in attributes {
-                let attribute_value = attribute.get_value(data_map, &column_config_map)?;
+                let attribute_value = attribute.get_value(
+                    data_map, None, &column_config_map
+                )?;
                 let attr_type = attribute.attr_type;
                 match attr_type {
                     AttributeType::Text => {
@@ -605,7 +607,9 @@ impl NumberFunction for Even {
         let data_map = &self.data_map.clone().unwrap();
         let column_config_map = self.column_config_map.clone();
         let attribute_item = attributes[0].clone();
-        let attribute_value = attribute_item.get_value(data_map, &column_config_map)?;
+        let attribute_value = attribute_item.get_value(
+            data_map, None, &column_config_map
+        )?;
         let number: f64 = FromStr::from_str(attribute_value.as_str()).unwrap();
         let mut rounded_int: i32;
         let rounded = number.round();
@@ -689,7 +693,9 @@ impl NumberFunction for Exp {
         let data_map = &self.data_map.clone().unwrap();
         let column_config_map = self.column_config_map.clone();
         let attribute_item = attributes[0].clone();
-        let attribute_value = attribute_item.get_value(data_map, &column_config_map)?;
+        let attribute_value = attribute_item.get_value(
+            data_map, None, &column_config_map
+        )?;
         let number: f64 = FromStr::from_str(attribute_value.as_str()).unwrap();
         let number_result: f64;
         number_result = number.exp();
@@ -765,7 +771,9 @@ impl NumberFunction for Int {
         let data_map = &self.data_map.clone().unwrap();
         let column_config_map = self.column_config_map.clone();
         let attribute_item = attributes[0].clone();
-        let attribute_value = attribute_item.get_value(data_map, &column_config_map)?;
+        let attribute_value = attribute_item.get_value(
+            data_map, None, &column_config_map
+        )?;
         let mut number: f64 = FromStr::from_str(attribute_value.as_str()).unwrap();
         number = number.trunc();
         let number_str = number.to_string();
@@ -858,12 +866,16 @@ impl NumberFunction for Log {
         let data_map = &self.data_map.clone().unwrap();
         let column_config_map = self.column_config_map.clone();
         let attribute_item = attributes[0].clone();
-        let attribute_value = attribute_item.get_value(data_map, &column_config_map)?;
+        let attribute_value = attribute_item.get_value(
+            data_map, None, &column_config_map
+        )?;
         let mut number: f64 = FromStr::from_str(attribute_value.as_str()).unwrap();
         let mut base: f64 = 10.0;
         if attributes.len() == 2 {
             let base_item = attributes[1].clone();
-            let base_value = base_item.get_value(data_map, &column_config_map)?;
+            let base_value = base_item.get_value(
+                data_map, None, &column_config_map
+            )?;
             base = FromStr::from_str(base_value.as_str()).unwrap();
         }
         number = number.log(base);
@@ -951,12 +963,16 @@ impl NumberFunction for Mod {
         let data_map = &self.data_map.clone().unwrap();
         let column_config_map = self.column_config_map.clone();
         let attribute_item = attributes[0].clone();
-        let attribute_value = attribute_item.get_value(data_map, &column_config_map)?;
+        let attribute_value = attribute_item.get_value(
+            data_map, None, &column_config_map
+        )?;
         let mut number: f64 = FromStr::from_str(attribute_value.as_str()).unwrap();
         let mut divisor: f64 = 10.0;
         if attributes.len() == 2 {
             let divisor_item = attributes[1].clone();
-            let divisor_value = divisor_item.get_value(data_map, &column_config_map)?;
+            let divisor_value = divisor_item.get_value(
+                data_map, None, &column_config_map
+            )?;
             divisor = FromStr::from_str(divisor_value.as_str()).unwrap();
         }
         number = number%divisor;
@@ -1044,14 +1060,18 @@ impl NumberFunction for Power {
         let data_map = &self.data_map.clone().unwrap();
         let column_config_map = self.column_config_map.clone();
         let attribute_item = attributes[0].clone();
-        let attribute_value = attribute_item.get_value(data_map, &column_config_map)?;
+        let attribute_value = attribute_item.get_value(
+            data_map, None, &column_config_map
+        )?;
         // let is_reference = attribute_item.is_reference;
         // let is_power_reference = power_item.is_reference;
         let mut number: f64 = FromStr::from_str(attribute_value.as_str()).unwrap();
         let mut power: f64 = 10.0;
         if attributes.len() == 2 {
             let power_item = attributes[1].clone();
-            let power_value = power_item.get_value(data_map, &column_config_map)?;
+            let power_value = power_item.get_value(
+                data_map, None, &column_config_map
+            )?;
             power = FromStr::from_str(power_value.as_str()).unwrap();
         }
         number = number.powf(power);
@@ -1162,14 +1182,18 @@ impl RoundNumberFunction for Round {
         let data_map = &self.data_map.clone().unwrap();
         let column_config_map = self.column_config_map.clone();
         let attribute_item = attributes[0].clone();
-        let attribute_value = attribute_item.get_value(data_map, &column_config_map)?;
+        let attribute_value = attribute_item.get_value(
+            data_map, None, &column_config_map
+        )?;
         // let is_reference = attribute_item.is_reference;
         // let is_digits_reference = digits_item.is_reference;
         let mut number: f64 = FromStr::from_str(attribute_value.as_str()).unwrap();
         let mut digits: i8 = 2;
         if attributes.len() == 2 {
             let digits_item = attributes[1].clone();
-            let digits_value = digits_item.get_value(data_map, &column_config_map)?;
+            let digits_value = digits_item.get_value(
+                data_map, None, &column_config_map
+            )?;
             digits = FromStr::from_str(digits_value.as_str()).unwrap();
         }
         match option {
@@ -1257,7 +1281,9 @@ impl NumberFunction for Sqrt {
         let data_map = &self.data_map.clone().unwrap();
         let column_config_map = self.column_config_map.clone();
         let attribute_item = attributes[0].clone();
-        let attribute_value = attribute_item.get_value(data_map, &column_config_map)?;
+        let attribute_value = attribute_item.get_value(
+            data_map, None, &column_config_map
+        )?;
         let mut number: f64 = FromStr::from_str(attribute_value.as_str()).unwrap();
         number = number.sqrt();
         let number_str = number.to_string();
@@ -1334,7 +1360,9 @@ impl NumberFunction for Value {
         let data_map = &self.data_map.clone().unwrap();
         let column_config_map = self.column_config_map.clone();
         let attribute_item = attributes[0].clone();
-        let mut text = attribute_item.get_value(data_map, &column_config_map)?;
+        let mut text = attribute_item.get_value(
+            data_map, None, &column_config_map
+        )?;
         let number: f64;
         text = text.replace("$", "").replace("€", "");
         text = text.replace("\"", "");

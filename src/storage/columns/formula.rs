@@ -101,6 +101,7 @@ impl FormulaColumn {
             let formula_result = execute_formula(
                 &formula_compiled, 
                 &data_map, 
+                None,
                 &field_config_map
             );
             if formula_result.is_err() {
@@ -111,7 +112,7 @@ impl FormulaColumn {
             }
             let formula_result = formula_result.unwrap();
             let mut list: Vec<String> = Vec::new();
-            list.push(formula_result);
+            list.push(formula_result.result);
             return Ok(list);
         } else {
             let error = PlanetError::new(
