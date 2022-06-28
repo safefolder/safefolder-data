@@ -697,15 +697,15 @@ impl TextColumn {
             let column_id = column_config.id.unwrap();
             let mut values_wrap: Option<Vec<String>> = None;
             match column_type {
-                COLUMN_TYPE_SMALL_TEXT => {
-                    values_wrap = self.do_text_basic(data_map, &column_id);
-                },
-                COLUMN_TYPE_LONG_TEXT => {
-                    values_wrap = self.do_text_basic(data_map, &column_id);
-                },
-                COLUMN_TYPE_NUMBER => {
-                    values_wrap = self.do_text_basic(data_map, &column_id);
-                },
+                // COLUMN_TYPE_SMALL_TEXT => {
+                //     values_wrap = self.do_text_basic(data_map, &column_id);
+                // },
+                // COLUMN_TYPE_LONG_TEXT => {
+                //     values_wrap = self.do_text_basic(data_map, &column_id);
+                // },
+                // COLUMN_TYPE_NUMBER => {
+                //     values_wrap = self.do_text_basic(data_map, &column_id);
+                // },
                 COLUMN_TYPE_SELECT => {
                     // Need to check from data_map the values sent, which can be a list separated by commas
                     let wrap = data_map.get(&column_id);
@@ -753,28 +753,30 @@ impl TextColumn {
                         values_wrap = Some(my_value_list);
                     }
                 },
-                COLUMN_TYPE_DATE => {
+                // COLUMN_TYPE_DATE => {
+                //     values_wrap = self.do_text_basic(data_map, &column_id);
+                // },
+                // COLUMN_TYPE_DURATION => {
+                //     values_wrap = self.do_text_basic(data_map, &column_id);
+                // },
+                // COLUMN_TYPE_CURRENCY => {
+                //     values_wrap = self.do_text_basic(data_map, &column_id);
+                // },
+                // COLUMN_TYPE_PERCENTAGE => {
+                //     values_wrap = self.do_text_basic(data_map, &column_id);
+                // },
+                // COLUMN_TYPE_PHONE => {
+                //     values_wrap = self.do_text_basic(data_map, &column_id);
+                // },
+                // COLUMN_TYPE_EMAIL => {
+                //     values_wrap = self.do_text_basic(data_map, &column_id);
+                // },
+                // COLUMN_TYPE_FILE => {
+                //     values_wrap = self.do_text_basic(data_map, &column_id);
+                // },
+                _ => {
                     values_wrap = self.do_text_basic(data_map, &column_id);
                 },
-                COLUMN_TYPE_DURATION => {
-                    values_wrap = self.do_text_basic(data_map, &column_id);
-                },
-                COLUMN_TYPE_CURRENCY => {
-                    values_wrap = self.do_text_basic(data_map, &column_id);
-                },
-                COLUMN_TYPE_PERCENTAGE => {
-                    values_wrap = self.do_text_basic(data_map, &column_id);
-                },
-                COLUMN_TYPE_PHONE => {
-                    values_wrap = self.do_text_basic(data_map, &column_id);
-                },
-                COLUMN_TYPE_EMAIL => {
-                    values_wrap = self.do_text_basic(data_map, &column_id);
-                },
-                COLUMN_TYPE_FILE => {
-                    values_wrap = self.do_text_basic(data_map, &column_id);
-                },
-                _ => {},
             }
             if values_wrap.is_some() {
                 let values = Some(values_wrap.unwrap().clone());

@@ -1454,46 +1454,48 @@ pub fn execute_formula(
                 index_data_map.clone(),
                 field_config_map_wrap.clone()
             )?;
-            // eprintln!("execute_formula_field :: function_parse: {:#?}", &function_parse);
+            // eprintln!("execute_formula :: function_parse: {:#?}", &function_parse);
             // eprintln!("execute_formula_field :: function: {:#?}", function.clone());
+            let mut has_search_match = false;
             if function_parse.has_search_match.is_some() {
-                let has_search_match = function_parse.has_search_match.unwrap();
-                if has_search_match {
-                    let score = function_parse.score.unwrap();
-                    score_total += score;
-                    formula_str = formula_str.replace(function_key, "1");    
-                } else {
-                    let function_result = function_parse.result.unwrap();
-                    let result_str = function_result.text;
-                    let result_number = function_result.number;
-                    let result_date = function_result.date;
-                    let result_bool = function_result.check;
-                    if result_str.is_some() {
-                        let result_str = result_str.unwrap();
-                        let replaced_str = result_str.as_str();
-                        formula_str = formula_str.replace(function_key, replaced_str);
-                        formula_str = format!("{}{}{}", String::from("\""), formula_str, String::from("\""));
-                    } else if result_number.is_some() {
-                        let result_number = result_number.unwrap();
-                        let replaced_str = result_number.to_string();
-                        let replaced_str = replaced_str.as_str();
-                        formula_str = formula_str.replace(function_key, replaced_str);
-                    } else if result_date.is_some() {
-                        let result_date = result_date.unwrap();
-                        let replaced_str = result_date.as_str();
-                        formula_str = formula_str.replace(function_key, replaced_str);
-                        formula_str = format!("{}{}{}", String::from("\""), formula_str, String::from("\""));
-                    } else if result_bool.is_some() {
-                        let result_bool = result_bool.unwrap();
-                        let replaced_str: &str;
-                        if result_bool == true {
-                            replaced_str = "1";
-                        } else {
-                            replaced_str = "0";
-                        }
-                        formula_str = formula_str.replace(function_key, replaced_str);
-                    }        
-                }
+                has_search_match = function_parse.has_search_match.unwrap();
+            }
+            if has_search_match {
+                let score = function_parse.score.unwrap();
+                score_total += score;
+                formula_str = formula_str.replace(function_key, "1");
+
+            } else {
+                let function_result = function_parse.result.unwrap();
+                let result_str = function_result.text;
+                let result_number = function_result.number;
+                let result_date = function_result.date;
+                let result_bool = function_result.check;
+                if result_str.is_some() {
+                    let result_str = result_str.unwrap();
+                    let replaced_str = result_str.as_str();
+                    formula_str = formula_str.replace(function_key, replaced_str);
+                    formula_str = format!("{}{}{}", String::from("\""), formula_str, String::from("\""));
+                } else if result_number.is_some() {
+                    let result_number = result_number.unwrap();
+                    let replaced_str = result_number.to_string();
+                    let replaced_str = replaced_str.as_str();
+                    formula_str = formula_str.replace(function_key, replaced_str);
+                } else if result_date.is_some() {
+                    let result_date = result_date.unwrap();
+                    let replaced_str = result_date.as_str();
+                    formula_str = formula_str.replace(function_key, replaced_str);
+                    formula_str = format!("{}{}{}", String::from("\""), formula_str, String::from("\""));
+                } else if result_bool.is_some() {
+                    let result_bool = result_bool.unwrap();
+                    let replaced_str: &str;
+                    if result_bool == true {
+                        replaced_str = "1";
+                    } else {
+                        replaced_str = "0";
+                    }
+                    formula_str = formula_str.replace(function_key, replaced_str);
+                }        
             }
         }
     }
@@ -1502,17 +1504,18 @@ pub fn execute_formula(
     formula_str = formula_str.replace("\"\"", "");
     let formula_string = format!("={}", &formula_str);
     // formula_string = String::from("=23 + -4 + 4");
-    // eprintln!("execute_formula_field :: formula_string: {}", &formula_string);
+    // eprintln!("execute_formula :: formula_string: {}", &formula_string);
     // let t_exec_1 = Instant::now();
     let formula_ = parse_formula::parse_string_to_formula(
         &formula_string, 
         None::<NoCustomFunction>
     );
-    // eprintln!("execute_formula_field :: formula_: {:?}", &formula_);
+    // eprintln!("execute_formula :: formula_: {:?}", &formula_);
     let result = calculate::calculate_formula(formula_, None::<NoReference>);
-    // eprintln!("execute_formula_field :: calcuated formula_: {:?}", &result);
+    // eprintln!("execute_formula :: calcuated formula_: {:?}", &result);
     let result = calculate::result_to_string(result);
-    // eprintln!("execute_formula_field :: perf : exec: {} µs", &t_exec_1.elapsed().as_micros());
+    // eprintln!("execute_formula :: result: {}", &result);
+    // eprintln!("execute_formula :: perf : exec: {} µs", &t_exec_1.elapsed().as_micros());
     let result = result.trim().to_string();
     let mut formula_execution = FormulaExecution::defaults(&result);
     if result == String::from("1") {
@@ -1696,9 +1699,9 @@ pub fn check_assignment(
     attr_type: AttributeType,
     db_data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
 ) -> Result<bool, PlanetError> {
-    eprintln!("check_assignment...");
-    eprintln!("check_assignment :: db_data_map: {:#?}", db_data_map);
-    eprintln!("check_assignment :: attr_assignment: {:#?}", &attr_assignment);
+    // eprintln!("check_assignment...");
+    // eprintln!("check_assignment :: db_data_map: {:#?}", db_data_map);
+    // eprintln!("check_assignment :: attr_assignment: {:#?}", &attr_assignment);
     // eprintln!("check_assignment :: attr_type: {:#?}", &attr_type);
     let column_id = attr_assignment.name;
     let column_id = column_id.as_str();
@@ -1786,17 +1789,17 @@ pub fn check_assignment(
                                 )
                             );
                         },
-                    }    
+                    }
                 },
                 AttributeType::Number => {
                     let value = value.as_str();
                     let value: f64 = FromStr::from_str(value).unwrap();
                     let db_value: f64 = FromStr::from_str(&db_value).unwrap();
-                    eprintln!("check_assignment :: db_value: {}", &db_value);
-                    eprintln!("check_assignment :: op: {:?}", &op);
-                    eprintln!("check_assignment :: value: {:?}", &value);
+                    // eprintln!("check_assignment :: db_value: {}", &db_value);
+                    // eprintln!("check_assignment :: op: {:?}", &op);
+                    // eprintln!("check_assignment :: value: {:?}", &value);
                     check = check_float_compare(&db_value, &value, op.clone())?;
-                    eprintln!("check_assignment :: check: {}", &check);
+                    // eprintln!("check_assignment :: check: {}", &check);
                 },
                 _ => {
                     return Err(
@@ -1810,6 +1813,7 @@ pub fn check_assignment(
             }
         }
     }
+    // eprintln!("check_assignment :: check: {}", &check);
     return Ok(check)
 }
 

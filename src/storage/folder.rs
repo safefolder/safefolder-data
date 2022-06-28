@@ -26,6 +26,7 @@ use chacha20poly1305::aead::{NewAead, stream};
 use anyhow::{anyhow};
 
 use crate::planet::constants::*;
+use crate::statements::folder::schema::ColumnConfig;
 use crate::storage::{generate_id};
 use crate::planet::{PlanetError};
 use crate::statements::folder::config::{DbFolderConfig};
@@ -2020,6 +2021,31 @@ impl TreeFolderItem {
         return Ok(index_item)
     }
 
+    pub fn get_language_code_by_config(
+        column_config_map: &BTreeMap<String, ColumnConfig>,
+        data_map: &BTreeMap<String, Vec<BTreeMap<String, String>>>,
+    ) -> String {
+        let mut language_code = LANGUAGE_CODE_ENGLISH.to_string();
+        for (_column_name, v) in column_config_map.clone() {
+            let column_type = v.column_type.unwrap();
+            let column_type = column_type.as_str();
+            let config_column_id = v.id.unwrap();
+            if column_type == COLUMN_TYPE_LANGUAGE {
+                let language_code_ = data_map.get(&config_column_id);
+                if language_code_.is_some() {
+                    let language_code_ = language_code_.unwrap();
+                    let language_code_ = get_value_list(language_code_);
+                    if language_code_.is_some() {
+                        let language_code_ = language_code_.unwrap();
+                        language_code = language_code_;
+                    }
+                }
+            }
+        }
+        return language_code
+
+    }
+
 }
 
 impl FolderItem for TreeFolderItem {
@@ -2218,7 +2244,7 @@ impl FolderItem for TreeFolderItem {
                             }
                         }
                     }
-                }    
+                }
             }
         }
         if index_data.len() == 0 {
