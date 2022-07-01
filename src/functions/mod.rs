@@ -1792,14 +1792,21 @@ pub fn check_assignment(
                     }
                 },
                 AttributeType::Number => {
-                    let value = value.as_str();
-                    let value: f64 = FromStr::from_str(value).unwrap();
-                    let db_value: f64 = FromStr::from_str(&db_value).unwrap();
-                    // eprintln!("check_assignment :: db_value: {}", &db_value);
-                    // eprintln!("check_assignment :: op: {:?}", &op);
-                    // eprintln!("check_assignment :: value: {:?}", &value);
-                    check = check_float_compare(&db_value, &value, op.clone())?;
-                    // eprintln!("check_assignment :: check: {}", &check);
+                    let value_str = value.as_str();
+                    let value = FromStr::from_str(value_str);
+                    if value.is_ok() {
+                        let value: f64 = value.unwrap();
+                        let db_value: f64 = FromStr::from_str(&db_value).unwrap();
+                        // eprintln!("check_assignment :: db_value: {}", &db_value);
+                        // eprintln!("check_assignment :: op: {:?}", &op);
+                        // eprintln!("check_assignment :: value: {:?}", &value);
+                        check = check_float_compare(&db_value, &value, op.clone())?;
+                        // eprintln!("check_assignment :: check: {}", &check);    
+                    } else {
+                        let value_string = value_str.to_string();
+                        check = check_string_equal(&db_value, &value_string)?;
+                        // eprintln!("check_assignment :: [Number forced str]: check: {}", &check);
+                    }
                 },
                 _ => {
                     return Err(
