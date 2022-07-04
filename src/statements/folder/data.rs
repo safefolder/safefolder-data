@@ -1678,6 +1678,15 @@ impl<'gb> SearchCompiler<'gb> {
                     let expr = &RE_SELECT_GROUP_COLUMNS;
                     let columns = expr.captures_iter(group_by_columns);
                     let mut columns_string: Vec<String> = Vec::new();
+                    if *&columns.count() > 3 {
+                        errors.push(
+                            PlanetError::new(
+                                500, 
+                                Some(tr!("Maximum number of GROUP BY columns is 3.")),
+                            )
+                        );
+                        return Err(errors)
+                    }
                     for column in columns {
                         let column_str = column.name("Column").unwrap().as_str();
                         columns_string.push(column_str.to_string().trim().to_string());
@@ -1971,6 +1980,7 @@ pub struct SearchSorter{
     pub id: String,
     pub column_id: Option<String>,
     pub score: Option<i64>,
+    pub grouped_data: Option<Vec<String>>,
     pub column_1_str: Option<String>,
     pub column_1_number: Option<i64>,
     pub column_2_str: Option<String>,
@@ -2000,6 +2010,7 @@ impl SearchSorter {
             id: id.clone(),
             column_id: None,
             score: None,
+            grouped_data: None,
             column_1_str: None,
             column_2_str: None,
             column_3_str: None,
@@ -2029,6 +2040,7 @@ impl SearchSorter {
 pub struct SearchResultItem {
     pub id: Option<String>,
     pub partition: Option<u16>,
+    pub grouped_data: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone)]
@@ -2576,6 +2588,18 @@ impl<'gb> SearchCount<'gb>{
 }
 
 #[derive(Debug, Clone)]
+pub struct SearchGroupBy<'gb>{
+    pub query: SelectFromFolderCompiledStmt,
+    pub env: &'gb Environment<'gb>,
+    pub space_database: SpaceDatabase,
+    pub db_folder: Option<TreeFolder>,
+    pub folder: Option<DbData>,
+}
+
+impl<'gb> SearchGroupBy<'gb>{
+}
+
+#[derive(Debug, Clone)]
 pub struct SearchIterator<'gb>{
     pub query: SelectFromFolderCompiledStmt,
     pub env: &'gb Environment<'gb>,
@@ -2693,13 +2717,40 @@ impl<'gb> SearchIterator<'gb>{
         partition: &u16,
         item: &DbData,
         column_type_map: &HashMap<String, String>,
+        column_config_map: &BTreeMap<String, ColumnConfig>,
         sorter_map: &HashMap<String, SortedtBy>,
         sorter_list: &Vec<SearchSorter>
     ) -> Result<Vec<SearchSorter>, Vec<PlanetError>> {
         let partition = partition.clone();
         let mut sorter_list = sorter_list.clone();
         let item_id = item.id.clone().unwrap();
+        let data = item.data.clone().unwrap();
         let mut sorter: SearchSorter = SearchSorter::defaults(&partition, &item_id);
+        // Get grouped data
+        let group_by = self.query.group_by.clone();
+        if group_by.is_some() {
+            let group_by = group_by.unwrap();
+            let mut grouped_data: Vec<String> = Vec::new();
+            for column_name in &group_by {
+                // I need column_id for column_name
+                let config = column_config_map.get(column_name);
+                if config.is_some() {
+                    let config = config.unwrap();
+                    let column_id = config.id.unwrap();
+                    let column_value = &data.get(&column_id);
+                    if column_value.is_some() {
+                        let column_value_list = column_value.unwrap();
+                        let value = get_value_list(column_value_list);
+                        if value.is_some() {
+                            let value = value.unwrap();
+                            grouped_data.push(value);
+                        }
+                    }    
+                }
+            }
+            sorter.grouped_data = Some(grouped_data);
+        }
+        //
         for (sorter_column_id, sorter_column_item) in sorter_map {
             let sorter_column_item = sorter_column_item.sorted_item.clone();
             let sort_value: SortValueMode;
@@ -2709,8 +2760,7 @@ impl<'gb> SearchIterator<'gb>{
                     number: None
                 };
                 sort_value = sort_value_;
-            } else if sorter_column_item.clone() == String::from(SCORE) {
-                let data = item.data.clone().unwrap();
+            } else if sorter_column_item.clone() == String::from(SCORE) {                
                 let score_str = data.get(SCORE);
                 if score_str.is_some() {
                     let score_str = score_str.unwrap();
@@ -3603,6 +3653,7 @@ impl<'gb> SearchIterator<'gb>{
                             &partition,
                             &item,
                             &column_type_map,
+                            &column_config_map,
                             &sorter_map,
                             &sorter_list
                         );
@@ -3627,6 +3678,7 @@ impl<'gb> SearchIterator<'gb>{
                         &partition,
                         &item,
                         &column_type_map,
+                        &column_config_map,
                         &sorter_map,
                         &sorter_list
                     );
@@ -3868,6 +3920,7 @@ impl<'gb> SearchIterator<'gb>{
         let planet_context = self.env.planet_context.clone();
         let context = self.env.context.clone();
         let folder = self.folder.clone().unwrap();
+        let group_by = self.query.group_by.clone();
         // Sorter
         let mut sorter_list: Vec<SearchSorter> = Vec::new();
         let sorter_tuple = self.prepare_sorting(&folder);
@@ -3948,9 +4001,11 @@ impl<'gb> SearchIterator<'gb>{
         // eprintln!("SearchIterator.do_search :: [sorted] sorter_list: {:#?}", &sorter_list);
         let mut result_list: Vec<SearchResultItem> = Vec::new();
         for sorter in sorter_list {
+            let grouped_data = *&sorter.grouped_data;
             let item = SearchResultItem{
                 id: Some(sorter.id),
                 partition: Some(sorter.partition),
+                grouped_data: grouped_data,
             };
             result_list.push(item);
         }
@@ -4923,6 +4978,43 @@ impl<'gb> SelectFromFolderStatement {
         ).unwrap();
         yaml_response.push(yaml_item[0].clone());
         return Ok(yaml_response)
+    }
+
+    pub fn execute_group_by(
+        &self,
+        env: &'gb Environment<'gb>,
+        space_database: &SpaceDatabase,
+        statement: SelectFromFolderCompiledStmt,
+        db_folder: &TreeFolder,
+        folder: &DbData,
+        search_iterator: &SearchIterator,
+        columns: Option<Vec<String>>,
+        start_time: Instant,
+        column_config_map: BTreeMap<String, ColumnConfig>
+    ) -> Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>> {
+        let mut errors: Vec<PlanetError> = Vec::new();
+        let db_folder = db_folder.clone();
+        let search_iterator = search_iterator.clone();
+        let folder = folder.clone();
+        let statement = statement.clone();
+        let group_by = statement.group_by.clone();
+        if group_by.is_none() {
+            let error = PlanetError::new(
+                500, 
+                Some(tr!("Query does not contain GROUP BY syntax.")),
+            );
+            errors.push(error);
+            return Err(errors)
+        }
+        let group_by = group_by.unwrap();
+        let results = search_iterator.do_search();
+        if results.is_err() {
+            let errors = results.unwrap_err();
+            return Err(errors)
+        }
+        let results = results.unwrap();
+        // I need to group the search result items by 
+        let group_by = statement.group_by.clone().unwrap();
     }
 
 }
