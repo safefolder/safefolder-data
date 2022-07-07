@@ -59,7 +59,7 @@ lazy_static! {
     pub static ref RE_SELECT_COLUMNS: Regex = Regex::new(r#"SELECT[\s]*((?P<AllColumns>\*)|(?P<Columns>[\w\s,]+))[\s]*FROM"#).unwrap();
     pub static ref RE_SELECT_SORTING: Regex = Regex::new(r#"(SORT[\s]*BY[\s]*\{(?P<SortBy>[|\w\s]+)\})"#).unwrap();
     pub static ref RE_SELECT_SORT_FIELDS: Regex = Regex::new(r#"(?P<Column>[\w\s]+)(?P<Mode>ASC|DESC)+"#).unwrap();
-    pub static ref RE_SELECT_GROUP_BY: Regex = Regex::new(r#"(GROUP[\s]*BY[\s]*"(?P<GroupByColumns>[\w\s,]+)")"#).unwrap();
+    pub static ref RE_SELECT_GROUP_BY: Regex = Regex::new(r#"(GROUP[\s]*BY[\s]*(?P<GroupByColumns>[\w\s,]+))"#).unwrap();
     pub static ref RE_SELECT_GROUP_COLUMNS: Regex = Regex::new(r#"(?P<Column>[\w\s]+)"#).unwrap();
     pub static ref RE_SELECT_WHERE: Regex = Regex::new(r#"WHERE[\s]*(?P<Where>[\s\S]+);+"#).unwrap();
     pub static ref RE_SELECT_WHERE_BOOST_YES: Regex = Regex::new(r#"(?P<Column>\{[\w\d\s]*\})(?P<Op>(=)|(>=)|(<=)|(<)|(>))(?P<Value>"*[\w\d\s]*"*)"#).unwrap();
@@ -1383,6 +1383,7 @@ pub struct SelectFromFolderCompiledStmt {
     pub needs_filter_aggs: bool,
     pub needs_output_links: bool,
     pub needs_output_aggs: bool,
+    pub skip_group_items: bool,
 }
 
 impl SelectFromFolderCompiledStmt {
@@ -1420,6 +1421,7 @@ impl SelectFromFolderCompiledStmt {
             needs_filter_aggs: false,
             needs_output_links: false,
             needs_output_aggs: false,
+            skip_group_items: false,
         };
         return statement
     }
@@ -1528,7 +1530,12 @@ impl<'gb> SearchCompiler<'gb> {
                 }
             }
         }
-        let statement_text = statement_text.clone();
+        let mut statement_text = statement_text.clone();
+        let has_skip_group_items = statement_text.find("SKIP_GROUP_ITEMS").is_some();
+        if has_skip_group_items {
+            statement.skip_group_items = true;
+            statement_text = statement_text.replace("SKIP_GROUP_ITEMS", "");
+        }
         let statement_text = statement_text.replace("\n", "").clone();
         let expr = &RE_SELECT;
         let is_match = expr.is_match(&statement_text);
@@ -1678,20 +1685,21 @@ impl<'gb> SearchCompiler<'gb> {
                     let expr = &RE_SELECT_GROUP_COLUMNS;
                     let columns = expr.captures_iter(group_by_columns);
                     let mut columns_string: Vec<String> = Vec::new();
-                    if *&columns.count() > 3 {
-                        errors.push(
-                            PlanetError::new(
-                                500, 
-                                Some(tr!("Maximum number of GROUP BY columns is 3.")),
-                            )
-                        );
-                        return Err(errors)
-                    }
                     for column in columns {
                         let column_str = column.name("Column").unwrap().as_str();
                         columns_string.push(column_str.to_string().trim().to_string());
                     }
-                    if columns_string.len() > 0 {
+                    let length = columns_string.len();
+                    if length > 10 {
+                        errors.push(
+                            PlanetError::new(
+                                500, 
+                                Some(tr!("Maximum number of GROUP BY columns is 10.")),
+                            )
+                        );
+                        return Err(errors)
+                    }
+                    if length > 0 {
                         statement.group_by = Some(columns_string);
                         statement_text = expr_1.replace(&statement_text, "").to_string();
                     }
@@ -1946,7 +1954,7 @@ impl<'gb> SearchCompiler<'gb> {
             return Err(errors)
         }
         let statement = statement.unwrap();
-        eprintln!("do_compile :: statement: {:#?}", &statement);
+        // eprintln!("do_compile :: statement: {:#?}", &statement);
         // 2 - Compile Where formula and validate query for existing columns.
         let validation = self.validate(
             statement,
@@ -2011,6 +2019,59 @@ impl SearchSorter {
             column_id: None,
             score: None,
             grouped_data: None,
+            column_1_str: None,
+            column_2_str: None,
+            column_3_str: None,
+            column_4_str: None,
+            column_5_str: None,
+            column_6_str: None,
+            column_7_str: None,
+            column_8_str: None,
+            column_9_str: None,
+            column_10_str: None,
+            column_1_number: None,
+            column_2_number: None,
+            column_3_number: None,
+            column_4_number: None,
+            column_5_number: None,
+            column_6_number: None,
+            column_7_number: None,
+            column_8_number: None,
+            column_9_number: None,
+            column_10_number: None,
+        };
+        return obj
+    }
+}
+
+#[derive(Debug, Eq, Ord, PartialEq, PartialOrd, Clone)]
+pub struct SearchGroupBySorter{
+    pub id: String,
+    pub column_1_str: Option<String>,
+    pub column_1_number: Option<i64>,
+    pub column_2_str: Option<String>,
+    pub column_2_number: Option<i64>,
+    pub column_3_str: Option<String>,
+    pub column_3_number: Option<i64>,
+    pub column_4_str: Option<String>,
+    pub column_4_number: Option<i64>,
+    pub column_5_str: Option<String>,
+    pub column_5_number: Option<i64>,
+    pub column_6_str: Option<String>,
+    pub column_6_number: Option<i64>,
+    pub column_7_str: Option<String>,
+    pub column_7_number: Option<i64>,
+    pub column_8_str: Option<String>,
+    pub column_8_number: Option<i64>,
+    pub column_9_str: Option<String>,
+    pub column_9_number: Option<i64>,
+    pub column_10_str: Option<String>,
+    pub column_10_number: Option<i64>,
+}
+impl SearchGroupBySorter {
+    pub fn defaults(id: &String) -> Self {
+        let obj = Self{
+            id: id.clone(),
             column_1_str: None,
             column_2_str: None,
             column_3_str: None,
@@ -2588,15 +2649,642 @@ impl<'gb> SearchCount<'gb>{
 }
 
 #[derive(Debug, Clone)]
+pub struct ColumnStat {
+    pub count: usize,
+    pub sum: Option<f64>,
+    pub max: Option<f64>,
+    pub min: Option<f64>,
+    pub avg: Option<f64>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GroupByResultItem {
+    pub items: Vec<SearchResultItem>,
+    pub items_data: Option<Vec<DbData>>,
+    pub column_stats: Option<HashMap<String, ColumnStat>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GroupByResult {
+    pub id: String,
+    pub column_1: Option<String>,
+    pub column_2: Option<String>,
+    pub column_3: Option<String>,
+    pub column_4: Option<String>,
+    pub column_5: Option<String>,
+    pub column_6: Option<String>,
+    pub column_7: Option<String>,
+    pub column_8: Option<String>,
+    pub column_9: Option<String>,
+    pub column_10: Option<String>,
+    pub item: Option<GroupByResultItem>,
+}
+
+impl GroupByResult {
+
+    pub fn defaults() -> Self {
+        let id = generate_id().unwrap();
+        let obj = Self{
+            id: id,
+            column_1: None,
+            column_2: None,
+            column_3: None,
+            column_4: None,
+            column_5: None,
+            column_6: None,
+            column_7: None,
+            column_8: None,
+            column_9: None,
+            column_10: None,
+            item: None,
+        };
+        return obj
+    }
+
+}
+
+#[derive(Debug, Clone)]
 pub struct SearchGroupBy<'gb>{
     pub query: SelectFromFolderCompiledStmt,
     pub env: &'gb Environment<'gb>,
     pub space_database: SpaceDatabase,
     pub db_folder: Option<TreeFolder>,
     pub folder: Option<DbData>,
+    pub search_iterator: SearchIterator<'gb>,
 }
 
 impl<'gb> SearchGroupBy<'gb>{
+
+    fn sort(
+        &self,
+        sorter_list: &Vec<SearchGroupBySorter>,
+        sorter_map: &HashMap<String, SortedtBy>,
+    ) -> Vec<SearchGroupBySorter> {
+        let mut sorter_list = sorter_list.clone();
+        let search_iterator = self.search_iterator.clone();
+        // eprintln!("sort :: sorter_list : {:#?}", &sorter_list);
+        sorter_list.sort_by(|a, b| {
+            let mut match_order = Ordering::Greater;
+            for (_column_id, sorted_by) in sorter_map.clone() {
+                let mode = sorted_by.mode;
+                let sorter_item = sorted_by.sorted_item;
+                let sorter_item = sorter_item.as_str();
+                let mut column_order: Ordering = Ordering::Greater;
+                match sorter_item {
+                    "column_1_str" => {
+                        let column_a_1_str = a.column_1_str.clone().unwrap_or_default();
+                        let column_b_1_str = b.column_1_str.clone().unwrap_or_default();
+                        column_order = search_iterator.compare_strings(&mode, &column_a_1_str, &column_b_1_str);
+                    },
+                    "column_1_number" => {
+                        let column_a_1_number = a.column_1_number.clone().unwrap_or_default();
+                        let column_b_1_number = b.column_1_number.clone().unwrap_or_default();
+                        column_order = search_iterator.compare_numbers(&mode, &column_a_1_number, &column_b_1_number);
+                    },
+                    "column_2_str" => {
+                        let column_a_2_str = a.column_2_str.clone().unwrap_or_default();
+                        let column_b_2_str = b.column_2_str.clone().unwrap_or_default();
+                        column_order = search_iterator.compare_strings(&mode, &column_a_2_str, &column_b_2_str);
+                    },
+                    "column_2_number" => {
+                        let column_a_2_number = a.column_2_number.clone().unwrap_or_default();
+                        let column_b_2_number = b.column_2_number.clone().unwrap_or_default();
+                        column_order = search_iterator.compare_numbers(&mode, &column_a_2_number, &column_b_2_number);
+                    },
+                    "column_3_str" => {
+                        let column_a_3_str = a.column_3_str.clone().unwrap_or_default();
+                        let column_b_3_str = b.column_3_str.clone().unwrap_or_default();
+                        column_order = search_iterator.compare_strings(&mode, &column_a_3_str, &column_b_3_str);
+                    },
+                    "column_3_number" => {
+                        let column_a_3_number = a.column_3_number.clone().unwrap_or_default();
+                        let column_b_3_number = b.column_3_number.clone().unwrap_or_default();
+                        column_order = search_iterator.compare_numbers(&mode, &column_a_3_number, &column_b_3_number);
+                    },
+                    "column_4_str" => {
+                        let column_a_4_str = a.column_4_str.clone().unwrap_or_default();
+                        let column_b_4_str = b.column_4_str.clone().unwrap_or_default();
+                        column_order = search_iterator.compare_strings(&mode, &column_a_4_str, &column_b_4_str);
+                    },
+                    "column_4_number" => {
+                        let column_a_4_number = a.column_4_number.clone().unwrap_or_default();
+                        let column_b_4_number = b.column_4_number.clone().unwrap_or_default();
+                        column_order = search_iterator.compare_numbers(&mode, &column_a_4_number, &column_b_4_number);
+                    },
+                    "column_5_str" => {
+                        let column_a_5_str = a.column_5_str.clone().unwrap_or_default();
+                        let column_b_5_str = b.column_5_str.clone().unwrap_or_default();
+                        column_order = search_iterator.compare_strings(&mode, &column_a_5_str, &column_b_5_str);
+                    },
+                    "column_5_number" => {
+                        let column_a_5_number = a.column_5_number.clone().unwrap_or_default();
+                        let column_b_5_number = b.column_5_number.clone().unwrap_or_default();
+                        column_order = search_iterator.compare_numbers(&mode, &column_a_5_number, &column_b_5_number);
+                    },
+                    "column_6_str" => {
+                        let column_a_6_str = a.column_6_str.clone().unwrap_or_default();
+                        let column_b_6_str = b.column_6_str.clone().unwrap_or_default();
+                        column_order = search_iterator.compare_strings(&mode, &column_a_6_str, &column_b_6_str);
+                    },
+                    "column_6_number" => {
+                        let column_a_6_number = a.column_6_number.clone().unwrap_or_default();
+                        let column_b_6_number = b.column_6_number.clone().unwrap_or_default();
+                        column_order = search_iterator.compare_numbers(&mode, &column_a_6_number, &column_b_6_number);
+                    },
+                    "column_7_str" => {
+                        let column_a_7_str = a.column_7_str.clone().unwrap_or_default();
+                        let column_b_7_str = b.column_7_str.clone().unwrap_or_default();
+                        column_order = search_iterator.compare_strings(&mode, &column_a_7_str, &column_b_7_str);
+                    },
+                    "column_7_number" => {
+                        let column_a_7_number = a.column_7_number.clone().unwrap_or_default();
+                        let column_b_7_number = b.column_7_number.clone().unwrap_or_default();
+                        column_order = search_iterator.compare_numbers(&mode, &column_a_7_number, &column_b_7_number);
+                    },
+                    "column_8_str" => {
+                        let column_a_8_str = a.column_8_str.clone().unwrap_or_default();
+                        let column_b_8_str = b.column_8_str.clone().unwrap_or_default();
+                        column_order = search_iterator.compare_strings(&mode, &column_a_8_str, &column_b_8_str);
+                    },
+                    "column_8_number" => {
+                        let column_a_8_number = a.column_8_number.clone().unwrap_or_default();
+                        let column_b_8_number = b.column_8_number.clone().unwrap_or_default();
+                        column_order = search_iterator.compare_numbers(&mode, &column_a_8_number, &column_b_8_number);
+                    },
+                    "column_9_str" => {
+                        let column_a_9_str = a.column_9_str.clone().unwrap_or_default();
+                        let column_b_9_str = b.column_9_str.clone().unwrap_or_default();
+                        column_order = search_iterator.compare_strings(&mode, &column_a_9_str, &column_b_9_str);
+                    },
+                    "column_9_number" => {
+                        let column_a_9_number = a.column_9_number.clone().unwrap_or_default();
+                        let column_b_9_number = b.column_9_number.clone().unwrap_or_default();
+                        column_order = search_iterator.compare_numbers(&mode, &column_a_9_number, &column_b_9_number);
+                    },
+                    "column_10_str" => {
+                        let column_a_10_str = a.column_10_str.clone().unwrap_or_default();
+                        let column_b_10_str = b.column_10_str.clone().unwrap_or_default();
+                        column_order = search_iterator.compare_strings(&mode, &column_a_10_str, &column_b_10_str);
+                    },
+                    "column_10_number" => {
+                        let column_a_10_number = a.column_10_number.clone().unwrap_or_default();
+                        let column_b_10_number = b.column_10_number.clone().unwrap_or_default();
+                        column_order = search_iterator.compare_numbers(&mode, &column_a_10_number, &column_b_10_number);
+                    },
+                    __ => {
+                        // I might have column_id but I ignore since we only process SORT BY from query
+                    }
+                }
+                match column_order {
+                    Ordering::Greater => {},
+                    Ordering::Less => {
+                        match_order = Ordering::Less;
+                        return match_order
+                    },
+                    Ordering::Equal => {
+                        match_order = Ordering::Equal;
+                        return match_order
+                    },
+                }
+            }
+            return match_order
+        });
+        return sorter_list
+    }
+
+    fn prepare_sorting(
+        &self,
+        folder: &DbData
+    ) -> (
+        HashMap<String, SortedtBy>,
+        HashMap<String, String>
+    ) {
+        let folder = folder.clone();
+        let search_iterator = self.search_iterator.clone();
+        let group_by = self.query.group_by.clone();
+        let mut group_by_column_names: HashSet<String> = HashSet::new();
+        if group_by.is_some() {
+            let group_by_columns = group_by.unwrap();
+            for group_by_column in group_by_columns {
+                group_by_column_names.insert(group_by_column);
+            }
+        }
+        // Sorter
+        let sort_by_wrap = self.query.sort_by.clone();
+        let mut sorter_map: HashMap<String, SortedtBy> = HashMap::new();
+        let mut sort_column_type_map: HashMap<String, String> = HashMap::new();
+        let mut column_type_map: HashMap<String, String> = HashMap::new();
+        let mut sort_by: Vec<SelectSortBy> = Vec::new();
+        if sort_by_wrap.is_some() {
+            sort_by = sort_by_wrap.unwrap();
+        } else {
+            for column_name in group_by_column_names.clone() {
+                let sort_by_item = SelectSortBy{
+                    column: column_name,
+                    mode: SelectSortMode::Ascending
+                };
+                sort_by.push(sort_by_item);
+            }
+        }
+        let mut column_sort_id = 1;
+        for sort_by_item in sort_by {
+            let column_name = sort_by_item.column;
+            let sort_mode = sort_by_item.mode;
+            if group_by_column_names.get(&column_name).is_none() {
+                continue
+            }
+            if column_name.to_lowercase() == String::from(ID) {
+                continue
+            }
+            let column = TreeFolder::get_column_by_name(
+                &column_name, 
+                &folder
+            );
+            if column.is_ok() {
+                let column = column.unwrap();
+                let column_id = column.get(ID).unwrap();
+                let content_type = column.get(COLUMN_TYPE).unwrap().clone();
+                column_type_map.insert(column_id.clone(), content_type);
+                let column_sort_type = search_iterator.get_column_sort_type(&column);
+                sort_column_type_map.insert(column_id.clone(), column_sort_type.clone());
+                let column_sort_type = column_sort_type.as_str();
+                let sorter_item = format!("column_{}_{}", &column_sort_id, column_sort_type);
+                let sorted_item = SortedtBy{
+                    sorted_item: sorter_item,
+                    mode: sort_mode
+                };
+                sorter_map.insert(column_id.clone(), sorted_item);
+                column_sort_id += 1;
+            }
+        }
+        // eprintln!("SearchGroupBy.prepare_sorting :: sorter_map: {:#?}", &sorter_map);
+        return (
+            sorter_map, 
+            column_type_map
+        )
+    }
+
+    fn get_sort_value(
+        &self, 
+        group_by: &GroupByResult,
+        column_item: &String,
+        column_type: &String,
+    ) -> Result<SortValueMode, PlanetError> {
+        // column_1_str, column_1_number, etc...
+        let column_item = column_item.clone();
+        let column_type = column_type.as_str();
+        // eprintln!("get_sort_value :: column_type: {}", column_type);
+        let column_key_fields: Vec<&str> = column_item.split("_").collect();
+        // column_1, column_2
+        let column_key = format!("{}_{}", column_key_fields[0], column_key_fields[1]);
+        let column_key = column_key.as_str();
+        let value: String;
+        match column_key {
+            "column_1" => {
+                value = group_by.column_1.clone().unwrap();
+            },
+            "column_2" => {
+                value = group_by.column_2.clone().unwrap();
+            },
+            "column_3" => {
+                value = group_by.column_3.clone().unwrap();
+            },
+            "column_4" => {
+                value = group_by.column_4.clone().unwrap();
+            },
+            "column_5" => {
+                value = group_by.column_5.clone().unwrap();
+            },
+            "column_6" => {
+                value = group_by.column_6.clone().unwrap();
+            },
+            "column_7" => {
+                value = group_by.column_7.clone().unwrap();
+            },
+            "column_8" => {
+                value = group_by.column_8.clone().unwrap();
+            },
+            "column_9" => {
+                value = group_by.column_9.clone().unwrap();
+            },
+            "column_10" => {
+                value = group_by.column_10.clone().unwrap();
+            },
+            _ => {
+                return Err(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Error sorting query data.")),
+                    )
+                )
+            }
+        }
+        // eprintln!("get_sort_value :: value: {}", &value);
+        match column_type {
+            COLUMN_TYPE_DURATION => {
+                let number: i64 = FromStr::from_str(value.as_str()).unwrap();
+                let number = number*1000;
+                return Ok(SortValueMode{str: None, number: Some(number)})
+            },
+            COLUMN_TYPE_CHECKBOX => {
+                let number: i64 = FromStr::from_str(value.as_str()).unwrap();
+                let number = number*1000;
+                return Ok(SortValueMode{str: None, number: Some(number)})
+            },
+            COLUMN_TYPE_NUMBER => {
+                let number: i64 = FromStr::from_str(value.as_str()).unwrap();
+                let number = number*1000;
+                return Ok(SortValueMode{str: None, number: Some(number)})
+            },
+            COLUMN_TYPE_GENERATE_NUMBER => {
+                let number: i64 = FromStr::from_str(value.as_str()).unwrap();
+                let number = number*1000;
+                return Ok(SortValueMode{str: None, number: Some(number)})
+            },
+            COLUMN_TYPE_CURRENCY => {
+                let number: i64 = FromStr::from_str(value.as_str()).unwrap();
+                let number = number*1000;
+                return Ok(SortValueMode{str: None, number: Some(number)})
+            },
+            COLUMN_TYPE_PERCENTAGE => {
+                let number: i64 = FromStr::from_str(value.as_str()).unwrap();
+                let number = number*1000;
+                return Ok(SortValueMode{str: None, number: Some(number)})
+            },
+            __ => {
+                return Ok(SortValueMode{str: Some(value), number: None})
+            }
+        }
+    }
+
+    fn add_to_sorter(
+        &self,
+        group_by: &GroupByResult,
+        column_type_map: &HashMap<String, String>,
+        sorter_map: &HashMap<String, SortedtBy>,
+        sorter_list: &Vec<SearchGroupBySorter>
+    ) -> Result<Vec<SearchGroupBySorter>, Vec<PlanetError>> {
+        let mut sorter_list = sorter_list.clone();
+        let group_by = group_by.clone();
+        let group_id = group_by.id.clone();
+        let mut sorter: SearchGroupBySorter = SearchGroupBySorter::defaults(&group_id);
+        for (sorter_column_id, sorter_column_item) in sorter_map {
+            let sorter_column_item = sorter_column_item.sorted_item.clone();
+            let sort_value: SortValueMode;
+            let column_type = column_type_map.get(sorter_column_id);
+            if column_type.is_none() {
+                continue
+            }
+            let column_type = column_type.unwrap();
+            let result = self.get_sort_value(
+                &group_by, 
+                &sorter_column_item, 
+                column_type
+            );
+            if result.is_err() {
+                let mut errors: Vec<PlanetError> = Vec::new();
+                errors.push(
+                    PlanetError::new(
+                        500, 
+                        Some(tr!("Error sorting query data.")),
+                    )
+                );
+            }
+            sort_value = result.unwrap();
+            let sorter_column_item = sorter_column_item.as_str();
+            let mut column_value = String::from("");
+            let mut column_value_number: i64 = 0;
+            if sort_value.str.is_some() {
+                column_value = sort_value.str.unwrap();
+                // Cap sorting strings to 100 bytes to reduce size
+                if column_value.len() > SORT_MAX_STRING_LENGTH {
+                    let slice = &column_value[0..SORT_MAX_STRING_LENGTH];
+                    column_value = format!("{}...", slice);
+                }
+            } else {
+                column_value_number = sort_value.number.unwrap();
+            }
+            match sorter_column_item {
+                "column_1_str" => {
+                    sorter.column_1_str = Some(column_value);
+                },
+                "column_2_str" => {
+                    sorter.column_2_str = Some(column_value);
+                },
+                "column_3_str" => {
+                    sorter.column_3_str = Some(column_value);
+                },
+                "column_4_str" => {
+                    sorter.column_4_str = Some(column_value);
+                },
+                "column_5_str" => {
+                    sorter.column_5_str = Some(column_value);
+                },
+                "column_6_str" => {
+                    sorter.column_6_str = Some(column_value);
+                },
+                "column_7_str" => {
+                    sorter.column_7_str = Some(column_value);
+                },
+                "column_8_str" => {
+                    sorter.column_8_str = Some(column_value);
+                },
+                "column_9_str" => {
+                    sorter.column_9_str = Some(column_value);
+                },
+                "column_10_str" => {
+                    sorter.column_10_str = Some(column_value);
+                },
+                "column_1_number" => {
+                    sorter.column_1_number = Some(column_value_number);
+                },
+                "column_2_number" => {
+                    sorter.column_2_number = Some(column_value_number);
+                },
+                "column_3_number" => {
+                    sorter.column_3_number = Some(column_value_number);
+                },
+                "column_4_number" => {
+                    sorter.column_4_number = Some(column_value_number);
+                },
+                "column_5_number" => {
+                    sorter.column_5_number = Some(column_value_number);
+                },
+                "column_6_number" => {
+                    sorter.column_6_number = Some(column_value_number);
+                },
+                "column_7_number" => {
+                    sorter.column_7_number = Some(column_value_number);
+                },
+                "column_8_number" => {
+                    sorter.column_8_number = Some(column_value_number);
+                },
+                "column_9_number" => {
+                    sorter.column_9_number = Some(column_value_number);
+                },
+                "column_10_number" => {
+                    sorter.column_10_number = Some(column_value_number);
+                },
+                __ => {}
+            }
+        }
+        sorter_list.push(sorter);
+        return Ok(sorter_list.clone())
+    }
+
+    pub fn do_search(
+        &self
+    ) -> Result<(Vec<GroupByResult>, usize), Vec<PlanetError>> {
+        let search_iterator = self.search_iterator.clone();
+        let search_results = search_iterator.do_search();
+        if search_results.is_err() {
+            let errors = search_results.unwrap_err();
+            return Err(errors)
+        }
+        let search_results = search_results.unwrap();
+        let total = search_results.len();
+        let folder = self.folder.clone().unwrap();
+        // prepare sorting and get sorter_map needed when do sorting
+        let (
+            sorter_map, 
+            column_type_map
+        ) = self.prepare_sorting(&folder);
+        let mut search_result_grouping: HashMap<String, Vec<SearchResultItem>> = HashMap::new();
+        for item_result in &search_results {
+            let grouped_data = item_result.grouped_data.clone();
+            if grouped_data.is_some() {
+                let grouped_data = grouped_data.unwrap();
+                if grouped_data.len() == 0 {
+                    continue
+                }
+                let key = grouped_data.join("|||");
+                let search_result_group_item = &search_result_grouping.get(&key);
+                if search_result_group_item.is_some() {
+                    // I add item to list of keyed items
+                    let mut search_result_group_item = search_result_group_item.unwrap().clone();
+                    search_result_group_item.push(item_result.clone());
+                    search_result_grouping.insert(key.clone(), search_result_group_item);
+                } else {
+                    // I init and add new item
+                    let mut search_result_group_item: Vec<SearchResultItem> = Vec::new();
+                    search_result_group_item.push(item_result.clone());
+                    search_result_grouping.insert(key.clone(), search_result_group_item);
+                }
+            }
+        }
+        let mut group_map: HashMap<String, GroupByResult> = HashMap::new();
+        let mut sorter_list: Vec<SearchGroupBySorter> = Vec::new();
+        for (key, items) in &search_result_grouping {
+            let mut group_by_result = GroupByResult::defaults();
+            let group_id = group_by_result.id.clone();
+            let fields: Vec<&str> = key.split("|||").collect();
+            let fields_length = fields.len();
+            if fields_length == 1 {
+                group_by_result.column_1 = Some(fields[0].to_string());
+            } else if fields_length == 2 {
+                group_by_result.column_1 = Some(fields[0].to_string());
+                group_by_result.column_2 = Some(fields[1].to_string());
+            } else if fields_length == 3 {
+                group_by_result.column_1 = Some(fields[0].to_string());
+                group_by_result.column_2 = Some(fields[1].to_string());
+                group_by_result.column_3 = Some(fields[2].to_string());
+            } else if fields_length == 4 {
+                group_by_result.column_1 = Some(fields[0].to_string());
+                group_by_result.column_2 = Some(fields[1].to_string());
+                group_by_result.column_3 = Some(fields[2].to_string());
+                group_by_result.column_4 = Some(fields[3].to_string());
+            } else if fields_length == 5 {
+                group_by_result.column_1 = Some(fields[0].to_string());
+                group_by_result.column_2 = Some(fields[1].to_string());
+                group_by_result.column_3 = Some(fields[2].to_string());
+                group_by_result.column_4 = Some(fields[3].to_string());
+                group_by_result.column_5 = Some(fields[4].to_string());
+            } else if fields_length == 6 {
+                group_by_result.column_1 = Some(fields[0].to_string());
+                group_by_result.column_2 = Some(fields[1].to_string());
+                group_by_result.column_3 = Some(fields[2].to_string());
+                group_by_result.column_4 = Some(fields[3].to_string());
+                group_by_result.column_5 = Some(fields[4].to_string());
+                group_by_result.column_6 = Some(fields[5].to_string());
+            } else if fields_length == 7 {
+                group_by_result.column_1 = Some(fields[0].to_string());
+                group_by_result.column_2 = Some(fields[1].to_string());
+                group_by_result.column_3 = Some(fields[2].to_string());
+                group_by_result.column_4 = Some(fields[3].to_string());
+                group_by_result.column_5 = Some(fields[4].to_string());
+                group_by_result.column_6 = Some(fields[5].to_string());
+                group_by_result.column_7 = Some(fields[6].to_string());
+            } else if fields_length == 8 {
+                group_by_result.column_1 = Some(fields[0].to_string());
+                group_by_result.column_2 = Some(fields[1].to_string());
+                group_by_result.column_3 = Some(fields[2].to_string());
+                group_by_result.column_4 = Some(fields[3].to_string());
+                group_by_result.column_5 = Some(fields[4].to_string());
+                group_by_result.column_6 = Some(fields[5].to_string());
+                group_by_result.column_7 = Some(fields[6].to_string());
+                group_by_result.column_8 = Some(fields[7].to_string());
+            } else if fields_length == 9 {
+                group_by_result.column_1 = Some(fields[0].to_string());
+                group_by_result.column_2 = Some(fields[1].to_string());
+                group_by_result.column_3 = Some(fields[2].to_string());
+                group_by_result.column_4 = Some(fields[3].to_string());
+                group_by_result.column_5 = Some(fields[4].to_string());
+                group_by_result.column_6 = Some(fields[5].to_string());
+                group_by_result.column_7 = Some(fields[6].to_string());
+                group_by_result.column_8 = Some(fields[7].to_string());
+                group_by_result.column_9 = Some(fields[8].to_string());
+            } else if fields_length == 10 {
+                group_by_result.column_1 = Some(fields[0].to_string());
+                group_by_result.column_2 = Some(fields[1].to_string());
+                group_by_result.column_3 = Some(fields[2].to_string());
+                group_by_result.column_4 = Some(fields[3].to_string());
+                group_by_result.column_5 = Some(fields[4].to_string());
+                group_by_result.column_6 = Some(fields[5].to_string());
+                group_by_result.column_7 = Some(fields[6].to_string());
+                group_by_result.column_8 = Some(fields[7].to_string());
+                group_by_result.column_9 = Some(fields[8].to_string());
+                group_by_result.column_10 = Some(fields[9].to_string());
+            }
+            let group_item = GroupByResultItem{
+                items: items.clone(),
+                column_stats: None,
+                items_data: None,
+            };
+            group_by_result.item = Some(group_item);
+            group_map.insert(group_id.clone(), group_by_result.clone());
+            // add to sorter
+            let result = self.add_to_sorter(
+                &group_by_result,
+                &column_type_map,
+                &sorter_map,
+                &sorter_list
+            );
+            if result.is_err() {
+                let errors = result.unwrap_err();
+                return Err(errors)
+            }
+            sorter_list = result.unwrap();
+        }
+        let mut group_list: Vec<GroupByResult> = Vec::new();
+        // eprintln!("SearchGroupBy.do_search :: [PRE SORT] sorter_list: {:#?}", &sorter_list);
+        let results = self.sort(&sorter_list, &sorter_map);
+        // eprintln!("SearchGroupBy.do_search :: [POST SORT] sorter_list: {:#?}", &results);
+        for result in results {
+            let item_id = result.id.clone();
+            let group = group_map.get(&item_id);
+            if group.is_some() {
+                let group = group.unwrap().clone();
+                group_list.push(group);
+            }
+        }
+        // eprintln!("SearchGroupBy.do_search :: group_list: {:#?}", &group_list);
+        return Ok(
+            (
+                group_list,
+                total    
+            )
+        )
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -2709,7 +3397,6 @@ impl<'gb> SearchIterator<'gb>{
                 Some(tr!("Error sorting query data.")),
             )
         )
-
     }
 
     fn add_to_sorter(
@@ -2736,7 +3423,7 @@ impl<'gb> SearchIterator<'gb>{
                 let config = column_config_map.get(column_name);
                 if config.is_some() {
                     let config = config.unwrap();
-                    let column_id = config.id.unwrap();
+                    let column_id = config.id.clone().unwrap();
                     let column_value = &data.get(&column_id);
                     if column_value.is_some() {
                         let column_value_list = column_value.unwrap();
@@ -3265,6 +3952,15 @@ impl<'gb> SearchIterator<'gb>{
         // Sorter
         let sort_by = self.query.sort_by.clone();
         let mut sorter_map: HashMap<String, SortedtBy> = HashMap::new();
+        // Get column names in the group by. I need to exclude these, since handled in sort on the group by search logic
+        let group_by = self.query.group_by.clone();
+        let mut group_by_column_names: HashSet<String> = HashSet::new();
+        if group_by.is_some() {
+            let group_by_columns = group_by.unwrap();
+            for group_by_column in group_by_columns {
+                group_by_column_names.insert(group_by_column);
+            }
+        }
         // has_search
         let has_search = self.query.has_search.clone();
         // Default sort by id, used in case no SORT BY defined
@@ -3293,6 +3989,9 @@ impl<'gb> SearchIterator<'gb>{
             for sort_by_item in sort_by {
                 let column_name = sort_by_item.column;
                 let sort_mode = sort_by_item.mode;
+                if group_by_column_names.get(&column_name).is_some() {
+                    continue
+                }
                 if column_name.to_lowercase() == String::from(ID) {
                     continue
                 }
@@ -3318,7 +4017,7 @@ impl<'gb> SearchIterator<'gb>{
                 }
             }
         }
-        eprintln!("SearchIterator.prepare_sorting :: sorter_map: {:#?}", &sorter_map);
+        // eprintln!("SearchIterator.prepare_sorting :: sorter_map: {:#?}", &sorter_map);
         return (
             sorter_map, 
             column_type_map
@@ -3920,7 +4619,6 @@ impl<'gb> SearchIterator<'gb>{
         let planet_context = self.env.planet_context.clone();
         let context = self.env.context.clone();
         let folder = self.folder.clone().unwrap();
-        let group_by = self.query.group_by.clone();
         // Sorter
         let mut sorter_list: Vec<SearchSorter> = Vec::new();
         let sorter_tuple = self.prepare_sorting(&folder);
@@ -4001,7 +4699,7 @@ impl<'gb> SearchIterator<'gb>{
         // eprintln!("SearchIterator.do_search :: [sorted] sorter_list: {:#?}", &sorter_list);
         let mut result_list: Vec<SearchResultItem> = Vec::new();
         for sorter in sorter_list {
-            let grouped_data = *&sorter.grouped_data;
+            let grouped_data = sorter.grouped_data.clone();
             let item = SearchResultItem{
                 id: Some(sorter.id),
                 partition: Some(sorter.partition),
@@ -4029,6 +4727,39 @@ impl SearchPaging {
     ) -> Result<Vec<SearchResultItem>, Vec<PlanetError>> {
         let results = results.clone();
         let mut paged_results: Vec<SearchResultItem> = Vec::new();
+        let page = self.page.clone();
+        let number_items = self.number_items;
+        let start = (page-1)*number_items;
+        let end = page*number_items;
+        let mut count = 0;
+        for item in results {
+            if count >= end {
+                break
+            }
+            if count >= start {
+                paged_results.push(item);
+            }
+            count += 1;
+        }
+        return Ok(paged_results)
+    }
+
+}
+
+#[derive(Debug, Clone)]
+pub struct SearchGroupByPaging{
+    pub number_items: u32,
+    pub page: u32,
+}
+
+impl SearchGroupByPaging {
+
+    pub fn do_paging(
+        &self,
+        results: &Vec<GroupByResult>
+    ) -> Result<Vec<GroupByResult>, Vec<PlanetError>> {
+        let results = results.clone();
+        let mut paged_results: Vec<GroupByResult> = Vec::new();
         let page = self.page.clone();
         let number_items = self.number_items;
         let start = (page-1)*number_items;
@@ -4565,6 +5296,425 @@ impl<'gb> SearchOutputData {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct SearchOutputGroupByData{
+    pub search_output_data: SearchOutputData,
+}
+
+impl<'gb> SearchOutputGroupByData {
+
+    fn prepare_items_partition(
+        &self,
+        results: &Vec<GroupByResult>
+    ) -> Vec<u16> {
+        let results = results.clone();
+        let mut partition_list: Vec<u16> = Vec::new();
+        let mut partitions: HashSet<u16> = HashSet::new();
+        for group_item in &results {
+            let item = group_item.item.clone();
+            if item.is_some() {
+                let item = item.unwrap();
+                let search_items = item.items.clone();
+                for search_item in &search_items {
+                    let partition = search_item.partition.unwrap();
+                    if !partitions.contains(&partition) {
+                        partition_list.push(partition);
+                        partitions.insert(partition);
+                    }
+                }
+            }
+        }
+        return partition_list
+    }
+
+    fn inject_column_stats(
+        &self,
+        group_results: &Vec<GroupByResult>,
+        column_config_map: &BTreeMap<String, ColumnConfig>,
+    ) -> Result<Vec<GroupByResult>, Vec<PlanetError>> {
+        let group_results = group_results.clone();
+        let column_config_map = column_config_map.clone();
+        let mut stats_column_ids: HashSet<String> = HashSet::new();
+        let mut column_name_map: HashMap<String, String> = HashMap::new();
+        for (column_name, config) in &column_config_map {
+            let column_type = config.column_type.clone().unwrap();
+            let column_type = column_type.as_str();
+            let column_id = config.id.clone().unwrap();
+            column_name_map.insert(column_id.clone(), column_name.clone());
+            let is_set_str = config.is_set.clone();
+            let mut is_set = false;
+            if is_set_str.is_some() {
+                let is_set_str = is_set_str.unwrap();
+                let is_set_str = is_set_str.as_str();
+                if is_set_str == "1" || is_set_str.to_lowercase() == TRUE {
+                    is_set = true;
+                }
+            }
+            if (
+                column_type == COLUMN_TYPE_NUMBER || 
+                column_type == COLUMN_TYPE_CURRENCY || 
+                column_type == COLUMN_TYPE_DURATION ||
+                column_type == COLUMN_TYPE_PERCENTAGE ||
+                column_type == COLUMN_TYPE_RATING
+            ) && !is_set {
+                stats_column_ids.insert(column_id);
+            }
+        }
+        let mut group_results_new: Vec<GroupByResult> = Vec::new();
+        for group_result in &group_results {
+            let mut group_result = group_result.clone();
+            let group_item = group_result.item.clone();
+            let mut column_ids_set: HashSet<String> = HashSet::new();
+            if group_item.is_some() {
+                let mut group_item = group_item.unwrap();
+                let item_data_list = group_item.items_data.clone();
+                if item_data_list.is_some() {
+                    let item_data_list = item_data_list.unwrap();
+                    let column_stats_wrap = group_item.column_stats.clone();
+                    let mut column_stats: HashMap<String, ColumnStat> = HashMap::new();
+                    if column_stats_wrap.is_some() {
+                        column_stats = column_stats_wrap.unwrap();
+                    }
+                    for item_data in &item_data_list {
+                        let data = item_data.data.clone().unwrap();
+                        for (column_id, data_item) in &data {
+                            let column_id = column_id.clone();
+                            column_ids_set.insert(column_id.clone());
+                            let column_name = column_name_map.get(&column_id);
+                            if column_name.is_none() {
+                                continue
+                            }
+                            let column_name = column_name.unwrap().clone();
+                            let is_stat_column = stats_column_ids.get(&column_id);
+                            if is_stat_column.is_some() {
+                                let value = get_value_list(data_item);
+                                if value.is_some() {
+                                    let value = value.unwrap();
+                                    let value_float: f64 = FromStr::from_str(value.as_str()).unwrap();
+                                    let stats = column_stats.get(&column_name);
+                                    if stats.is_some() {
+                                        let mut stats = stats.unwrap().clone();
+                                        let mut sum = stats.sum.unwrap();
+                                        sum += value_float;
+                                        stats.sum = Some(sum);
+                                        stats.count += 1;
+                                        let min = stats.min.unwrap();
+                                        if value_float < min {
+                                            stats.min = Some(value_float);
+                                        }
+                                        let max = stats.max.unwrap();
+                                        if value_float > max {
+                                            stats.max = Some(value_float);
+                                        }
+                                        let count_float: f64 = FromStr::from_str(&stats.count.to_string()).unwrap();
+                                        stats.avg = Some(sum / count_float);
+                                        column_stats.insert(column_name.clone(), stats);
+                                    } else {
+                                        let stats = ColumnStat{
+                                            count: 1,
+                                            sum: Some(value_float),
+                                            avg: Some(value_float),
+                                            min: Some(value_float),
+                                            max: Some(value_float),
+                                        };
+                                        column_stats.insert(column_name.clone(), stats);
+                                    }
+                                } else {
+                                    let stats = ColumnStat{
+                                        count: 0,
+                                        sum: None,
+                                        avg: None,
+                                        min: None,
+                                        max: None,
+                                    };
+                                    column_stats.insert(column_name.clone(), stats);
+                                }
+                            } else {
+                                // Update only count, since this column might be SmallText, etc... does not satisfy having amount/number stats
+                                let stats = column_stats.get(&column_name);
+                                if stats.is_some() {
+                                    let mut stats = stats.unwrap().clone();
+                                    stats.count += 1;
+                                    column_stats.insert(column_name.clone(), stats);
+                                } else {
+                                    let stats = ColumnStat{
+                                        count: 1,
+                                        sum: None,
+                                        avg: None,
+                                        min: None,
+                                        max: None,
+                                    };
+                                    column_stats.insert(column_name.clone(), stats);
+                                }
+                            }
+                        }
+                    }
+                    // Columns with no data will not be in DbData
+                    for (column_name, config) in &column_config_map {
+                        let column_id = config.id.clone().unwrap();
+                        if *column_name == NAME_CAMEL || *column_name == TEXT_COLUMN {
+                            continue
+                        }
+                        if column_ids_set.get(&column_id).is_none() {
+                            let stats = ColumnStat{
+                                count: 0,
+                                sum: None,
+                                avg: None,
+                                min: None,
+                                max: None,
+                            };
+                            column_stats.insert(column_name.clone(), stats);
+                        }
+                    }
+                    if column_stats.len() > 0 {
+                        group_item.column_stats = Some(column_stats);
+                    }
+                }
+                group_result.item = Some(group_item.clone());
+                group_results_new.push(group_result);
+            }
+        }
+        // eprintln!("SearchOutputGroupByData.inject_column_stats :: group_results_new: {:#?}", &group_results_new);
+        return Ok(
+            group_results_new
+        )
+    }
+
+    pub fn do_output(
+        &self,
+        env: &'gb Environment<'gb>,
+        space_database: &SpaceDatabase,
+        statement: SelectFromFolderCompiledStmt,
+        db_folder: &TreeFolder,
+        folder: &DbData,
+        group_results: &Vec<GroupByResult>,
+        columns: &Option<Vec<String>>,
+        total: usize,
+        elapsed_time: usize,
+        column_config_map: BTreeMap<String, ColumnConfig>
+    ) -> Result<String, Vec<PlanetError>> {
+        let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
+        let group_results = group_results.clone();
+        let columns_wrap = columns.clone();
+        let mut columns: Vec<String> = Vec::new();
+        if columns_wrap.is_some() {
+            columns = columns_wrap.unwrap();
+        }
+        let space_database = space_database.clone();
+        let planet_context = env.planet_context.clone();
+        let context = env.context.clone();
+        let home_dir = planet_context.home_path.clone();
+        let account_id = context.account_id.clone().unwrap_or_default();
+        let space_id = context.space_id;
+        let site_id = context.site_id.clone();
+        let mut site_id_alt: Option<String> = None;
+        let mut errors: Vec<PlanetError> = Vec::new();
+        if site_id.is_some() {
+            let site_id = site_id.clone().unwrap();
+            site_id_alt = Some(site_id.clone().to_string());
+        }
+        let folder_id = folder.id.clone().unwrap();
+        let folder_name = folder.name.clone().unwrap();
+        // Group results from search iterator in partitions and list of partitions we need to display output
+        let output = self.search_output_data.clone();
+        let partition_list = self.prepare_items_partition(&group_results);
+        // Init TreeFolderItem
+        let result: Result<TreeFolderItem, PlanetError> = TreeFolderItem::defaults(
+            space_database.connection_pool.clone(),
+            home_dir.clone().unwrap_or_default().as_str(),
+            &account_id,
+            space_id,
+            site_id_alt.clone(),
+            folder_id.as_str(),
+            &db_folder,
+        );
+        if result.is_err() {
+            let error = result.unwrap_err();
+            errors.push(error);
+            return Err(errors)
+        }
+        let mut db_items = result.unwrap();
+        // Prepare for LINKS and REFERENCES
+        let needs_output_links = statement.needs_output_links.clone();
+        let needs_output_aggs = statement.needs_output_aggs.clone();
+        let mut link_data: HashMap<String, HashMap<String, Vec<BTreeMap<String, String>>>> = HashMap::new();
+        let mut link_tree_map: HashMap<String, TreeFolderItem> = HashMap::new();
+        let mut links_map: HashMap<String, ColumnConfig> = HashMap::new();
+        let mut ref_map: HashMap<String, Vec<(String, String)>> = HashMap::new();
+        if needs_output_links {
+            let links_tuple = output.prepare_links_references(
+                env, 
+                &space_database, 
+                column_config_map.clone(), 
+                db_folder
+            );
+            if links_tuple.is_err() {
+                let errors = links_tuple.unwrap_err();
+                return Err(errors)
+            }
+            let tuple = links_tuple.unwrap();
+            link_data = tuple.0;
+            link_tree_map = tuple.1;
+            links_map = tuple.2;
+            ref_map = tuple.3;
+        }
+        // These items are the ones being sent to the serializer to display data
+        let mut group_data_map: HashMap<String, DbData> = HashMap::new();
+        for partition in partition_list {
+            // Open partition, having db tree
+            let result = db_items.open_partition(&partition);
+            if result.is_err() {
+                let error = result.unwrap_err();
+                let mut errors: Vec<PlanetError> = Vec::new();
+                errors.push(error);
+                return Err(errors)
+            }
+            let result = result.unwrap();
+            let tree = result.0;
+            for group_result in group_results.clone() {
+                let group_result_item = group_result.item.clone();
+                if group_result_item.is_some() {
+                    let group_result_item = group_result_item.unwrap();
+                    let items = group_result_item.items.clone();
+                    for item in &items {
+                        let item_partition = item.partition.unwrap();
+                        if item_partition == partition {
+                            let item_id = item.id.clone().unwrap();
+                            let id_db = xid::Id::from_str(&item_id).unwrap();
+                            let id_db = id_db.as_bytes();
+                            let db_result = tree.get(&id_db);
+                            if db_result.is_err() {
+                                errors.push(
+                                    PlanetError::new(
+                                        500, 
+                                        Some(tr!("Could not fetch item from database"))
+                                    )
+                                );
+                            }
+                            let item_exsists = db_result.unwrap();
+                            if item_exsists.is_none() {
+                                errors.push(
+                                    PlanetError::new(
+                                        404, 
+                                        Some(tr!(
+                                            "Folder Item with id \"{}\" at folder \"{}\" does not exist.", &item_id, folder_name
+                                        ))
+                                    )
+                                );
+                            }
+                            if errors.len() > 0 {
+                                return Err(errors)
+                            }
+                            let item_db = item_exsists.unwrap().to_vec();
+                            let item_ = EncryptedMessage::deserialize(item_db).unwrap();
+                            let item_ = DbData::decrypt_owned(
+                                &item_, 
+                                &shared_key
+                            );
+                            match item_ {
+                                Ok(_) => {
+                                    let mut item = item_.unwrap();
+                                    let data = item.data.clone();
+                                    if data.is_some() {
+                                        let mut data = data.unwrap();
+                                        if needs_output_links {
+                                            data = output.do_data_links(
+                                                &data, 
+                                                &links_map, 
+                                                &link_data, 
+                                                &link_tree_map, 
+                                                &ref_map
+                                            );
+                                        }
+                                        if needs_output_aggs {
+                                            let results = output.do_stats(
+                                                &data, 
+                                                &db_folder,
+                                                &folder,
+                                                &column_config_map.clone()
+                                            );
+                                            if results.is_err() {
+                                                let errors = results.unwrap_err();
+                                                return Err(errors)
+                                            }
+                                            data = results.unwrap();
+                                        }
+                                        item.data = Some(data);
+                                    }
+                                    if columns.len() != 0 {
+                                        let result = db_items.filter_fields(&folder_name, &columns, &item);
+                                        if result.is_err() {
+                                            errors.push(result.clone().unwrap_err());
+                                        }
+                                        item = result.unwrap();
+                                        group_data_map.insert(item_id.clone(), item.clone());
+                                    }
+                                    group_data_map.insert(item_id.clone(), item.clone());
+                                },
+                                Err(_) => {
+                                    errors.push(
+                                        PlanetError::new(500, Some(tr!(
+                                            "Could not fetch item from database"
+                                        )))
+                                    );
+                                    return Err(errors)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // Create new group list with DbData embedded
+        let mut group_results_new: Vec<GroupByResult> = Vec::new();
+        for mut group_result in group_results.clone() {
+            let group_result_item = group_result.item.clone();
+            if group_result_item.is_some() {
+                let mut group_result_item = group_result_item.unwrap();
+                let items = group_result_item.items.clone();
+                let mut item_data_list: Vec<DbData> = Vec::new();
+                for item in items {
+                    let item_id = item.id.clone().unwrap();
+                    let item_data = group_data_map.get(&item_id);
+                    if item_data.is_some() {
+                        let item_data = item_data.unwrap().clone();
+                        item_data_list.push(item_data);
+                    }
+                }
+                if item_data_list.len() > 0 {
+                    group_result_item.items_data = Some(item_data_list);
+                    group_result.item = Some(group_result_item);
+                    group_results_new.push(group_result);    
+                }
+            }
+        }
+        // At this point I have all data into group_results for all groups to be returned
+        if errors.len() > 0 {
+            return Err(errors)
+        }
+        let result = self.inject_column_stats(
+            &group_results_new, 
+            &column_config_map
+        );
+        if result.is_err() {
+            let errors = result.unwrap_err();
+            return Err(errors)
+        }
+        let group_results_new = result.unwrap();
+        let page = statement.page.to_usize().unwrap();
+        let result = SelectGroupByResult::serialize_yaml(
+            total, 
+            elapsed_time, 
+            page, 
+            group_results_new, 
+            folder,
+            column_config_map,
+            &statement
+        );
+        return Ok(result)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SelectResultData {
     pub id: String,
@@ -4582,49 +5732,6 @@ pub struct SelectResult {
     pub data: Vec<SelectResultData>,
 }
 impl SelectResult {
-    pub fn defaults(
-        total: usize,
-        time: usize,
-        page: usize,
-        items: Vec<DbData>,
-        folder: &DbData
-    ) -> Self {
-        let data_count = items.len();
-        let mut data: Vec<SelectResultData> = Vec::new();
-        for item in items {
-            let item_data = item.data.unwrap();
-            let mut data_new: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
-            for (k, v) in item_data {
-                let column_id = k;
-                let column = TreeFolder::get_column_by_id(&column_id, folder);
-                if column.is_err() {
-                    continue;
-                }
-                let column = column.unwrap();
-                let column_name = column.get(NAME);
-                if column_name.is_none() {
-                    continue
-                }
-                let column_name = column_name.unwrap().clone();
-                data_new.insert(column_name, v);
-            }
-            let data_item = SelectResultData{
-                id: item.id.unwrap(),
-                slug: item.slug.unwrap(),
-                name: item.name.unwrap(),
-                data: data_new
-            };
-            data.push(data_item);
-        }
-        let obj = Self{
-            total: total,
-            time: time,
-            page: page,
-            data_count: data_count,
-            data: data
-        };
-        return obj
-    }
 
     pub fn serialize_yaml (
         total: usize,
@@ -4814,6 +5921,359 @@ impl SelectResult {
         // eprintln!("serialize_yaml :: yaml_string: {}", &yaml_string);
         return yaml_string
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SelectGroupByResult {
+    pub total: usize,
+    pub time: usize,
+    pub page: usize,
+    pub data_count: usize,
+    pub data: Vec<SelectResultData>,
+}
+impl SelectGroupByResult {
+
+    fn update_for_groups(
+        column: Option<String>, 
+        column_set: &HashSet<String>,
+        yaml_string: &String,
+        number_spaces: usize,
+    ) -> (HashSet<String>, String) {
+        let mut column_set = column_set.clone();
+        let mut yaml_string = yaml_string.clone();
+        if column.is_some() {
+            let column = column.unwrap();
+            let is_new = column_set.get(&column).is_none();
+            if is_new {
+                yaml_string.push_str(format!("{}{}:\n", str::repeat(" ", number_spaces), column).as_str());
+                column_set.insert(column.clone());
+            }
+        }
+        return (
+            column_set,
+            yaml_string
+        )
+    }
+
+    pub fn serialize_yaml (
+        total: usize,
+        time: usize,
+        page: usize,
+        items: Vec<GroupByResult>,
+        folder: &DbData,
+        column_config_map: BTreeMap<String, ColumnConfig>,
+        statement: &SelectFromFolderCompiledStmt
+    ) -> String {
+        let data_count = items.len();
+        let mut yaml_string = String::from("---\n");
+        let folder = folder.clone();
+        let text_columns = [
+            COLUMN_TYPE_SMALL_TEXT, COLUMN_TYPE_CREATED_BY, COLUMN_TYPE_CREATED_TIME, COLUMN_TYPE_DATE, COLUMN_TYPE_EMAIL,
+            COLUMN_TYPE_DURATION, COLUMN_TYPE_GENERATE_ID, COLUMN_TYPE_FILE, COLUMN_TYPE_LANGUAGE, COLUMN_TYPE_LAST_MODIFIED_BY,
+            COLUMN_TYPE_LAST_MODIFIED_TIME, COLUMN_TYPE_PHONE, COLUMN_TYPE_CHECKBOX, COLUMN_TYPE_FORMULA,
+            COLUMN_TYPE_LINK, COLUMN_TYPE_REFERENCE
+        ];
+        let explicit_text_columns = [
+            COLUMN_TYPE_LONG_TEXT, COLUMN_TYPE_SELECT, COLUMN_TYPE_TEXT, COLUMN_TYPE_URL
+        ];
+        let number_columns = [
+            COLUMN_TYPE_NUMBER, COLUMN_TYPE_GENERATE_NUMBER, COLUMN_TYPE_PERCENTAGE, COLUMN_TYPE_RATING, COLUMN_TYPE_STATS
+        ];
+        let object_columns = [
+            COLUMN_TYPE_OBJECT, COLUMN_TYPE_STATEMENT
+        ];
+        yaml_string.push_str(format!("{column}: {value}\n", 
+            column=String::from("total"), 
+            value=total
+        ).as_str());
+        yaml_string.push_str(format!("{column}: {value}\n", 
+            column=String::from("time"), 
+            value=time
+        ).as_str());
+        yaml_string.push_str(format!("{column}: {value}\n", 
+            column=String::from("page"), 
+            value=page
+        ).as_str());
+        yaml_string.push_str(format!("{column}: {value}\n", 
+            column=String::from("data_count"), 
+            value=data_count
+        ).as_str());
+        yaml_string.push_str(format!("{column}:\n", 
+            column=String::from("data"), 
+        ).as_str());
+        let mut column_1_set: HashSet<String> = HashSet::new();
+        let mut column_2_set: HashSet<String> = HashSet::new();
+        let mut column_3_set: HashSet<String> = HashSet::new();
+        let mut column_4_set: HashSet<String> = HashSet::new();
+        let mut column_5_set: HashSet<String> = HashSet::new();
+        let mut column_6_set: HashSet<String> = HashSet::new();
+        let mut column_7_set: HashSet<String> = HashSet::new();
+        let mut column_8_set: HashSet<String> = HashSet::new();
+        let mut column_9_set: HashSet<String> = HashSet::new();
+        let mut column_10_set: HashSet<String> = HashSet::new();
+        for item in items {
+            let column_1 = item.column_1.clone();
+            let column_2 = item.column_2.clone();
+            let column_3 = item.column_3.clone();
+            let column_4 = item.column_4.clone();
+            let column_5 = item.column_5.clone();
+            let column_6 = item.column_6.clone();
+            let column_7 = item.column_7.clone();
+            let column_8 = item.column_8.clone();
+            let column_9 = item.column_9.clone();
+            let column_10 = item.column_10.clone();
+            let tuple = SelectGroupByResult::update_for_groups(
+                column_1.clone(), &column_1_set, &yaml_string, 2
+            );
+            column_1_set = tuple.0;
+            yaml_string = tuple.1;
+            let tuple = SelectGroupByResult::update_for_groups(
+                column_2.clone(), &column_2_set, &yaml_string, 4
+            );
+            column_2_set = tuple.0;
+            yaml_string = tuple.1;
+            let tuple = SelectGroupByResult::update_for_groups(
+                column_3.clone(), &column_3_set, &yaml_string, 6
+            );
+            column_3_set = tuple.0;
+            yaml_string = tuple.1;
+            let tuple = SelectGroupByResult::update_for_groups(
+                column_4.clone(), &column_4_set, &yaml_string, 8
+            );
+            column_4_set = tuple.0;
+            yaml_string = tuple.1;
+            let tuple = SelectGroupByResult::update_for_groups(
+                column_5.clone(), &column_5_set, &yaml_string, 10
+            );
+            column_5_set = tuple.0;
+            yaml_string = tuple.1;
+            let tuple = SelectGroupByResult::update_for_groups(
+                column_6.clone(), &column_6_set, &yaml_string, 12
+            );
+            column_6_set = tuple.0;
+            yaml_string = tuple.1;
+            let tuple = SelectGroupByResult::update_for_groups(
+                column_7.clone(), &column_7_set, &yaml_string, 14
+            );
+            column_7_set = tuple.0;
+            yaml_string = tuple.1;
+            let tuple = SelectGroupByResult::update_for_groups(
+                column_8.clone(), &column_8_set, &yaml_string, 16
+            );
+            column_8_set = tuple.0;
+            yaml_string = tuple.1;
+            let tuple = SelectGroupByResult::update_for_groups(
+                column_9.clone(), &column_9_set, &yaml_string, 18
+            );
+            column_9_set = tuple.0;
+            yaml_string = tuple.1;
+            let tuple = SelectGroupByResult::update_for_groups(
+                column_10.clone(), &column_10_set, &yaml_string, 20
+            );
+            column_10_set = tuple.0;
+            yaml_string = tuple.1;
+            let mut start_number_spaces = str::repeat(" ", 2);
+            if column_2.is_some() {
+                start_number_spaces = str::repeat(" ", 4);
+            } else if column_3.is_some() {
+                start_number_spaces = str::repeat(" ", 6);
+            } else if column_4.is_some() {
+                start_number_spaces = str::repeat(" ", 8);
+            } else if column_5.is_some() {
+                start_number_spaces = str::repeat(" ", 10);
+            } else if column_6.is_some() {
+                start_number_spaces = str::repeat(" ", 12);
+            } else if column_7.is_some() {
+                start_number_spaces = str::repeat(" ", 14);
+            } else if column_8.is_some() {
+                start_number_spaces = str::repeat(" ", 16);
+            } else if column_9.is_some() {
+                start_number_spaces = str::repeat(" ", 18);
+            } else if column_10.is_some() {
+                start_number_spaces = str::repeat(" ", 20);
+            }
+            let group_item = item.item.clone();
+            if group_item.is_some() {
+                let group_item = group_item.unwrap();
+                let items_data = group_item.items_data.clone();
+                let mut number_group_items = 0;
+                if items_data.is_some() {
+                    yaml_string.push_str(format!("{}  items:\n", start_number_spaces).as_str());
+                    let items_data = items_data.unwrap();
+                    number_group_items = *&items_data.len();
+                    if statement.skip_group_items == false {
+                        for item in items_data {
+                            let item_data = item.data.unwrap();
+                            let item_id = item.id.unwrap();
+                            let item_name = item.name.unwrap();
+                            let item_slug = item.slug.unwrap();
+                            yaml_string.push_str(format!("{}    - id: {item_id}\n", start_number_spaces, item_id=item_id).as_str());
+                            yaml_string.push_str(format!("{}      name: {item_name}\n", start_number_spaces, item_name=item_name).as_str());
+                            yaml_string.push_str(format!("{}      slug: {item_slug}\n", start_number_spaces, item_slug=item_slug).as_str());
+                            if item_data.len() > 0 {
+                                yaml_string.push_str(format!("{}      data:\n", start_number_spaces).as_str());
+                            }
+                            let mut item_data_sorted: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
+                            for (k, v) in item_data {
+                                let column_id = k;
+                                let column = TreeFolder::get_column_by_id(&column_id, &folder);
+                                if column.is_err() {
+                                    continue;
+                                }
+                                let column = column.unwrap();
+                                let column_name = column.get(NAME);
+                                if column_name.is_none() {
+                                    continue
+                                }
+                                let column_name = column_name.unwrap().clone();
+                                item_data_sorted.insert(column_name, v);
+                            }
+                            for (column_name, v) in item_data_sorted {
+                                let column_config = column_config_map.get(&column_name);
+                                if column_config.is_none() {
+                                    continue
+                                }
+                                let column_config = column_config.unwrap().clone();
+                                let column_type = column_config.column_type;
+                                if column_type.is_none() {
+                                    continue
+                                }
+                                // eprintln!("SelectGroupByResult.serialize_yaml :: data list: {:#?}", &v);
+                                let column_type = column_type.unwrap();
+                                // eprintln!("SelectGroupByResult.serialize_yaml :: column_type: {}", &column_type);
+                                let column_type = column_type.as_str();
+                                let mut is_set = false;
+                                let is_set_str = column_config.is_set;
+                                if is_set_str.is_some() {
+                                    let is_set_str = is_set_str.unwrap();
+                                    if is_set_str == String::from("1") || is_set_str.to_lowercase() == String::from("true") {
+                                        is_set = true;
+                                    }
+                                }
+                                let mut is_many = column_config.many.is_some();
+                                if is_many {
+                                    is_many = column_config.many.unwrap();
+                                }
+                                let column_name = column_config.name.unwrap();
+                                if text_columns.contains(&column_type) {
+                                    if !is_set && !is_many {
+                                        let value: String;
+                                        if column_type == COLUMN_TYPE_LINK {
+                                            let link_id = v[0].get(ID).unwrap();
+                                            let link_name = v[0].get(NAME_CAMEL).unwrap();
+                                            value = link_id.clone();
+                                            yaml_string.push_str(format!("{}        {field}:\n", start_number_spaces, field=&column_name).as_str());
+                                            yaml_string.push_str(format!("{}          {}: {value}\n", start_number_spaces, ID, value=value).as_str());
+                                            yaml_string.push_str(format!("{}          {}: {value}\n", start_number_spaces, NAME_CAMEL, value=link_name).as_str());
+                                        } else {
+                                            value = get_value_list(&v).unwrap();
+                                            yaml_string.push_str(format!("{}        {field}: {value}\n", start_number_spaces, field=&column_name, value=value).as_str());
+                                        }
+                                    } else {
+                                        let values = v;
+                                        yaml_string.push_str(format!("{}        {field}:\n", start_number_spaces, field=&column_name).as_str());
+                                        for value in &values {
+                                            if column_type == COLUMN_TYPE_LINK {
+                                                let link_id = value.get(ID);
+                                                let link_name = value.get(NAME_CAMEL);
+                                                if link_id.is_some() {
+                                                    let link_id = link_id.unwrap().clone();
+                                                    let link_name = link_name.unwrap();
+                                                    yaml_string.push_str(format!("{}          - {}: {value}\n", start_number_spaces, ID, value=link_id).as_str());
+                                                    yaml_string.push_str(format!("{}            {}: {value}\n", start_number_spaces, NAME_CAMEL, value=link_name).as_str());
+                                                }
+                                            } else {
+                                                let value = value.get(VALUE);
+                                                if value.is_some() {
+                                                    let value = value.unwrap().clone();
+                                                    yaml_string.push_str(format!("{}          - {value}\n", start_number_spaces, value=value).as_str());
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else if number_columns.contains(&column_type) {
+                                    if !is_set {
+                                        let value = get_value_list(&v).unwrap();
+                                        yaml_string.push_str(format!("{}        {field}: {value}\n", start_number_spaces, field=&column_name, value=value).as_str());
+                                    } else {
+                                        let values = v;
+                                        yaml_string.push_str(format!("{}        {field}:\n", start_number_spaces, field=&column_name).as_str());
+                                        for value in values {
+                                            let value = value.get(VALUE);
+                                            if value.is_some() {
+                                                let value = value.unwrap().clone();
+                                                yaml_string.push_str(format!("{}          - {value}\n", start_number_spaces, value=value).as_str());
+                                            }                            
+                                        }
+                                    }
+                                } else if explicit_text_columns.contains(&column_type) {
+                                    if !is_set {
+                                        let value = get_value_list(&v).unwrap();
+                                        yaml_string.push_str(format!("{}        {field}: \"{value}\"\n", start_number_spaces, field=&column_name, value=value).as_str());
+                                    } else {
+                                        let values = v;
+                                        yaml_string.push_str(format!("{}        {field}:\n", start_number_spaces, field=&column_name).as_str());
+                                        for value in values {
+                                            let value = value.get(VALUE);
+                                            if value.is_some() {
+                                                let value = value.unwrap().clone();
+                                                yaml_string.push_str(format!("{}          - \"{value}\"\n", start_number_spaces, value=value).as_str()); 
+                                            }                            
+                                        }
+                                    }
+                                } else if object_columns.contains(&column_type) {
+                                    if !is_set {
+                                        let value = get_value_list(&v).unwrap();
+                                        let value_items: Vec<&str> = value.split("---\n").collect();
+                                        let value = value_items[1].to_string();
+                                        yaml_string.push_str(format!("{}        {field}:\n", start_number_spaces, field=&column_name).as_str());
+                                        yaml_string.push_str(format!("{}          {}:\n", start_number_spaces, &value).as_str());
+                                    } else {
+                                        let values = v;
+                                        yaml_string.push_str(format!("{}        {field}:\n", start_number_spaces, field=&column_name).as_str());
+                                        for value in values {
+                                            let value = value.get(VALUE).unwrap().clone();
+                                            let value = value.replace("\\n", "\n");
+                                            let value_items: Vec<&str> = value.split("---\n").collect();
+                                            let value = value_items[1].to_string();
+                                            yaml_string.push_str(format!("{}          - {}\n", start_number_spaces, &value).as_str());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    yaml_string.push_str(format!("{}  items: ~\n", start_number_spaces).as_str());
+                }
+                let stats = group_item.column_stats.clone();
+                if stats.is_some() {
+                    yaml_string.push_str(format!("{}  stats:\n", start_number_spaces).as_str());
+                    yaml_string.push_str(format!("{}    count: {}\n", start_number_spaces, number_group_items).as_str());
+                    yaml_string.push_str(format!("{}    columns:\n", start_number_spaces).as_str());
+                    let stats = stats.unwrap();
+                    for (column_name, column_stats) in &stats {
+                        let is_number_stats = column_stats.sum.is_some();
+                        if !is_number_stats {
+                            yaml_string.push_str(format!("{}      {}:\n", start_number_spaces, column_name).as_str());
+                            yaml_string.push_str(format!("{}        count: {}\n", start_number_spaces, column_stats.count).as_str());
+                        } else {
+                            yaml_string.push_str(format!("{}      {}:\n", start_number_spaces, column_name).as_str());
+                            yaml_string.push_str(format!("{}        count: {}\n", start_number_spaces, column_stats.count).as_str());
+                            yaml_string.push_str(format!("{}        sum: {}\n", start_number_spaces, column_stats.sum.unwrap()).as_str());
+                            yaml_string.push_str(format!("{}        max: {}\n", start_number_spaces, column_stats.max.unwrap()).as_str());
+                            yaml_string.push_str(format!("{}        min: {}\n", start_number_spaces, column_stats.min.unwrap()).as_str());
+                            yaml_string.push_str(format!("{}        avg: {}\n", start_number_spaces, column_stats.avg.unwrap()).as_str());
+                        }
+                    }                    
+                } else {
+                    yaml_string.push_str(format!("{}  stats: ~\n", start_number_spaces).as_str());
+                }
+            }
+        }
+        return yaml_string
+    }
+
 }
 
 #[derive(Debug, Clone)]
@@ -5006,15 +6466,62 @@ impl<'gb> SelectFromFolderStatement {
             errors.push(error);
             return Err(errors)
         }
-        let group_by = group_by.unwrap();
-        let results = search_iterator.do_search();
+        // 1 - Group search iterator items for all items
+        let search_group_by = SearchGroupBy{
+            env: env,
+            space_database: space_database.clone(),
+            query: statement.clone(),
+            db_folder: Some(db_folder.clone()), 
+            folder: Some(folder.clone()),
+            search_iterator: search_iterator,
+        };
+        let results = search_group_by.do_search();
+        if results.is_err() {
+            let errors = results.unwrap_err();
+            return Err(errors)
+        }
+        let tuple = results.unwrap();
+        let results = tuple.0;
+        let total = tuple.1;
+        // 2 - Paging
+        let paging = SearchGroupByPaging{
+            number_items: statement.number_items,
+            page: statement.page
+        };
+        let results = paging.do_paging(&results);
         if results.is_err() {
             let errors = results.unwrap_err();
             return Err(errors)
         }
         let results = results.unwrap();
-        // I need to group the search result items by 
-        let group_by = statement.group_by.clone().unwrap();
+        // 3 - Output: Generates output for selected page, serializing data and calculatig stats
+        let output = SearchOutputGroupByData{
+            search_output_data: SearchOutputData{},
+        };
+        let elapsed_time = start_time.elapsed().as_millis().to_usize().unwrap();
+        let result = output.do_output(
+            env,
+            &space_database,
+            statement.clone(),
+            &db_folder,
+            &folder,
+            &results,
+            &columns,
+            total,
+            elapsed_time,
+            column_config_map
+        );
+        if result.is_err() {
+            let errors_ = result.clone().unwrap_err();
+            errors.extend(errors_);
+        }
+        let results = result.unwrap();
+        let mut yaml_response: Vec<yaml_rust::Yaml> = Vec::new();
+        let yaml_item = yaml_rust::YamlLoader::load_from_str(
+            &results
+        ).unwrap();
+        yaml_response.push(yaml_item[0].clone());
+        return Ok(yaml_response) 
     }
 
 }
@@ -5073,18 +6580,34 @@ impl<'gb> Statement<'gb> for SelectFromFolderStatement {
             folder: Some(folder.clone())
         };
         if select_count.is_none() {
-            let result = self.execute_collection(
-                env,
-                &space_database,
-                statement,
-                &db_folder,
-                &folder,
-                &search_iterator,
-                columns,
-                start_time,
-                column_config_map
-            );
-            return result
+            let group_by = statement.group_by.clone();
+            if group_by.is_some() {
+                let result = self.execute_group_by(
+                    env, 
+                    &space_database, 
+                    statement, 
+                    &db_folder, 
+                    &folder, 
+                    &search_iterator, 
+                    columns, 
+                    start_time, 
+                    column_config_map
+                );
+                return result
+            } else {
+                let result = self.execute_collection(
+                    env,
+                    &space_database,
+                    statement,
+                    &db_folder,
+                    &folder,
+                    &search_iterator,
+                    columns,
+                    start_time,
+                    column_config_map
+                );
+                return result
+            }
         } else {
             let search_count = SearchCount{
                 env: env,
