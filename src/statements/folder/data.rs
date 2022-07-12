@@ -13,6 +13,8 @@ use tr::tr;
 use regex::Regex;
 use lazy_static::lazy_static;
 use colored::Colorize;
+use std::sync::{Arc, Mutex};
+use std::{thread};
 
 use serde_encrypt::{
     shared_key::SharedKey, traits::SerdeEncryptSharedKey,
@@ -2111,7 +2113,7 @@ pub struct SearchCount<'gb>{
     pub space_database: SpaceDatabase,
     pub db_folder: Option<TreeFolder>,
     pub folder: Option<DbData>,
-    pub iterator: SearchIterator<'gb>,
+    pub iterator: SearchIterator,
 }
 
 impl<'gb> SearchCount<'gb>{
@@ -2710,7 +2712,7 @@ pub struct SearchGroupBy<'gb>{
     pub space_database: SpaceDatabase,
     pub db_folder: Option<TreeFolder>,
     pub folder: Option<DbData>,
-    pub search_iterator: SearchIterator<'gb>,
+    pub search_iterator: SearchIterator,
 }
 
 impl<'gb> SearchGroupBy<'gb>{
@@ -3136,7 +3138,13 @@ impl<'gb> SearchGroupBy<'gb>{
         &self
     ) -> Result<(Vec<GroupByResult>, usize), Vec<PlanetError>> {
         let search_iterator = self.search_iterator.clone();
-        let search_results = search_iterator.do_search();
+        let env = self.env;
+        let context = env.context;
+        let planet_context = env.planet_context;
+        let search_results = search_iterator.do_search(
+            &context,
+            &planet_context
+        );
         if search_results.is_err() {
             let errors = search_results.unwrap_err();
             return Err(errors)
@@ -3281,22 +3289,25 @@ impl<'gb> SearchGroupBy<'gb>{
         return Ok(
             (
                 group_list,
-                total    
+                total
             )
         )
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct SearchIterator<'gb>{
+pub struct SearchIterator{
     pub query: SelectFromFolderCompiledStmt,
-    pub env: &'gb Environment<'gb>,
+    pub home_dir: Option<String>,
+    pub account_id: Option<String>,
+    pub space_id: Option<String>,
+    pub site_id: Option<String>,
     pub space_database: SpaceDatabase,
     pub db_folder: Option<TreeFolder>,
     pub folder: Option<DbData>,
 }
 
-impl<'gb> SearchIterator<'gb>{
+impl SearchIterator{
 
     fn get_column_sort_type(
         &self,
@@ -4028,12 +4039,13 @@ impl<'gb> SearchIterator<'gb>{
         &self
     ) -> Result<TreeFolderItem, PlanetError> {
         let space_database = self.space_database.clone();
-        let planet_context = self.env.planet_context.clone();
-        let context = self.env.context.clone();
-        let home_dir = planet_context.home_path.clone();
-        let account_id = context.account_id.clone().unwrap_or_default();
-        let space_id = context.space_id;
-        let site_id = context.site_id.clone();
+        let home_dir = self.home_dir.clone();
+        let account_id = self.account_id.clone();
+        let account_id = account_id.unwrap_or_default();
+        let space_id = self.space_id.clone();
+        let space_id = space_id.unwrap();
+        let space_id = space_id.as_str();
+        let site_id = self.site_id.clone();
         let db_folder = self.db_folder.clone().unwrap();
         let folder = self.folder.clone().unwrap();
         let folder_id = folder.id.clone().unwrap_or_default();
@@ -4087,15 +4099,15 @@ impl<'gb> SearchIterator<'gb>{
         let db_folder_item = result.unwrap();
         
         let space_database = self.space_database.clone();
-        let planet_context = self.env.planet_context.clone();
-        let context = self.env.context.clone();
-        let home_dir = planet_context.home_path.clone();
-        let account_id = context.account_id.clone().unwrap_or_default();
-        let space_id = context.space_id;
-        let site_id = context.site_id.clone();
+        let site_id = self.site_id.clone();
+        let home_dir = self.home_dir.clone();
+        let account_id = self.account_id.clone();
+        let account_id = account_id.unwrap_or_default();
+        let account_id = account_id.as_str();
+        let space_id = self.space_id.clone();
+        let space_id = space_id.unwrap();
+        let space_id = space_id.as_str();
         let db_folder = self.db_folder.clone().unwrap();
-        // let folder = self.folder.clone().unwrap();
-        // let folder_id = folder.id.clone().unwrap_or_default();
         // TreeFolderItem
         let mut site_id_alt: Option<String> = None;
         if site_id.is_some() {
@@ -4425,118 +4437,163 @@ impl<'gb> SearchIterator<'gb>{
         let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let needs_filter_links = self.query.needs_filter_links.clone();
         let mut db_folder_item = db_folder_item.clone();
-        let mut sorter_list = sorter_list.clone();
+        let sorter_list = sorter_list.clone();
         let boost_words = boost_words.clone();
         
         let partitions = db_folder_item.get_partitions();
+        let errors: Vec<PlanetError> = Vec::new();
         if partitions.is_ok() {
             let partitions = partitions.unwrap();
+            let mut handles= vec![];
             let remote_folder_data_map: HashMap<String, HashMap<String, DbData>> = HashMap::new();
+            let sorter_list: Arc<Mutex<Vec<SearchSorter>>> = Arc::new(Mutex::new(sorter_list.clone()));
+            let column_config_map: Arc<Mutex<BTreeMap<String, ColumnConfig>>> = Arc::new(Mutex::new(column_config_map.clone()));
+            let links_folder_by_column_id: Arc<Mutex<Option<HashMap<String, String>>>> = Arc::new(Mutex::new(links_folder_by_column_id.clone()));
+            let remote_folder_map: Arc<Mutex<Option<HashMap<String, HashMap<u16, TreeFolderItem>>>>> = Arc::new(Mutex::new(remote_folder_map.clone()));
+            let remote_folder_obj_map: Arc<Mutex<Option<HashMap<String, DbData>>>> = Arc::new(Mutex::new(remote_folder_obj_map.clone()));
+            let sorter_map: Arc<Mutex<HashMap<String, SortedtBy>>> = Arc::new(Mutex::new(sorter_map.clone()));
+            let column_type_map: Arc<Mutex<HashMap<String, String>>> = Arc::new(Mutex::new(column_type_map.clone()));
+            let db_folder_item: Arc<Mutex<TreeFolderItem>> = Arc::new(Mutex::new(db_folder_item.clone()));
+            let this: Arc<Mutex<SearchIterator>> = Arc::new(Mutex::new(self.clone()));
+            let remote_folder_data_map: Arc<Mutex<HashMap<String, HashMap<String, DbData>>>> = Arc::new(Mutex::new(remote_folder_data_map.clone()));
+            let errors = Arc::new(Mutex::new(errors.clone()));
+            let boost_words: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(boost_words.clone()));
+            let shared_key: Arc<Mutex<SharedKey>> = Arc::new(Mutex::new(shared_key.clone()));
             for partition in partitions {
-                // TODO: Implement threads for each partition
-                let (db_tree, index_tree) = db_folder_item.open_partition(&partition).unwrap();
-                // performance boost through indices using index_tree
-                let iter = db_tree.iter();
-                for db_result in iter {
-                    if db_result.is_err() {
-                        let mut errors: Vec<PlanetError> = Vec::new();
-                        errors.push(
-                            PlanetError::new(
-                                500, 
-                                Some(tr!("Could not fetch item from index"))
-                            )
-                        );
-                        return Err(errors)
-                    }
-                    let item_tuple = db_result.unwrap();
-                    let item_id = item_tuple.0.clone();
-                    let item = item_tuple.1.clone();
-                    let item_db = item.to_vec();
-                    let item_ = EncryptedMessage::deserialize(
-                        item_db
-                    ).unwrap();
-                    let item_ = DbData::decrypt_owned(
-                        &item_, 
-                        &shared_key);
-                    match item_ {
-                        Ok(_) => {
-                            let item = item_.unwrap();
-                            let item_data = item.data.unwrap();
-                            // stop words and stemmer for item language code
-                            let language_code = TreeFolderItem::get_language_code_by_config(
-                                column_config_map, 
-                                &item_data
-                            );
-                            let stemmer = get_stemmer_by_language(&language_code);
-                            let stop_words = get_stop_words_by_language(&language_code);
-
-                            let index_result = TreeFolderItem::get_index_item(
-                                index_tree.clone(), 
-                                &item_id
-                            );
-                            if index_result.is_err() {
-                                let error = index_result.unwrap_err();
-                                let mut errors: Vec<PlanetError> = Vec::new();
-                                errors.push(error);
-                                return Err(errors)
-                            }
-                            let index_item = index_result.unwrap();
-                            let index_data = index_item.data.clone().unwrap();
-                            for word in &boost_words {
-                                let word = word.to_lowercase();
-                                let is_stop = stop_words.contains(&word.to_string());
-                                if is_stop {
-                                    continue
-                                }
-                                let stem = stemmer.stem(&word);
-                                let stem = stem.to_string();
-                                let has_stem = *&index_data.get(&stem).is_some();
-                                if has_stem {
-                                    let mut links_folder_by_column_id_wrap: Option<HashMap<String, String>> = None;
-                                    let mut remote_folder_data_map_wrap: Option<HashMap<String, HashMap<String, DbData>>> = None;
-                                    let mut remote_folder_map_wrap: Option<HashMap<String, HashMap<u16, TreeFolderItem>>> = None;
-                                    let mut remote_folder_obj_map_wrap: Option<HashMap<String, DbData>> = None;
-                                    if needs_filter_links {
-                                        links_folder_by_column_id_wrap = links_folder_by_column_id.clone();
-                                        remote_folder_data_map_wrap = Some(remote_folder_data_map.clone());
-                                        remote_folder_map_wrap = remote_folder_map.clone();
-                                        remote_folder_obj_map_wrap = remote_folder_obj_map.clone();
-                                    }
-                                    let result = self.do_search_item(
-                                        item_tuple.clone(), 
-                                        index_tree.clone(), 
-                                        &column_config_map, 
-                                        links_folder_by_column_id_wrap, 
-                                        remote_folder_data_map_wrap, 
-                                        remote_folder_map_wrap, 
-                                        remote_folder_obj_map_wrap, 
-                                        &sorter_map, 
-                                        &column_type_map, 
-                                        &sorter_list, 
-                                        &partition
-                                    );
-                                    if result.is_err() {
-                                        let errors = result.unwrap_err();
-                                        return Err(errors)
-                                    }
-                                    sorter_list = result.unwrap();
-                                }
-                            }
-                        },
-                        Err(_) => {
-                            let mut errors: Vec<PlanetError> = Vec::new();
+                let sorter_list = Arc::clone(&sorter_list);
+                let column_config_map = Arc::clone(&column_config_map);
+                let links_folder_by_column_id = Arc::clone(&links_folder_by_column_id);
+                let remote_folder_map = Arc::clone(&remote_folder_map);
+                let remote_folder_obj_map = Arc::clone(&remote_folder_obj_map);
+                let sorter_map = Arc::clone(&sorter_map);
+                let column_type_map = Arc::clone(&column_type_map);
+                let this = Arc::clone(&this);
+                let db_folder_item = Arc::clone(&db_folder_item);
+                let boost_words = Arc::clone(&boost_words);
+                let shared_key = Arc::clone(&shared_key);
+                let remote_folder_data_map = Arc::clone(&remote_folder_data_map);
+                let errors = Arc::clone(&errors);
+                let handle = thread::spawn(move || {
+                    let mut sorter_list = sorter_list.lock().unwrap();
+                    let column_config_map = column_config_map.lock().unwrap();
+                    let links_folder_by_column_id = links_folder_by_column_id.lock().unwrap();
+                    let remote_folder_map = remote_folder_map.lock().unwrap();
+                    let remote_folder_obj_map = remote_folder_obj_map.lock().unwrap();
+                    let sorter_map = sorter_map.lock().unwrap();
+                    let column_type_map = column_type_map.lock().unwrap();
+                    let this = this.lock().unwrap();
+                    let mut db_folder_item = db_folder_item.lock().unwrap();
+                    let remote_folder_data_map = remote_folder_data_map.lock().unwrap();
+                    let mut errors = errors.lock().unwrap();
+                    let boost_words = boost_words.lock().unwrap();
+                    let shared_key = shared_key.lock().unwrap();
+                    let (db_tree, index_tree) = db_folder_item.open_partition(&partition).unwrap();
+                    // performance boost through indices using index_tree
+                    let iter = db_tree.iter();
+                    for db_result in iter {
+                        if db_result.is_err() {
                             errors.push(
-                                PlanetError::new(500, Some(tr!(
-                                    "Could not fetch item from index"
-                                )))
+                                PlanetError::new(
+                                    500, 
+                                    Some(tr!("Could not fetch item from index"))
+                                )
                             );
-                            return Err(errors)
                         }
-                    }
-                }
+                        let item_tuple = db_result.unwrap();
+                        let item_id = item_tuple.0.clone();
+                        let item = item_tuple.1.clone();
+                        let item_db = item.to_vec();
+                        let item_ = EncryptedMessage::deserialize(
+                            item_db
+                        ).unwrap();
+                        let item_ = DbData::decrypt_owned(
+                            &item_, 
+                            &shared_key);
+                        match item_ {
+                            Ok(_) => {
+                                let item = item_.unwrap();
+                                let item_data = item.data.unwrap();
+                                // stop words and stemmer for item language code
+                                let language_code = TreeFolderItem::get_language_code_by_config(
+                                    &column_config_map, 
+                                    &item_data
+                                );
+                                let stemmer = get_stemmer_by_language(&language_code);
+                                let stop_words = get_stop_words_by_language(&language_code);
+    
+                                let index_result = TreeFolderItem::get_index_item(
+                                    index_tree.clone(), 
+                                    &item_id
+                                );
+                                if index_result.is_err() {
+                                    let error = index_result.clone().unwrap_err();
+                                    let mut errors: Vec<PlanetError> = Vec::new();
+                                    errors.push(error);
+                                } else {
+                                    let index_item = index_result.unwrap();
+                                    let index_data = index_item.data.clone().unwrap();
+                                    for word in &boost_words.clone() {
+                                        let word = word.to_lowercase();
+                                        let is_stop = stop_words.contains(&word.to_string());
+                                        if is_stop {
+                                            continue
+                                        }
+                                        let stem = stemmer.stem(&word);
+                                        let stem = stem.to_string();
+                                        let has_stem = *&index_data.get(&stem).is_some();
+                                        if has_stem {
+                                            let mut links_folder_by_column_id_wrap: Option<HashMap<String, String>> = None;
+                                            let mut remote_folder_data_map_wrap: Option<HashMap<String, HashMap<String, DbData>>> = None;
+                                            let mut remote_folder_map_wrap: Option<HashMap<String, HashMap<u16, TreeFolderItem>>> = None;
+                                            let mut remote_folder_obj_map_wrap: Option<HashMap<String, DbData>> = None;
+                                            if needs_filter_links {
+                                                links_folder_by_column_id_wrap = links_folder_by_column_id.clone();
+                                                remote_folder_data_map_wrap = Some(remote_folder_data_map.clone());
+                                                remote_folder_map_wrap = remote_folder_map.clone();
+                                                remote_folder_obj_map_wrap = remote_folder_obj_map.clone();
+                                            }
+                                            let result = this.do_search_item(
+                                                item_tuple.clone(), 
+                                                index_tree.clone(), 
+                                                &column_config_map, 
+                                                links_folder_by_column_id_wrap, 
+                                                remote_folder_data_map_wrap, 
+                                                remote_folder_map_wrap, 
+                                                remote_folder_obj_map_wrap, 
+                                                &sorter_map, 
+                                                &column_type_map, 
+                                                &sorter_list, 
+                                                &partition
+                                            );
+                                            if result.clone().is_err() {
+                                                let errors_ = result.clone().unwrap_err();
+                                                errors.extend(errors_);
+                                            }
+                                            let result_sorter_list = result.unwrap();
+                                            *sorter_list = result_sorter_list;
+                                        }
+                                    }    
+                                }
+                            },
+                            Err(_) => {
+                                errors.push(
+                                    PlanetError::new(500, Some(tr!(
+                                        "Could not fetch item from index"
+                                    )))
+                                );
+                            }
+                        }
+                    }    
+                });
+                handles.push(handle);
             }
+            for handle in handles {
+                handle.join().unwrap();
+            }
+            let sorter_list = sorter_list.lock().unwrap().clone();
+            return Ok(sorter_list)
         }
-        return Ok(sorter_list)
+        return Err(errors)
     }
 
     fn do_search_sequential(
@@ -4552,72 +4609,112 @@ impl<'gb> SearchIterator<'gb>{
     ) -> Result<Vec<SearchSorter>, Vec<PlanetError>> {
         let needs_filter_links = self.query.needs_filter_links.clone();
         let mut db_folder_item = db_folder_item.clone();
-        let mut sorter_list = sorter_list.clone();
+        let sorter_list = sorter_list.clone();
         let partitions = db_folder_item.get_partitions();
+        let errors: Vec<PlanetError> = Vec::new();
         if partitions.is_ok() {
             let partitions = partitions.unwrap();
-            // eprintln!("do_search :: partitions: {:?}", &partitions);
+            let mut handles= vec![];
             let remote_folder_data_map: HashMap<String, HashMap<String, DbData>> = HashMap::new();
+            let sorter_list: Arc<Mutex<Vec<SearchSorter>>> = Arc::new(Mutex::new(sorter_list.clone()));
+            let column_config_map: Arc<Mutex<BTreeMap<String, ColumnConfig>>> = Arc::new(Mutex::new(column_config_map.clone()));
+            let links_folder_by_column_id: Arc<Mutex<Option<HashMap<String, String>>>> = Arc::new(Mutex::new(links_folder_by_column_id.clone()));
+            let remote_folder_map: Arc<Mutex<Option<HashMap<String, HashMap<u16, TreeFolderItem>>>>> = Arc::new(Mutex::new(remote_folder_map.clone()));
+            let remote_folder_obj_map: Arc<Mutex<Option<HashMap<String, DbData>>>> = Arc::new(Mutex::new(remote_folder_obj_map.clone()));
+            let sorter_map: Arc<Mutex<HashMap<String, SortedtBy>>> = Arc::new(Mutex::new(sorter_map.clone()));
+            let column_type_map: Arc<Mutex<HashMap<String, String>>> = Arc::new(Mutex::new(column_type_map.clone()));
+            let db_folder_item: Arc<Mutex<TreeFolderItem>> = Arc::new(Mutex::new(db_folder_item.clone()));
+            let this: Arc<Mutex<SearchIterator>> = Arc::new(Mutex::new(self.clone()));
+            let remote_folder_data_map: Arc<Mutex<HashMap<String, HashMap<String, DbData>>>> = Arc::new(Mutex::new(remote_folder_data_map.clone()));
+            let errors = Arc::new(Mutex::new(errors.clone()));
             for partition in partitions {
-                let (db_tree, index_tree) = db_folder_item.open_partition(&partition).unwrap();
-                // eprintln!("do_search :: partition: {}", &partition);
-                // I may need botth db and index to execute formula
-                let iter = db_tree.iter();
-                // folder name => item id => DbData
-                for db_result in iter {
-                    if db_result.is_err() {
-                        let mut errors: Vec<PlanetError> = Vec::new();
-                        errors.push(
-                            PlanetError::new(
-                                500, 
-                                Some(tr!("Could not fetch item from database"))
-                            )
+                let sorter_list = Arc::clone(&sorter_list);
+                let column_config_map = Arc::clone(&column_config_map);
+                let links_folder_by_column_id = Arc::clone(&links_folder_by_column_id);
+                let remote_folder_map = Arc::clone(&remote_folder_map);
+                let remote_folder_obj_map = Arc::clone(&remote_folder_obj_map);
+                let sorter_map = Arc::clone(&sorter_map);
+                let column_type_map = Arc::clone(&column_type_map);
+                let this = Arc::clone(&this);
+                let db_folder_item = Arc::clone(&db_folder_item);
+                let remote_folder_data_map = Arc::clone(&remote_folder_data_map);
+                let errors = Arc::clone(&errors);
+                let handle = thread::spawn(move || {
+                    let mut sorter_list = sorter_list.lock().unwrap();
+                    let column_config_map = column_config_map.lock().unwrap();
+                    let links_folder_by_column_id = links_folder_by_column_id.lock().unwrap();
+                    let remote_folder_map = remote_folder_map.lock().unwrap();
+                    let remote_folder_obj_map = remote_folder_obj_map.lock().unwrap();
+                    let sorter_map = sorter_map.lock().unwrap();
+                    let column_type_map = column_type_map.lock().unwrap();
+                    let this = this.lock().unwrap();
+                    let mut db_folder_item = db_folder_item.lock().unwrap();
+                    let remote_folder_data_map = remote_folder_data_map.lock().unwrap();
+                    let mut errors = errors.lock().unwrap();
+                    let (db_tree, index_tree) = db_folder_item.open_partition(&partition).unwrap();
+                    // I may need botth db and index to execute formula
+                    let iter = db_tree.iter();
+                    for db_result in iter {
+                        if db_result.is_err() {
+                            errors.push(
+                                PlanetError::new(
+                                    500, 
+                                    Some(tr!("Could not fetch item from database"))
+                                )
+                            );
+                        }
+                        let item_tuple = db_result.unwrap();
+                        let mut links_folder_by_column_id_wrap: Option<HashMap<String, String>> = None;
+                        let mut remote_folder_data_map_wrap: Option<HashMap<String, HashMap<String, DbData>>> = None;
+                        let mut remote_folder_map_wrap: Option<HashMap<String, HashMap<u16, TreeFolderItem>>> = None;
+                        let mut remote_folder_obj_map_wrap: Option<HashMap<String, DbData>> = None;
+                        if needs_filter_links {
+                            links_folder_by_column_id_wrap = links_folder_by_column_id.clone();
+                            remote_folder_data_map_wrap = Some(remote_folder_data_map.clone());
+                            remote_folder_map_wrap = remote_folder_map.clone();
+                            remote_folder_obj_map_wrap = remote_folder_obj_map.clone();
+                        }
+
+                        let result = this.do_search_item(
+                            item_tuple, 
+                            index_tree.clone(), 
+                            &column_config_map, 
+                            links_folder_by_column_id_wrap, 
+                            remote_folder_data_map_wrap, 
+                            remote_folder_map_wrap, 
+                            remote_folder_obj_map_wrap, 
+                            &sorter_map, 
+                            &column_type_map, 
+                            &sorter_list, 
+                            &partition
                         );
-                        return Err(errors)
+                        if result.clone().is_err() {
+                            let errors_ = result.clone().unwrap_err();
+                            errors.extend(errors_);
+                        }
+                        let result_sorter_list = result.unwrap();
+                        *sorter_list = result_sorter_list;
                     }
-                    let item_tuple = db_result.unwrap();
-
-                    let mut links_folder_by_column_id_wrap: Option<HashMap<String, String>> = None;
-                    let mut remote_folder_data_map_wrap: Option<HashMap<String, HashMap<String, DbData>>> = None;
-                    let mut remote_folder_map_wrap: Option<HashMap<String, HashMap<u16, TreeFolderItem>>> = None;
-                    let mut remote_folder_obj_map_wrap: Option<HashMap<String, DbData>> = None;
-                    if needs_filter_links {
-                        links_folder_by_column_id_wrap = links_folder_by_column_id.clone();
-                        remote_folder_data_map_wrap = Some(remote_folder_data_map.clone());
-                        remote_folder_map_wrap = remote_folder_map.clone();
-                        remote_folder_obj_map_wrap = remote_folder_obj_map.clone();
-                    }
-
-                    let result = self.do_search_item(
-                        item_tuple, 
-                        index_tree.clone(), 
-                        &column_config_map, 
-                        links_folder_by_column_id_wrap, 
-                        remote_folder_data_map_wrap, 
-                        remote_folder_map_wrap, 
-                        remote_folder_obj_map_wrap, 
-                        &sorter_map, 
-                        &column_type_map, 
-                        &sorter_list, 
-                        &partition
-                    );
-                    if result.is_err() {
-                        let errors = result.unwrap_err();
-                        return Err(errors)
-                    }
-                    sorter_list = result.unwrap();
-                }
+                });
+                handles.push(handle);
             }
+            for handle in handles {
+                handle.join().unwrap();
+            }
+            let sorter_list = sorter_list.lock().unwrap().clone();
+            return Ok(sorter_list)
         }
-        return Ok(sorter_list)
+        return Err(errors)
     }
 
     pub fn do_search(
-        &self
+        &self,
+        context: &Context,
+        planet_context: &PlanetContext
     ) -> Result<Vec<SearchResultItem>, Vec<PlanetError>> {
         // let query = self.query.where_compiled.clone();
-        let planet_context = self.env.planet_context.clone();
-        let context = self.env.context.clone();
+        // let planet_context = self.env.planet_context.clone();
+        // let context = self.env.context.clone();
         let folder = self.folder.clone().unwrap();
         // Sorter
         let mut sorter_list: Vec<SearchSorter> = Vec::new();
@@ -6355,7 +6452,12 @@ impl<'gb> SelectFromFolderStatement {
         let search_iterator = search_iterator.clone();
         let folder = folder.clone();
         let statement = statement.clone();
-        let results = search_iterator.do_search();
+        let context = env.context;
+        let planet_context = env.planet_context;
+        let results = search_iterator.do_search(
+            &context,
+            &planet_context
+        );
         if results.is_err() {
             let errors = results.unwrap_err();
             return Err(errors)
@@ -6572,12 +6674,21 @@ impl<'gb> Statement<'gb> for SelectFromFolderStatement {
         let statement = result.unwrap();
         let columns = statement.columns.clone();
         let select_count = statement.count.clone();
+        let context = env.context;
+        let planet_context = env.planet_context;
+        let home_dir = planet_context.home_path.clone();
+        let account_id = context.account_id.clone();
+        let space_id = Some(context.space_id.to_string()).clone();
+        let site_id = context.site_id.clone();
         let search_iterator = SearchIterator{
-            env: env,
             space_database: space_database.clone(),
             query: statement.clone(),
             db_folder: Some(db_folder.clone()), 
-            folder: Some(folder.clone())
+            folder: Some(folder.clone()),
+            home_dir: home_dir,
+            account_id: account_id,
+            space_id: space_id,
+            site_id: site_id,
         };
         if select_count.is_none() {
             let group_by = statement.group_by.clone();
