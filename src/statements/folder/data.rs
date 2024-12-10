@@ -2107,21 +2107,22 @@ pub struct SearchResultItem {
 }
 
 #[derive(Debug, Clone)]
-pub struct SearchCount<'gb>{
+pub struct SearchCount{
     pub query: SelectFromFolderCompiledStmt,
-    pub env: &'gb Environment<'gb>,
     pub space_database: SpaceDatabase,
     pub db_folder: Option<TreeFolder>,
     pub folder: Option<DbData>,
     pub iterator: SearchIterator,
 }
 
-impl<'gb> SearchCount<'gb>{
+impl<'gb> SearchCount{
 
     pub fn do_search(
         &self,
         distinct: bool,
-        column: Option<String>
+        column: Option<String>,
+        context: &Context,
+        planet_context: &PlanetContext
     ) -> Result<usize, Vec<PlanetError>> {
         // let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
         let distinct = distinct.clone();
@@ -2138,8 +2139,6 @@ impl<'gb> SearchCount<'gb>{
             column_id = column_data.get(ID).unwrap().clone();
         }
         // let query = self.query.where_compiled.clone();
-        let planet_context = self.env.planet_context.clone();
-        let context = self.env.context.clone();
         let needs_filter_links = self.query.needs_filter_links.clone();
 
         // Columns config map
@@ -2246,142 +2245,184 @@ impl<'gb> SearchCount<'gb>{
         let mut db_folder_item = db_folder_item.clone();
         let boost_words = boost_words.clone();
 
-        let mut search_count: usize = 0;
-        let mut column_data_set: HashSet<String> = HashSet::new();
+        let search_count: usize = 0;
+        let column_data_set: HashSet<String> = HashSet::new();
         
+        let errors: Vec<PlanetError> = Vec::new();
         let partitions = db_folder_item.get_partitions();
         if partitions.is_ok() {
             let partitions = partitions.unwrap();
             let remote_folder_data_map: HashMap<String, HashMap<String, DbData>> = HashMap::new();
+            let column_config_map: Arc<Mutex<BTreeMap<String, ColumnConfig>>> = Arc::new(Mutex::new(column_config_map.clone()));
+            let links_folder_by_column_id: Arc<Mutex<Option<HashMap<String, String>>>> = Arc::new(Mutex::new(links_folder_by_column_id.clone()));
+            let remote_folder_map: Arc<Mutex<Option<HashMap<String, HashMap<u16, TreeFolderItem>>>>> = Arc::new(Mutex::new(remote_folder_map.clone()));
+            let remote_folder_obj_map: Arc<Mutex<Option<HashMap<String, DbData>>>> = Arc::new(Mutex::new(remote_folder_obj_map.clone()));
+            let db_folder_item: Arc<Mutex<TreeFolderItem>> = Arc::new(Mutex::new(db_folder_item.clone()));
+            let this: Arc<Mutex<SearchCount>> = Arc::new(Mutex::new(self.clone()));
+            let remote_folder_data_map: Arc<Mutex<HashMap<String, HashMap<String, DbData>>>> = Arc::new(Mutex::new(remote_folder_data_map.clone()));
+            let distinct: Arc<Mutex<bool>> = Arc::new(Mutex::new(distinct.clone()));
+            let column_id: Arc<Mutex<String>> = Arc::new(Mutex::new(column_id.clone()));
+            let has_column: Arc<Mutex<bool>> = Arc::new(Mutex::new(has_column.clone()));
+            let errors = Arc::new(Mutex::new(errors.clone()));
+            let column_data_set: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(column_data_set.clone()));
+            let search_count: Arc<Mutex<usize>> = Arc::new(Mutex::new(search_count.clone()));
             for partition in partitions {
-                // TODO: Implement threads for each partition
-                let (db_tree, index_tree) = db_folder_item.open_partition(&partition).unwrap();
-                // performance boost through indices using index_tree
-                let iter = db_tree.iter();
-                for db_result in iter {
-                    if db_result.is_err() {
-                        let mut errors: Vec<PlanetError> = Vec::new();
-                        errors.push(
-                            PlanetError::new(
-                                500, 
-                                Some(tr!("Could not fetch item from index"))
-                            )
-                        );
-                        return Err(errors)
-                    }
-                    let item_tuple = db_result.unwrap();
-                    let item_id = item_tuple.0.clone();
-                    let item = item_tuple.1.clone();
-                    let item_db = item.to_vec();
-                    let item_ = EncryptedMessage::deserialize(
-                        item_db
-                    ).unwrap();
-                    let item_ = DbData::decrypt_owned(
-                        &item_, 
-                        &shared_key);
-                    match item_ {
-                        Ok(_) => {
-                            let item = item_.unwrap();
-                            let item_data = item.data.unwrap();
-                            // stop words and stemmer for item language code
-                            let language_code = TreeFolderItem::get_language_code_by_config(
-                                column_config_map, 
-                                &item_data
-                            );
-                            let stemmer = get_stemmer_by_language(&language_code);
-                            let stop_words = get_stop_words_by_language(&language_code);
-
-                            let index_result = TreeFolderItem::get_index_item(
-                                index_tree.clone(), 
-                                &item_id
-                            );
-                            if index_result.is_err() {
-                                let error = index_result.unwrap_err();
-                                let mut errors: Vec<PlanetError> = Vec::new();
-                                errors.push(error);
-                                return Err(errors)
-                            }
-                            let index_item = index_result.unwrap();
-                            let index_data = index_item.data.clone().unwrap();
-                            for word in &boost_words {
-                                let word = word.to_lowercase();
-                                let is_stop = stop_words.contains(&word.to_string());
-                                if is_stop {
-                                    continue
-                                }
-                                let stem = stemmer.stem(&word);
-                                let stem = stem.to_string();
-                                let has_stem = *&index_data.get(&stem).is_some();
-                                if has_stem {
-                                    if needs_filter_links {
-                                        let result = self.do_search_item(
-                                            item_tuple.clone(), 
-                                            index_tree.clone(), 
-                                            &column_config_map, 
-                                            links_folder_by_column_id.clone(), 
-                                            Some(remote_folder_data_map.clone()), 
-                                            remote_folder_map.clone(), 
-                                            remote_folder_obj_map.clone(), 
-                                            &column_data_set,
-                                            &search_count,
-                                            &distinct,
-                                            &column_id,
-                                            &has_column,
-                                        );
-                                        if result.is_err() {
-                                            let errors = result.unwrap_err();
-                                            return Err(errors)
-                                        }
-                                        // let (column_data_set, search_count) = result.unwrap();
-                                        let tuple = result.unwrap();
-                                        column_data_set = tuple.0;
-                                        search_count = tuple.1;
-                                    } else {
-                                        let result = self.do_search_item(
-                                            item_tuple.clone(), 
-                                            index_tree.clone(), 
-                                            &column_config_map, 
-                                            None, 
-                                            None, 
-                                            None, 
-                                            None, 
-                                            &column_data_set,
-                                            &search_count,
-                                            &distinct,
-                                            &column_id,
-                                            &has_column,
-                                        );
-                                        if result.is_err() {
-                                            let errors = result.unwrap_err();
-                                            return Err(errors)
-                                        }
-                                        // let (column_data_set, search_count) = result.unwrap();
-                                        let tuple = result.unwrap();
-                                        column_data_set = tuple.0;
-                                        search_count = tuple.1;
-                                    } 
-                                }
-                            }
-                        },
-                        Err(_) => {
-                            let mut errors: Vec<PlanetError> = Vec::new();
+                let column_config_map = Arc::clone(&column_config_map);
+                let links_folder_by_column_id = Arc::clone(&links_folder_by_column_id);
+                let remote_folder_map = Arc::clone(&remote_folder_map);
+                let remote_folder_obj_map = Arc::clone(&remote_folder_obj_map);
+                let this = Arc::clone(&this);
+                let db_folder_item = Arc::clone(&db_folder_item);
+                let remote_folder_data_map = Arc::clone(&remote_folder_data_map);
+                let errors = Arc::clone(&errors);
+                let distinct = Arc::clone(&distinct);
+                let has_column = Arc::clone(&has_column);
+                let column_id = Arc::clone(&column_id);
+                let column_data_set = Arc::clone(&column_data_set);
+                let search_count = Arc::clone(&search_count);
+                let handle = thread::spawn(move || {
+                    let column_config_map = column_config_map.lock().unwrap();
+                    let links_folder_by_column_id = links_folder_by_column_id.lock().unwrap();
+                    let remote_folder_map = remote_folder_map.lock().unwrap();
+                    let remote_folder_obj_map = remote_folder_obj_map.lock().unwrap();
+                    let this = this.lock().unwrap();
+                    let mut db_folder_item = db_folder_item.lock().unwrap();
+                    let remote_folder_data_map = remote_folder_data_map.lock().unwrap();
+                    let mut errors = errors.lock().unwrap();
+                    let distinct = distinct.lock().unwrap();
+                    let has_column = has_column.lock().unwrap();
+                    let column_id = column_id.lock().unwrap();
+                    let mut column_data_set = column_data_set.lock().unwrap();
+                    let mut search_count = search_count.lock().unwrap();
+                    let (db_tree, index_tree) = db_folder_item.open_partition(&partition).unwrap();
+                    // performance boost through indices using index_tree
+                    let iter = db_tree.iter();
+                    for db_result in iter {
+                        if db_result.is_err() {
                             errors.push(
-                                PlanetError::new(500, Some(tr!(
-                                    "Could not fetch item from index"
-                                )))
+                                PlanetError::new(
+                                    500, 
+                                    Some(tr!("Could not fetch item from index"))
+                                )
                             );
-                            return Err(errors)
                         }
-                    }
-                }
+                        let item_tuple = db_result.unwrap();
+                        let item_id = item_tuple.0.clone();
+                        let item = item_tuple.1.clone();
+                        let item_db = item.to_vec();
+                        let item_ = EncryptedMessage::deserialize(
+                            item_db
+                        ).unwrap();
+                        let item_ = DbData::decrypt_owned(
+                            &item_, 
+                            &shared_key);
+                        match item_ {
+                            Ok(_) => {
+                                let item = item_.unwrap();
+                                let item_data = item.data.unwrap();
+                                // stop words and stemmer for item language code
+                                let language_code = TreeFolderItem::get_language_code_by_config(
+                                    &column_config_map, 
+                                    &item_data
+                                );
+                                let stemmer = get_stemmer_by_language(&language_code);
+                                let stop_words = get_stop_words_by_language(&language_code);
+    
+                                let index_result = TreeFolderItem::get_index_item(
+                                    index_tree.clone(), 
+                                    &item_id
+                                );
+                                if index_result.is_err() {
+                                    let error = index_result.unwrap_err();
+                                    let mut errors: Vec<PlanetError> = Vec::new();
+                                    errors.push(error);
+                                }
+                                let index_item = index_result.unwrap();
+                                let index_data = index_item.data.clone().unwrap();
+                                for word in &boost_words {
+                                    let word = word.to_lowercase();
+                                    let is_stop = stop_words.contains(&word.to_string());
+                                    if is_stop {
+                                        continue
+                                    }
+                                    let stem = stemmer.stem(&word);
+                                    let stem = stem.to_string();
+                                    let has_stem = *&index_data.get(&stem).is_some();
+                                    if has_stem {
+                                        if needs_filter_links {
+                                            let result = this.do_search_item(
+                                                item_tuple.clone(), 
+                                                index_tree.clone(), 
+                                                &column_config_map, 
+                                                links_folder_by_column_id.clone(), 
+                                                Some(remote_folder_data_map.clone()), 
+                                                remote_folder_map.clone(), 
+                                                remote_folder_obj_map.clone(), 
+                                                &column_data_set,
+                                                &search_count,
+                                                &distinct,
+                                                &column_id,
+                                                &has_column,
+                                            );
+                                            if result.is_err() {
+                                                let errors_ = result.unwrap_err();
+                                                errors.extend(errors_);
+                                            }
+                                            // let (column_data_set, search_count) = result.unwrap();
+                                            let tuple = result.unwrap();
+                                            column_data_set = tuple.0;
+                                            search_count = tuple.1;
+                                        } else {
+                                            let result = this.do_search_item(
+                                                item_tuple.clone(), 
+                                                index_tree.clone(), 
+                                                &column_config_map, 
+                                                None, 
+                                                None, 
+                                                None, 
+                                                None, 
+                                                &column_data_set,
+                                                &search_count,
+                                                &distinct,
+                                                &column_id,
+                                                &has_column,
+                                            );
+                                            if result.is_err() {
+                                                let errors_ = result.unwrap_err();
+                                                errors.extend(errors_);
+                                            }
+                                            // let (column_data_set, search_count) = result.unwrap();
+                                            let tuple = result.unwrap();
+                                            column_data_set = tuple.0;
+                                            search_count = tuple.1;
+                                        } 
+                                    }
+                                }
+                            },
+                            Err(_) => {
+                                let mut errors: Vec<PlanetError> = Vec::new();
+                                errors.push(
+                                    PlanetError::new(500, Some(tr!(
+                                        "Could not fetch item from index"
+                                    )))
+                                );
+                            }
+                        }
+                    }    
+                });
+                handles.push(handle);
+            }
+            for handle in handles {
+                handle.join().unwrap();
             }
         }
-        return Ok(
-            (
-                column_data_set.clone(),
-                search_count.clone()
-            )
-        )
+        // return Ok(
+        //     (
+        //         column_data_set.clone(),
+        //         search_count.clone()
+        //     )
+        // )
+        return Err(errors)
     }
 
     fn do_search_item(
@@ -2578,74 +2619,122 @@ impl<'gb> SearchCount<'gb>{
         let needs_filter_links = self.query.needs_filter_links.clone();
         let mut db_folder_item = db_folder_item.clone();
 
-        let mut search_count: usize = 0;
-        let mut column_data_set: HashSet<String> = HashSet::new();
+        let search_count: usize = 0;
+        let column_data_set: HashSet<String> = HashSet::new();
 
+        let errors: Vec<PlanetError> = Vec::new();
         let partitions = db_folder_item.get_partitions();
         if partitions.is_ok() {
+            let mut handles= vec![];
             let partitions = partitions.unwrap();
-            // eprintln!("do_search :: partitions: {:?}", &partitions);
             let remote_folder_data_map: HashMap<String, HashMap<String, DbData>> = HashMap::new();
+            let column_config_map: Arc<Mutex<BTreeMap<String, ColumnConfig>>> = Arc::new(Mutex::new(column_config_map.clone()));
+            let links_folder_by_column_id: Arc<Mutex<Option<HashMap<String, String>>>> = Arc::new(Mutex::new(links_folder_by_column_id.clone()));
+            let remote_folder_map: Arc<Mutex<Option<HashMap<String, HashMap<u16, TreeFolderItem>>>>> = Arc::new(Mutex::new(remote_folder_map.clone()));
+            let remote_folder_obj_map: Arc<Mutex<Option<HashMap<String, DbData>>>> = Arc::new(Mutex::new(remote_folder_obj_map.clone()));
+            let db_folder_item: Arc<Mutex<TreeFolderItem>> = Arc::new(Mutex::new(db_folder_item.clone()));
+            let this: Arc<Mutex<SearchCount>> = Arc::new(Mutex::new(self.clone()));
+            let remote_folder_data_map: Arc<Mutex<HashMap<String, HashMap<String, DbData>>>> = Arc::new(Mutex::new(remote_folder_data_map.clone()));
+            let distinct: Arc<Mutex<bool>> = Arc::new(Mutex::new(distinct.clone()));
+            let column_id: Arc<Mutex<String>> = Arc::new(Mutex::new(column_id.clone()));
+            let has_column: Arc<Mutex<bool>> = Arc::new(Mutex::new(has_column.clone()));
+            let errors = Arc::new(Mutex::new(errors.clone()));
+            let column_data_set: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(column_data_set.clone()));
+            let search_count: Arc<Mutex<usize>> = Arc::new(Mutex::new(search_count.clone()));
             for partition in partitions {
-                let (db_tree, index_tree) = db_folder_item.open_partition(&partition).unwrap();
-                // eprintln!("do_search :: partition: {}", &partition);
-                // I may need botth db and index to execute formula
-                let iter = db_tree.iter();
-                // folder name => item id => DbData
-                for db_result in iter {
-                    if db_result.is_err() {
-                        let mut errors: Vec<PlanetError> = Vec::new();
-                        errors.push(
-                            PlanetError::new(
-                                500, 
-                                Some(tr!("Could not fetch item from database"))
-                            )
+                let column_config_map = Arc::clone(&column_config_map);
+                let links_folder_by_column_id = Arc::clone(&links_folder_by_column_id);
+                let remote_folder_map = Arc::clone(&remote_folder_map);
+                let remote_folder_obj_map = Arc::clone(&remote_folder_obj_map);
+                let this = Arc::clone(&this);
+                let db_folder_item = Arc::clone(&db_folder_item);
+                let remote_folder_data_map = Arc::clone(&remote_folder_data_map);
+                let errors = Arc::clone(&errors);
+                let distinct = Arc::clone(&distinct);
+                let has_column = Arc::clone(&has_column);
+                let column_id = Arc::clone(&column_id);
+                let column_data_set = Arc::clone(&column_data_set);
+                let search_count = Arc::clone(&search_count);
+                let handle = thread::spawn(move || {
+                    let column_config_map = column_config_map.lock().unwrap();
+                    let links_folder_by_column_id = links_folder_by_column_id.lock().unwrap();
+                    let remote_folder_map = remote_folder_map.lock().unwrap();
+                    let remote_folder_obj_map = remote_folder_obj_map.lock().unwrap();
+                    let this = this.lock().unwrap();
+                    let mut db_folder_item = db_folder_item.lock().unwrap();
+                    let remote_folder_data_map = remote_folder_data_map.lock().unwrap();
+                    let mut errors = errors.lock().unwrap();
+                    let distinct = distinct.lock().unwrap();
+                    let has_column = has_column.lock().unwrap();
+                    let column_id = column_id.lock().unwrap();
+                    let mut column_data_set = column_data_set.lock().unwrap();
+                    let mut search_count = search_count.lock().unwrap();
+                    let (db_tree, index_tree) = db_folder_item.open_partition(&partition).unwrap();
+                    // eprintln!("do_search :: partition: {}", &partition);
+                    // I may need botth db and index to execute formula
+                    let iter = db_tree.iter();
+                    // folder name => item id => DbData
+                    for db_result in iter {
+                        if db_result.is_err() {
+                            let mut errors: Vec<PlanetError> = Vec::new();
+                            errors.push(
+                                PlanetError::new(
+                                    500, 
+                                    Some(tr!("Could not fetch item from database"))
+                                )
+                            );
+                        }
+                        let item_tuple = db_result.unwrap();
+    
+                        let mut links_folder_by_column_id_wrap: Option<HashMap<String, String>> = None;
+                        let mut remote_folder_data_map_wrap: Option<HashMap<String, HashMap<String, DbData>>> = None;
+                        let mut remote_folder_map_wrap: Option<HashMap<String, HashMap<u16, TreeFolderItem>>> = None;
+                        let mut remote_folder_obj_map_wrap: Option<HashMap<String, DbData>> = None;
+                        if needs_filter_links {
+                            links_folder_by_column_id_wrap = links_folder_by_column_id.clone();
+                            remote_folder_data_map_wrap = Some(remote_folder_data_map.clone());
+                            remote_folder_map_wrap = remote_folder_map.clone();
+                            remote_folder_obj_map_wrap = remote_folder_obj_map.clone();
+                        }
+    
+                        let result = this.do_search_item(
+                            item_tuple, 
+                            index_tree.clone(), 
+                            &column_config_map, 
+                            links_folder_by_column_id_wrap, 
+                            remote_folder_data_map_wrap, 
+                            remote_folder_map_wrap, 
+                            remote_folder_obj_map_wrap, 
+                            &column_data_set,
+                            &search_count,
+                            &distinct,
+                            &column_id,
+                            &has_column,
                         );
-                        return Err(errors)
+                        if result.is_err() {
+                            let errors_ = result.clone().unwrap_err();
+                            errors.extend(errors_);
+                        }
+                        let tuple = result.unwrap();
+                        *column_data_set = tuple.0;
+                        *search_count = tuple.1;
                     }
-                    let item_tuple = db_result.unwrap();
-
-                    let mut links_folder_by_column_id_wrap: Option<HashMap<String, String>> = None;
-                    let mut remote_folder_data_map_wrap: Option<HashMap<String, HashMap<String, DbData>>> = None;
-                    let mut remote_folder_map_wrap: Option<HashMap<String, HashMap<u16, TreeFolderItem>>> = None;
-                    let mut remote_folder_obj_map_wrap: Option<HashMap<String, DbData>> = None;
-                    if needs_filter_links {
-                        links_folder_by_column_id_wrap = links_folder_by_column_id.clone();
-                        remote_folder_data_map_wrap = Some(remote_folder_data_map.clone());
-                        remote_folder_map_wrap = remote_folder_map.clone();
-                        remote_folder_obj_map_wrap = remote_folder_obj_map.clone();
-                    }
-
-                    let result = self.do_search_item(
-                        item_tuple, 
-                        index_tree.clone(), 
-                        &column_config_map, 
-                        links_folder_by_column_id_wrap, 
-                        remote_folder_data_map_wrap, 
-                        remote_folder_map_wrap, 
-                        remote_folder_obj_map_wrap, 
-                        &column_data_set,
-                        &search_count,
-                        &distinct,
-                        &column_id,
-                        &has_column,
-                    );
-                    if result.is_err() {
-                        let errors = result.unwrap_err();
-                        return Err(errors)
-                    }
-                    let tuple = result.unwrap();
-                    column_data_set = tuple.0;
-                    search_count = tuple.1;
-                }
+                });
+                handles.push(handle);
             }
-        }
-        return Ok(
-            (
-                column_data_set.clone(),
-                search_count.clone()
+            for handle in handles {
+                handle.join().unwrap();
+            }
+            let column_data_set = column_data_set.lock().unwrap().clone();
+            let search_count = search_count.lock().unwrap().clone();
+            return Ok(
+                (
+                    column_data_set.clone(),
+                    search_count.clone()
+                )
             )
-        )
+        }
+        return Err(errors)
     }
 
 }
@@ -6507,7 +6596,9 @@ impl<'gb> SelectFromFolderStatement {
     pub fn execute_count(
         &self,
         search_count: &SearchCount,
-        select_count: SelectCount
+        select_count: SelectCount,
+        planet_context: &PlanetContext,
+        context: &Context
     ) -> Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>> {
         let mut errors: Vec<PlanetError> = Vec::new();
         let select_count = select_count.clone();
@@ -6516,7 +6607,9 @@ impl<'gb> SelectFromFolderStatement {
         let search_count = search_count.clone();
         let results = search_count.do_search(
             distinct,
-            column
+            column,
+            context,
+            planet_context,
         );
         if results.is_err() {
             let errors = results.unwrap_err();
@@ -6721,7 +6814,6 @@ impl<'gb> Statement<'gb> for SelectFromFolderStatement {
             }
         } else {
             let search_count = SearchCount{
-                env: env,
                 space_database: space_database.clone(),
                 query: statement.clone(),
                 db_folder: Some(db_folder.clone()), 
@@ -6730,7 +6822,10 @@ impl<'gb> Statement<'gb> for SelectFromFolderStatement {
             };
             let result = self.execute_count(
                 &search_count,
-                select_count.unwrap()
+                select_count.unwrap(),
+                env.planet_context,
+                env.context,
+    
             );
             return result
         }
