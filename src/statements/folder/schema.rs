@@ -1419,7 +1419,7 @@ impl<'gb> Statement<'gb> for CreateFolderStatement {
         let statement = statement.unwrap();
         let home_dir = planet_context.home_path.clone();
         let account_id = context.account_id.clone().unwrap_or_default();
-        let space_id = context.space_id.clone();
+        let space_id = context.space_id;
         let site_id = context.site_id.clone();
 
         let result: Result<TreeFolder, PlanetError> = TreeFolder::defaults(
@@ -4381,7 +4381,6 @@ pub fn resolve_schema_statement(
     column_map: Option<BTreeMap<String, Vec<BTreeMap<String, String>>>>,
     mode: &StatementCallMode
 ) -> Option<Result<Vec<yaml_rust::Yaml>, Vec<PlanetError>>> {
-    let mode = mode.clone();
     let response_wrap = response_wrap.clone();
     if response_wrap.is_some() {
         let response = response_wrap.unwrap();

@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use regex::{Regex, Captures};
 use rust_decimal::prelude::ToPrimitive;
-use std::{collections::BTreeMap};
+use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use lazy_static::lazy_static;
 
@@ -171,7 +171,7 @@ impl CollectionStatsFunction for Stats {
             sequence = sequence.replace("\"", "");
             let sequence_str_list: Vec<&str> = sequence.split(",").collect();
             for mut item in sequence_str_list {
-                let has_dot = item.clone().find(".");
+                let has_dot = item.find(".");
                 item = item.trim();
                 let mut item_string: String = item.to_string();
                 if has_dot.is_none() {

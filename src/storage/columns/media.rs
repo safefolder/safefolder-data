@@ -9,7 +9,7 @@ use json;
 use reqwest::blocking::Client;
 use serde_yaml;
 
-use crate::planet::{PlanetError};
+use crate::planet::PlanetError;
 use crate::statements::folder::schema::*;
 use crate::storage::constants::*;
 use crate::storage::columns::*;
@@ -62,7 +62,7 @@ impl FileColumn {
         let mut file_ids: Vec<String> = Vec::new();
         for path in paths.clone() {
             let path_fields: Vec<&str> = path.split("/").collect();
-            let file_name = path_fields.last().unwrap().clone();
+            let file_name = path_fields.last().unwrap();
             // 1. Check path exists, raise error if does not exist
             let file = File::open(path.clone());
             if file.is_err() {

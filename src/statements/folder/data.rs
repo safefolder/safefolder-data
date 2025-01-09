@@ -2231,22 +2231,22 @@ impl<'gb> SearchCount{
     fn do_search_index_boost(
         &self,
         db_folder_item: &TreeFolderItem,
-        column_config_map: &BTreeMap<String, ColumnConfig>,
-        links_folder_by_column_id: Option<HashMap<String, String>>,
-        remote_folder_map: Option<HashMap<String, HashMap<u16, TreeFolderItem>>>,
-        remote_folder_obj_map: Option<HashMap<String, DbData>>,
+        _column_config_map: &BTreeMap<String, ColumnConfig>,
+        _links_folder_by_column_id: Option<HashMap<String, String>>,
+        _remote_folder_map: Option<HashMap<String, HashMap<u16, TreeFolderItem>>>,
+        _remote_folder_obj_map: Option<HashMap<String, DbData>>,
         boost_words: &HashSet<String>,
-        distinct: &bool,
-        column_id: &String,
-        has_column: &bool,
+        _distinct: &bool,
+        _column_id: &String,
+        _has_column: &bool,
     ) -> Result<(HashSet<String>, usize), Vec<PlanetError>> {
-        let shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
-        let needs_filter_links = self.query.needs_filter_links.clone();
-        let mut db_folder_item = db_folder_item.clone();
-        let boost_words = boost_words.clone();
+        let _shared_key: SharedKey = SharedKey::from_array(CHILD_PRIVATE_KEY_ARRAY);
+        let _needs_filter_links = self.query.needs_filter_links.clone();
+        let _db_folder_item = db_folder_item.clone();
+        let _boost_words = boost_words.clone();
 
-        let search_count: usize = 0;
-        let column_data_set: HashSet<String> = HashSet::new();
+        let _search_count: usize = 0;
+        let _column_data_set: HashSet<String> = HashSet::new();
         
         let errors: Vec<PlanetError> = Vec::new();
         /*let partitions = db_folder_item.get_partitions();

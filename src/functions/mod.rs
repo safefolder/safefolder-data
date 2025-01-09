@@ -327,7 +327,7 @@ impl Formula {
             let function_text = function_text.as_str();
             //eprintln!("Formula :: function_text: {}", function_text);
             //eprintln!("Formula :: function_placeholder: {}", function_placeholder);
-            let function_list_ = expr.captures(function_text.clone());
+            let function_list_ = expr.captures(function_text);
             if function_list_.is_none() {
                 //eprintln!("Formula :: have function list, compile function text");
                 let mut main_function = compile_function_text(
@@ -425,7 +425,7 @@ pub fn compile_assignment(
     eprintln!("compile_assignment :: formula: {}", &formula);
     let column_config_map = column_config_map.clone();
     let field_config_map_wrap = Some(column_config_map);
-    let formula = formula.clone();
+    let formula = formula;
     let formula_string = formula.to_string();
     let expr = &RE_FORMULA_ASSIGN;
     let capture_assignment = expr.captures(&formula);
@@ -850,7 +850,7 @@ pub fn compile_function_text(
             // In case I have assign into a formula, I need to parse it.
             let expr = &RE_FORMULA_FUNCTIONS;
             let have_assign_functions = expr.is_match(attr);
-            let mut assign_attr = attr.clone().to_string();
+            let mut assign_attr = attr.to_string();
             //eprintln!("compile_function_text :: have_assign_functions: {}", &have_assign_functions);
             // let mut formula_map: BTreeMap<String, String> = BTreeMap::new();
             if have_assign_functions {

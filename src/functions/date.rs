@@ -1,6 +1,6 @@
-use std::{str::FromStr};
+use std::str::FromStr;
 use regex::{Regex, Captures};
-use std::{collections::BTreeMap};
+use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use lazy_static::lazy_static;
 use chrono::{DateTime, Datelike, FixedOffset, NaiveDate, Utc, Duration, Timelike};
@@ -757,7 +757,7 @@ impl DateFunction for Today {
         return Ok(function)
     }
     fn execute(&self) -> Result<String, PlanetError> {
-        let today_date_obj = Utc::today();
+        let today_date_obj = Utc::now();
         let month_short = &today_date_obj.format("%b").to_string();
         let day = &today_date_obj.day();
         let year = &today_date_obj.year();
@@ -1331,10 +1331,10 @@ pub fn get_standard_date_short_month(date_str: &String) -> String {
     map.insert("NOV", "Nov");
     map.insert("DEC", "Dec");
     for key in map.keys() {
-        let key = key.clone();
+        let key = key;
         let has_item = date_str.find(key);
         if has_item.is_some() {
-            let replaced_item = map.get(key).unwrap().clone();
+            let replaced_item = map.get(key).unwrap();
             date_str = date_str.replace(key, replaced_item);
             break
         }
@@ -1452,7 +1452,7 @@ fn get_rust_date_format(date_obj: DateTime<FixedOffset>, mut format: String) -> 
     fmt_map.insert("x", "%s");
     // additional processing: x, ww, Mo, Do
     for fmt_key in fmt_map.keys() {
-        let fmt_key = fmt_key.clone();
+        let fmt_key = fmt_key.trim();
         let mut find_key = String::from("{");
         find_key.push_str(fmt_key);
         find_key.push_str("}");

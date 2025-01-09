@@ -7,12 +7,12 @@ use serde::{Deserialize, Serialize};
 use tr::tr;
 use asciifolding::fold_to_ascii;
 use lazy_static::lazy_static;
-use regex::{Regex};
+use regex::Regex;
 use lingua::{Language, LanguageDetector, LanguageDetectorBuilder};
 use rust_stemmers::{Algorithm, Stemmer};
 
 use crate::planet::constants::ID;
-use crate::planet::{PlanetError};
+use crate::planet::PlanetError;
 use crate::storage::folder::{DbData, get_value_list};
 use crate::statements::folder::schema::*;
 use crate::storage::constants::*;
@@ -226,7 +226,7 @@ impl SelectColumn {
             let mut options_name_map: BTreeMap<String, String> = BTreeMap::new();
             let column_config = &column_obj.config;
             let column_name = column_config.name.clone().unwrap();
-            for data in folder.data.clone() {
+            for data in folder.data.iter() {
                 // key for ordering: field_ids
                 for key in data.keys() {
                     let has_select_sep = key.find("__");
@@ -723,7 +723,7 @@ impl TextColumn {
                                     value_ids.push(values.as_str());
                                 }
                                 let mut value: String = String::from("");
-                                for data in folder.data.clone() {
+                                for data in folder.data.iter() {
                                     for (key, collection_value) in data {
                                         let has_select_sep = &key.find("__").clone();
                                         if has_select_sep.is_some() {
