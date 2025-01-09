@@ -86,9 +86,6 @@ impl StatementConfig {
     }
 }
 
-#[derive(Debug, PartialEq)]
-struct MyBullshitError;
-
 pub enum StatementResponseFormat {
     YAML,
     JSON,
