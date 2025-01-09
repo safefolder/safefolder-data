@@ -14,7 +14,7 @@ use regex::Regex;
 use lazy_static::lazy_static;
 use colored::Colorize;
 use std::sync::{Arc, Mutex};
-use std::{thread};
+use std::thread;
 
 use serde_encrypt::{
     shared_key::SharedKey, traits::SerdeEncryptSharedKey,
@@ -31,7 +31,7 @@ use crate::statements::constants::*;
 use crate::planet::constants::{ID, NAME, VALUE, FALSE, COLUMNS};
 use crate::storage::folder::*;
 use crate::storage::{ConfigStorageColumn, generate_id};
-use crate::storage::space::{SpaceDatabase};
+use crate::storage::space::SpaceDatabase;
 use crate::planet::{
     PlanetContext, 
     PlanetError,
@@ -46,7 +46,7 @@ use crate::storage::columns::reference::*;
 use crate::storage::columns::structure::*;
 use crate::storage::columns::processing::*;
 use crate::storage::columns::media::*;
-use crate::statements::constants::{COLUMN_ID};
+use crate::statements::constants::COLUMN_ID;
 use crate::functions::{RE_FORMULA_QUERY, execute_formula, RE_FORMULA_ASSIGN};
 
 lazy_static! {
@@ -2249,9 +2249,10 @@ impl<'gb> SearchCount{
         let column_data_set: HashSet<String> = HashSet::new();
         
         let errors: Vec<PlanetError> = Vec::new();
-        let partitions = db_folder_item.get_partitions();
+        /*let partitions = db_folder_item.get_partitions();
         if partitions.is_ok() {
             let partitions = partitions.unwrap();
+            let mut handles= vec![];
             let remote_folder_data_map: HashMap<String, HashMap<String, DbData>> = HashMap::new();
             let column_config_map: Arc<Mutex<BTreeMap<String, ColumnConfig>>> = Arc::new(Mutex::new(column_config_map.clone()));
             let links_folder_by_column_id: Arc<Mutex<Option<HashMap<String, String>>>> = Arc::new(Mutex::new(links_folder_by_column_id.clone()));
@@ -2333,11 +2334,12 @@ impl<'gb> SearchCount{
                                     &item_id
                                 );
                                 if index_result.is_err() {
-                                    let error = index_result.unwrap_err();
+                                    let error = index_result.clone().unwrap_err();
                                     let mut errors: Vec<PlanetError> = Vec::new();
                                     errors.push(error);
                                 }
                                 let index_item = index_result.unwrap();
+                                // let index_item: DbData = DbData.clone();
                                 let index_data = index_item.data.clone().unwrap();
                                 for word in &boost_words {
                                     let word = word.to_lowercase();
@@ -2369,9 +2371,9 @@ impl<'gb> SearchCount{
                                                 errors.extend(errors_);
                                             }
                                             // let (column_data_set, search_count) = result.unwrap();
-                                            let tuple = result.unwrap();
-                                            column_data_set = tuple.0;
-                                            search_count = tuple.1;
+                                            // let tuple = result.unwrap();
+                                            // column_data_set = tuple.0;
+                                            // search_count = tuple.1;
                                         } else {
                                             let result = this.do_search_item(
                                                 item_tuple.clone(), 
@@ -2392,9 +2394,9 @@ impl<'gb> SearchCount{
                                                 errors.extend(errors_);
                                             }
                                             // let (column_data_set, search_count) = result.unwrap();
-                                            let tuple = result.unwrap();
-                                            column_data_set = tuple.0;
-                                            search_count = tuple.1;
+                                            // let tuple = result.unwrap();
+                                            // column_data_set = tuple.0;
+                                            // search_count = tuple.1;
                                         } 
                                     }
                                 }
@@ -2415,7 +2417,7 @@ impl<'gb> SearchCount{
             for handle in handles {
                 handle.join().unwrap();
             }
-        }
+        }*/
         // return Ok(
         //     (
         //         column_data_set.clone(),
@@ -2509,7 +2511,7 @@ impl<'gb> SearchCount{
                             let errors = result.unwrap_err();
                             return Err(errors)
                         }
-                        data_map = result.unwrap();    
+                        data_map = result.unwrap();
                     }
 
                     // This will be used by SEARCH function, implemented when SEARCH is done

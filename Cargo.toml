@@ -1,60 +1,59 @@
 [package]
-name = "achiever"
+name = "safefolder-data"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 yaml-rust = "0.4"
-# yaml validator client warning
-yaml-validator = {version = "0.1.0"}
-sled = {version = "0.34.7", features = ["compression", "zstd"]}
-yaml-validator-cli = {version="0.1.0"}
-tantivy = {version="0.15.2"}
-stop-words = {version="0.4.0"}
+yaml-validator = {version = "0.2.0"}
+# sled = {version = "0.34.7", features = ["compression"], links = "zstd-sys=1.6.1"}
+sled = {version = "0.34.7"}
+yaml-validator-cli = {version="0.1.1"}
+tantivy = {version="0.22.0"}
+stop-words = {version="0.8.1"}
 rust-stemmers = {version="1.2.0"}
-dirs = {version="3.0.2"}
-uuid = {version="0.8.2"}
+dirs = {version="5.0.1"}
+uuid = {version="1.11.0"}
 argparse = {version="0.2.2"}
-validator = { version = "0.14", features=["derive", "phone", "unic", "card"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_yaml = {version="0.8"}
-i18n-embed = {version="0.10"}
-# warning
-xtr = {version="0.1.6"}
-tr = {version="0.1.6"}
-xid = {version="1.0.0"}
-regex = {version="1.5.4"}
-colored = {version="2.0.0"}
+validator = { version = "0.19.0", features=["derive"] }
+serde = { version = "1.0.217", features = ["derive"] }
+serde_yaml = {version="0.9.34"}
+i18n-embed = {version="0.15.3"}
+xtr = {version="0.1.10"}
+tr = {version="0.1.10"}
+xid = {version="1.1.1"}
+regex = {version="1.11.1"}
+colored = {version="3.0.0"}
 json = {version="0.12.4"}
 bincode = {version="1.3.3"}
-serde_json = {version = "1.0.64"}
-lazy_static = {version="1.4.0"}
-bip32 = {version="0.2.1"}
-rand_core = {version="0.6.3"}
-serde-encrypt = {version="0.6.0"}
-libp2p = {version="0.39.1"}
-libp2p-bitswap = {version="0.19.0"}
-futures = {version="0.3.16"}
-async-std = {version="1.9.0"}
-libipld = {version="0.12.0"}
-ipfs-api = {version="0.11.0"}
-tokio = {version="1.9.0", features = ["full"]}
-slug = {version="0.1.4"}
-xlformula_engine = {version="0.1.12"}
-chrono = {version="0.4.19"}
-ordinal = {version="0.2.3"}
+serde_json = {version = "1.0.135"}
+lazy_static = {version="1.5.0"}
+bip32 = {version="0.5.2"}
+rand_core = {version="0.6.4"}
+serde-encrypt = {version="0.7.0"}
+libp2p = {version="0.54.1"}
+libp2p-bitswap = {version="0.25.0"}
+futures = {version="0.3.31"}
+async-std = {version="1.13.0"}
+libipld = {version="0.16.0"}
+ipfs-api = {version="0.17.0"}
+tokio = {version="1.43.0", features = ["full"]}
+slug = {version="0.1.6"}
+xlformula_engine = {version="0.1.18"}
+chrono = {version="0.4.39"}
+ordinal = {version="0.3.2"}
 libmath = {version="0.2.1"}
-hmac = {version="0.11.0"}
-sha2 = {version="0.9.8"}
-rust_decimal = {version="1.18"}
-rust_decimal_macros = {version="1.18"}
-lingua = {version="1.3.2"}
+hmac = {version="0.12.1"}
+sha2 = {version="0.10.8"}
+rust_decimal = {version="1.36.0"}
+rust_decimal_macros = {version="1.36.0"}
+lingua = {version="1.6.2"}
 asciifolding = {version="0.1.0"}
-reqwest = {version="0.11.9", features = ["blocking", "json"]}
-mime_guess = {version="2.0.3"}
-chacha20poly1305 = { version = "0.9.0", features = ["stream"] }
-anyhow = {version="1.0"}
-rand = {version="0.8"}
-zstd = {version="0.9"}
+reqwest = {version="0.12.12", features = ["blocking", "json"]}
+mime_guess = {version="2.0.5"}
+chacha20poly1305 = { version = "0.10.1", features = ["stream"] }
+anyhow = {version="1.0.95"}
+rand = {version="0.8.5"}
+zstd = {version="0.13.2"}

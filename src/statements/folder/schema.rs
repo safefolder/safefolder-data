@@ -13,9 +13,7 @@ use tr::tr;
 use colored::*;
 use regex::{Regex, Captures};
 
-use crate::statements::folder::config::{
-    create_minimum_column_map,
-};
+use crate::statements::folder::config::create_minimum_column_map;
 use crate::statements::*;
 use crate::statements::{Statement, StatementCallMode};
 use crate::storage::folder::{
@@ -28,7 +26,7 @@ use crate::storage::folder::{
     TreeFolderItem, 
     FolderItem,
 };
-use crate::storage::space::{SpaceDatabase};
+use crate::storage::space::SpaceDatabase;
 use crate::planet::{
     PlanetContext, 
     PlanetError,
@@ -168,13 +166,13 @@ pub const ALLOWED_COLUMN_TYPES: [&str; 29] = [
 
 #[derive(Debug, Deserialize, Serialize, Validate, Clone)]
 pub struct LanguageConfig {
-    #[validate(custom="validate_default_language")]
+    #[validate(custom(function="validate_default_language"))]
     pub default: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, Validate, Clone)]
 pub struct TextSearchConfig {
-    #[validate(custom="validate_column_relevance")]
+    #[validate(custom(function="validate_column_relevance"))]
     pub column_relevance: BTreeMap<String, u8>,
 }
 

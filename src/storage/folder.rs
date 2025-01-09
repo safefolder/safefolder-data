@@ -5,7 +5,7 @@ extern crate rust_stemmers;
 use std::fs;
 use std::io::{Read, Write};
 use std::str::FromStr;
-use std::{thread};
+use std::thread;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use std::collections::{BTreeMap, HashMap};
@@ -21,15 +21,15 @@ use serde_encrypt::{
 use slug::slugify;
 use sled::{Tree, IVec};
 use std::fs::{File, remove_file, create_dir_all};
-use chacha20poly1305::{ChaCha20Poly1305}; // Or `XChaCha20Poly1305`
-use chacha20poly1305::aead::{NewAead, stream};
-use anyhow::{anyhow};
+use chacha20poly1305::{ChaCha20Poly1305, KeyInit}; // Or `XChaCha20Poly1305`
+use chacha20poly1305::aead::stream;
+use anyhow::anyhow;
 
 use crate::planet::constants::*;
 use crate::statements::folder::schema::ColumnConfig;
-use crate::storage::{generate_id};
-use crate::planet::{PlanetError};
-use crate::statements::folder::config::{DbFolderConfig};
+use crate::storage::generate_id;
+use crate::planet::PlanetError;
+use crate::statements::folder::config::DbFolderConfig;
 use crate::storage::constants::*;
 use crate::storage::columns::*;
 use crate::storage::columns::text::{

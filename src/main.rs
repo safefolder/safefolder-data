@@ -4,7 +4,7 @@ extern crate serde_yaml;
 extern crate colored;
 extern crate lazy_static;
 extern crate tokio;
-use achiever::storage::constants::{PRIVATE};
+use safefolder_data::storage::constants::PRIVATE;
 use colored::Colorize;
 use lingua::{LanguageDetector, LanguageDetectorBuilder};
 

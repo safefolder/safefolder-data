@@ -1,6 +1,6 @@
 extern crate xid;
 
-use std::collections::{BTreeMap};
+use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use serde_yaml;
 use validator::{Validate, ValidationErrors};
@@ -8,7 +8,7 @@ use lazy_static::lazy_static;
 use regex::Regex;
 
 use crate::planet::validation::{CommandImportConfig, PlanetValidationError};
-use crate::planet::{PlanetContext};
+use crate::planet::PlanetContext;
 
 use crate::storage::constants::*;
 use crate::statements::folder::schema::*;
@@ -52,7 +52,7 @@ pub struct DataId {
 
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
 pub struct GetFromFolderConfig {
-    #[validate(required, regex="RE_COMMAND_GET_FROM_FOLDER")]
+    #[validate(required, regex(path=*RE_COMMAND_GET_FROM_FOLDER))]
     pub command: Option<String>,
     #[validate(required)]
     pub data: Option<DataId>,
@@ -112,7 +112,7 @@ impl GetFromFolderConfig {
 
 #[derive(Debug, Serialize, Deserialize, Validate, Clone)]
 pub struct SelectFromFolderConfig {
-    #[validate(required, regex="RE_COMMAND_SELECT_FROM_FOLDER")]
+    #[validate(required, regex(path=*RE_COMMAND_SELECT_FROM_FOLDER))]
     pub command: Option<String>,
     #[validate(required)]
     pub r#where: Option<String>,
