@@ -34,7 +34,7 @@ fn main() {
 
     { // this block limits scope of borrows by ap.refer() method
         let mut ap = ArgumentParser::new();
-        ap.set_description("Achiever Client Tool");
+        ap.set_description("Safefolder Data Client Tool");
         ap.refer(&mut verbose).add_option(
             &["-v", "--verbose"], 
             StoreTrue,
@@ -44,7 +44,7 @@ fn main() {
             "Account Id");
         ap.refer(&mut site_id).add_option(
             &["-s", "--siteid"], Store,
-            "Site Id");    
+            "Site Id");
         ap.refer(&mut space_id).add_option(
             &["-s", "--spaceid"], Store,
             "Space Id");
@@ -59,7 +59,7 @@ fn main() {
         ap.refer(&mut scope).add_argument(
             "scope", 
             Store, 
-            "Scope: statement, action, journey"
+            "Scope: statement"
         );
         ap.parse_args_or_exit();
     }
@@ -68,11 +68,11 @@ fn main() {
     let planet_context = PlanetContext::import(&planet_context_source);
     let context_source = ContextSource::defaults(space_id, site_id);
     let context = Context::defaults(&context_source);
-    eprintln!("main.rs :: context: {:#?}", &context);
+    //eprintln!("main.rs :: context: {:#?}", &context);
 
     if op.to_lowercase() == "run" && &scope.to_lowercase() == "statement" {
-        eprint!("main.rs :: run statement...");
-        eprint!("main.rs :: run statement :: statement: {}", &statement);
+        eprintln!("main.rs :: run statement...");
+        eprintln!("main.rs :: run statement :: statement: {}", &statement);
         let env = Environment{
             context: &context,
             planet_context: &planet_context

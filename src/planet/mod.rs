@@ -7,10 +7,10 @@ extern crate dirs;
 extern crate xid;
 
 use serde::{Deserialize, Serialize};
-use validator::{Validate};
+use validator::Validate;
 
 use tr::tr;
-use std::collections::{HashMap};
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::io;
@@ -49,9 +49,9 @@ impl PlanetContextSource {
         let mut planet_context_source: PlanetContextSource = serde_yaml::from_str(&planet_context_str).unwrap();
         let sys_home_dir = dirs::home_dir().unwrap();
         let sys_home_dir_str = sys_home_dir.as_os_str().to_str().unwrap();
-        let home_path = format!("{home_dir}/.achiever-planet", home_dir=sys_home_dir_str).clone();
+        let home_path = format!("{home_dir}/.safefolder", home_dir=sys_home_dir_str).clone();
         planet_context_source.home_path = Some(home_path);
-        eprintln!("PlanetContextSource.import_context :: planet_context_source: {:#?}", &planet_context_source);
+        // eprintln!("PlanetContextSource.import_context :: planet_context_source: {:#?}", &planet_context_source);
         return Ok(planet_context_source)
     }
 }

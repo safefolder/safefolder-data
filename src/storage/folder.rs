@@ -798,7 +798,6 @@ impl FolderSchema for TreeFolder {
         }
         let path =  format!("folders.db");
         let site_id = site_id.clone().unwrap_or_default();
-        eprintln!("DbFolder.defaults :: path: {}", &path);
         let result = database.open_tree(path);
         match result {
             Ok(_) => {

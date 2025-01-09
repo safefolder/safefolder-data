@@ -3,7 +3,7 @@ extern crate sled;
 use std::collections::HashMap;
 use tr::tr;
 
-use crate::planet::{PlanetError};
+use crate::planet::PlanetError;
 use crate::storage::constants::*;
 
 #[derive(Debug, Clone)]
@@ -42,8 +42,8 @@ impl SpaceDatabase {
                 } else {
                     path = format!("{home}/{file}", file=db_name, home=&home_dir);
                 }
+                // .use_compression(true)
                 let config: sled::Config = sled::Config::default()
-                .use_compression(true)
                 .path(path);
                 let result= config.open();
                 if result.is_ok() {
