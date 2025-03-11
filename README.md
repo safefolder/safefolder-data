@@ -133,16 +133,17 @@ Integrated into the formula field. Formula fields allow you to use functions. Ma
 
 Statements follow a SQL-like syntax. We support these:
 
-1.	INSERT INTO FOLDER
-2.	SELECT
-3.	SELECT COUNT(*)
-4.	GET
-5.	SELECT GROUP BY
-6.	DESCRIBE
-7.	DROP FOLDER
-8.	ADD COLUMN
-9.	MODIFY COLUMN
-10.	LIST FOLDERS
+1. CREATE FOLDER
+2. INSERT INTO FOLDER
+3. SELECT
+4. SELECT COUNT(*)
+5. GET
+6. SELECT GROUP BY
+7. DESCRIBE
+8. DROP FOLDER
+9. ADD COLUMN
+10. MODIFY COLUMN
+11. LIST FOLDERS
 
 # Examples
 
