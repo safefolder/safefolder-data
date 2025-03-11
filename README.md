@@ -16,7 +16,7 @@ You can also check our site at:
 
 https://safefolder.app
 
-Safefolder has a digital property backed by an NFT, which gives access to unlimited usage in the future, a 3x1 reward for the current stage, Bootstrapping. We call these “Spots.” A spot will allow you to use Safefolder’s repositories in your cloud.
+Safefolder has a digital property backed by an NFT, which gives access to unlimited usage in the future, a 3x1 reward for the current stage, Bootstrapping. We call these “Spots.” A spot will allow you to use Safefolder’s repositories in your cloud. And gives you access to a 70% shared revenue affiliate network.
 
 # Status
 
