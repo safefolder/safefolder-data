@@ -6,11 +6,11 @@ This repository contains the under-construction data layer for the Safefolder pl
 
 You can watch this YouTube explainer video:
 
-[![Explainer Video](https://img.youtube.com/vi/IRfGsF6DrkU/0.jpg)](https://www.youtube.com/watch?v=IRfGsF6DrkU)
+<a href="https://www.youtube.com/watch?v=IRfGsF6DrkU" target="_blank"><img src="https://img.youtube.com/vi/IRfGsF6DrkU/0.jpg" alt="Explainer Video"></a>
 
 The technology preview video with the user interface and experience:
 
-[![Tech Preview Video](https://img.youtube.com/vi/uK1ARuXs_ME/0.jpg)](https://www.youtube.com/watch?v=uK1ARuXs_ME)
+<a href="https://www.youtube.com/watch?v=uK1ARuXs_ME" target="_blank"><img src="https://img.youtube.com/vi/uK1ARuXs_ME/0.jpg" alt="Tech Preview Video"></a>
 
 You can also check our site at:
 
