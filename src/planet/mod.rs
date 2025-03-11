@@ -11,8 +11,8 @@ use validator::Validate;
 
 use tr::tr;
 use std::collections::HashMap;
-use std::env;
-use std::fs;
+// use std::env;
+// use std::fs;
 use std::io;
 
 use crate::storage::constants::PRIVATE;
@@ -37,7 +37,7 @@ pub struct PlanetContextSource {
 }
 impl PlanetContextSource {
     pub fn import_context() -> Result<PlanetContextSource, io::Error> {
-        let app_path = env::current_dir();
+        /*let app_path = env::current_dir();
         if app_path.is_err() {
             return Err(app_path.unwrap_err())
         }
@@ -45,14 +45,22 @@ impl PlanetContextSource {
         let app_path_str = app_path_str.to_str().unwrap();
         let path_planet_context: &str = &*format!("{}/planet_context.yaml", app_path_str);
         let planet_context_str = fs::read_to_string(&path_planet_context)
-            .expect("Something went wrong reading the YAML file");
+            .expect("Something went wrong reading the Planet Context YAML file");
         let mut planet_context_source: PlanetContextSource = serde_yaml::from_str(&planet_context_str).unwrap();
         let sys_home_dir = dirs::home_dir().unwrap();
         let sys_home_dir_str = sys_home_dir.as_os_str().to_str().unwrap();
         let home_path = format!("{home_dir}/.safefolder", home_dir=sys_home_dir_str).clone();
-        planet_context_source.home_path = Some(home_path);
+        planet_context_source.home_path = Some(home_path);*/
         // eprintln!("PlanetContextSource.import_context :: planet_context_source: {:#?}", &planet_context_source);
-        return Ok(planet_context_source)
+        let statements: Vec<StatementRegistryItem> = Vec::new();
+        let ctx_source: PlanetContextSource = PlanetContextSource{
+            mission: "Some mission".to_string(),
+            site_id: "c9p5rma79h979776ca6g".to_string(),
+            space_id: "".to_string(),
+            home_path: Some("base".to_string()),
+            statements: statements
+        };
+        return Ok(ctx_source)
     }
 }
 

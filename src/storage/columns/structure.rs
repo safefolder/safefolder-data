@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
 
-use crate::planet::{PlanetError};
+use crate::planet::PlanetError;
 use crate::statements::folder::schema::*;
 use crate::storage::constants::*;
 use crate::storage::columns::*;
